@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** Task 1 done · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Tasks 1 and 2 done · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -161,7 +161,7 @@ the chooser when the pinned app fails, never throw. Extract that half before add
 Modify `MusicIntentResolver.kt`, `VideoIntentResolver.kt`,
 Test `core/core-data/src/test/kotlin/com/psplauncher/core/data/media/MediaOpenIntentTest.kt`
 
-- [ ] Write the test first. It must pin the two behaviours that are easy to lose in a refactor:
+- [x] Write the test first. It must pin the two behaviours that are easy to lose in a refactor:
       a pinned package is set on the intent, and a blank package is NOT (the sentinel case that
       made `MusicIntentResolver` leave `builtin` unpinned).
 
@@ -197,18 +197,22 @@ class MediaOpenIntentTest {
 }
 ```
 
-- [ ] Run it, confirm RED.
-- [ ] Implement `MediaOpenIntent` with `build(uri, mime, packageName): Intent` and
+- [x] Run it, confirm RED.
+- [x] Implement `MediaOpenIntent` with `build(uri, mime, packageName): Intent` and
       `launch(context, intent, chooserTitle): String?` returning null on success or a
       user-readable message, retrying once through the chooser when a pinned package fails.
       Lift the bodies from `VideoIntentResolver.buildViewIntent` / `launch` verbatim; they are
       already the more complete of the two.
-- [ ] Rewrite `MusicIntentResolver` and `VideoIntentResolver` to delegate. Keep both classes and
+- [x] Rewrite `MusicIntentResolver` and `VideoIntentResolver` to delegate. Keep both classes and
       their public signatures: they own the per-type MIME default and the error copy, which is the
       part that is genuinely different.
-- [ ] Run the existing music and video tests, confirm still GREEN. **This is the real check on
+- [x] Run the existing music and video tests, confirm still GREEN. **This is the real check on
       the refactor, not the new test.**
-- [ ] `/cs-verify`, then commit.
+- [x] `/cs-verify`, then commit.
+
+**Done 2026-09-18.** One behaviour was unified rather than preserved: a pinned player that
+failed sent Video to the system chooser and Music to a second bare attempt, which let Android
+silently pick a different app. Neither was pinned by a test. Music now does what Video did.
 
 **Verify:** `./gradlew :core:core-data:testDebugUnitTest --tests '*MediaOpenIntent*' --tests '*MusicIntent*' --tests '*VideoIntent*'`
 
