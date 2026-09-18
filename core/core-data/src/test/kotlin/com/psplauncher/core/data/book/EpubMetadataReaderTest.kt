@@ -5,9 +5,13 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 /**
@@ -17,11 +21,19 @@ import kotlin.test.assertNull
  * only one convention reports "no series" for half a library and looks like a scan bug rather than
  * a parser gap, so both are pinned here.
  *
+ * This runs under Robolectric because the parser is `android.util.Xml`, and that is deliberate.
+ * The first version parsed with `DocumentBuilderFactory` so these tests could stay on a plain JVM,
+ * and every one of them passed while the parser returned null for all 80 books on the device:
+ * Android's DOM factory refuses the `disallow-doctype-decl` feature that the host's Xerces accepts.
+ * A test that cannot run the code the device runs is not testing the parser.
+ *
  * The archives below are built as real ZIPs rather than fixture files, so the test exercises the
  * same [com.psplauncher.core.archive.BoundedZipReader] path the scanner uses, including entry
  * ordering. The entry order matters: the reader makes one forward pass per entry it wants, and a
  * package document sitting BEFORE container.xml is the case a single-pass reader gets wrong.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(manifest = Config.NONE)
 class EpubMetadataReaderTest {
 
     // ── Archive construction ──────────────────────────────────────────────────
@@ -246,9 +258,12 @@ class EpubMetadataReaderTest {
     }
 
     @Test
-    fun `an external entity is not expanded`() {
-        // An EPUB comes off the user's disk but is still outside input. Were doctype declarations
-        // allowed, this title would resolve to the contents of /etc/passwd.
+    fun `an external entity is never resolved into the title`() {
+        // An EPUB comes off the user's disk but is still outside input. The claim asserted here is
+        // the one that matters and not how a given parser meets it: whatever comes back, it must
+        // not be the contents of a file on disk. The pull parser resolves no external entity, so
+        // this either fails the parse or yields the reference untouched; both are acceptable and
+        // an assertion pinned to only one of them would break on a parser swap for no reason.
         val hostile = """
             <?xml version="1.0"?>
             <!DOCTYPE package [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
@@ -260,7 +275,8 @@ class EpubMetadataReaderTest {
             "META-INF/container.xml" to container("content.opf"),
             "content.opf" to hostile,
         )
-        // The parse is refused outright, so nothing is returned and no file was read.
-        assertNull(EpubMetadataReader.read(book)?.title)
+        val title = EpubMetadataReader.read(book)?.title.orEmpty()
+        assertFalse(title.contains("root:"), "the title must never hold the contents of a file")
+        assertFalse(title.contains("/bin/"), "the title must never hold the contents of a file")
     }
 }
