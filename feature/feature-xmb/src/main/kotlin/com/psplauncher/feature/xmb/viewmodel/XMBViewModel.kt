@@ -1088,6 +1088,52 @@ fun XMBUiState.activeSortModes(): List<XmbSortMode>? {
 }
 
 /**
+ * Rebuilds the crossbar from the canonical built-in definitions merged with each row's stored
+ * fields. [categories] is the *visible* set, so a built-in the user hid is simply absent and
+ * dropped here, which is what makes "Show On Bar" work. Settings is the one exception and is always
+ * kept, since it is the only route back into category management.
+ *
+ * **Name and position come from the stored row, not the constant.** They did not until 2026-09-18,
+ * and the result was a contradiction with a comment on each side of it: `CategoryRepositoryImpl`
+ * says built-ins are ones "the user may hide/reorder but never delete" and its `move()` writes the
+ * swapped positions, while this function rebuilt every built-in from [XMBViewModel.FALLBACK_CATEGORIES]
+ * and then sorted by the constant's position. Reordering or renaming a built-in wrote to the
+ * database and changed nothing on the bar. Category Manager offers both edits, so the bar honours
+ * both; the id and the icon stay canonical because neither is editable by this route.
+ *
+ * Top-level and pure so the merge is unit-testable without a ViewModel, which is what was missing
+ * when the bar and the repository drifted apart.
+ */
+internal fun canonicalXmbCategories(
+    categories: List<Category>,
+    fallbacks: List<Category>,
+): List<Category> {
+    val byId = categories.associateBy { it.id }
+    val builtInIds = fallbacks.map { it.id }.toSet()
+
+    val builtIns = fallbacks.mapNotNull { fallback ->
+        val stored = byId[fallback.id]
+        // Drop hidden built-ins (absent from the visible set); never drop Settings.
+        if (stored == null && fallback.id != BuiltInCategory.SETTINGS) return@mapNotNull null
+        fallback.copy(
+            name             = stored?.name?.takeIf { it.isNotBlank() } ?: fallback.name,
+            position         = stored?.position ?: fallback.position,
+            accentColor      = stored?.accentColor,
+            customIconUri    = stored?.customIconUri,
+            filterRules      = stored?.filterRules,
+            // Preserve the system-defined gaming flag from the DB (reconciled each launch);
+            // without this the rebuilt Main Game category loses isGamingCategory, which hides
+            // "Move to Category" for collections and suppresses live refresh.
+            isGamingCategory = stored?.isGamingCategory ?: fallback.isGamingCategory,
+        )
+    }
+
+    val customCategories = categories.filter { it.id !in builtInIds }
+
+    return (builtIns + customCategories).sortedBy { it.position }
+}
+
+/**
  * The sort mode [cycle] is currently on, and the state with it changed.
  *
  * These two exist as a pair because the alternative was three `when` blocks keyed on list identity
@@ -8344,34 +8390,8 @@ class XMBViewModel @Inject constructor(
         ) + SettingsSection.entries.map { XMBItem(id = it.id, title = it.title, subtitle = it.subtitle) }
     }
 
-    // Rebuilds the bar from the canonical built-in definitions (name/icon/position/order) merged with
-    // per-row DB fields. [categories] is the *visible* set, so a built-in the user hid is simply
-    // absent from [byId] and dropped here — that's what makes "Show On Bar" work for Main categories.
-    // Settings is the one exception: it's always kept, since it's the only route back into category
-    // management and hiding it would soft-lock the user out.
-    private fun canonicalXmbCategories(categories: List<Category>): List<Category> {
-        val byId = categories.associateBy { it.id }
-        val builtInIds = FALLBACK_CATEGORIES.map { it.id }.toSet()
-
-        val builtIns = FALLBACK_CATEGORIES.mapNotNull { fallback ->
-            val stored = byId[fallback.id]
-            // Drop hidden built-ins (absent from the visible set); never drop Settings.
-            if (stored == null && fallback.id != BuiltInCategory.SETTINGS) return@mapNotNull null
-            fallback.copy(
-                accentColor      = stored?.accentColor,
-                customIconUri    = stored?.customIconUri,
-                filterRules      = stored?.filterRules,
-                // Preserve the system-defined gaming flag from the DB (reconciled each launch);
-                // without this the rebuilt Main Game category loses isGamingCategory, which hides
-                // "Move to Category" for collections and suppresses live refresh.
-                isGamingCategory = stored?.isGamingCategory ?: fallback.isGamingCategory,
-            )
-        }
-
-        val customCategories = categories.filter { it.id !in builtInIds }
-
-        return (builtIns + customCategories).sortedBy { it.position }
-    }
+    private fun canonicalXmbCategories(categories: List<Category>): List<Category> =
+        canonicalXmbCategories(categories, FALLBACK_CATEGORIES)
 
     private fun defaultXmbCategoryIndex(categories: List<Category>): Int =
         categories.indexOfFirst { it.id == BuiltInCategory.GAMES }
