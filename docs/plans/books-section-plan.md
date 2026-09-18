@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** Tasks 1 to 5 done, the data half is complete · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Tasks 1 to 6 done, usable from Settings · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -321,15 +321,23 @@ remove) and `VideoSettingsScreen`'s default-player picker for **Default Reader**
 apps that can handle `ACTION_VIEW` for `application/epub+zip`, plus "Ask Every Time". There is no
 built-in option, so unlike Video there is no `PLAYER_BUILTIN` sentinel.
 
-- [ ] Add `"settings_books"` to `SETTINGS_SCREEN_ROUTES` **and** to the `when` in the same file.
+- [x] Add `"settings_books"` to `SETTINGS_SCREEN_ROUTES` **and** to the `when` in the same file.
       The file's own comment says new screens must be in both; `SettingsHierarchyTest` fails if
       they drift.
-- [ ] Add the L2 row to `XMBViewModel.kt` beside `settings_photo`:
+- [x] Add the L2 row to `XMBViewModel.kt` beside `settings_photo`:
       `XMBItem(id = "settings_books", title = "Books", subtitle = "Book libraries & reader")`
-- [ ] Run `SettingsHierarchyTest`, confirm GREEN.
-- [ ] `/cs-verify`, then commit.
+- [x] Run `SettingsHierarchyTest`, confirm GREEN.
+- [x] `/cs-verify`, then commit.
 
-**Verify:** `./gradlew :feature:feature-xmb:testDebugUnitTest --tests '*SettingsHierarchy*'`
+**Done 2026-09-18.** Built on `MediaRootKind` rather than a bespoke library list, so the
+section gets the same root folders, grant status and re-link flow as Music, Video and Photo, and
+the new `book_root_tree_uris` key rides backup with the other three. Adding the enum value broke
+an exhaustive `when` in `WizardMediaScanRunner`, which now carries an explicit `BOOK -> Unit` and
+a note: the Library section is not a wizard step, and making that an `else` would hide the day it
+should be. `RootAccessSection` hardcoded "No ROM roots configured", which every media section that
+reuses it was already showing; it is now a parameter and all four say the right thing.
+
+**Verify:** `./gradlew :feature:feature-xmb:testDebugUnitTest --tests '*SettingsHierarchy*' :feature:feature-backup:testDebugUnitTest`
 
 ---
 

@@ -20,10 +20,11 @@ enum class MediaRootKind(internal val key: String) {
     MUSIC("music_root_tree_uris"),
     VIDEO("video_root_tree_uris"),
     PHOTO("photo_root_tree_uris"),
+    BOOK("book_root_tree_uris"),
 }
 
 /**
- * The user's ROOT folders for each media section (Music / Video / Photo). Each root is a persisted
+ * The user's ROOT folders for each media section (Music / Video / Photo / Library). Each root is a persisted
  * `ACTION_OPEN_DOCUMENT_TREE` grant; its subfolders become that section's libraries (auto-managed
  * on scan). Multiple roots let a section span internal storage and an SD card.
  *

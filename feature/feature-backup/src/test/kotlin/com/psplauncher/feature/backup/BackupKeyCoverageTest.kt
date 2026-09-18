@@ -81,7 +81,12 @@ class BackupKeyCoverageTest {
         // Book libraries and their rows ride backup as tables. This is the one Library setting
         // that lives in preferences, so it is the one that can go missing on a restored device
         // without anything failing: the folders come back and every book opens the wrong app.
-        assertCovered("books_default_reader")
+        assertCovered(
+            "books_default_reader",
+            // The root folders too: they are where the books are, so losing them is losing the
+            // section. They ride the same per-kind key the other three media sections use.
+            "book_root_tree_uris",
+        )
     }
 
     @Test

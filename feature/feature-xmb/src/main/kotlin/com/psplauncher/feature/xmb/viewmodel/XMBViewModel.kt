@@ -428,6 +428,7 @@ fun settingsSectionItems(section: SettingsSection): List<XMBItem> = when (sectio
         XMBItem(id = "settings_music", title = "Music", subtitle = "Music folders & default player"),
         XMBItem(id = "settings_video", title = "Video", subtitle = "Video libraries, scanning & playback"),
         XMBItem(id = "settings_photo", title = "Photo", subtitle = "Photo libraries & scanning"),
+        XMBItem(id = "settings_books", title = "Library", subtitle = "Book folders & reader"),
     )
     SettingsSection.SYSTEM -> listOf(
         XMBItem(id = "settings_about",  title = "About",            subtitle = "PSPLauncher"),

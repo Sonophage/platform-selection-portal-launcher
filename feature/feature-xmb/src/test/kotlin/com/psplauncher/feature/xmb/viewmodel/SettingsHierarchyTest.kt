@@ -46,7 +46,7 @@ class SettingsHierarchyTest {
             settingsSectionItems(SettingsSection.LIBRARY).map { it.id },
         )
         assertEquals(
-            listOf("settings_music", "settings_video", "settings_photo"),
+            listOf("settings_music", "settings_video", "settings_photo", "settings_books"),
             settingsSectionItems(SettingsSection.MEDIA).map { it.id },
         )
         assertEquals(

@@ -79,6 +79,11 @@ class WizardMediaScanRunner @Inject constructor(
             MediaRootKind.VIDEO -> {
                 dropOrphanVideoLibraries(roots); roots.forEach { scanVideo(it) }
             }
+            // The Library section is not a step in the first-run wizard, so it has no root to
+            // scan here. Left as an explicit branch rather than an `else`, so adding that step
+            // later is a compile error in this file instead of a section that silently never
+            // scans.
+            MediaRootKind.BOOK -> Unit
         }
     }
 

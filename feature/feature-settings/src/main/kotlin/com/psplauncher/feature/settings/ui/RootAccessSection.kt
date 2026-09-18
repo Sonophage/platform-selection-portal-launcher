@@ -22,6 +22,10 @@ fun RootAccessSection(
     roots: List<RootFolderRow>,
     addLabel: String,
     addSublabel: String,
+    // What the group says with no roots yet. Defaults to the ROM wording this component was
+    // written for; every media section that reuses it was showing that too, which is why it
+    // is a parameter rather than a constant.
+    emptyLabel: String = "No ROM roots configured",
     onAddRoot: () -> Unit,
     onRelinkRoot: (RootFolderRow) -> Unit,
     onRemoveRoot: (RootFolderRow) -> Unit,
@@ -33,7 +37,7 @@ fun RootAccessSection(
 
     if (roots.isEmpty()) {
         SettingsRow(
-            label = "No ROM roots configured",
+            label = emptyLabel,
             sublabel = "Add a folder below to start managing your library",
         )
     } else {

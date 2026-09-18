@@ -100,6 +100,7 @@ fun PhotoSettingsContent(
                 roots       = state.roots,
                 addLabel    = "Add Photo Root",
                 addSublabel = "Grant a root folder (e.g. /Pictures) — add several to span locations",
+                emptyLabel   = "No photo folders yet",
                 onAddRoot   = onAddRoot,
                 onRelinkRoot = onRelinkRoot,
                 onRemoveRoot = onRemoveRoot,

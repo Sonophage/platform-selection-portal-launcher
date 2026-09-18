@@ -17,6 +17,7 @@ val SETTINGS_SCREEN_ROUTES: Set<String> = setOf(
     "settings_music",
     "settings_video",
     "settings_photo",
+    "settings_books",
     "settings_categories",
     "settings_artwork",
     "settings_artwork_import",
@@ -108,6 +109,7 @@ fun SettingsNavHost(
             "settings_music"      -> MusicSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_video"      -> VideoSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_photo"      -> PhotoSettingsScreen(onBack = onBack, modifier = modifier)
+            "settings_books"      -> BooksSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_categories" -> CategoryManagerScreen(onBack = onBack, modifier = modifier)
             "settings_artwork"    -> ArtworkSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_artwork_import" -> ArtworkImportScreen(onBack = onBack, modifier = modifier)

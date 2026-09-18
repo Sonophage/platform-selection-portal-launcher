@@ -1,8 +1,8 @@
 package com.psplauncher.feature.settings.ui
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,21 +23,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.ui.preview.CombinedPreviews
-import com.psplauncher.core.ui.preview.PfpPreview
+import com.psplauncher.core.ui.preview.PfpScreenPreview
+import com.psplauncher.feature.settings.viewmodel.BooksSettingsUiState
+import com.psplauncher.feature.settings.viewmodel.BooksSettingsViewModel
 import com.psplauncher.feature.settings.viewmodel.RootFolderRow
-import com.psplauncher.feature.settings.viewmodel.VideoSettingsUiState
-import com.psplauncher.feature.settings.viewmodel.VideoSettingsViewModel
 
+/**
+ * Stateful entry point: owns the ViewModel, collects its state, and wires the folder pickers.
+ * Thin on purpose, so the previewable UI lives in [BooksSettingsContent].
+ */
 @Composable
-fun VideoSettingsScreen(
+fun BooksSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: VideoSettingsViewModel = hiltViewModel(),
+    viewModel: BooksSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Pickers: one for adding a root, one pre-pointed at the root being re-linked (re-granting
-    // after a restore/reinstall lands on the exact same folder in one tap).
     val addRootPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> uri?.let { viewModel.addRoot(it) } }
@@ -50,41 +52,40 @@ fun VideoSettingsScreen(
         if (uri != null && old != null) viewModel.relinkRoot(old, uri)
     }
 
-    VideoSettingsContent(
-        state = state,
-        onBack = onBack,
-        onAddRoot = { addRootPicker.launch(null) },
-        onRelinkRoot = { row ->
+    BooksSettingsContent(
+        state                 = state,
+        onBack                = onBack,
+        onAddRoot             = { addRootPicker.launch(null) },
+        onRelinkRoot          = { row ->
             relinkTarget = row.treeUri
             relinkRootPicker.launch(runCatching { Uri.parse(row.treeUri) }.getOrNull())
         },
-        onRemoveRoot = { viewModel.removeRoot(it.treeUri) },
-        onRescan = viewModel::rescan,
-        onOpenPlayerPicker = viewModel::openPlayerPicker,
-        onDismissPlayerPicker = viewModel::dismissPlayerPicker,
-        onChoosePlayer = viewModel::chooseDefaultPlayer,
-        onDismissMessage = viewModel::dismissMessage,
-        modifier = modifier,
+        onRemoveRoot          = { viewModel.removeRoot(it.treeUri) },
+        onRescan              = viewModel::rescan,
+        onOpenReaderPicker    = viewModel::openReaderPicker,
+        onDismissReaderPicker = viewModel::dismissReaderPicker,
+        onChooseReader        = viewModel::chooseReader,
+        modifier              = modifier,
     )
 }
 
+/** Stateless UI, driven purely by [state] and callbacks, so it renders in `@Preview`. */
 @Composable
-fun VideoSettingsContent(
-    state: VideoSettingsUiState,
+fun BooksSettingsContent(
+    state: BooksSettingsUiState,
     onBack: () -> Unit,
     onAddRoot: () -> Unit,
     onRelinkRoot: (RootFolderRow) -> Unit,
     onRemoveRoot: (RootFolderRow) -> Unit,
     onRescan: () -> Unit,
-    onOpenPlayerPicker: () -> Unit,
-    onDismissPlayerPicker: () -> Unit,
-    onChoosePlayer: (String?) -> Unit,
-    onDismissMessage: () -> Unit,
+    onOpenReaderPicker: () -> Unit,
+    onDismissReaderPicker: () -> Unit,
+    onChooseReader: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(
         title    = "Settings",
-        subtitle = "Video",
+        subtitle = "Library",
         onBack   = onBack,
         modifier = modifier,
     ) {
@@ -96,24 +97,24 @@ fun VideoSettingsContent(
                 .verticalScroll(scrollState),
         ) {
             RootAccessSection(
-                groupTitle  = "Root Folders",
-                roots       = state.roots,
-                addLabel    = "Add Video Root",
-                addSublabel = "Grant a root folder (e.g. /Movies) — add several to span locations",
-                emptyLabel   = "No video folders yet",
-                onAddRoot   = onAddRoot,
+                groupTitle   = "Root Folders",
+                roots        = state.roots,
+                addLabel     = "Add Book Root",
+                addSublabel  = "Grant a root folder (e.g. /Books) — add several to span locations",
+                emptyLabel   = "No book folders yet",
+                onAddRoot    = onAddRoot,
                 onRelinkRoot = onRelinkRoot,
                 onRemoveRoot = onRemoveRoot,
             )
 
             SettingsRow(
-                label    = "Rescan Video Library",
+                label    = "Rescan Library",
                 sublabel = when {
                     state.scanning            -> "Scanning…"
                     state.scanMessage != null -> state.scanMessage
-                    else                      -> "Update the libraries from every root folder"
+                    else                      -> "Find the EPUBs in every root folder"
                 },
-                focusKey = "video_rescan",
+                focusKey = "books_rescan",
                 onClick  = if (state.scanning || !state.hasRoots) null else onRescan,
             )
 
@@ -125,45 +126,42 @@ fun VideoSettingsContent(
                 )
             }
 
-            SettingsGroup("Playback")
+            SettingsGroup("Reading")
 
             SettingsValueRow(
-                label    = "Default Video Player",
-                sublabel = "PSPLauncher plays in-app; or pick an app / be asked each time.",
-                value    = state.defaultPlayerLabel,
-                focusKey = "video_default_player",
-                onClick  = onOpenPlayerPicker,
+                label    = "Default Reader",
+                sublabel = "The app a book opens in. There is no in-app reader.",
+                value    = state.defaultReaderLabel,
+                focusKey = "books_default_reader",
+                onClick  = onOpenReaderPicker,
             )
         }
     }
 
-    // ── Default player picker: PSPLauncher / System Default / an installed app ──
-    if (state.showPlayerPicker) {
+    // ── Reader picker: Ask Every Time, or an installed reader ──────────────────
+    // No built-in choice, unlike Music and Video: this launcher does not read EPUBs.
+    if (state.showReaderPicker) {
         AlertDialog(
-            onDismissRequest = onDismissPlayerPicker,
-            title = { Text("Default Video Player") },
+            onDismissRequest = onDismissReaderPicker,
+            title = { Text("Default Reader") },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    PlayerChoiceRow(
-                        label = "PSPLauncher",
-                        selected = state.defaultPlayer == null || state.defaultPlayer == "builtin",
-                        onClick = { onChoosePlayer("builtin") },
+                    ReaderChoiceRow(
+                        label = "Ask Every Time",
+                        selected = state.defaultReader == null,
+                        onClick = { onChooseReader(null) },
                     )
-                    PlayerChoiceRow(
-                        label = "System Default",
-                        selected = state.defaultPlayer == "ask",
-                        onClick = { onChoosePlayer("ask") },
-                    )
-                    state.availablePlayers.forEach { player ->
-                        PlayerChoiceRow(
-                            label = player.label,
-                            selected = state.defaultPlayer == player.packageName,
-                            onClick = { onChoosePlayer(player.packageName) },
+                    state.availableReaders.forEach { reader ->
+                        ReaderChoiceRow(
+                            label = reader.label,
+                            selected = state.defaultReader == reader.packageName,
+                            onClick = { onChooseReader(reader.packageName) },
                         )
                     }
-                    if (state.availablePlayers.isEmpty()) {
+                    if (state.availableReaders.isEmpty()) {
                         Text(
-                            "No external video players found on this device.",
+                            "No app on this device says it can open EPUB files. Install a reader, " +
+                                "then reopen this list.",
                             color = SettingsSubtext,
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
@@ -171,13 +169,13 @@ fun VideoSettingsContent(
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = onDismissPlayerPicker) { Text("Close") } },
+            dismissButton = { TextButton(onClick = onDismissReaderPicker) { Text("Close") } },
         )
     }
 }
 
 @Composable
-private fun PlayerChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ReaderChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
     TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Text(
             text = (if (selected) "● " else "○ ") + label,
@@ -188,23 +186,22 @@ private fun PlayerChoiceRow(label: String, selected: Boolean, onClick: () -> Uni
 
 @CombinedPreviews
 @Composable
-private fun VideoSettingsContentPreview() {
-    PfpPreview {
-        VideoSettingsContent(
-            state = VideoSettingsUiState(
+private fun BooksSettingsContentPreview() {
+    PfpScreenPreview {
+        BooksSettingsContent(
+            state = BooksSettingsUiState(
                 roots = listOf(
-                    RootFolderRow("content://preview/tree/primary%3AMovies", "Movies", linked = true),
+                    RootFolderRow("content://preview/tree/primary%3ABooks", "Books", linked = true),
                 ),
             ),
-            onBack = {},
-            onAddRoot = {},
-            onRelinkRoot = {},
-            onRemoveRoot = {},
-            onRescan = {},
-            onOpenPlayerPicker = {},
-            onDismissPlayerPicker = {},
-            onChoosePlayer = {},
-            onDismissMessage = {},
+            onBack                = {},
+            onAddRoot             = {},
+            onRelinkRoot          = {},
+            onRemoveRoot          = {},
+            onRescan              = {},
+            onOpenReaderPicker    = {},
+            onDismissReaderPicker = {},
+            onChooseReader        = {},
         )
     }
 }

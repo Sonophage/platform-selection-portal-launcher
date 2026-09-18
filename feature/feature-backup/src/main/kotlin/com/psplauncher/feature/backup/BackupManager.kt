@@ -564,6 +564,7 @@ open class BackupManager @Inject constructor(
             stringPreferencesKey("music_root_tree_uris"),
             stringPreferencesKey("video_root_tree_uris"),
             stringPreferencesKey("photo_root_tree_uris"),
+            stringPreferencesKey("book_root_tree_uris"),
             // Where backups are saved (SAF folder). Inert without a live grant; carried so a
             // restore can pre-point the Folder Access picker at it.
             stringPreferencesKey("backup_folder_tree_uri"),

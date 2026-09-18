@@ -23,6 +23,8 @@ import com.psplauncher.core.data.database.dao.PlatformDao
 import com.psplauncher.core.data.database.dao.ThemeDao
 import com.psplauncher.core.data.database.dao.UnmatchedRomDao
 import com.psplauncher.core.data.database.dao.HiddenPlacementDao
+import com.psplauncher.core.data.database.dao.BookDao
+import com.psplauncher.core.data.database.dao.BookLibraryDao
 import com.psplauncher.core.data.database.dao.PhotoDao
 import com.psplauncher.core.data.database.dao.PhotoLibraryDao
 import com.psplauncher.core.data.database.dao.ScanTombstoneDao
@@ -138,6 +140,8 @@ object DatabaseModule {
     @Provides fun provideHiddenPlacementDao(db: PFPDatabase): HiddenPlacementDao = db.hiddenPlacementDao()
     @Provides fun providePhotoLibraryDao(db: PFPDatabase): PhotoLibraryDao = db.photoLibraryDao()
     @Provides fun providePhotoDao(db: PFPDatabase): PhotoDao = db.photoDao()
+    @Provides fun provideBookLibraryDao(db: PFPDatabase): BookLibraryDao = db.bookLibraryDao()
+    @Provides fun provideBookDao(db: PFPDatabase): BookDao = db.bookDao()
     @Provides fun provideScanTombstoneDao(db: PFPDatabase): ScanTombstoneDao = db.scanTombstoneDao()
     @Provides fun provideBackupDao(db: PFPDatabase): BackupDao = db.backupDao()
     @Provides fun provideArtworkRecordDao(db: PFPDatabase): ArtworkRecordDao = db.artworkRecordDao()
