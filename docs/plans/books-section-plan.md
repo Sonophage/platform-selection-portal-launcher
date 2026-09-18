@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** Tasks 1 and 2 done · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Tasks 1 to 3 done · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -229,19 +229,26 @@ Mirror `PhotoLibraryEntity` / `PhotoEntity` exactly, renaming photo to book and 
 `books` cascade-deletes with `book_libraries` and is indexed on `library_id` and `uri`, as
 `photos` is.
 
-- [ ] Write `Migration43To44Test` first, following `Migration42To43Test` and
+- [x] Write `Migration43To44Test` first, following `Migration42To43Test` and
       `MigrationTestSupport.kt`. Assert the two tables exist, that the foreign key cascades, and
       that an existing row in another table survives untouched.
-- [ ] Run it, confirm RED.
-- [ ] Add `MIGRATION_43_44` to `PFPDatabase.kt` as `CREATE TABLE IF NOT EXISTS` plus the two
+- [x] Run it, confirm RED.
+- [x] Add `MIGRATION_43_44` to `PFPDatabase.kt` as `CREATE TABLE IF NOT EXISTS` plus the two
       indices. **Never destructive migration.** Bump `@Database(version = 44)` and add the two
       entities and DAOs.
-- [ ] Register `PFPDatabase.MIGRATION_43_44` in `DatabaseModule.kt` beside `MIGRATION_42_43`.
-- [ ] Run, confirm GREEN. Room exports `schemas/com.psplauncher.core.data.database.PFPDatabase/44.json` —
+- [x] Register `PFPDatabase.MIGRATION_43_44` in `DatabaseModule.kt` beside `MIGRATION_42_43`.
+- [x] Run, confirm GREEN. Room exports `schemas/com.psplauncher.core.data.database.PFPDatabase/44.json` —
       **commit that file**, or every later migration test fails with `FileNotFoundException`.
-- [ ] `/cs-verify`, then commit.
+- [x] `/cs-verify`, then commit.
 
-**Verify:** `./gradlew :core:core-data:testDebugUnitTest --tests '*Migration43To44*'`
+**Done 2026-09-18.** The cascade and index assertions were written into the migration test
+first and could not be falsified there: `runMigrationsAndValidate` compares the result against the
+exported schema and fires before any assertion, taking the whole class with it. The migration test
+now asserts only the one claim that can fail on its own, that existing data survives; the cascade
+moved to `BookCascadeTest` against a live in-memory database, where breaking it raises a real
+`SQLiteConstraintException`.
+
+**Verify:** `./gradlew :core:core-data:testDebugUnitTest --tests '*Migration43To44*' --tests '*BookCascadeTest*'`
 
 ---
 

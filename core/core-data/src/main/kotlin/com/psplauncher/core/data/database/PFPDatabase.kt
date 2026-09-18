@@ -27,6 +27,8 @@ import com.psplauncher.core.data.database.dao.PlatformDao
 import com.psplauncher.core.data.database.dao.ThemeDao
 import com.psplauncher.core.data.database.dao.UnmatchedRomDao
 import com.psplauncher.core.data.database.dao.HiddenPlacementDao
+import com.psplauncher.core.data.database.dao.BookDao
+import com.psplauncher.core.data.database.dao.BookLibraryDao
 import com.psplauncher.core.data.database.dao.PhotoDao
 import com.psplauncher.core.data.database.dao.PhotoLibraryDao
 import com.psplauncher.core.data.database.dao.ScanTombstoneDao
@@ -59,6 +61,8 @@ import com.psplauncher.core.data.database.entity.PlatformEntity
 import com.psplauncher.core.data.database.entity.ThemeEntity
 import com.psplauncher.core.data.database.entity.UnmatchedRomEntity
 import com.psplauncher.core.data.database.entity.HiddenPlacementEntity
+import com.psplauncher.core.data.database.entity.BookEntity
+import com.psplauncher.core.data.database.entity.BookLibraryEntity
 import com.psplauncher.core.data.database.entity.PhotoEntity
 import com.psplauncher.core.data.database.entity.PhotoLibraryEntity
 import com.psplauncher.core.data.database.entity.ScanTombstoneEntity
@@ -106,8 +110,10 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
         AchievementMatchNoteEntity::class,
         SteamOwnedGameEntity::class,
         SteamNoAchievementsEntity::class,
+        BookLibraryEntity::class,
+        BookEntity::class,
     ],
-    version = 43,
+    version = 44,
     exportSchema = true,        // schema JSON exported to /schemas/ for migration auditing
 )
 @TypeConverters(PFPTypeConverters::class)
@@ -133,6 +139,8 @@ abstract class PFPDatabase : RoomDatabase() {
     abstract fun hiddenPlacementDao(): HiddenPlacementDao
     abstract fun photoLibraryDao(): PhotoLibraryDao
     abstract fun photoDao(): PhotoDao
+    abstract fun bookLibraryDao(): BookLibraryDao
+    abstract fun bookDao(): BookDao
     abstract fun scanTombstoneDao(): ScanTombstoneDao
     abstract fun backupDao(): BackupDao
     abstract fun artworkRecordDao(): ArtworkRecordDao
@@ -1271,6 +1279,54 @@ abstract class PFPDatabase : RoomDatabase() {
                         arrayOf<Any>(store, storeId, id),
                     )
                 }
+            }
+        }
+
+        /**
+         * v44 — the Library section's two tables. Purely additive: nothing existing is read,
+         * altered or dropped, so an install that never opens the section carries two empty tables
+         * and behaves exactly as it did on v43.
+         */
+        val MIGRATION_43_44 = object : Migration(43, 44) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `book_libraries` (
+                        `id` TEXT NOT NULL,
+                        `display_name` TEXT NOT NULL,
+                        `tree_uri` TEXT NOT NULL,
+                        `enabled` INTEGER NOT NULL,
+                        `scan_recursively` INTEGER NOT NULL,
+                        `book_count` INTEGER NOT NULL,
+                        `last_scanned_at` INTEGER,
+                        `created_at` INTEGER NOT NULL,
+                        `updated_at` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `books` (
+                        `id` TEXT NOT NULL,
+                        `library_id` TEXT NOT NULL,
+                        `uri` TEXT NOT NULL,
+                        `display_name` TEXT NOT NULL,
+                        `title` TEXT,
+                        `author` TEXT,
+                        `last_modified` INTEGER,
+                        `size_bytes` INTEGER,
+                        `mime_type` TEXT,
+                        `relative_path` TEXT,
+                        `date_added` INTEGER,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`library_id`) REFERENCES `book_libraries`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_books_library_id` ON `books` (`library_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_books_uri` ON `books` (`uri`)")
             }
         }
     }
