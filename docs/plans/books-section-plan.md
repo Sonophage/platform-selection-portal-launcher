@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** Tasks 1 to 4 done · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Tasks 1 to 5 done, the data half is complete · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -294,11 +294,18 @@ branches rather than carrying them.
 Emit the same result shape (`Progress` / `Complete` / `Error`) so the settings screen and the
 rescan path can treat it like the others.
 
-- [ ] Write the scanner test first against a fake SAF tree, asserting: a nested `.epub` is found
+- [x] Write the scanner test first against a fake SAF tree, asserting: a nested `.epub` is found
       when recursive, is not when not, a `.nomedia` folder is skipped, and a non-book file is
       ignored.
-- [ ] Run RED, implement, run GREEN.
-- [ ] `/cs-verify`, then commit.
+- [x] Run RED, implement, run GREEN.
+- [x] `/cs-verify`, then commit.
+
+**Done 2026-09-18.** The walk is a plain function taking its directory listing as a lambda,
+rather than a class reading a `ContentResolver`, so the policy is testable with no device and no
+Robolectric in this module. Dedupe is keyed on the document id rather than the uri, since the id
+is the provider's identity for a file. The loop guard is the one rule whose failure mode is a hang
+rather than a red assertion; removing it stops the suite completing, which is what a CI timeout
+catches.
 
 **Verify:** `./gradlew :feature:feature-library:testDebugUnitTest --tests '*BookScanner*'`
 
