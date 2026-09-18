@@ -84,6 +84,7 @@ object IconSlots {
         item("item_library_reader", "Reader app"),
         item("item_library_folder", "Book folder"),
         item("item_library_book", "Book"),
+        item("item_library_series", "Book series"),
         item("item_camera", "Camera"),
         item("item_music_track", "Music track"),
         item("item_playlist", "Playlist"),

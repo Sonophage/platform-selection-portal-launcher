@@ -338,7 +338,17 @@ sealed interface BooksNav {
     data object AllBooks : BooksNav
     data object Shelves : BooksNav
     data class Shelf(val id: String, val name: String) : BooksNav
+    /** The list of series found across every shelf. */
+    data object SeriesList : BooksNav
+    /** One series, listed in reading order. Keyed by name: a series has no id of its own. */
+    data class Series(val name: String) : BooksNav
 }
+
+/**
+ * One series and what the Library knows about it. Derived from the books rather than stored: a
+ * series is whatever the scanned files agree to call one, so there is nothing to keep in step.
+ */
+data class BookSeries(val name: String, val bookCount: Int, val coverUri: String?)
 
 sealed interface PhotoNav {
     data object Root : PhotoNav
@@ -517,6 +527,8 @@ enum class DrillOutStep {
     PHOTO,
     /** A shelf backs out to the Shelves list before leaving Library. */
     LIBRARY_SHELF,
+    /** A series backs out to the Series list before leaving Library. */
+    LIBRARY_SERIES,
     LIBRARY,
     ACHIEVEMENTS,
     /** A Games platform folder, collection, All Games or Favorites. */
@@ -679,6 +691,8 @@ data class XMBUiState(
     val photoNav: PhotoNav = PhotoNav.Root,
     val booksNav: BooksNav = BooksNav.Root,
     val bookLibraries: List<com.psplauncher.core.domain.model.BookLibrary> = emptyList(),
+    // Derived from every scanned book, so the Series row's count is live.
+    val bookSeries: List<BookSeries> = emptyList(),
     // Package name of the reader a book opens in, or null for the system chooser.
     val defaultReader: String? = null,
     val defaultReaderLabel: String? = null,
@@ -820,6 +834,7 @@ data class XMBUiState(
             videoNav != VideoNav.Root -> DrillOutStep.VIDEO
             photoNav is PhotoNav.Library -> DrillOutStep.PHOTO_LIBRARY
             photoNav != PhotoNav.Root -> DrillOutStep.PHOTO
+            booksNav is BooksNav.Series -> DrillOutStep.LIBRARY_SERIES
             booksNav is BooksNav.Shelf -> DrillOutStep.LIBRARY_SHELF
             booksNav != BooksNav.Root -> DrillOutStep.LIBRARY
             achievementsNav != AchievementsNav.Root -> DrillOutStep.ACHIEVEMENTS
@@ -913,6 +928,8 @@ enum class XMBItemType {
     LIBRARY_READER,
     LIBRARY_FOLDER,
     LIBRARY_BOOK,
+    // The "Series" root row, and each series folder inside it.
+    LIBRARY_SERIES,
     PHOTO_FILE,
     PHOTO_APPS,
     CAMERA,
@@ -945,12 +962,46 @@ private val BOOK_SORTS  = listOf(XmbSortMode.TITLE, XmbSortMode.SERIES, XmbSortM
  * library the alternative is a wall of unrelated titles above the series the user asked to see.
  * Within a series, an unnumbered book sorts after the numbered ones for the same reason.
  */
+/**
+ * Where a book sits WITHIN its series: by index, then by title for the unnumbered.
+ *
+ * One definition, used by both the SERIES sort mode and the Series folder. They have to agree or
+ * the same three books read in one order on the flat list and another inside their own folder, and
+ * nothing would catch that because each looks right on its own.
+ */
+private val BY_SERIES_POSITION = compareBy<com.psplauncher.core.domain.model.Book>(
+    { it.seriesIndex ?: Double.MAX_VALUE },
+    { it.displayTitle.lowercase() },
+)
+
+/** The books of one series, in reading order. */
+internal fun List<com.psplauncher.core.domain.model.Book>.inSeriesOrder(): List<com.psplauncher.core.domain.model.Book> =
+    sortedWith(BY_SERIES_POSITION)
+
+/**
+ * The series across a set of books, alphabetical, each carrying the cover of its earliest volume.
+ *
+ * Books declaring no series are simply absent. There is no "No series" bucket: the Books row
+ * already lists everything, so a bucket holding over half the library would be a second, worse
+ * copy of it.
+ */
+internal fun List<com.psplauncher.core.domain.model.Book>.seriesGroups(): List<BookSeries> =
+    filter { it.seriesName != null }
+        .groupBy { it.seriesName!! }
+        .map { (name, books) ->
+            BookSeries(
+                name = name,
+                bookCount = books.size,
+                coverUri = books.inSeriesOrder().firstNotNullOfOrNull { it.coverUri },
+            )
+        }
+        .sortedBy { it.name.lowercase() }
+
 internal fun List<com.psplauncher.core.domain.model.Book>.bookSorted(mode: XmbSortMode): List<com.psplauncher.core.domain.model.Book> = when (mode) {
     XmbSortMode.SERIES -> sortedWith(
         compareBy<com.psplauncher.core.domain.model.Book> { it.seriesName == null }
             .thenBy { it.seriesName?.lowercase() ?: "" }
-            .thenBy { it.seriesIndex ?: Double.MAX_VALUE }
-            .thenBy { it.displayTitle.lowercase() }
+            .then(BY_SERIES_POSITION)
     )
     XmbSortMode.DATE_ADDED -> sortedByDescending { it.dateAdded ?: 0L }
     else -> sortedBy { it.displayTitle.lowercase() }
@@ -1078,6 +1129,8 @@ fun XMBUiState.activeSortModes(): List<XmbSortMode>? {
             (videoNav == VideoNav.AllVideos || videoNav == VideoNav.Favorites ||
                 videoNav is VideoNav.Library) -> VIDEO_SORTS
         // Book lists sort; the Library root and the shelf list are fixed rows, not a library.
+        // A series folder is intentionally absent: it is always in reading order, which is the
+        // whole reason it exists as a folder rather than a filter.
         cat.id == BuiltInCategory.LIBRARY &&
             (booksNav == BooksNav.AllBooks || booksNav is BooksNav.Shelf) -> BOOK_SORTS
         cat.id == BuiltInCategory.GAMES &&
@@ -2118,6 +2171,21 @@ class XMBViewModel @Inject constructor(
                     is BooksNav.Shelf -> bookRepository.observeBooksByLibrary(nav.id).collect { books ->
                         _uiState.update { it.copy(currentItems = bookItems(books.bookSorted(it.bookSortMode)).ifEmpty { listOf(emptyBooksItem()) }) }
                     }
+                    BooksNav.SeriesList -> bookRepository.observeAllBooks().collect { books ->
+                        _uiState.update {
+                            it.copy(
+                                bookSeries = books.seriesGroups(),
+                                currentItems = bookSeriesItems().ifEmpty { listOf(emptySeriesItem()) },
+                            )
+                        }
+                    }
+                    // A series folder is always in reading order, whatever the flat list's sort
+                    // mode is. Ordering a series by title is the one thing the folder exists to
+                    // stop, so it does not take the sort mode and does not offer one.
+                    is BooksNav.Series -> bookRepository.observeAllBooks().collect { books ->
+                        val inSeries = books.filter { it.seriesName == nav.name }.inSeriesOrder()
+                        _uiState.update { it.copy(currentItems = bookItems(inSeries).ifEmpty { listOf(emptyBooksItem()) }) }
+                    }
                 }
                 else -> {
                     // Gaming categories show games and collections
@@ -2962,6 +3030,12 @@ class XMBViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            bookRepository.observeAllBooks().collect { books ->
+                _uiState.update { it.copy(bookSeries = books.seriesGroups()) }
+                refreshBooksRootIfShowing()
+            }
+        }
+        viewModelScope.launch {
             bookRepository.observeDefaultReader().collect { reader ->
                 _uiState.update {
                     it.copy(
@@ -3009,6 +3083,19 @@ class XMBViewModel @Inject constructor(
                     type     = XMBItemType.LIBRARY_SHELVES,
                 )
             )
+            // Only worth a row once something declares a series. A library of standalones would
+            // otherwise carry a row that opens an empty list.
+            val series = _uiState.value.bookSeries
+            if (series.isNotEmpty()) {
+                add(
+                    XMBItem(
+                        id       = BOOK_SERIES_ITEM_ID,
+                        title    = "Series",
+                        subtitle = "${series.size} ${if (series.size == 1) "series" else "series"}",
+                        type     = XMBItemType.LIBRARY_SERIES,
+                    )
+                )
+            }
             add(
                 XMBItem(
                     id       = ALL_BOOKS_ITEM_ID,
@@ -3083,6 +3170,25 @@ class XMBViewModel @Inject constructor(
             )
         }
 
+    private fun bookSeriesItems(): List<XMBItem> =
+        _uiState.value.bookSeries.map { series ->
+            XMBItem(
+                id       = "series_${series.name}",
+                title    = series.name,
+                subtitle = "${series.bookCount} ${if (series.bookCount == 1) "book" else "books"}",
+                coverUri = series.coverUri,
+                artworkUri = series.coverUri,
+                type     = XMBItemType.LIBRARY_SERIES,
+            )
+        }
+
+    private fun emptySeriesItem(): XMBItem = XMBItem(
+        id       = "series_empty",
+        title    = "No series yet",
+        subtitle = "No scanned book declares one. Embed series metadata, then Deep Rescan.",
+        type     = XMBItemType.EMPTY,
+    )
+
     /** Returns true when [item] was a Library row and has been handled. */
     private fun handleBooksSelection(item: XMBItem): Boolean = when {
         item.id == OPEN_READER_ITEM_ID -> {
@@ -3096,9 +3202,15 @@ class XMBViewModel @Inject constructor(
         }
         item.id == BOOK_SHELVES_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openBooksView(BooksNav.Shelves); true }
         item.id == ALL_BOOKS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openBooksView(BooksNav.AllBooks); true }
+        item.id == BOOK_SERIES_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openBooksView(BooksNav.SeriesList); true }
         item.id == ADD_BOOK_FOLDER_ITEM_ID -> {
             menuSound.play(MenuSound.SELECT)
             _uiState.update { it.copy(activeSettingsScreen = "settings_books") }
+            true
+        }
+        item.type == XMBItemType.LIBRARY_SERIES -> {
+            menuSound.play(MenuSound.SELECT)
+            openBooksView(BooksNav.Series(item.title))
             true
         }
         item.type == XMBItemType.LIBRARY_FOLDER -> {
@@ -3127,6 +3239,8 @@ class XMBViewModel @Inject constructor(
         BooksNav.AllBooks -> "all"
         BooksNav.Shelves  -> "shelves"
         is BooksNav.Shelf -> "shelf_${nav.id}"
+        BooksNav.SeriesList -> "series"
+        is BooksNav.Series  -> "series_${nav.name}"
     }
 
     private fun openBooksView(nav: BooksNav) = navigateRememberingCursor { it.copy(booksNav = nav) }
@@ -4099,6 +4213,8 @@ class XMBViewModel @Inject constructor(
             BooksNav.AllBooks -> "Books"
             BooksNav.Shelves  -> "Shelves"
             is BooksNav.Shelf -> nav.name
+            BooksNav.SeriesList -> "Series"
+            is BooksNav.Series  -> nav.name
             BooksNav.Root     -> null
         }
         if (booksTitle != null) return booksTitle
@@ -6708,6 +6824,7 @@ class XMBViewModel @Inject constructor(
             // An album drill-in backs out via the Albums list first.
             DrillOutStep.PHOTO_LIBRARY -> openPhotoView(PhotoNav.Albums)
             DrillOutStep.PHOTO -> closePhotoView()
+            DrillOutStep.LIBRARY_SERIES -> openBooksView(BooksNav.SeriesList)
             DrillOutStep.LIBRARY_SHELF -> openBooksView(BooksNav.Shelves)
             DrillOutStep.LIBRARY -> closeBooksView()
             DrillOutStep.ACHIEVEMENTS -> closeAchievementsView()
@@ -8352,6 +8469,7 @@ class XMBViewModel @Inject constructor(
         private const val PHOTO_ALBUMS_ITEM_ID = "photo_albums"
         private const val OPEN_READER_ITEM_ID = "library_open_reader"
         private const val BOOK_SHELVES_ITEM_ID = "library_shelves"
+        private const val BOOK_SERIES_ITEM_ID = "library_series"
         private const val ALL_BOOKS_ITEM_ID = "all_books"
         private const val ADD_BOOK_FOLDER_ITEM_ID = "add_book_folder"
         private const val PHOTO_APPS_ITEM_ID = "photo_apps_item"

@@ -381,6 +381,7 @@ internal fun itemSlotKeyFor(type: XMBItemType): String? = when (type) {
     XMBItemType.LIBRARY_READER -> "item_library_reader"
     XMBItemType.LIBRARY_FOLDER -> "item_library_folder"
     XMBItemType.LIBRARY_BOOK -> "item_library_book"
+    XMBItemType.LIBRARY_SERIES -> "item_library_series"
     XMBItemType.CAMERA -> "item_camera"
     XMBItemType.MUSIC_TRACK -> "item_music_track"
     XMBItemType.PLAYLIST -> "item_playlist"
@@ -973,6 +974,22 @@ private fun XmbItemLeadingIcon(
         // Books show the cover extracted from the EPUB, falling back to a book glyph for a file
         // that declares none. The tile is portrait, unlike video's and photo's landscape ones,
         // because a book jacket cropped to landscape is unrecognisable.
+        // A series folder shows the cover of its earliest volume, same portrait tile as a book,
+        // falling back to a bookmarks glyph when no volume in it had one.
+        item.type == XMBItemType.LIBRARY_SERIES -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                if (item.coverUri != null) {
+                    AsyncImage(
+                        model = item.coverUri,
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.size(width = 40.dp, height = 56.dp).clip(RoundedCornerShape(4.dp)),
+                    )
+                } else {
+                    ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Bookmarks, null, iconTint, Modifier.size(46.dp))
+                }
+            }
+        }
         item.type == XMBItemType.LIBRARY_BOOK -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
                 if (item.coverUri != null) {

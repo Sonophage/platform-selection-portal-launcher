@@ -96,6 +96,7 @@ object StudioIconSet {
         "item_library_reader" to Icons.Filled.ImportContacts,
         "item_library_folder" to Icons.Filled.Folder,
         "item_library_book" to Icons.Filled.Book,
+        "item_library_series" to Icons.Filled.Bookmarks,
         "item_photo_apps" to Icons.Filled.Collections,
         "item_camera" to Icons.Filled.PhotoCamera,
         "item_music_track" to Icons.Filled.MusicNote,

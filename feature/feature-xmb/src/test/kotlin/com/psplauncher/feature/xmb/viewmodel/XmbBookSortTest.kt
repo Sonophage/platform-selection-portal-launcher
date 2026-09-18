@@ -113,6 +113,76 @@ class XmbBookSortTest {
         assertEquals(listOf("new", "old"), books.bookSorted(XmbSortMode.DATE_ADDED).map { it.id })
     }
 
+    // ── Series folders ────────────────────────────────────────────────────────
+
+    @Test
+    fun `series are grouped by name, counted, and listed alphabetically`() {
+        val books = listOf(
+            book("h1", "Hyperion", series = "Hyperion", index = 1.0),
+            book("d1", "Dune", series = "Dune", index = 1.0),
+            book("d2", "Dune Messiah", series = "Dune", index = 2.0),
+            book("loose", "Neuromancer"),
+        )
+        val groups = books.seriesGroups()
+        assertEquals(listOf("Dune", "Hyperion"), groups.map { it.name })
+        assertEquals(listOf(2, 1), groups.map { it.bookCount })
+    }
+
+    @Test
+    fun `a book with no series joins no group rather than a No series bucket`() {
+        // The Books row already lists everything, so a bucket holding the standalones would be a
+        // second and worse copy of it. On this user's library that bucket would hold 44 of 80.
+        val books = listOf(book("loose", "Neuromancer"), book("also", "Anathem"))
+        assertEquals(emptyList<String>(), books.seriesGroups().map { it.name })
+    }
+
+    @Test
+    fun `a series folder takes the cover of its earliest volume`() {
+        // Not the first row in the list: the group is built from whatever order the query returned,
+        // so the cover has to be chosen by series position or it changes between scans.
+        val books = listOf(
+            book("d3", "Children of Dune", series = "Dune", index = 3.0).copy(coverUri = "file:///three.jpg"),
+            book("d1", "Dune", series = "Dune", index = 1.0).copy(coverUri = "file:///one.jpg"),
+        )
+        assertEquals("file:///one.jpg", books.seriesGroups().single().coverUri)
+    }
+
+    @Test
+    fun `a series folder falls through to a later cover when the first volume has none`() {
+        val books = listOf(
+            book("d1", "Dune", series = "Dune", index = 1.0),
+            book("d2", "Dune Messiah", series = "Dune", index = 2.0).copy(coverUri = "file:///two.jpg"),
+        )
+        assertEquals("file:///two.jpg", books.seriesGroups().single().coverUri)
+    }
+
+    @Test
+    fun `a series folder lists in reading order, never alphabetically`() {
+        val books = listOf(
+            book("c", "Children of Dune", series = "Dune", index = 3.0),
+            book("a", "Dune", series = "Dune", index = 1.0),
+            book("b", "Dune Messiah", series = "Dune", index = 2.0),
+        )
+        // Alphabetically this is Children, Dune, Dune Messiah. Reading order is the point.
+        assertEquals(listOf("a", "b", "c"), books.inSeriesOrder().map { it.id })
+    }
+
+    @Test
+    fun `the flat list and the series folder agree on order within one series`() {
+        // Both go through BY_SERIES_POSITION. If they ever diverge, the same three books read in
+        // one order on the Books list and another inside their own folder, and each looks correct
+        // on its own, so only comparing them catches it.
+        val dune = listOf(
+            book("c", "Children of Dune", series = "Dune", index = 3.0),
+            book("a", "Dune", series = "Dune", index = 1.0),
+            book("b", "Dune Messiah", series = "Dune", index = 2.0),
+        )
+        assertEquals(
+            dune.bookSorted(XmbSortMode.SERIES).map { it.id },
+            dune.inSeriesOrder().map { it.id },
+        )
+    }
+
     // ── Which list sorts ──────────────────────────────────────────────────────
 
     @Test
@@ -130,6 +200,13 @@ class XmbBookSortTest {
         // would put a "Sort: Title" pill on a list whose order the user cannot change.
         assertNull(state(BooksNav.Root).activeSortModes())
         assertNull(state(BooksNav.Shelves).activeSortModes())
+    }
+
+    @Test
+    fun `a series folder does not sort, because reading order is the point of it`() {
+        // Offering Title here would let the user do the one thing the folder exists to prevent.
+        assertNull(state(BooksNav.SeriesList).activeSortModes())
+        assertNull(state(BooksNav.Series("Dune")).activeSortModes())
     }
 
     @Test
