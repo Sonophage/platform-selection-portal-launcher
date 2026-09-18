@@ -1,0 +1,68 @@
+package com.psplauncher.feature.settings.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.psplauncher.core.data.repository.CollectionRepository
+import com.psplauncher.core.data.repository.CategoryRepositoryImpl
+import com.psplauncher.core.domain.model.Category
+import com.psplauncher.core.domain.model.Game
+import com.psplauncher.core.domain.model.GameCollection
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class CollectionsSettingsViewModel @Inject constructor(
+    private val collectionRepository: CollectionRepository,
+    private val categoryRepository: CategoryRepositoryImpl,
+) : ViewModel() {
+
+    val collections: StateFlow<List<GameCollection>> =
+        collectionRepository.observeCollections()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val gamingCategories: StateFlow<List<Category>> =
+        categoryRepository.observeAll()
+            .map { categories -> categories.filter { it.isGamingCategory } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun gamesIn(collectionId: Long): Flow<List<Game>> =
+        collectionRepository.observeGames(collectionId)
+
+    fun create(name: String, categoryId: String = "games") {
+        if (name.isBlank()) return
+        viewModelScope.launch { collectionRepository.create(name, categoryId) }
+    }
+
+    fun rename(id: Long, name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch { collectionRepository.rename(id, name) }
+    }
+
+    fun delete(id: Long) {
+        viewModelScope.launch { collectionRepository.delete(id) }
+    }
+
+    /** Sets the collection's icon (a key from the shared category icon catalog). Null resets it to
+     *  the default memory-card art. */
+    fun setIcon(id: Long, iconKey: String?) {
+        viewModelScope.launch { collectionRepository.setIcon(id, iconKey) }
+    }
+
+    fun moveUp(id: Long) {
+        viewModelScope.launch { collectionRepository.move(id, up = true) }
+    }
+
+    fun moveDown(id: Long) {
+        viewModelScope.launch { collectionRepository.move(id, up = false) }
+    }
+
+    fun removeGame(collectionId: Long, gameId: Long) {
+        viewModelScope.launch { collectionRepository.removeGame(collectionId, gameId) }
+    }
+}

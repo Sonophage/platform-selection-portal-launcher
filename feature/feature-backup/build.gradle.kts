@@ -7,7 +7,7 @@
 }
 
 android {
-    namespace  = "com.playfieldportal.feature.backup"
+    namespace  = "com.psplauncher.feature.backup"
     compileSdk = 37
     defaultConfig { minSdk = 29 }
     compileOptions {

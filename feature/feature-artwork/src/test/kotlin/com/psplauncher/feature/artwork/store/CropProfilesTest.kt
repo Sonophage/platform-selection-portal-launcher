@@ -1,0 +1,198 @@
+package com.psplauncher.feature.artwork.store
+
+import com.psplauncher.core.domain.model.GameRegion
+import com.psplauncher.core.ui.detail.DetailHeroAspect
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class CropProfilesTest {
+
+    @Test
+    fun `shipped kinds resolve to today's exact ratios`() {
+        val registry = CropProfileRegistry.Default
+
+        assertEquals(144f / 80f, registry.resolve(ArtworkKind.ICON, null, null).aspect)
+        assertEquals(144f / 80f, registry.resolve(ArtworkKind.ICON1, null, null).aspect)
+        assertEquals(DetailHeroAspect, registry.resolve(ArtworkKind.HERO, null, null).aspect)
+        assertEquals(16f / 9f, registry.resolve(ArtworkKind.BACKGROUND, null, null).aspect)
+    }
+
+    @Test
+    fun `the hero crop is the Game Detail banner's own shape`() {
+        // The banner at full size: the 920dp page body less its 28dp side margins, 220dp tall.
+        val aspect = CropProfileRegistry.Default.resolve(ArtworkKind.HERO, null, null).aspect!!
+        assertEquals(864f / 220f, aspect, 0.001f)
+    }
+
+    @Test
+    fun `every other kind is Original Image`() {
+        val registry = CropProfileRegistry.Default
+        val everyOther = ArtworkKind.entries.filterNot {
+            it == ArtworkKind.ICON || it == ArtworkKind.ICON1 || it == ArtworkKind.HERO || it == ArtworkKind.BACKGROUND
+        }
+        for (kind in everyOther) {
+            val profile = registry.resolve(kind, null, null)
+            assertNull(profile.aspect, "$kind should resolve to Original Image")
+            assertEquals(CropProfileRegistry.ORIGINAL_KEY, profile.key)
+        }
+    }
+
+    @Test
+    fun `a platform row beats the kind default`() {
+        val registry = CropProfileRegistry(
+            mapOf(
+                ArtworkKind.ICON.name to 144f / 80f,
+                "${ArtworkKind.ICON.name}:psx" to 4f / 3f,
+            )
+        )
+        val profile = registry.resolve(ArtworkKind.ICON, "psx", null)
+        assertEquals(4f / 3f, profile.aspect)
+        assertEquals("ICON:psx", profile.key)
+    }
+
+    @Test
+    fun `a region row beats the platform row`() {
+        val registry = CropProfileRegistry(
+            mapOf(
+                ArtworkKind.ICON.name to 144f / 80f,
+                "${ArtworkKind.ICON.name}:psx" to 4f / 3f,
+                "${ArtworkKind.ICON.name}:psx:NTSC_U" to 3f / 2f,
+            )
+        )
+        val profile = registry.resolve(ArtworkKind.ICON, "psx", GameRegion.NTSC_U)
+        assertEquals(3f / 2f, profile.aspect)
+        assertEquals("ICON:psx:NTSC_U", profile.key)
+    }
+
+    @Test
+    fun `unknown platform falls back to the kind default`() {
+        val registry = CropProfileRegistry(
+            mapOf(
+                ArtworkKind.ICON.name to 144f / 80f,
+                "${ArtworkKind.ICON.name}:psx" to 4f / 3f,
+            )
+        )
+        val profile = registry.resolve(ArtworkKind.ICON, "saturn", null)
+        assertEquals(144f / 80f, profile.aspect)
+        assertEquals(ArtworkKind.ICON.name, profile.key)
+    }
+
+    @Test
+    fun `null region with a known platform falls back to the platform row`() {
+        val registry = CropProfileRegistry(
+            mapOf(
+                ArtworkKind.ICON.name to 144f / 80f,
+                "${ArtworkKind.ICON.name}:psx" to 4f / 3f,
+                "${ArtworkKind.ICON.name}:psx:NTSC_U" to 3f / 2f,
+            )
+        )
+        val profile = registry.resolve(ArtworkKind.ICON, "psx", null)
+        assertEquals(4f / 3f, profile.aspect)
+        assertEquals("ICON:psx", profile.key)
+    }
+
+    @Test
+    fun `an empty table falls back to Original Image without throwing`() {
+        val registry = CropProfileRegistry(emptyMap())
+        val profile = registry.resolve(ArtworkKind.HERO, "unknown-platform", GameRegion.PAL)
+        assertNull(profile.aspect)
+        assertEquals(CropProfileRegistry.ORIGINAL_KEY, profile.key)
+    }
+
+    @Test
+    fun `every resolution returns a non-empty key`() {
+        val registries = listOf(
+            CropProfileRegistry.Default,
+            CropProfileRegistry(
+                mapOf(
+                    ArtworkKind.ICON.name to 144f / 80f,
+                    "${ArtworkKind.ICON.name}:psx" to 4f / 3f,
+                    "${ArtworkKind.ICON.name}:psx:NTSC_U" to 3f / 2f,
+                )
+            ),
+        )
+        val platforms = listOf(null, "psx", "unknown")
+        val regions = listOf(null, GameRegion.NTSC_U, GameRegion.PAL, GameRegion.NTSC_J)
+
+        for (registry in registries) {
+            for (kind in ArtworkKind.entries) {
+                for (platformId in platforms) {
+                    for (region in regions) {
+                        val profile = registry.resolve(kind, platformId, region)
+                        assertTrue(profile.key.isNotEmpty(), "resolve($kind, $platformId, $region) returned an empty key")
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Task 6.3: the per-game override ──────────────────────────────────────
+
+    @Test
+    fun `a stored override beats every tier, including a region row`() {
+        val registry = CropProfileRegistry(
+            mapOf(
+                ArtworkKind.ICON.name to 144f / 80f,
+                "${ArtworkKind.ICON.name}:psx" to 4f / 3f,
+                "${ArtworkKind.ICON.name}:psx:NTSC_U" to 3f / 2f,
+            )
+        )
+        val profile = registry.resolve(ArtworkKind.ICON, "psx", GameRegion.NTSC_U, override = "${ArtworkKind.ICON.name}:psx")
+        assertEquals(4f / 3f, profile.aspect)
+        assertEquals("ICON:psx", profile.key)
+    }
+
+    @Test
+    fun `Original Image is selectable as an override even where a kind default exists`() {
+        val profile = CropProfileRegistry.Default.resolve(
+            ArtworkKind.ICON, "psx", null, override = CropProfileRegistry.ORIGINAL_KEY,
+        )
+        assertNull(profile.aspect)
+        assertEquals(CropProfileRegistry.ORIGINAL_KEY, profile.key)
+    }
+
+    @Test
+    fun `an unknown override is ignored rather than resolving to no target`() {
+        // A key written by a later version, or a platform row since removed. Falling through to the
+        // kind default keeps the crop frame sane; treating it as Original Image would silently drop
+        // a fixed crop target the artwork kind requires.
+        val profile = CropProfileRegistry.Default.resolve(
+            ArtworkKind.ICON, "psx", null, override = "ICON:nonesuch:PAL",
+        )
+        assertEquals(144f / 80f, profile.aspect)
+        assertEquals(ArtworkKind.ICON.name, profile.key)
+    }
+
+    @Test
+    fun `clearing the override returns the tier result — Reset to Platform Default`() {
+        val registry = CropProfileRegistry(
+            mapOf(
+                ArtworkKind.ICON.name to 144f / 80f,
+                "${ArtworkKind.ICON.name}:psx" to 4f / 3f,
+            )
+        )
+        val overridden = registry.resolve(ArtworkKind.ICON, "psx", null, override = CropProfileRegistry.ORIGINAL_KEY)
+        val reset = registry.resolve(ArtworkKind.ICON, "psx", null, override = null)
+        assertNull(overridden.aspect)
+        assertEquals(4f / 3f, reset.aspect)
+        assertEquals("ICON:psx", reset.key)
+    }
+
+    @Test
+    fun `an override never leaks across kinds`() {
+        // The stored key carries its own kind, so a HERO key must not satisfy an ICON resolve.
+        val profile = CropProfileRegistry.Default.resolve(
+            ArtworkKind.ICON, "psx", null, override = ArtworkKind.HERO.name,
+        )
+        assertEquals(144f / 80f, profile.aspect)
+        assertEquals(ArtworkKind.ICON.name, profile.key)
+    }
+
+    @Test
+    fun `a blank override is treated as no override`() {
+        val profile = CropProfileRegistry.Default.resolve(ArtworkKind.ICON, "psx", null, override = "  ")
+        assertEquals(144f / 80f, profile.aspect)
+    }
+}

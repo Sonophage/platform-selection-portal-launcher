@@ -35,14 +35,14 @@ The achievement pages also do not consistently report touch input at their root.
 
 ### Files to reuse or update
 
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/ShibaCoinsScreen.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/ShibaCoinsViewModel.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/ShibaLibraryScreen.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/ShibaLibraryViewModel.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/PlayerStatusScreen.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/PlayerStatusViewModel.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/XMBShell.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/viewmodel/XMBViewModel.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/ShibaCoinsScreen.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/ShibaCoinsViewModel.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/ShibaLibraryScreen.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/ShibaLibraryViewModel.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/PlayerStatusScreen.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/PlayerStatusViewModel.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/XMBShell.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/viewmodel/XMBViewModel.kt`
 - Existing shared components in `core/core-ui/.../components` and `core/core-ui/.../detail`
 
 ## 3. Touch interaction contract

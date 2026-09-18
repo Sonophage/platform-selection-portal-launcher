@@ -36,9 +36,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Floating push-to-talk button drawn over a running game (Discord voice, opt-in). -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
     <!-- Capture legacy game shortcuts from apps that still use the old broadcast
          (BannerHub, older Winlator). The modern path is LauncherApps shortcut harvesting. -->
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
@@ -135,7 +132,7 @@
         <!-- Keeps in-app music playing (with a media notification) while the user is in other
              apps. Started on-demand from the player's "Play in Background". -->
         <service
-            android:name="com.playfieldportal.feature.xmb.music.MusicPlaybackService"
+            android:name="com.psplauncher.feature.xmb.music.MusicPlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 

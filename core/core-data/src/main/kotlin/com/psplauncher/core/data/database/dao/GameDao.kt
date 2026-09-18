@@ -1,0 +1,487 @@
+package com.psplauncher.core.data.database.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import com.psplauncher.core.data.database.entity.GameEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface GameDao {
+
+    // Projects one row per multi-disc set (the primary) so display counts never double-count a
+    // set's discs. Every consumer is display-side (card subtitles, pickers, Games root).
+    @Query(
+        """
+        SELECT * FROM games
+        WHERE (disc_set_key IS NULL AND is_missing = 0)
+           OR (disc_set_key IS NOT NULL AND is_disc_primary = 1
+               AND EXISTS (
+                   SELECT 1 FROM games member
+                   WHERE member.disc_set_key = games.disc_set_key
+                     AND member.is_missing = 0
+               ))
+        ORDER BY title ASC
+        """
+    )
+    fun observeAll(): Flow<List<GameEntity>>
+
+    // "All Games" aggregate — real games only. App-style entries (content_type != 'GAME',
+    // e.g. ANDROID_APP / VIDEO_APP) are excluded so they never show up here automatically.
+    @Query("SELECT * FROM games WHERE content_type = 'GAME'  AND is_missing = 0 ORDER BY title ASC")
+    fun observeGamesOnly(): Flow<List<GameEntity>>
+
+    // Multi-disc projection (docs/plans/README.md (C1)): one row per disc set —
+    // the primary — for the All Games surface. The unprojected [observeGamesOnly] above stays
+    // untouched for per-disc achievement matching.
+    @Query(
+        """
+        SELECT * FROM games
+        WHERE content_type = 'GAME'
+          AND (
+              (disc_set_key IS NULL AND is_missing = 0)
+              OR (disc_set_key IS NOT NULL AND is_disc_primary = 1
+                  AND EXISTS (
+                      SELECT 1 FROM games member
+                      WHERE member.disc_set_key = games.disc_set_key
+                        AND member.is_missing = 0
+                  ))
+          )
+        ORDER BY title ASC
+        """
+    )
+    fun observeAllGames(): Flow<List<GameEntity>>
+
+    @Query("UPDATE games SET content_type = :contentType WHERE id = :id")
+    suspend fun setContentType(id: Long, contentType: String)
+
+    // Projects one row per multi-disc set (the primary) — favorites count a set once. Display-only.
+    @Query(
+        """
+        SELECT * FROM games
+        WHERE (
+            (disc_set_key IS NULL AND is_favorite = 1 AND is_missing = 0)
+            OR (disc_set_key IS NOT NULL AND is_disc_primary = 1
+                AND EXISTS (
+                    SELECT 1 FROM games member
+                    WHERE member.disc_set_key = games.disc_set_key
+                      AND member.is_missing = 0
+                )
+                AND EXISTS (
+                    SELECT 1 FROM games member
+                    WHERE member.disc_set_key = games.disc_set_key
+                      AND member.is_favorite = 1
+                ))
+        )
+        ORDER BY favorite_sort_order ASC, title ASC
+        """
+    )
+    fun observeFavorites(): Flow<List<GameEntity>>
+
+    @Query("SELECT * FROM games WHERE platform_id = :platformId AND is_missing = 0 ORDER BY title ASC")
+    fun observeByPlatform(platformId: String): Flow<List<GameEntity>>
+
+    // Multi-disc projection (docs/plans/README.md (C1)): one row per disc set —
+    // the primary — for the Memory Card game list. The unprojected [observeByPlatform] above stays
+    // untouched for scan baselines (existing-path resolution must see every disc).
+    @Query(
+        """
+        SELECT * FROM games
+        WHERE platform_id = :platformId
+          AND (
+              (disc_set_key IS NULL AND is_missing = 0)
+              OR (disc_set_key IS NOT NULL AND is_disc_primary = 1
+                  AND EXISTS (
+                      SELECT 1 FROM games member
+                      WHERE member.disc_set_key = games.disc_set_key
+                        AND member.is_missing = 0
+                  ))
+          )
+        ORDER BY title ASC
+        """
+    )
+    fun observePlatformGames(platformId: String): Flow<List<GameEntity>>
+
+    @Query("SELECT * FROM games WHERE platform_id = :platformId ORDER BY title ASC")
+    suspend fun getByPlatformOnce(platformId: String): List<GameEntity>
+
+    @Query("UPDATE games SET platform_id = :platformId, content_type = :contentType WHERE id = :id")
+    suspend fun setPlatformAndContentType(id: Long, platformId: String, contentType: String)
+
+    @Query("SELECT * FROM games WHERE id = :id")
+    suspend fun getById(id: Long): GameEntity?
+
+    @Query("SELECT * FROM games WHERE disc_set_key = :discSetKey " +
+            "ORDER BY is_disc_primary DESC, disc_number IS NULL ASC, disc_number ASC, id ASC"
+    )
+    suspend fun getDiscSetMembers(discSetKey: String): List<GameEntity>
+
+    // The v39 partial index allows only one primary per set. Clear competing primaries before a
+    // replacement upsert, including when an incremental scan promotes a newly discovered disc.
+    @Query("UPDATE games SET is_disc_primary = 0 WHERE disc_set_key = :discSetKey AND id != :gameId")
+    suspend fun clearOtherDiscPrimaries(discSetKey: String, gameId: Long)
+
+    @Query("UPDATE games SET is_disc_primary = CASE WHEN id = :discId THEN 1 ELSE 0 END WHERE disc_set_key = (SELECT disc_set_key FROM games WHERE id = :id)")
+    suspend fun setPreferredDisc(id: Long, discId: Long)
+
+    @Query("SELECT * FROM games WHERE rom_path = :romPath LIMIT 1")
+    suspend fun getByRomPath(romPath: String): GameEntity?
+
+    @Query("SELECT * FROM games WHERE package_name = :packageName LIMIT 1")
+    suspend fun getByPackageName(packageName: String): GameEntity?
+
+    // The plain app-launch row (no launcher shortcut). Distinguishes the "open the app" entry
+    // from per-game launcher-shortcut rows that share the same package_name.
+    @Query("SELECT * FROM games WHERE package_name = :packageName AND launch_shortcut_id IS NULL LIMIT 1")
+    suspend fun getAppEntry(packageName: String): GameEntity?
+
+    // A specific harvested launcher-shortcut row (package + shortcut id) — used to dedupe imports.
+    @Query("SELECT * FROM games WHERE package_name = :packageName AND launch_shortcut_id = :shortcutId LIMIT 1")
+    suspend fun getLauncherShortcut(packageName: String, shortcutId: String): GameEntity?
+
+    // A legacy INSTALL_SHORTCUT row, deduped by its captured launch intent.
+    @Query("SELECT * FROM games WHERE launch_intent_uri = :intentUri LIMIT 1")
+    suspend fun getByIntentUri(intentUri: String): GameEntity?
+
+    @Query("SELECT * FROM games WHERE last_played_at IS NOT NULL  AND is_missing = 0 ORDER BY last_played_at DESC LIMIT :limit")
+    fun observeRecentlyPlayed(limit: Int): Flow<List<GameEntity>>
+
+    // Used by recently played per-platform drill-down
+    @Query(
+        """
+        SELECT * FROM games
+        WHERE platform_id = :platformId
+          AND last_played_at IS NOT NULL  
+          AND is_missing = 0
+        ORDER BY last_played_at DESC
+        LIMIT :limit
+        """
+    )
+    fun observeRecentByPlatform(platformId: String, limit: Int): Flow<List<GameEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(game: GameEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(games: List<GameEntity>)
+
+    @Update
+    suspend fun update(game: GameEntity)
+
+    @Query("DELETE FROM games WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM games WHERE platform_id = :platformId")
+    suspend fun deleteByPlatform(platformId: String)
+
+    @Query("SELECT COUNT(*) FROM games WHERE platform_id = :platformId AND is_missing = 0")
+    suspend fun countByPlatform(platformId: String): Int
+
+    // Real games only — what a Memory Card actually displays (standard app rows are excluded).
+    // Counts one row per multi-disc set (the primary) — a Memory Card's game count never
+    // double-counts a set's discs.
+    @Query(
+        """
+        SELECT COUNT(*) FROM games primary_game
+        WHERE primary_game.platform_id = :platformId
+          AND primary_game.content_type = 'GAME'
+          AND (
+              (primary_game.disc_set_key IS NULL AND primary_game.is_missing = 0)
+              OR (primary_game.disc_set_key IS NOT NULL AND primary_game.is_disc_primary = 1
+                  AND EXISTS (
+                      SELECT 1 FROM games member
+                      WHERE member.disc_set_key = primary_game.disc_set_key
+                        AND member.is_missing = 0
+                  ))
+          )
+        """
+    )
+    suspend fun countGamesByPlatform(platformId: String): Int
+
+    @Query("UPDATE games SET is_favorite = :isFavorite WHERE id = :id")
+    suspend fun setFavorite(id: Long, isFavorite: Boolean)
+
+    @Query("UPDATE games SET favorite_sort_order = :order WHERE id = :id")
+    suspend fun updateFavoriteSortOrder(id: Long, order: Int)
+
+    @Query("UPDATE games SET user_note = :note WHERE id = :id")
+    suspend fun updateNote(id: Long, note: String?)
+
+    @Query("UPDATE games SET artwork_uri = :artworkUri WHERE id = :id")
+    suspend fun updateArtwork(id: Long, artworkUri: String?)
+
+    @Query("UPDATE games SET hero_uri = :heroUri WHERE id = :id")
+    suspend fun updateHero(id: Long, heroUri: String?)
+
+    @Query("UPDATE games SET logo_uri = :logoUri WHERE id = :id")
+    suspend fun updateLogo(id: Long, logoUri: String?)
+
+    @Query("UPDATE games SET hero_uri = :heroUri, logo_uri = :logoUri WHERE id = :id")
+    suspend fun updateHeroAndLogo(id: Long, heroUri: String?, logoUri: String?)
+
+    @Query(
+        """
+        UPDATE games
+        SET total_play_time_millis = total_play_time_millis + :durationMillis,
+            last_played_at = :playedAt
+        WHERE id = :id
+    """
+    )
+    suspend fun addPlayTime(id: Long, durationMillis: Long, playedAt: Long)
+
+    @Query(
+        """
+        UPDATE games SET emulator_package = :emulatorPackage WHERE id = :id
+    """
+    )
+    suspend fun setPreferredEmulator(id: Long, emulatorPackage: String?)
+
+    // B4 per-platform assignment screen: bulk-clears every per-game emulator override on a
+    // platform so those games fall back to the platform default. Scoped to real game rows
+    // (content_type = 'GAME') — app-shortcut rows can never carry or receive a ROM emulator.
+    @Query(
+        "UPDATE games SET emulator_package = NULL " +
+            "WHERE platform_id = :platformId AND content_type = 'GAME' AND emulator_package IS NOT NULL"
+    )
+    suspend fun clearPreferredEmulatorForPlatform(platformId: String)
+
+    // For missing ROM check — returns all games that have a rom_path
+    @Query("SELECT id, rom_path FROM games WHERE rom_path IS NOT NULL")
+    suspend fun getAllRomPaths(): List<RomPathProjection>
+
+    // ── Missing-ROM tracking ──────────────────────────────────────────────────
+    // A missing game keeps all its state (favorite, play stats, artwork) and is only hidden
+    // from the normal views; it reappears everywhere once its file is seen again.
+
+    // Marks the given paths present: clears the missing flag and stamps the last-seen time.
+    @Query("UPDATE games SET is_missing = 0, last_seen_at = :seenAt WHERE rom_path IN (:romPaths)")
+    suspend fun markSeen(romPaths: List<String>, seenAt: Long)
+
+    // Flags the given paths missing. last_seen_at is left untouched — it holds the last time the
+    // file WAS present. The reconciler passes an explicit, already-diffed list (never a NOT IN over
+    // the whole table) so an empty or partial scan can never mass-flag the library.
+    @Query("UPDATE games SET is_missing = 1 WHERE rom_path IN (:romPaths)")
+    suspend fun markMissing(romPaths: List<String>)
+
+    // The Missing bucket — one primary per fully missing set, plus ordinary missing games.
+    @Query(
+        """
+        SELECT * FROM games
+        WHERE (disc_set_key IS NULL AND is_missing = 1)
+           OR (disc_set_key IS NOT NULL AND is_disc_primary = 1
+               AND NOT EXISTS (
+                   SELECT 1 FROM games member
+                   WHERE member.disc_set_key = games.disc_set_key
+                     AND member.is_missing = 0
+               ))
+        ORDER BY title ASC
+        """
+    )
+    fun observeMissing(): Flow<List<GameEntity>>
+
+    @Query("SELECT * FROM games ORDER BY title ASC")
+    suspend fun getAll(): List<GameEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReplace(games: List<GameEntity>)
+
+    @Query("SELECT * FROM games WHERE artwork_uri IS NULL AND rom_path IS NOT NULL")
+    suspend fun getGamesWithoutArtwork(): List<GameEntity>
+
+    // Updates only non-null fields — COALESCE keeps existing value when new value is null.
+    // scraped_title is updated when a metadata source returns a title.
+    // user_title_override is NEVER touched here — only explicit user action changes it.
+    @Query(
+        """
+        UPDATE games SET
+            description     = COALESCE(:description,  description),
+            developer       = COALESCE(:developer,    developer),
+            publisher       = COALESCE(:publisher,    publisher),
+            release_year    = COALESCE(:releaseYear,  release_year),
+            genre           = COALESCE(:genre,        genre),
+            artwork_uri     = COALESCE(:artworkUri,   artwork_uri),
+            hero_uri        = COALESCE(:heroUri,      hero_uri),
+            logo_uri        = COALESCE(:logoUri,      logo_uri),
+            icon_uri        = COALESCE(:iconUri,      icon_uri),
+            box_art_uri     = COALESCE(:boxArtUri,    box_art_uri),
+            physical_media_uri = COALESCE(:physicalMediaUri, physical_media_uri),
+            box3d_uri       = COALESCE(:box3dUri,     box3d_uri),
+            scraped_title   = COALESCE(:scrapedTitle, scraped_title),
+            players         = COALESCE(:players,      players),
+            age_rating      = COALESCE(:ageRating,    age_rating),
+            franchise       = COALESCE(:franchise,    franchise),
+            community_rating = COALESCE(:communityRating, community_rating),
+            release_date    = COALESCE(:releaseDate,  release_date),
+            ss_id           = COALESCE(:ssId,         ss_id),
+            tgdb_id         = COALESCE(:tgdbId,       tgdb_id),
+            igdb_id         = COALESCE(:igdbId,       igdb_id),
+            steam_grid_db_id = COALESCE(:steamGridDbId, steam_grid_db_id),
+            rom_crc32       = COALESCE(:romCrc32,     rom_crc32)
+        WHERE id = :id
+    """
+    )
+    suspend fun updateMetadata(
+        id: Long,
+        description: String? = null,
+        developer: String? = null,
+        publisher: String? = null,
+        releaseYear: Int? = null,
+        genre: String? = null,
+        artworkUri: String? = null,
+        heroUri: String? = null,
+        logoUri: String? = null,
+        iconUri: String? = null,
+        boxArtUri: String? = null,
+        physicalMediaUri: String? = null,
+        box3dUri: String? = null,
+        scrapedTitle: String? = null,
+        players: String? = null,
+        ageRating: String? = null,
+        franchise: String? = null,
+        communityRating: Float? = null,
+        releaseDate: String? = null,
+        ssId: Long? = null,
+        tgdbId: Long? = null,
+        igdbId: Long? = null,
+        steamGridDbId: Long? = null,
+        romCrc32: String? = null,
+    )
+
+    @Query("UPDATE games SET scraped_title = :scrapedTitle WHERE id = :id")
+    suspend fun updateScrapedTitle(id: Long, scrapedTitle: String?)
+
+    /**
+     * Names a game the scrape has never named, and nothing else: the write is skipped outright when
+     * `scraped_title` already holds something.
+     *
+     * An automatic scrape may NAME an unnamed game but must never RENAME one. [updateMetadata]
+     * takes the opposite side for every other column (`COALESCE(:new, old)` — the incoming value
+     * wins), which is right for a description or a release year and wrong for the title: it made a
+     * Change Match, or any later re-scrape, silently rewrite what the library calls a game. A title
+     * now only ever CHANGES through a path the user drove — the metadata preview's chosen fields,
+     * or Edit Title, which writes `user_title_override` and outranks this column entirely.
+     */
+    @Query("UPDATE games SET scraped_title = :scrapedTitle WHERE id = :id AND scraped_title IS NULL")
+    suspend fun fillScrapedTitleIfMissing(id: Long, scrapedTitle: String)
+
+    // ── Windows storefront identity (C16 phase 0) ─────────────────────────────
+    // Fill-only: a null argument keeps whatever is already stored, so a re-import that could not
+    // determine the store never erases an identity an earlier one captured.
+    @Query(
+        """
+        UPDATE games SET
+            storefront         = COALESCE(:storefront,       storefront),
+            storefront_game_id = COALESCE(:storefrontGameId, storefront_game_id)
+        WHERE id = :id
+    """
+    )
+    suspend fun updateStorefrontIdentity(id: Long, storefront: String?, storefrontGameId: String?)
+
+    // ── Confirmed provider match (C16 task 2.3) ──────────────────────────────
+    // Sets EXACTLY ONE provider id and leaves the other three untouched, so a match confirmed on
+    // SteamGridDB can never be read back as an IGDB id. Unlike updateMetadata this is not
+    // COALESCE-guarded: a null :providerGameId is Forget Match and must actually clear the column.
+    // It touches no artwork column and no metadata column — forgetting a match never costs the
+    // user a downloaded asset or a scraped description.
+    @Query(
+        """
+        UPDATE games SET
+            ss_id            = CASE WHEN :provider = 'SCREENSCRAPER' THEN :providerGameId ELSE ss_id            END,
+            tgdb_id          = CASE WHEN :provider = 'THEGAMESDB'    THEN :providerGameId ELSE tgdb_id          END,
+            igdb_id          = CASE WHEN :provider = 'IGDB'          THEN :providerGameId ELSE igdb_id          END,
+            steam_grid_db_id = CASE WHEN :provider = 'STEAMGRIDDB'   THEN :providerGameId ELSE steam_grid_db_id END
+        WHERE id = :id
+    """
+    )
+    suspend fun updateProviderMatch(id: Long, provider: String, providerGameId: Long?)
+
+    /** Games claiming one storefront id. Matched as a PAIR — an app id is unique per store only. */
+    @Query("SELECT * FROM games WHERE storefront = :storefront AND storefront_game_id = :storefrontGameId")
+    suspend fun getByStorefront(storefront: String, storefrontGameId: String): List<GameEntity>
+
+    // Fill-missing-only metadata write (reversed COALESCE — the EXISTING value always wins).
+    // Used by the artwork importer's gamelist.xml pass (imported metadata never overwrites anything
+    // a scraper or the user already set) and by C16 task 3.2's Fill Missing Only policy, which is
+    // why it covers every field a metadata preset can carry. A null argument is a no-op per column.
+    @Query(
+        """
+        UPDATE games SET
+            description      = COALESCE(description,      :description),
+            developer        = COALESCE(developer,        :developer),
+            publisher        = COALESCE(publisher,        :publisher),
+            release_year     = COALESCE(release_year,     :releaseYear),
+            genre            = COALESCE(genre,            :genre),
+            scraped_title    = COALESCE(scraped_title,    :scrapedTitle),
+            age_rating       = COALESCE(age_rating,       :ageRating),
+            franchise        = COALESCE(franchise,        :franchise),
+            community_rating = COALESCE(community_rating, :communityRating),
+            release_date     = COALESCE(release_date,     :releaseDate)
+        WHERE id = :id
+    """
+    )
+    suspend fun updateMetadataIfMissing(
+        id: Long,
+        description: String? = null,
+        developer: String? = null,
+        publisher: String? = null,
+        releaseYear: Int? = null,
+        genre: String? = null,
+        scrapedTitle: String? = null,
+        ageRating: String? = null,
+        franchise: String? = null,
+        communityRating: Float? = null,
+        releaseDate: String? = null,
+    )
+
+    // Stores the user-chosen display name. Pass null to clear and fall back to scrapedTitle/title.
+    @Query("UPDATE games SET user_title_override = :override WHERE id = :id")
+    suspend fun updateUserTitleOverride(id: Long, override: String?)
+
+    @Query("UPDATE games SET icon_uri = :iconUri WHERE id = :id")
+    suspend fun updateIconUri(id: Long, iconUri: String?)
+
+    @Query("UPDATE games SET box_art_uri = :boxArtUri WHERE id = :id")
+    suspend fun updateBoxArt(id: Long, boxArtUri: String?)
+
+    @Query("UPDATE games SET physical_media_uri = :physicalMediaUri WHERE id = :id")
+    suspend fun updatePhysicalMedia(id: Long, physicalMediaUri: String?)
+
+    @Query("UPDATE games SET box3d_uri = :box3dUri WHERE id = :id")
+    suspend fun updateBox3d(id: Long, box3dUri: String?)
+
+    // Per-game icon display mode override (IconDisplayMode name); null follows the global setting.
+    @Query("UPDATE games SET icon_display_mode = :mode WHERE id = :id")
+    suspend fun updateIconDisplayMode(id: Long, mode: String?)
+
+    // Full artwork reset (Clear Cache): every artwork reference on every game. Titles,
+    // metadata, scraper ids and play stats are untouched — only the art pointers go.
+    @Query(
+        """
+        UPDATE games SET artwork_uri = NULL, hero_uri = NULL, logo_uri = NULL, icon_uri = NULL,
+            box_art_uri = NULL, physical_media_uri = NULL, box3d_uri = NULL
+    """
+    )
+    suspend fun clearAllArtworkRefs()
+
+    // Mints the portable artwork key once — an already-set key is never rewritten (slug rules
+    // may evolve; the key recorded at first save is the one the folder was created under).
+    @Query("UPDATE games SET artwork_key = COALESCE(artwork_key, :artworkKey) WHERE id = :id")
+    suspend fun mintArtworkKey(id: Long, artworkKey: String)
+
+    // Clears all artwork references so a re-scrape starts from a clean slate.
+    @Query("UPDATE games SET artwork_uri = NULL, hero_uri = NULL, logo_uri = NULL, icon_uri = NULL")
+    suspend fun clearAllArtwork()
+
+    @Query("UPDATE games SET artwork_uri = NULL, hero_uri = NULL, logo_uri = NULL, icon_uri = NULL WHERE id = :id")
+    suspend fun clearArtworkForGame(id: Long)
+
+    @Query("DELETE FROM games")
+    suspend fun deleteAll()
+}
+
+data class RomPathProjection(
+    val id: Long,
+    val rom_path: String,
+)

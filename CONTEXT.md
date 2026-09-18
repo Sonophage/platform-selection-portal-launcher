@@ -1,4 +1,4 @@
-# PlayFieldPortal domain glossary
+# PSPLauncher domain glossary
 
 This glossary names the domain concepts used by the library scan module and its callers.
 

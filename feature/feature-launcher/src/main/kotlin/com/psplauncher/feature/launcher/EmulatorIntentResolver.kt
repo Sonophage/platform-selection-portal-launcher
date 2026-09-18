@@ -1,0 +1,355 @@
+package com.psplauncher.feature.launcher
+
+import android.content.ClipData
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import com.psplauncher.core.domain.model.EmulatorProfile
+import com.psplauncher.core.domain.model.Game
+import com.psplauncher.core.domain.model.IntentType
+import com.psplauncher.core.domain.model.LaunchTemplate
+import dagger.hilt.android.qualifiers.ApplicationContext
+import timber.log.Timber
+import java.io.File
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Builds the Android launch [android.content.Intent] for a game + chosen emulator profile.
+ *
+ * Supports `ACTION_VIEW` (ROM passed as a FileProvider content URI, with type/component fallbacks
+ * for emulators whose intent filters omit a MIME type), `COMPONENT` (explicit activity + extras,
+ * e.g. RetroArch's `ROM`/`LIBRETRO`), and `CUSTOM_COMMAND`. Validation (emulator installed, ROM
+ * exists, core configured) happens up front; [resolve] never throws — it returns a [Result] with a
+ * user-readable failure message instead.
+ */
+@Singleton
+class EmulatorIntentResolver @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val romUriMinter: RomUriMinter,
+) {
+
+    /**
+     * Resolves a launch [Intent] for the given [game] and selected [profile].
+     *
+     * Returns [Result.success] with the intent on success, or [Result.failure] with a
+     * user-readable message explaining why launch cannot proceed. Never throws.
+     */
+    suspend fun resolve(game: Game, profile: EmulatorProfile): Result<Intent> {
+        return runCatching {
+            validateBeforeLaunch(game, profile)
+            val intent = when (profile.intentType) {
+                IntentType.ACTION_VIEW    -> buildViewIntent(game, profile)
+                IntentType.COMPONENT      -> buildComponentIntent(game, profile)
+                IntentType.CUSTOM_COMMAND -> buildCustomCommandIntent(game, profile)
+                IntentType.SHORTCUT       -> error("Shortcut launch not supported from this screen")
+            }
+            Timber.d(
+                "Launch intent resolved: gameId=${game.id}, title=${game.title}, platform=${game.platformId}, emulatorId=${profile.id}, emulatorName=${profile.name}, package=${profile.packageName}, intentType=${profile.intentType}, core=${profile.corePathFor(game.platformId).orEmpty()}, rom=${game.romPath.orEmpty()}, summary=${intent.toUri(Intent.URI_INTENT_SCHEME)}"
+            )
+            intent
+        }.onFailure { e ->
+            Timber.e(
+                e,
+                "Failed to build launch intent: gameId=${game.id}, title=${game.title}, platform=${game.platformId}, emulatorId=${profile.id}, emulatorName=${profile.name}, rom=${game.romPath.orEmpty()}"
+            )
+        }
+    }
+
+    fun resolveNativeApp(game: Game): Result<Intent> {
+        return runCatching {
+            val packageName = game.packageName
+                ?: error("No Android package recorded for ${game.title}")
+            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+                ?: error("Android app not installed or not launchable: $packageName")
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            Timber.d(
+                "Native game intent resolved: gameId=${game.id}, title=${game.title}, package=$packageName, summary=${intent.toUri(Intent.URI_INTENT_SCHEME)}"
+            )
+            intent
+        }.onFailure { e ->
+            Timber.e(
+                e,
+                "Failed to build native game launch intent: gameId=${game.id}, title=${game.title}, package=${game.packageName.orEmpty()}"
+            )
+        }
+    }
+
+    /**
+     * Refuses a launch that would hand the emulator a dead handle (B1 preflight): package gone,
+     * COMPONENT activity dropped by an update, or a stale RetroArch core mapping. Public so the
+     * XMB direct-launch path can run the identical checks Game Detail's resolve applies —
+     * failures refuse with a repair message before startActivity instead of at it.
+     */
+    fun validateBeforeLaunch(game: Game, profile: EmulatorProfile) {
+        if (profile.intentType != IntentType.CUSTOM_COMMAND) {
+            try {
+                context.packageManager.getPackageInfo(profile.packageName, 0)
+            } catch (_: PackageManager.NameNotFoundException) {
+                error("Emulator not installed: ${profile.name} (${profile.packageName})")
+            }
+        }
+
+        // A COMPONENT launch targets a pinned activity by class name. If the emulator update
+        // dropped or renamed that activity, startActivity would throw ActivityNotFoundException
+        // at hand-off — catch it here so the failure names the repair instead.
+        if (profile.intentType == IntentType.COMPONENT) {
+            val activityClass = profile.activityClass ?: error("Activity class required for COMPONENT intent - profile: ${profile.name}")
+            try {
+                context.packageManager.getActivityInfo(
+                    ComponentName(profile.packageName, activityClass),
+                    0,
+                )
+            } catch (_: PackageManager.NameNotFoundException) {
+                error(
+                    "${profile.name} no longer provides its launch activity " +
+                        "($activityClass). Update the emulator, or pick another " +
+                        "emulator for this platform."
+                )
+            }
+        }
+
+        // ID-launch emulators (e.g. Vita3K) boot an installed title by its launch token, not a ROM
+        // file — there is nothing on disk for PFP to stat, so validate the token instead.
+        if (launchesByToken(profile)) {
+            if (game.launchToken.isNullOrBlank()) {
+                error("No launch ID recorded for ${game.title}. Re-scan its library.")
+            }
+        } else if (!game.romUri.isNullOrBlank()) {
+            // A SAF game launches from its granted content:// URI — PFP holds no raw path to stat,
+            // so just require the URI is present/parseable, then probe whether the grant still
+            // resolves. A revoked grant (volume unmounted, URI permission cleared) reaches the
+            // emulator as an unreadable URI and looks exactly like a black screen — the corpus's
+            // known-bad case. openFileDescriptor is the same handshake the emulator performs;
+            // refusing only on SecurityException keeps ambiguity (a transient I/O error) on the
+            // permissive side so a real failure stays detectable instead of being guessed at.
+            val romUri = runCatching { Uri.parse(game.romUri) }.getOrNull()
+                ?: error("This game's ROM link is invalid. Re-scan its library.")
+            try {
+                context.contentResolver.openFileDescriptor(romUri, "r")?.close()
+            } catch (_: SecurityException) {
+                error(
+                    "PSPLauncher lost access to this game's file. Reconnect the " +
+                        "storage and rescan its library."
+                )
+            } catch (_: Exception) {
+                // Anything else (a provider we cannot see from here, a transient I/O error) is
+                // ambiguous — never guess "broken" when the probe itself may be the problem.
+                // A genuinely revoked grant surfaces as SecurityException above.
+            }
+        } else {
+            val romPath = game.romPath ?: error("ROM path is required to launch ${game.title}")
+            if (!File(romPath).exists()) error("ROM file not found: $romPath")
+        }
+
+        if (profile.intentType == IntentType.COMPONENT && profile.coreMap.isNotEmpty()) {
+            val corePath = profile.corePathFor(game.platformId)
+            if (corePath.isNullOrBlank()) {
+                error("No RetroArch core configured for platform '${game.platformId}' in profile '${profile.name}'. Open RetroArch → Core Downloader to install a core for this system.")
+            }
+            // We cannot read /data/data/<pkg>/cores/ — it's the emulator's private internal
+            // storage. Skip the file-existence check and let RetroArch report a missing core.
+        }
+    }
+
+    // True when the profile boots by launch token (the {title_id} template appears in a string or
+    // array extra) rather than by ROM file — e.g. Vita3K's AppStartParameters.
+    private fun launchesByToken(profile: EmulatorProfile): Boolean =
+        profile.intentArrayExtras.values.flatten().any { it.contains(LaunchTemplate.TITLE_ID) } ||
+            profile.intentExtras.values.any { it.contains(LaunchTemplate.TITLE_ID) }
+
+    private suspend fun buildViewIntent(game: Game, profile: EmulatorProfile): Intent {
+        val uri = romLaunchUri(game, profile)
+        val activityClass = profile.activityClass
+        val mime = profile.mimeType ?: "application/octet-stream"
+
+        fun build(withType: Boolean, withComponent: Boolean): Intent =
+            Intent(Intent.ACTION_VIEW).apply {
+                // Android matching rule: if the intent sets a MIME type, the target's intent
+                // filter must ALSO declare a type. Some emulators (e.g. the AzaharPlus build on
+                // the Lime3DS package) declare ACTION_VIEW with only a content scheme and NO type,
+                // so a typed intent fails to resolve — hence the no-type fallback.
+                if (withType) setDataAndType(uri, mime) else data = uri
+                if (withComponent && activityClass != null) {
+                    component = ComponentName(profile.packageName, activityClass)
+                } else {
+                    setPackage(profile.packageName)
+                }
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                applyProfileFlags(profile)
+            }
+
+        // Most-specific first (preserves behaviour for emulators that already work), then relax:
+        // drop the MIME type (scheme-only filters), then drop the pinned component (resolve by the
+        // app's own declared ACTION_VIEW handler).
+        val candidates = listOf(
+            build(withType = true,  withComponent = true),
+            build(withType = false, withComponent = true),
+            build(withType = true,  withComponent = false),
+            build(withType = false, withComponent = false),
+        )
+        val intent = candidates.firstOrNull {
+            context.packageManager.queryIntentActivities(it, PackageManager.MATCH_DEFAULT_ONLY).isNotEmpty()
+        } ?: run {
+            Timber.w(
+                "Intent not resolvable: profile=${profile.name}, package=${profile.packageName}, uri=${uri.scheme}://, mime=$mime, activity=${activityClass ?: "(by package)"}"
+            )
+            error("${profile.name} cannot open this ROM type. Try reinstalling the emulator, or verify its app permissions in Android Settings.")
+        }
+
+        intent.grantReadPermissionIfNeeded(uri, game.title, profile.packageName)
+        Timber.d("View intent resolved: package=${profile.packageName}, type=${intent.type ?: "(none)"}, component=${intent.component?.shortClassName ?: "(by package)"}")
+        return intent
+    }
+
+    private suspend fun buildComponentIntent(game: Game, profile: EmulatorProfile): Intent {
+        val activity = profile.activityClass
+            ?: error("Activity class required for COMPONENT intent - profile: ${profile.name}")
+
+        val needsRomUri = profile.attachRomData ||
+            profile.intentExtras.values.any { it.contains(LaunchTemplate.ROM_URI) }
+        val romUri: Uri? = if (needsRomUri) {
+            // SAF game → the granted content URI; legacy game → a FileProvider URI from its raw path.
+            game.romUri?.takeIf { it.isNotBlank() }?.let { runCatching { Uri.parse(it) }.getOrNull() }
+                ?: romUriMinter.mint(game.romPath ?: error("ROM path required for ${profile.name}"))
+        } else null
+
+        val action = profile.intentAction ?: Intent.ACTION_MAIN
+        return Intent(action).apply {
+            component = ComponentName(profile.packageName, activity)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            applyProfileFlags(profile)
+
+            if (profile.attachRomData && romUri != null) data = romUri
+
+            profile.intentCategory?.let { addCategory(it) }
+
+            profile.intentExtras.forEach { (key, valueTemplate) ->
+                putExtra(key, resolveTemplate(valueTemplate, game, profile, romUri))
+            }
+            profile.intentBoolExtras.forEach { (key, value) ->
+                putExtra(key, value)
+            }
+            // String-array extras (e.g. Vita3K's AppStartParameters = ["-r", "<TITLE_ID>"]).
+            profile.intentArrayExtras.forEach { (key, templates) ->
+                putExtra(key, templates.map { resolveTemplate(it, game, profile, romUri) }.toTypedArray())
+            }
+
+            if (romUri != null) {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                clipData = ClipData.newUri(context.contentResolver, game.title, romUri)
+                context.grantUriPermission(profile.packageName, romUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+    }
+
+    private fun buildCustomCommandIntent(game: Game, profile: EmulatorProfile): Intent {
+        val command = profile.customCommand
+            ?: error("Custom command required for CUSTOM_COMMAND intent")
+        val resolved = resolveTemplate(command, game, profile)
+        Timber.d("Custom launch command resolved: $resolved")
+        return parseAmCommand(resolved, profile.packageName)
+    }
+
+    // The URI handed to an ACTION_VIEW emulator. A SAF game uses its granted content:// document URI
+    // directly (no FileProvider, no raw-file access by PFP). A legacy raw-path game keeps the prior
+    // behaviour: file:// on very old APIs when explicitly requested, else a FileProvider content URI.
+    private suspend fun romLaunchUri(game: Game, profile: EmulatorProfile): Uri {
+        game.romUri?.takeIf { it.isNotBlank() }?.let { return Uri.parse(it) }
+
+        val romPath = game.romPath ?: error("ROM path is required to launch ${game.title}")
+        if (profile.useFileUri && !profile.useSafUri && Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return Uri.fromFile(File(romPath))
+        }
+        if (profile.useFileUri && !profile.useSafUri) {
+            Timber.d(
+                "Profile ${profile.id} requests file:// ROM launch; using granted content:// URI on API ${Build.VERSION.SDK_INT}"
+            )
+        }
+        // Minted through RomUriMinter, which refuses any path outside a configured ROM source —
+        // the FileProvider's own root is far wider than a launch ever needs.
+        return romUriMinter.mint(romPath)
+            ?: error(
+                "${game.title} is not inside a configured ROM folder, so it cannot be handed to " +
+                    "${profile.name}. Check the folder set for this Memory Card in Settings."
+            )
+    }
+
+    private fun Intent.applyProfileFlags(profile: EmulatorProfile) {
+        profile.intentFlags.forEach { flag ->
+            when (flag) {
+                "CLEAR_TASK" -> addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                "CLEAR_TOP"  -> addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+        }
+    }
+
+    private fun Intent.grantReadPermissionIfNeeded(uri: Uri, title: String, packageName: String) {
+        if (uri.scheme != "content") return
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        clipData = ClipData.newUri(context.contentResolver, title, uri)
+        context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    private fun resolveTemplate(
+        template: String,
+        game: Game,
+        profile: EmulatorProfile,
+        romUri: Uri? = null,
+    ): String {
+        val romFile = game.romPath?.let { File(it) }
+        val corePath = profile.corePathFor(game.platformId) ?: ""
+
+        return template
+            .replace(LaunchTemplate.ROM_PATH, game.romPath ?: "")
+            .replace(LaunchTemplate.ROM_URI, romUri?.toString() ?: "")
+            .replace(LaunchTemplate.ROM_NAME, romFile?.nameWithoutExtension ?: "")
+            .replace(LaunchTemplate.ROM_DIR, romFile?.parent ?: "")
+            .replace(LaunchTemplate.CORE_PATH, corePath)
+            .replace(LaunchTemplate.CONFIG_PATH, retroarchConfigPath(profile.packageName))
+            .replace(LaunchTemplate.PACKAGE, profile.packageName)
+            .replace(LaunchTemplate.PLATFORM, game.platformId)
+            .replace(LaunchTemplate.TITLE_ID, game.launchToken ?: "")
+    }
+
+    private fun retroarchConfigPath(packageName: String): String =
+        "/storage/emulated/0/Android/data/$packageName/files/retroarch.cfg"
+
+    private fun parseAmCommand(command: String, packageName: String): Intent {
+        // Minimal am-start parser: extracts -e/--es key value pairs as intent extras.
+        // Full am-start syntax is not supported — use COMPONENT or ACTION_VIEW profiles instead.
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            setPackage(packageName)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val tokens = command.trim().split("\\s+".toRegex())
+        var i = 0
+        while (i < tokens.size) {
+            when (tokens[i]) {
+                "-e", "--es" -> {
+                    if (i + 2 < tokens.size) {
+                        intent.putExtra(tokens[i + 1], tokens[i + 2])
+                        i += 3
+                    } else i++
+                }
+                "-n" -> {
+                    if (i + 1 < tokens.size) {
+                        val cn = tokens[i + 1].split("/")
+                        if (cn.size == 2) intent.component = ComponentName(cn[0], cn[1])
+                        i += 2
+                    } else i++
+                }
+                else -> i++
+            }
+        }
+        Timber.d("Parsed am command: package=$packageName, extras=${intent.extras?.keySet()?.joinToString()}, component=${intent.component}")
+        return intent
+    }
+
+    // corePathFor / platformAliases / normalizeRetroArchCorePath live in
+    // EmulatorPlatformMapping.kt (shared with EmulatorProfileRepository and the launch ladder) so
+    // the path shown to users and the path handed to RetroArch can never drift.
+}

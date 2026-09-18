@@ -3,13 +3,12 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 REM ============================================================
 REM  Play Field Portal - Release APK Builder
-REM  Builds a signed release APK for the chosen flavor. Gradle's
-REM  copy{Flavor}ReleaseToDist task (app/build.gradle.kts) is what
-REM  renames and drops the APK into <root>\dist as
-REM  PlayFieldPortal-<version>-<flavor>.apk -- this script drives
-REM  and verifies that, it never copies or renames on its own.
+REM  Builds the signed release APK. Gradle's copyReleaseToDist
+REM  task (app/build.gradle.kts) is what renames and drops it into
+REM  <root>\dist as PSPLauncher-<version>.apk -- this script
+REM  drives and verifies that, it never copies or renames on its own.
 REM
-REM  Usage: build-release-apk.bat [full^|lite^|both]
+REM  Usage: build-release-apk.bat
 REM ============================================================
 
 pushd "%~dp0"
@@ -20,32 +19,6 @@ echo.
 echo ========================================
 echo Play Field Portal - Release APK Builder
 echo ========================================
-
-REM -- Flavor selection (argument wins over the prompt) ---------
-set "_CHOICE=%~1"
-if not defined _CHOICE (
-    echo.
-    echo Choose flavor:
-    echo   1. full   ^(includes the Discord Social SDK^)
-    echo   2. lite   ^(smaller download, no Discord native libs^)
-    echo   3. both
-    echo.
-    set /p "_CHOICE=Flavor [1-3]: "
-)
-
-set "_FLAVORS="
-if /i "%_CHOICE%"=="1"    set "_FLAVORS=full"
-if /i "%_CHOICE%"=="full" set "_FLAVORS=full"
-if /i "%_CHOICE%"=="2"    set "_FLAVORS=lite"
-if /i "%_CHOICE%"=="lite" set "_FLAVORS=lite"
-if /i "%_CHOICE%"=="3"    set "_FLAVORS=full lite"
-if /i "%_CHOICE%"=="both" set "_FLAVORS=full lite"
-
-if not defined _FLAVORS (
-    echo ERROR: invalid flavor selection "%_CHOICE%". Expected 1, 2, 3, full, lite or both. 1>&2
-    popd
-    exit /b 1
-)
 
 REM -- Signing preflight ---------------------------------------
 if not exist "%~dp0keystore.properties" (
@@ -71,16 +44,10 @@ if not defined _VERSION (
     exit /b 1
 )
 
-REM -- Build the Gradle task list ------------------------------
-set "_TASKS="
-for %%F in (%_FLAVORS%) do (
-    if "%%F"=="full" set "_TASKS=!_TASKS! :app:assembleFullRelease"
-    if "%%F"=="lite" set "_TASKS=!_TASKS! :app:assembleLiteRelease"
-)
+set "_TASKS= :app:assembleRelease"
 
 echo.
 echo Version : %_VERSION%
-echo Flavor  : %_FLAVORS%
 echo Tasks   :%_TASKS%
 echo Log     : %LOG%
 echo.
@@ -112,19 +79,17 @@ echo BUILD SUCCESS
 echo ========================================
 echo.
 echo Artifacts in %~dp0dist:
-for %%F in (%_FLAVORS%) do (
-    set "_APK=%~dp0dist\PlayFieldPortal-%_VERSION%-%%F.apk"
-    if exist "!_APK!" (
-        for %%A in ("!_APK!") do echo   %%~nxA   ^(%%~zA bytes^)
-    ) else (
-        echo   MISSING: PlayFieldPortal-%_VERSION%-%%F.apk 1>&2
-        set "_FAIL=1"
-    )
+set "_APK=%~dp0dist\PSPLauncher-%_VERSION%.apk"
+if exist "!_APK!" (
+    for %%A in ("!_APK!") do echo   %%~nxA   ^(%%~zA bytes^)
+) else (
+    echo   MISSING: PSPLauncher-%_VERSION%.apk 1>&2
+    set "_FAIL=1"
 )
 
 if "%_FAIL%"=="1" (
     echo.
-    echo ERROR: Gradle succeeded but an expected APK is not in dist. 1>&2
+    echo ERROR: Gradle succeeded but the expected APK is not in dist. 1>&2
     echo Check the copy task in app\build.gradle.kts and the log: %LOG% 1>&2
     popd
     exit /b 1

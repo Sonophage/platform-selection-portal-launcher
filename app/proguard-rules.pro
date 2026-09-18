@@ -12,11 +12,11 @@
 -keepclasseswithmembers class kotlinx.serialization.json.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep,includedescriptorclasses class com.playfieldportal.**$$serializer { *; }
--keepclassmembers class com.playfieldportal.** {
+-keep,includedescriptorclasses class com.psplauncher.**$$serializer { *; }
+-keepclassmembers class com.psplauncher.** {
     *** Companion;
 }
--keepclasseswithmembers class com.playfieldportal.** {
+-keepclasseswithmembers class com.psplauncher.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 
@@ -32,8 +32,8 @@
 # (matches a ProvidableCompositionLocal[] array return type), so it never fires, R8
 # renames the method, the reflection fails, and ANY read of the lifecycle-compose
 # local crashes release builds with "CompositionLocal LocalLifecycleOwner not
-# present" (debug is unaffected — nothing is renamed there). Seen on the Discord QR
-# login screen. Keep the real signature so the bridge works.
+# present" (debug is unaffected — nothing is renamed there). Keep the real signature
+# so the bridge works.
 -keep public class androidx.compose.ui.platform.AndroidCompositionLocals_androidKt {
     public static androidx.compose.runtime.ProvidableCompositionLocal getLocalLifecycleOwner();
 }

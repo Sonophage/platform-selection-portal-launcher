@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace  = "com.playfieldportal.feature.achievements"
+    namespace  = "com.psplauncher.feature.achievements"
     compileSdk = 37
     defaultConfig { minSdk = 29 }
     compileOptions {

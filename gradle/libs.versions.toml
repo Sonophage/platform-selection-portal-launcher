@@ -28,7 +28,6 @@ activity-compose        = "1.13.0"
 splashscreen            = "1.2.0"
 accompanist             = "0.37.3"
 media3                  = "1.11.0"
-zxing                   = "3.5.4"
 # OkHttp is never declared directly: it arrives transitively through Coil's network fetcher,
 # Retrofit (Steam) and ktor-client-okhttp, which resolves it to 5.3.2. The version is pinned here
 # only so the one OkHttp artifact that would otherwise stay on 4.12.0 — RetroAchievements'
@@ -111,7 +110,6 @@ coil-network-okhttp             = { group = "io.coil-kt.coil3",       name = "co
 coil-gif                        = { group = "io.coil-kt.coil3",       name = "coil-gif",                    version.ref = "coil" }
 
 # Discord Social integration
-zxing-core                      = { group = "com.google.zxing",       name = "core",                        version.ref = "zxing" }
 androidx-browser                = { group = "androidx.browser",       name = "browser",                     version.ref = "browser" }
 
 # Ktor (networking)

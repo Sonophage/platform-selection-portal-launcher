@@ -7,7 +7,7 @@
 }
 
 android {
-    namespace  = "com.playfieldportal.feature.xmb"
+    namespace  = "com.psplauncher.feature.xmb"
     compileSdk = 37
     defaultConfig { minSdk = 29 }
     compileOptions {
@@ -52,10 +52,6 @@ dependencies {
     implementation(project(":feature:feature-artwork"))
     implementation(project(":feature:feature-achievements"))
     implementation(project(":feature:feature-library"))
-    // Discord Social section — QR login screen. The native SDK bridge is not referenced here; the
-    // app module owns it (full flavor only), so feature-xmb stays flavor-agnostic.
-    implementation(project(":feature:feature-social"))
-
     // Renders @Preview composables in Android Studio (same as feature-settings / feature-appbar).
     debugImplementation(libs.compose.ui.tooling)
 

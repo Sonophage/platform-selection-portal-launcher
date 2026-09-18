@@ -7,7 +7,7 @@
 }
 
 android {
-    namespace  = "com.playfieldportal.feature.launcher"
+    namespace  = "com.psplauncher.feature.launcher"
     compileSdk = 37
     defaultConfig { minSdk = 29 }
     compileOptions {

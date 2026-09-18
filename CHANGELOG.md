@@ -1,9 +1,67 @@
 # Changelog
 
-All notable changes to Play Field Portal are documented here. This project follows
+All notable changes to PSPLauncher are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+### Changed
+- **Renamed to PSPLauncher, with a new mark.** The launcher is now PSPLauncher — the repository's
+  own name read as an initialism (Platform Selection Portal). The PlayField "P" is replaced by a
+  **PSP** wordmark, supplied as two purpose-cut assets in `core:core-ui`:
+  `psp_icon_mark.png` is the launcher icon's foreground and its Android 13+ themed-icon monochrome
+  layer — white on transparency, placed inside the adaptive icon's 66dp safe circle so no launcher
+  mask can clip it — over a black background layer. `psp_logo.png` is the boot mark, the wordmark
+  in a ring; it draws through `PortalIcon` rather than a plain `Image`, which is what that entry
+  point is for: the alpha carries the shape and the tint replaces the colour, so the art is legible
+  on the wave and follows the theme's icon colour instead of a hardcoded white. It is sized as a
+  fraction of the screen's short edge rather than a fixed dp box, so it never overflows a small
+  screen. The old raster art (`ic_launcher_foreground.png`, `pfp_boot_logo.webp`) is deleted, and
+  Credits drops its "App Icon & Logo" section, since that artwork no longer ships.
+- **Package renamed to `com.psplauncher`.** `com.playfieldportal` is gone from every namespace,
+  source path, manifest and ProGuard rule; `applicationId` is now `com.psplauncher.launcher` and
+  the release APKs are named `PSPLauncher-<version>.apk`. Room's exported schema history moved with
+  it (`schemas/com.psplauncher.core.data.database.PFPDatabase/`), since the export directory is
+  keyed by the database class's fully-qualified name and the migration tests read it back. The
+  FileProvider authority needed no change: it was already derived as `${applicationId}.fileprovider`
+  rather than written out. **The `/storage/emulated/0/PlayFieldPortal/` folder keeps its name** —
+  it holds real user themes and backups, and renaming it is a data move, not a string change. The
+  new application id cannot upgrade an install of the old one; migrate with Backup & Restore.
+
+### Removed
+- **Discord Social, and with it the Full/Lite split.** The Social column, the Discord account and
+  friends list, activity/presence sharing, voice rooms and push-to-talk are gone, along with the
+  `:discord:discord-native` NDK/CMake bridge, the vendored Discord SDK aars (Git LFS), and
+  `:feature:feature-social`. The two product flavors existed only to include or omit that SDK, so
+  the `distribution` dimension goes too: there is now one build, and the application id loses the
+  `.lite` suffix. Settings ▸ About drops its Edition row, the twelve `catbar_social` /
+  `item_social_*` icon slots leave the theme schema, `SYSTEM_ALERT_WINDOW` (the PTT overlay's
+  permission) leaves the manifest, and the eleven Discord preference keys leave backup — restore
+  ignores keys it does not know, so an older `.pfpbackup` still restores. Ktor drops out of
+  `:core:core-data` and zxing out of the version catalog; both were there only for the QR login.
+
+### Fixed
+- **Restore refused the backups this app writes.** `BoundedZipReader` was introduced as the one
+  bounded ZIP reader for themes, the theme codec and backup restore, and its own header records
+  that "the backup reader capped nothing. Taking the union makes the strongest reader the floor" —
+  which handed restore the THEME limits: 512 entries, 32 MB per entry, 128 MB in total.
+  `BackupManager` caps nothing on the writing side and bundles `artwork/`, `wallpaper/`,
+  `custom-icons/` and `ui-media/` whole, so a real library's backup is thousands of files and
+  gigabytes. The two sides disagreed: a 1.53 GB archive written minutes earlier was refused,
+  `RestoreWorker` returned FAILURE after three seconds, and the screen said nothing at all.
+  Restore now passes `BACKUP_ZIP_LIMITS` (200,000 entries, 256 MB per entry, 32 GB total) — sized
+  for a library rather than for a `.pfptheme` from a stranger, while still refusing a bomb. The
+  default parameter on `RestoreArchive.read` stays theme-sized on purpose, so a caller that
+  forgets is refused loudly instead of running unbounded.
+- **A restored backup can no longer put a retired category column back.** Restore upserts whatever
+  categories the archive carried, and the archive is usually written by the older build you are
+  migrating away from — so a pre-removal backup reinstated the Social column, which then drew with
+  no icon (its entry is gone from the catalog) and did nothing when selected, because the shell has
+  no branch for it any more. `BuiltInCategory.RETIRED_IDS` now names the ids this build has dropped
+  and `CategoryRepositoryImpl.pruneRetiredCategories()` sweeps their rows and category items — on
+  every cold start's reconcile, and once more straight after a restore so the dead column never
+  survives even until the next launch. It is the same job `UiMediaStore.pruneOrphans()` already did
+  for retired media slots, one table over; as with those keys, a retired id is never reused.
 
 ### Added
 - **Drag anywhere to scroll, and back out by going left (C15).** Two input-model gaps on the same
@@ -712,7 +770,7 @@ theme system** — `.pfptheme` bundles with custom icons and per-theme layout, P
   (one SAF grant; replacing overwrites it — the picker opens pre-pointed at the saved folder so
   re-granting after a restore is one tap), and *Rescan* (fast incremental — new files in, deleted
   files out). Photo settings also has *Clear Thumbnail Cache*; Music/Video have a **Default Player**
-  choice (Play Field Portal / System Default / a chosen app). Libraries update automatically after a
+  choice (PSPLauncher / System Default / a chosen app). Libraries update automatically after a
   scan. The XMB media sections show a single "＋ Add" getting-started row that opens the matching
   Settings section and disappears once a root has been added and scanned (even if it finds nothing).
 - **Backups saved to a folder you choose.** *Back Up Now* writes the `.pfpbackup` into a

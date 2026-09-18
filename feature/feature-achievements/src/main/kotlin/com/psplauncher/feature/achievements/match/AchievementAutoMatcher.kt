@@ -1,0 +1,357 @@
+package com.psplauncher.feature.achievements.match
+
+import com.psplauncher.core.data.database.dao.AchievementMatchNoteDao
+import com.psplauncher.core.data.database.dao.ProviderGameLinkDao
+import com.psplauncher.core.data.database.entity.AchievementMatchNoteEntity
+import com.psplauncher.core.domain.achievement.AchievementProvider
+import com.psplauncher.core.domain.model.Game
+import com.psplauncher.core.domain.repository.GameRepository
+import com.psplauncher.feature.achievements.AchievementController
+import com.psplauncher.feature.achievements.provider.retro.RaHashLookup
+import com.psplauncher.feature.achievements.provider.retro.RaHashResolver
+import com.psplauncher.feature.achievements.provider.steam.SteamShortcut
+import kotlinx.coroutines.flow.first
+import timber.log.Timber
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/** A game the auto-matcher couldn't link, with a plain reason for the report. */
+data class UnmatchedGame(
+    val gameId: Long,
+    val title: String,
+    val platformId: String,
+    val reason: String,
+)
+
+/** Outcome of an auto-match run: what got linked and what didn't. */
+data class MatchReport(
+    val matched: Int,
+    val unmatched: List<UnmatchedGame>,
+)
+
+/**
+ * Batch-links unlinked games to their achievement provider: Steam PC games by title, and
+ * RetroAchievements ROMs by content hash (cartridge systems). Anything it can't resolve is
+ * returned in the report for the user to link by hand. See docs/shiba-coins-achievements-plan.md.
+ */
+@Singleton
+class AchievementAutoMatcher @Inject constructor(
+    private val gameRepository: GameRepository,
+    private val linkDao: ProviderGameLinkDao,
+    private val matchNoteDao: AchievementMatchNoteDao,
+    private val raHashResolver: RaHashResolver,
+    private val repository: AchievementController,
+    private val romReader: RomBytesReader,
+    private val discOpener: DiscImageOpener,
+    private val steamGridDb: com.psplauncher.feature.artwork.api.SteamGridDbApi,
+    private val localSteamDiscovery: com.psplauncher.feature.achievements.provider.localsteam.LocalSteamDiscovery,
+    private val localSteamOwnership: com.psplauncher.feature.achievements.provider.localsteam.LocalSteamOwnership,
+    private val steamNames: com.psplauncher.feature.achievements.provider.steam.SteamAppListResolver,
+) {
+    private sealed interface Outcome {
+        data object Matched : Outcome
+        data class Unmatched(val reason: String) : Outcome
+    }
+
+    // How the ROM/disc hashing step turned out, so the failure reason can name the actual cause.
+    private sealed interface HashAttempt {
+        data class Hashed(val hash: String) : HashAttempt
+        data object Unreadable : HashAttempt          // cartridge bytes couldn't be read
+        data object DiscUnreadable : HashAttempt      // disc image couldn't be opened (bad/unsupported format)
+        data object DiscUnidentified : HashAttempt    // disc opened but its boot executable wasn't found
+        data object NoHasher : HashAttempt            // RA console, but this system's format isn't hashed yet
+    }
+
+    /** Matches every unlinked game; [onProgress] reports (done, total). */
+    suspend fun matchUnlinked(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): MatchReport {
+        emuFolderCache = null   // fresh discovery per run — the singleton outlives folder changes
+        val unlinked = gameRepository.observeGamesOnly().first()
+            .filter { linkDao.getForGame(it.id) == null }
+
+        // Notes are rewritten from scratch: this run's unmatched set is the source of truth.
+        matchNoteDao.clear()
+        val now = System.currentTimeMillis()
+
+        var matched = 0
+        val unmatched = mutableListOf<UnmatchedGame>()
+        Timber.d("auto-match: %d unlinked of %d games", unlinked.size, unlinked.size)
+        unlinked.forEachIndexed { index, game ->
+            onProgress(index, unlinked.size)
+            val outcome = matchOne(game)
+            Timber.d("auto-match [%s] %s -> %s", game.platformId, game.displayTitle, outcome)
+            when (outcome) {
+                Outcome.Matched -> matched++
+                is Outcome.Unmatched -> {
+                    unmatched += UnmatchedGame(game.id, game.displayTitle, game.platformId, outcome.reason)
+                    matchNoteDao.upsert(AchievementMatchNoteEntity(game.id, outcome.reason, now))
+                }
+            }
+        }
+        onProgress(unlinked.size, unlinked.size)
+        return MatchReport(matched, unmatched)
+    }
+
+    /**
+     * Single-game Auto-Match for a launcher-managed ("legit") Steam copy: the same STEAM resolution
+     * ladder the batch run uses (embedded appid, SteamGridDB, title). Returns true when linked.
+     */
+    suspend fun matchSingleAsSteam(gameId: Long): Boolean {
+        val game = gameRepository.getById(gameId) ?: return false
+        return matchSteam(game) is Outcome.Matched
+    }
+
+    /** Outcome of the explicit per-game RetroAchievements hash match. */
+    sealed interface RaMatchResult {
+        data object Matched : RaMatchResult
+        /** The hash pipeline's plain-language reason — the same strings the batch report uses. */
+        data class Unmatched(val reason: String) : RaMatchResult
+    }
+
+    /**
+     * Single-game Auto-Match for a RetroAchievements-platform game: hash-only, running exactly
+     * the per-game pipeline [matchUnlinked] uses (read/hash the ROM or disc, look the hash up in
+     * the console's registered list). No title fallback and no manual entry — RA identifies
+     * games solely by content hash. The game's match note is updated to mirror this attempt so
+     * the Shiba Library's Untracked view stays truthful.
+     */
+    suspend fun matchSingleByHash(gameId: Long): RaMatchResult {
+        val game = gameRepository.getById(gameId)
+            ?: return RaMatchResult.Unmatched("Game not found")
+        return when (val outcome = matchOne(game)) {
+            Outcome.Matched -> {
+                matchNoteDao.deleteForGame(gameId)
+                RaMatchResult.Matched
+            }
+            is Outcome.Unmatched -> {
+                matchNoteDao.upsert(
+                    AchievementMatchNoteEntity(gameId, outcome.reason, System.currentTimeMillis()),
+                )
+                RaMatchResult.Unmatched(outcome.reason)
+            }
+        }
+    }
+
+    /** Outcome of the explicit per-game Local Steam match, so the UI can say what to fix. */
+    sealed interface LocalSteamMatchResult {
+        data object Matched : LocalSteamMatchResult
+        /** No emu-marked folders at all — the kit isn't set up (or tracking is off). */
+        data object NoEmuFolders : LocalSteamMatchResult
+        /** Folders exist but none maps to this game's name — a rename fixes it. */
+        data class NoNameMatch(val folderNames: List<String>) : LocalSteamMatchResult
+    }
+
+    /**
+     * Single-game Auto-Match for a non-Steam copy: emu-marked game folders only, linking
+     * LOCAL_STEAM from the matching folder's own appid. Because this is an explicit action on
+     * ONE game, the ladder is wider than the bulk reconcile's exact-name rule: the folder
+     * appid's official Steam name, then a containment match when it singles out exactly one
+     * folder (e.g. "Resonance of Fate" against "RESONANCE OF FATE 4K_HD EDITION").
+     */
+    suspend fun matchSingleAsLocalSteam(gameId: Long): LocalSteamMatchResult {
+        val game = gameRepository.getById(gameId) ?: return LocalSteamMatchResult.NoEmuFolders
+        emuFolderCache = null   // fresh discovery — the singleton outlives folder changes
+        val folders = emuFolders()
+        if (folders.isEmpty()) return LocalSteamMatchResult.NoEmuFolders
+        val titles = steamTitleCandidates(game).map { normalizePc(it) }.filter { it.isNotEmpty() }
+
+        // 1 — exact normalized name equality (the bulk reconcile's rule).
+        var folder = folders.firstOrNull { normalizePc(it.folderName) in titles }
+
+        // 2 — Steam-name bridge: the folder's own appid resolved to its official store name.
+        if (folder == null) {
+            folder = folders.firstOrNull { f ->
+                steamNames.officialNameOf(f.appId)?.let { normalizePc(it) in titles } == true
+            }
+        }
+
+        // 3 — containment, only when it singles out exactly one folder. The bulk pass must
+        // never guess, but a unique superset/subset name on a user-picked game is unambiguous.
+        if (folder == null) {
+            folder = folders.filter { f ->
+                val name = normalizePc(f.folderName)
+                // Empty normalized names (symbol-only folders) would contain-match every title.
+                name.isNotEmpty() && titles.any { name.contains(it) || it.contains(name) }
+            }.singleOrNull()
+        }
+
+        if (folder == null) return LocalSteamMatchResult.NoNameMatch(folders.map { it.folderName })
+        repository.linkManually(game.id, AchievementProvider.LOCAL_STEAM, folder.appId)
+        localSteamOwnership.classify(game.id, folder.appId)
+        return LocalSteamMatchResult.Matched
+    }
+
+    private suspend fun matchOne(game: Game): Outcome {
+        if (game.platformId == "windows") return matchWindows(game)
+        // RetroAchievements is hash-only: a game links solely by its ROM/disc content hash, never
+        // by title. If the hash isn't a registered RA hash, the game stays untracked.
+        val consoleId = RaConsole.idFor(game.platformId)
+            ?: return Outcome.Unmatched("RetroAchievements has no achievements for ${platformLabel(game.platformId)}")
+
+        val attempt = attemptHash(game)
+        // Log the computed content hash so a known-good title can be checked against RA's "Supported
+        // Game Files" list (a mismatch = wrong dump / romhack; a match that stays unlinked = not on RA).
+        if (attempt is HashAttempt.Hashed) {
+            Timber.d("auto-match hash [%s] %s = %s", game.platformId, game.displayTitle, attempt.hash)
+        }
+        if (attempt !is HashAttempt.Hashed) return Outcome.Unmatched(reasonFor(attempt))
+
+        return when (val lookup = raHashResolver.lookup(consoleId, attempt.hash)) {
+            is RaHashLookup.Found -> {
+                repository.linkManually(game.id, AchievementProvider.RETRO_ACHIEVEMENTS, lookup.gameId)
+                Outcome.Matched
+            }
+            RaHashLookup.NotRegistered ->
+                Outcome.Unmatched("ROM hash isn't registered on RetroAchievements")
+            RaHashLookup.Unavailable ->
+                Outcome.Unmatched(
+                    "Couldn't load the RetroAchievements game list — check your connection and " +
+                        "your RetroAchievements credentials in Settings, then run Auto-Match again",
+                )
+        }
+    }
+
+    // Windows games are folder-first (docs/windows-library-refactor-plan.md section 5): an
+    // emu-marked game folder mapping to this game by normalized title links LOCAL_STEAM with the
+    // folder's own appid — no guessing — and gets its ownership classified. No folder means the
+    // copy is launcher-managed ("most likely legit") and the STEAM ladder decides.
+    private suspend fun matchWindows(game: Game): Outcome {
+        emuFolders().firstOrNull { folder ->
+            steamTitleCandidates(game).any { normalizePc(it) == normalizePc(folder.folderName) }
+        }?.let { folder ->
+            repository.linkManually(game.id, AchievementProvider.LOCAL_STEAM, folder.appId)
+            localSteamOwnership.classify(game.id, folder.appId)
+            return Outcome.Matched
+        }
+        val steam = matchSteam(game)
+        if (steam is Outcome.Unmatched) {
+            return Outcome.Unmatched(
+                "Not found on Steam, and no Steam-emulator data in your windows game folders " +
+                    "(a DRM-free or non-Steam copy has no achievement data)",
+            )
+        }
+        return steam
+    }
+
+    // One discovery pass per auto-match run; windows games all match against the same folder set.
+    private var emuFolderCache: List<com.psplauncher.feature.achievements.provider.localsteam.LocalSteamGame>? = null
+    private suspend fun emuFolders(): List<com.psplauncher.feature.achievements.provider.localsteam.LocalSteamGame> =
+        emuFolderCache ?: runCatching { localSteamDiscovery.scan() }.getOrDefault(emptyList())
+            .also { emuFolderCache = it }
+
+    private fun normalizePc(title: String): String = title.lowercase().filter { it.isLetterOrDigit() }
+
+    // Steam PC games resolve down a ladder: the appid the shortcut already carries (deterministic),
+    // then SteamGridDB's platform data (if we have an SGDB id), then the title match.
+    private suspend fun matchSteam(game: Game): Outcome {
+        SteamShortcut.appIdFrom(game)?.let { appId ->
+            repository.linkManually(game.id, AchievementProvider.STEAM, appId)
+            return Outcome.Matched
+        }
+        game.steamGridDbId?.let { sgdbId ->
+            steamGridDb.getSteamAppId(sgdbId)?.let { appId ->
+                repository.linkManually(game.id, AchievementProvider.STEAM, appId)
+                return Outcome.Matched
+            }
+        }
+        // Try each title variant — a user's shortened display override (e.g. "Resonance of Fate")
+        // must not hide the full store name ("RESONANCE OF FATE.../4K/HD EDITION") that Steam lists.
+        for (title in steamTitleCandidates(game)) {
+            if (repository.resolveSteamLink(game.id, title) != null) return Outcome.Matched
+        }
+        return Outcome.Unmatched("Not found on Steam (no embedded appid, no SteamGridDB or title match)")
+    }
+
+    // Full title first (most complete), then any scraped title, then the display override.
+    private fun steamTitleCandidates(game: Game): List<String> =
+        listOfNotNull(game.title, game.scrapedTitle, game.displayTitle)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+
+    // Computes the RA content hash, naming the failure mode when it can't. Cartridges hash from a
+    // full byte read; disc images hash from a seeking reader (they're far too large to load whole).
+    private suspend fun attemptHash(game: Game): HashAttempt {
+        if (RaRomHasher.isSupported(game.platformId)) {
+            // NDS carts run up to 256 MB; hash the header + code + icon via a seeking reader instead
+            // of loading the whole ROM into one allocation (OOM). Zipped ROMs can't be seeked, so they
+            // take the in-memory path (a zipped 256 MB cart is rare, and unzips to the same size).
+            if (game.platformId == "nds" && !game.isZippedRom()) {
+                val source = discOpener.openRawSource(game) ?: return HashAttempt.Unreadable
+                val hash = source.use { RaRomHasher.hashNds(it) } ?: return HashAttempt.Unreadable
+                return HashAttempt.Hashed(hash)
+            }
+            val bytes = romReader.read(game) ?: return HashAttempt.Unreadable
+            val hash = RaRomHasher.hash(game.platformId, bytes) ?: return HashAttempt.Unreadable
+            return HashAttempt.Hashed(hash)
+        }
+        // CHD container: its hunks decompress to the same logical sectors as the uncompressed disc,
+        // so it feeds the normal CD hashers (PSX/PS2/Saturn/Sega CD). Intercept before the raw-image
+        // openers, which can't parse a compressed container.
+        if (game.isChdImage()) {
+            val image = discOpener.openChd(game) ?: return HashAttempt.DiscUnreadable
+            val hash = image.use { hashCdDiscImage(game.platformId, it) }
+            return if (hash == null) HashAttempt.DiscUnidentified else HashAttempt.Hashed(hash)
+        }
+        if (RaNintendoDiscHasher.isSupported(game.platformId)) {
+            val source = discOpener.openRawSource(game) ?: return HashAttempt.DiscUnreadable
+            val hash = source.use { RaNintendoDiscHasher.hash(game.platformId, it) }
+            return if (hash == null) HashAttempt.DiscUnidentified else HashAttempt.Hashed(hash)
+        }
+        if (RaSegaDiscHasher.isSupported(game.platformId)) {
+            val image = discOpener.openRawCd(game) ?: return HashAttempt.DiscUnreadable
+            val hash = image.use { RaSegaDiscHasher.hash(it) }
+            return if (hash == null) HashAttempt.DiscUnidentified else HashAttempt.Hashed(hash)
+        }
+        if (RaDreamcastHasher.isSupported(game.platformId)) {
+            val image = discOpener.openGdi(game) ?: return HashAttempt.DiscUnreadable
+            val hash = image.use { RaDreamcastHasher.hash(it) }
+            return if (hash == null) HashAttempt.DiscUnidentified else HashAttempt.Hashed(hash)
+        }
+        if (RaDiscHasher.isSupported(game.platformId)) {
+            val image = discOpener.open(game) ?: return HashAttempt.DiscUnreadable
+            val hash = image.use { RaDiscHasher.hash(game.platformId, it) }
+            return if (hash == null) HashAttempt.DiscUnidentified else HashAttempt.Hashed(hash)
+        }
+        return HashAttempt.NoHasher
+    }
+
+    // A CHD's logical sectors feed whichever disc hasher fits the platform — including Dreamcast
+    // GD-ROM, whose ISO track the CHD reader anchors via firstTrackSector. GameCube/Wii (raw DVD, not
+    // CD frames) aren't covered by the CD reader, so they return null here.
+    private fun hashCdDiscImage(platformId: String, image: DiscImage): String? = when {
+        RaSegaDiscHasher.isSupported(platformId) -> RaSegaDiscHasher.hash(image)
+        RaDreamcastHasher.isSupported(platformId) -> RaDreamcastHasher.hash(image)
+        RaDiscHasher.isSupported(platformId) -> RaDiscHasher.hash(platformId, image)
+        else -> null
+    }
+
+    private fun Game.isChdImage(): Boolean =
+        romPath?.endsWith(".chd", ignoreCase = true) == true ||
+            romUri?.endsWith(".chd", ignoreCase = true) == true
+
+    private fun Game.isZippedRom(): Boolean =
+        romPath?.endsWith(".zip", ignoreCase = true) == true ||
+            romUri?.endsWith(".zip", ignoreCase = true) == true
+
+    // Why the ROM/disc didn't hash to a registered RetroAchievements game (RA is hash-only).
+    private fun reasonFor(attempt: HashAttempt): String = when (attempt) {
+        is HashAttempt.Hashed -> "ROM hash isn't registered on RetroAchievements"
+        HashAttempt.Unreadable -> "Couldn't read the ROM file"
+        HashAttempt.DiscUnreadable -> "Unsupported disc image (e.g. NKit, CHD, or compressed) — can't hash"
+        HashAttempt.DiscUnidentified -> "Couldn't find the disc's boot executable"
+        HashAttempt.NoHasher -> "Disc hashing for this system isn't supported yet"
+    }
+
+    // Friendly names for the systems RetroAchievements doesn't cover, so the note reads naturally.
+    private fun platformLabel(platformId: String): String = when (platformId) {
+        "x360" -> "Xbox 360"
+        "xbox" -> "Xbox"
+        "xboxone" -> "Xbox One"
+        "psvita" -> "PS Vita"
+        "ps4" -> "PlayStation 4"
+        "n3ds" -> "Nintendo 3DS"
+        "wiiu" -> "Wii U"
+        "switch" -> "Nintendo Switch"
+        else -> "this system ($platformId)"
+    }
+}

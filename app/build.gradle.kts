@@ -18,11 +18,11 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.playfieldportal.launcher"
+    namespace = "com.psplauncher.launcher"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.playfieldportal.launcher"
+        applicationId = "com.psplauncher.launcher"
         minSdk = 29           // Android 10 — Winlator minimum
         targetSdk = 35
         versionCode = 10
@@ -59,21 +59,6 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
-        }
-    }
-
-    // "full" ships the Discord Social SDK; "lite" excludes it (see the flavor-scoped dependency
-    // below) for a much smaller download. The lite flavor hides the Social section at runtime via
-    // DiscordSessionActivator.sdkAvailable and binds no-op Discord components.
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("full") {
-            dimension = "distribution"
-        }
-        create("lite") {
-            dimension = "distribution"
-            applicationIdSuffix = ".lite"
-            versionNameSuffix = "-lite"
         }
     }
 
@@ -120,49 +105,40 @@ dependencies {
     implementation(project(":feature:feature-settings"))
     implementation(project(":feature:feature-appbar"))
     implementation(project(":feature:feature-backup"))
-    implementation(project(":feature:feature-social"))
-    // Native Discord SDK bridge — provides the DiscordSessionActivator Hilt binding + the .so.
-    // Discord SDK only in the "full" flavor — the native libs (WebRTC + Krisp) are the largest part
-    // of the download, so "lite" omits them entirely.
-    "fullImplementation"(project(":discord:discord-native"))
 
     debugImplementation(libs.compose.ui.tooling)
 }
 
 // ── Release artifact collection ──────────────────────────────────────────────
 // Mirror every release APK into <root>/dist so all shippable builds land in one
-// predictable, gitignored place. Each assemble{Flavor}Release finalizes into its
+// predictable, gitignored place. assembleRelease finalizes into its
 // copy, so the APK is always in dist after a release build (or `./gradlew dist`).
 val distDir = rootProject.layout.projectDirectory.dir("dist")
 val appVersion = android.defaultConfig.versionName ?: "0"
-listOf("Full", "Lite").forEach { flavor ->
-    val copyApk = tasks.register<Copy>("copy${flavor}ReleaseToDist") {
-        from(layout.buildDirectory.dir("outputs/apk/${flavor.lowercase()}/release"))
-        include("*.apk")
-        // Clean, versioned name in dist (e.g. PlayFieldPortal-1.1.0-full.apk).
-        rename { "PlayFieldPortal-$appVersion-${flavor.lowercase()}.apk" }
-        into(distDir)
-        // dist is a shared, versioned drop folder — always refresh so the current build is
-        // guaranteed present even when the APK itself is up-to-date.
-        outputs.upToDateWhen { false }
-    }
-    tasks.matching { it.name == "assemble${flavor}Release" }.configureEach {
-        finalizedBy(copyApk)
-    }
+val copyReleaseApk = tasks.register<Copy>("copyReleaseToDist") {
+    from(layout.buildDirectory.dir("outputs/apk/release"))
+    include("*.apk")
+    // Clean, versioned name in dist (e.g. PSPLauncher-1.3.0.apk).
+    rename { "PSPLauncher-$appVersion.apk" }
+    into(distDir)
+    // dist is a shared, versioned drop folder — always refresh so the current build is
+    // guaranteed present even when the APK itself is up-to-date.
+    outputs.upToDateWhen { false }
+}
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    finalizedBy(copyReleaseApk)
 }
 
-// Same idea for debug builds: mirror every debug APK into <root>/debug so it's always found
-// in one predictable, gitignored place regardless of flavor.
+// Same idea for debug builds: mirror the debug APK into <root>/debug so it's always found
+// in one predictable, gitignored place.
 val debugDir = rootProject.layout.projectDirectory.dir("debug")
-listOf("Full", "Lite").forEach { flavor ->
-    val copyApk = tasks.register<Copy>("copy${flavor}DebugToDebugDir") {
-        from(layout.buildDirectory.dir("outputs/apk/${flavor.lowercase()}/debug"))
-        include("*.apk")
-        rename { "PlayFieldPortal-$appVersion-${flavor.lowercase()}-debug.apk" }
-        into(debugDir)
-        outputs.upToDateWhen { false }
-    }
-    tasks.matching { it.name == "assemble${flavor}Debug" }.configureEach {
-        finalizedBy(copyApk)
-    }
+val copyDebugApk = tasks.register<Copy>("copyDebugToDebugDir") {
+    from(layout.buildDirectory.dir("outputs/apk/debug"))
+    include("*.apk")
+    rename { "PSPLauncher-$appVersion-debug.apk" }
+    into(debugDir)
+    outputs.upToDateWhen { false }
+}
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy(copyDebugApk)
 }

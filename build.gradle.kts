@@ -11,14 +11,13 @@ plugins {
 }
 
 // One command to build every shippable release artifact into <root>/dist (gitignored):
-// the full + lite launcher APKs and the Theme Studio installer for the current OS. The
-// per-module copy tasks (finalizing each release build) do the actual placing.
+// the launcher APK and the Theme Studio installer for the current OS. The per-module copy
+// tasks (finalizing each release build) do the actual placing.
 tasks.register("dist") {
     group = "distribution"
-    description = "Builds full+lite release APKs and the Theme Studio installer into <root>/dist."
+    description = "Builds the release APK and the Theme Studio installer into <root>/dist."
     dependsOn(
-        ":app:assembleFullRelease",
-        ":app:assembleLiteRelease",
+        ":app:assembleRelease",
         ":studio:packageReleaseDistributionForCurrentOS",
     )
 }

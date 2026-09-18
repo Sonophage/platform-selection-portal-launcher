@@ -1,4 +1,4 @@
-# Play Field Portal (PFP)
+# PSPLauncher
 
 **A controller-first Android game launcher inspired by the PSP's XMB (Cross Media Bar).**
 
@@ -7,12 +7,11 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 (Winlator), native apps, and your music, video and photo libraries.
 
 <p align="center">
-  <img src="docs/screenshots/theme-vaporwave-home.jpg" alt="Play Field Portal — a themed crossbar with game covers" width="720">
+  <img src="docs/screenshots/theme-vaporwave-home.jpg" alt="PSPLauncher — a themed crossbar with game covers" width="720">
 </p>
 
 <p align="center">
-  <b>Version 1.2.1</b> &nbsp;·&nbsp; Side-loaded APK (not on the Play Store) &nbsp;·&nbsp;
-  <b>Full</b> &amp; <b>Lite</b> editions &nbsp;·&nbsp; Desktop <b>Theme Studio</b> companion
+  Side-loaded APK (not on the Play Store) &nbsp;·&nbsp; Desktop <b>Theme Studio</b> companion
 </p>
 
 > This document is the **user manual**. It walks you from install to daily use, feature by
@@ -45,8 +44,8 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 | A custom gaming category with its own icon and wallpaper | Memory Card options (△) — scan, refresh, pin, hide |
 | <img src="docs/screenshots/library-manager.jpg" width="420"> | <img src="docs/screenshots/winlator-pc-games.jpg" width="420"> |
 | Library Manager — ROM roots, auto-detect, per-console cards | PC-layer titles (Winlator) live next to console games |
-| <img src="docs/screenshots/artwork-manager.jpg" width="420"> | <img src="docs/screenshots/social-discord.jpg" width="420"> |
-| Artwork Manager — SteamGridDB / TheGamesDB / IGDB / local | Social — Discord friends, voice, and activity |
+| <img src="docs/screenshots/artwork-manager.jpg" width="420"> | |
+| Artwork Manager — SteamGridDB / TheGamesDB / IGDB / local | |
 
 ### Media & more
 
@@ -56,21 +55,20 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 | Music section — Now Playing surfaces on the crossbar | The in-app player (background service keeps it going) |
 | <img src="docs/screenshots/video-library.jpg" width="420"> | <img src="docs/screenshots/video-apps.jpg" width="420"> |
 | Video library — scanned files with thumbnails | Video Apps — your installed players, one row away |
-| <img src="docs/screenshots/photo-section.jpg" width="420"> | <img src="docs/screenshots/social-voice-ptt.jpg" width="420"> |
-| Photo section — albums and a fullscreen viewer | Push-to-talk with the floating Talk button overlay |
+| <img src="docs/screenshots/photo-section.jpg" width="420"> | |
+| Photo section — albums and a fullscreen viewer | |
 
 ---
 
 ## Table of contents
 
-1. [What is Play Field Portal?](#1-what-is-play-field-portal)
+1. [What is PSPLauncher?](#1-what-is-psplauncher)
 2. [Getting started](#2-getting-started)
    - [2.1 Requirements](#21-requirements)
-   - [2.2 Choose an edition (Full vs Lite)](#22-choose-an-edition-full-vs-lite)
-   - [2.3 Install the APK](#23-install-the-apk)
-   - [2.4 Set PFP as your home screen (Optional)](#24-set-pfp-as-your-home-screen-optional)
-   - [2.5 Grant permissions](#25-grant-permissions)
-   - [2.6 First-run setup](#26-first-run-setup)
+   - [2.2 Install the APK](#22-install-the-apk)
+   - [2.3 Set PFP as your home screen (Optional)](#23-set-pfp-as-your-home-screen-optional)
+   - [2.4 Grant permissions](#24-grant-permissions)
+   - [2.5 First-run setup](#25-first-run-setup)
 3. [Navigation & controls](#3-navigation--controls)
 4. [Feature guide](#4-feature-guide)
    - [4.1 The Game library](#41-the-game-library)
@@ -88,19 +86,18 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
    - [4.13 Custom XMB icons](#413-custom-xmb-icons)
    - [4.14 Motion wallpapers](#414-motion-wallpapers)
    - [4.15 Interface sounds & boot videos](#415-interface-sounds--boot-videos)
-   - [4.16 Discord Social (Full edition)](#416-discord-social-full-edition)
-   - [4.17 Adjusting the layout for your screen](#417-adjusting-the-layout-for-your-screen)
-   - [4.18 Backup & restore](#418-backup--restore)
-   - [4.19 Shiba Coins (achievements)](#419-shiba-coins-achievements)
-   - [4.20 Tracking local (Steam-emulated) PC games](#420-tracking-local-steam-emulated-pc-games)
-   - [4.21 Settings reference](#421-settings-reference)
+   - [4.16 Adjusting the layout for your screen](#416-adjusting-the-layout-for-your-screen)
+   - [4.17 Backup & restore](#417-backup--restore)
+   - [4.18 Shiba Coins (achievements)](#418-shiba-coins-achievements)
+   - [4.19 Tracking local (Steam-emulated) PC games](#419-tracking-local-steam-emulated-pc-games)
+   - [4.20 Settings reference](#420-settings-reference)
 5. [Permissions & privacy](#5-permissions--privacy)
 6. [Troubleshooting](#6-troubleshooting)
 7. [For Developers](#for-developers)
    - [7.1 Tech stack](#71-tech-stack)
    - [7.2 Prerequisites](#72-prerequisites)
    - [7.3 Get the code & open it in Android Studio](#73-get-the-code--open-it-in-android-studio)
-   - [7.4 Build variants & flavors](#74-build-variants--flavors)
+   - [7.4 Build variants](#74-build-variants)
    - [7.5 Run & debug from Android Studio](#75-run--debug-from-android-studio)
    - [7.6 Release signing](#76-release-signing)
    - [7.7 Command-line builds & the `dist` task](#77-command-line-builds--the-dist-task)
@@ -112,9 +109,9 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 
 ---
 
-## 1. What is Play Field Portal?
+## 1. What is PSPLauncher?
 
-Play Field Portal is a **home-screen replacement** for Android handhelds, tablets and phones that
+PSPLauncher is a **home-screen replacement** for Android handhelds, tablets and phones that
 gives your whole library the look and feel of a PlayStation Portable. It is a unified game
 frontend: ROM emulation, Android games, PC-layer titles and native apps brought together under one
 cohesive interface that feels like the golden era of handheld gaming. Everything is one crossbar
@@ -143,42 +140,30 @@ to fetch artwork. See [Permissions & privacy](#5-permissions--privacy).
 | **Input** | A game controller is recommended; full touch navigation is also supported |
 | **Emulators** | Installed separately — PFP launches them, it does not emulate anything itself |
 
-### 2.2 Choose an edition (Full vs Lite)
-
-PFP ships in two editions. You can tell which one is installed under **Settings ▸ About ▸ Edition**.
-
-| Edition | Includes | Download size |
-|---|---|---|
-| **Full** | Everything, including the **Discord Social** section (friends, presence, voice chat) | Larger |
-| **Lite** | Everything **except** Discord Social (the Social column is hidden) | ~44 MB smaller |
-
-Choose **Lite** if you do not want Discord integration or want the smallest download.
-
-### 2.3 Install the APK
+### 2.2 Install the APK
 
 PFP is distributed as a **side-loaded APK** (it is not on the Google Play Store).
 
-1. Download the APK for your chosen edition (`PlayFieldPortal-<version>-full.apk` or
-   `-lite.apk`).
+1. Download the APK (`PSPLauncher-<version>.apk`).
 2. Open the file on your device. Android will ask you to allow installs from your browser or file
    manager the first time — approve it.
 3. Tap **Install**.
 
 > Building the APK yourself instead? See [For Developers](#for-developers).
 
-### 2.4 Set PFP as your home screen (Optional)
+### 2.3 Set PFP as your home screen (Optional)
 
 PFP registers as an Android **HOME** launcher.
 
 1. Press the **Home** button.
-2. When Android asks which launcher to use, pick **Play Field Portal** and choose **Always**.
+2. When Android asks which launcher to use, pick **PSPLauncher** and choose **Always**.
 
 You can change this later under *Android Settings ▸ Apps ▸ Default apps ▸ Home app*.
 
 > A few features (importing game shortcuts from other launchers, capturing pinned shortcuts)
 > require PFP to be the **active default launcher**.
 
-### 2.5 Grant permissions
+### 2.4 Grant permissions
 
 PFP asks for permissions **only when a feature needs them**:
 
@@ -188,7 +173,7 @@ PFP asks for permissions **only when a feature needs them**:
 
 Full detail in [Permissions & privacy](#5-permissions--privacy).
 
-### 2.6 First-run setup
+### 2.5 First-run setup
 
 On a fresh install PFP opens a guided **setup wizard**:
 
@@ -626,20 +611,7 @@ shortcuts on the focused row, bound to physical buttons so an X/Y swap cannot mo
 
 Everything you assign here is included in **Backup & restore**.
 
-### 4.16 Discord Social (Full edition)
-
-**Full edition only.** A **Social** column adds Discord integration:
-
-- **Sign in by QR** — scan with your phone (OAuth device grant; no password typed on the handheld).
-  Tokens are stored **encrypted** in the Android Keystore and refreshed automatically.
-- **Friends** — avatars, presence, and what they are playing in PFP.
-- **Activity sharing** — opt-in (default **off**), with a Generic Mode that shows only "a game".
-- **Voice chat** — join rooms by code, invite friends, with noise cancellation, a Game↔Voice
-  balance, and **push-to-talk** (a floating hold-to-talk button or a controller button you map).
-
-Everything is inert until you connect, and presence is limited to this app.
-
-### 4.17 Adjusting the layout for your screen
+### 4.16 Adjusting the layout for your screen
 
 PFP scales itself to fit your device automatically, including near-square foldable inner displays.
 To fine-tune it, open **Settings ▸ Display ▸ Adjust XMB Layout** — a live editor over the real
@@ -651,14 +623,14 @@ crossbar:
 - Each screen size keeps its **own** tuning, so a handheld and a foldable never share (and distort)
   one layout.
 
-### 4.18 Backup & restore
+### 4.17 Backup & restore
 
 *Settings ▸ Backup & Restore* writes a `.pfpbackup` archive (library + settings) into a folder you
 pick, and restores from one. Because on-device cloud backup is disabled for privacy, this is how you
 move your setup to a new device or recover after a reinstall. Restoring re-links your ROM/media
 folders via *Library ▸ Root Access*.
 
-### 4.19 Shiba Coins (achievements)
+### 4.18 Shiba Coins (achievements)
 
 **Shiba Coins** turn achievements into a coin economy across your whole library. Enable it
 under **Settings ▸ Shiba Coins** and connect one or more providers:
@@ -667,7 +639,7 @@ under **Settings ▸ Shiba Coins** and connect one or more providers:
 |---|---|---|
 | **RetroAchievements** | Retro console games with RA sets | RA username + Web API key |
 | **Steam** | Games on your own Steam account | SteamID64 (or vanity name) + Steam Web API key |
-| **Local Steam** | Steam-emulated PC games run through Wine emulators | Steam Web API key (see [4.20](#420-tracking-local-steam-emulated-pc-games)) |
+| **Local Steam** | Steam-emulated PC games run through Wine emulators | Steam Web API key (see [4.19](#419-tracking-local-steam-emulated-pc-games)) |
 
 Each achievement earns a **bronze, silver, gold or platinum** coin by rarity; coins feed an
 account-wide wallet with **levels and ranks** shown on the **Player Card**.
@@ -689,7 +661,7 @@ account-wide wallet with **levels and ranks** shown on the **Player Card**.
   sort by Title / Progress / Console with **X**) and an **Untracked** view of games you
   could still link. Android games are excluded — they can never have achievements.
 
-### 4.20 Tracking local (Steam-emulated) PC games
+### 4.19 Tracking local (Steam-emulated) PC games
 
 PFP can track achievements for Windows games run through Wine emulators (GameHub, Winlator,
 GameNative and friends) whose bundled Steam emulator (GSE / Goldberg) records unlocks in local
@@ -757,7 +729,7 @@ Notes:
   installs the bundled emulator over the game's original `steam_api` DLL (backed up alongside
   it). This is the step the Warning Note's backup protects against.
 
-### 4.21 Settings reference
+### 4.20 Settings reference
 
 | Section | What it covers |
 |---|---|
@@ -772,8 +744,8 @@ Notes:
 | **Collections / Categories** | Create, rename, reorder, hide |
 | **Backup & Restore** | Export / import `.pfpbackup` |
 | **Logs** | Open a rolling, redacted log in an external viewer; Share for bug reports |
-| **Re-Run Setup Wizard** | Replays the first-run wizard (see [2.6](#26-first-run-setup)) |
-| **About / Credits** | Version, **Edition (Full / Lite)**, attributions |
+| **Re-Run Setup Wizard** | Replays the first-run wizard (see [2.5](#25-first-run-setup)) |
+| **About / Credits** | Version, attributions |
 
 ---
 
@@ -781,14 +753,13 @@ Notes:
 
 PFP is a **local-first** launcher: your data stays on your device. There is no analytics, no
 telemetry, and no account. PFP reaches the network only for the things you connect:
-artwork/metadata scraping (SteamGridDB, ScreenScraper, TheGamesDB, IGDB), achievement
-data (RetroAchievements, Steam), and Discord presence in the Full edition. Everything is
-HTTPS.
+artwork/metadata scraping (SteamGridDB, ScreenScraper, TheGamesDB, IGDB) and achievement
+data (RetroAchievements, Steam). Everything is HTTPS.
 
 **What PFP stores, and how**
 - **On-device only.** Your library, settings and artwork live in app storage. **Backup is disabled**
   (`allowBackup=false`), so nothing is uploaded or transferred automatically — use
-  [Backup & restore](#418-backup--restore) to move devices.
+  [Backup & restore](#417-backup--restore) to move devices.
 - **Scraper API keys are encrypted at rest** with a hardware-backed Android Keystore key.
   On the rare devices where the Keystore is unavailable, a key you enter is stored
   unencrypted and the app tells you so at save time.
@@ -819,7 +790,6 @@ sanitized and require you to **confirm each one** before it appears.
 | Disc/multi-file game not found | Open the game's console folder in a file manager and confirm the file is there; if the console uses a legacy raw-path library, re-grant its folder in *Settings ▸ Library*. |
 | Artwork won't download | Add a SteamGridDB (or other) API key in *Settings ▸ Artwork* and check your connection. |
 | Interface too big/small or off-center | Tune it in *Settings ▸ Display ▸ Adjust XMB Layout*. |
-| Which edition am I on? | *Settings ▸ About ▸ Edition* shows **Full** or **Lite**. |
 
 If something looks like a bug, grab the log from *Settings ▸ Logs ▸ Share* — it is redacted and safe
 to send.
@@ -842,7 +812,6 @@ to send.
 - **Image loading:** Coil
 - **Background work:** WorkManager + Android notifications
 - **Serialization:** Kotlinx Serialization
-- **Native:** an NDK/CMake bridge to the Discord Social SDK (**full flavor only**)
 - **Desktop companion:** Compose Multiplatform Desktop (`:studio`)
 - **Testing:** JUnit 4 + MockK + Turbine
 - **Build:** Gradle `9.7.1` (Kotlin DSL), AGP `9.4.0` (built-in Kotlin), KSP2
@@ -853,14 +822,14 @@ to send.
   JetBrains Runtime (JBR 17/21)** as the IDE boot runtime.
 - **JDK 17** for command-line Gradle (`JAVA_HOME` pointing at a JDK 17). The desktop `:studio`
   module targets a JVM 17 toolchain.
-- **Android SDK 37** installed (compileSdk 37; targetSdk stays 35), with **NDK + CMake** (required to build the full flavor's native
-  Discord bridge). Minimum supported device API is **29** (Android 10).
+- **Android SDK 37** installed (compileSdk 37; targetSdk stays 35). Minimum supported device
+  API is **29** (Android 10).
 
 ### 7.3 Get the code & open it in Android Studio
 
 ```bash
 git clone <repo-url>
-cd PlayFieldPortal
+cd platform-selection-portal-launcher
 ```
 
 1. In Android Studio choose **Open** and select the project root (the folder with
@@ -870,33 +839,14 @@ cd PlayFieldPortal
 3. If prompted, install the matching **Android SDK 37**, **NDK,** and **CMake** from the SDK
    Manager.
 
-### 7.4 Build variants & flavors
+### 7.4 Build variants
 
-The app has two dimensions:
-
-- **Flavor (`distribution`):** `full` (ships the Discord Social SDK + native libs) and `lite`
-  (omits them; smaller download, Social section hidden). `lite` uses the `.lite` application-id
-  suffix, so both editions can be installed side by side.
-- **Build type:** `debug` (`.debug` suffix) and `release` (R8 + signing).
-
-That yields `fullDebug`, `fullRelease`, `liteDebug`, `liteRelease`. Switch the active variant in the
-**Build Variants** tool window.
-
-> The native Discord bridge is built for **arm64-v8a** and **armeabi-v7a** only. The **full** flavor
-> therefore cannot run on an **x86_64 emulator** — use the **lite** flavor for emulator testing.
+There are no product flavors — one app, two build types: `debug` (`.debug` application-id suffix)
+and `release` (R8 + signing). Switch the active one in the **Build Variants** tool window.
 
 ### 7.5 Run & debug from Android Studio
 
-1. Open **Build Variants** and select **`liteDebug`** (recommended for emulators and quick
-   iteration).
-2. Pick your device/emulator and press **Run** (or **Debug**).
-
-Two shareable run configurations are checked in under `.run/`:
-
-- **`app (lite)`** — an Android App configuration (full debugger + logcat). Pair it with the
-  `liteDebug` build variant.
-- **`Install Lite (emulator)`** — a Gradle configuration that runs `:app:installLiteDebug`, which
-  always installs the lite flavor regardless of the selected variant.
+1. Pick your device/emulator and press **Run** (or **Debug**).
 
 ### 7.6 Release signing
 
@@ -914,11 +864,11 @@ keyPassword=…
 ### 7.7 Command-line builds & the `dist` task
 
 ```bash
-# Debug (lite) APK
-./gradlew :app:assembleLiteDebug
+# Debug APK
+./gradlew :app:assembleDebug
 
-# Both release APKs (full + lite); signed if keystore.properties is present
-./gradlew :app:assembleFullRelease :app:assembleLiteRelease
+# Release APK; signed if keystore.properties is present
+./gradlew :app:assembleRelease
 
 # Unit tests
 ./gradlew test
@@ -930,13 +880,12 @@ keyPassword=…
 ./gradlew dist
 ```
 
-`dist` builds the full + lite release APKs and the Theme Studio installer for the current OS and
+`dist` builds the release APK and the Theme Studio installer for the current OS and
 collects them, cleanly named, into the gitignored **`dist/`** folder:
 
 ```
 dist/
-├── PlayFieldPortal-<version>-full.apk
-├── PlayFieldPortal-<version>-lite.apk
+├── PSPLauncher-<version>.apk
 └── PlayField-Theme-Studio-<version>.msi   (or .dmg / .deb per OS)
 ```
 
@@ -974,8 +923,6 @@ core/
   core-navigation/        Pure navigation logic, no Android dependency — NavigationEngine, gridMove
   core-ui/                PFPTheme/PFPColors, WaveStyle, PortalIcon, category-icon catalog,
                           motion-wallpaper surfaces, MenuSoundPlayer
-discord/
-  discord-native/         NDK/CMake bridge to the Discord Social SDK (full flavor only)
 feature/
   feature-xmb/            Crossbar shell, XMBViewModel, game/app detail, Artwork Studio, boot
   feature-library/        ROM scanner, rescan triggers, disc-image resolver, platform map
@@ -986,7 +933,6 @@ feature/
   feature-settings/       Settings screens + ViewModels
   feature-appbar/         App drawer, app→category classification, filters
   feature-backup/         BackupManager, backup/restore workers
-  feature-social/         Discord Social UI (full flavor)
 ```
 
 See **[ARCHITECTURE.md](ARCHITECTURE.md)** for data-flow, launch-pipeline, and state detail.
@@ -1011,20 +957,20 @@ PlayStation Portable, PlayStation 3 and other devices. The crossbar layout, flow
 background, navigation model and options-menu behaviour are homages to Sony's original design.
 
 **"XrossMediaBar", "XMB", "PSP", "PlayStation" and related marks are trademarks of Sony Interactive
-Entertainment Inc.** Play Field Portal is an independent, non-commercial fan project. It is **not
+Entertainment Inc.** PSPLauncher is an independent, non-commercial fan project. It is **not
 affiliated with, endorsed by, or sponsored by Sony**, and ships none of Sony's code, firmware,
 fonts or audio. The bundled UI artwork comes from the community *XMB Menu for ES-DE* theme (see
 below) and remains the property of its respective authors; the menu sounds are original to this
 project.
 
-**On the name.** *PFP* is a deliberate double entendre — *Play Field Portal* as the product name,
+**On the name.** *PFP* is a deliberate double entendre — *PSPLauncher* as the product name,
 and the affectionate shorthand from anime and gaming communities. The trademarks above cover the
 *names* "XMB" and "Cross Media Bar", not the visual style itself, which is not protectable as trade
 dress in a non-competing product category. That reading is why the homage is drawn as openly as it
 is, while the marks themselves are left alone.
 
 ### App icon & logo
-The Play Field Portal **app icon and logo** were created by **johakovi**
+The PSPLauncher **app icon and logo** were created by **johakovi**
 ([u/silverloc96](https://www.reddit.com/user/silverloc96) on Reddit), who generously volunteered
 their time to make them. The work is amazing — please go check out their work.
 
@@ -1080,11 +1026,11 @@ Fetched at the user's request from third-party providers and remaining the prope
   the work of the RetroAchievements community. https://retroachievements.org
 - **Steam** — achievement schemas and unlock data are fetched from the **Steam Web API**
   using the user's own API key. **Powered by Steam.** Steam and the Steam logo are
-  trademarks and/or registered trademarks of **Valve Corporation**. Play Field Portal is
+  trademarks and/or registered trademarks of **Valve Corporation**. PSPLauncher is
   not affiliated with or endorsed by Valve. https://steampowered.com
 
 ### Goldberg Steam Emulator (gbe_fork)
-Local achievement tracking for Steam-emulated PC games ([4.20](#420-tracking-local-steam-emulated-pc-games))
+Local achievement tracking for Steam-emulated PC games ([4.19](#419-tracking-local-steam-emulated-pc-games))
 bundles the **Goldberg Steam Emulator** — specifically **gbe_fork**, the community fork
 maintained by **Detanup01** and contributors, building on the original **Goldberg Emulator**
 by **Mr. Goldberg**.
@@ -1095,7 +1041,7 @@ by **Mr. Goldberg**.
   [full text](https://www.gnu.org/licenses/lgpl-3.0.html)
 - What PFP ships: an **unmodified** build of the emulator's `steam_api64.dll`, bundled as an
   app asset and installed into a game folder only when you opt in and confirm (see the
-  Warning Note in [4.20](#420-tracking-local-steam-emulated-pc-games)). The original DLL is
+  Warning Note in [4.19](#419-tracking-local-steam-emulated-pc-games)). The original DLL is
   always backed up alongside, so the emulator build can be freely replaced with your own —
   as the LGPL requires. The complete corresponding source code is available from the
   project links above.

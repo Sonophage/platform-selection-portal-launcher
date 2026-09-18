@@ -2,8 +2,8 @@
 
 **Status:** Implementation plan  
 **Mockup:** `docs/mockup/Player Status Mockup.html`  
-**Primary screen:** `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/PlayerStatusScreen.kt`  
-**Primary state:** `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/PlayerStatusViewModel.kt`
+**Primary screen:** `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/PlayerStatusScreen.kt`  
+**Primary state:** `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/PlayerStatusViewModel.kt`
 
 ## 1. Goal
 
@@ -85,7 +85,7 @@ The existing ViewModel already contains most of the required achievement data. T
 
 **Files:**
 
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/PlayerStatusScreen.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/PlayerStatusScreen.kt`
 - New shared detail file, preferably `ShibaDetailParts.kt` or `ShibaCoinArt.kt`
 
 Actions:
@@ -138,9 +138,9 @@ Actions:
 
 **Files to inspect and reuse:**
 
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/ShibaCoinsViewModel.kt`
-- `feature/feature-achievements/src/main/kotlin/com/playfieldportal/feature/achievements/AchievementController.kt`
-- `feature/feature-achievements/src/main/kotlin/com/playfieldportal/feature/achievements/AchievementRepository.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/ShibaCoinsViewModel.kt`
+- `feature/feature-achievements/src/main/kotlin/com/psplauncher/feature/achievements/AchievementController.kt`
+- `feature/feature-achievements/src/main/kotlin/com/psplauncher/feature/achievements/AchievementRepository.kt`
 - Existing account-wide sync handling in `XMBViewModel.kt`
 
 Actions:
@@ -269,8 +269,8 @@ Actions:
 
 **Files:**
 
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/XMBShell.kt`
-- `feature/feature-settings/src/main/kotlin/com/playfieldportal/feature/settings/ui/SettingsNavHost.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/XMBShell.kt`
+- `feature/feature-settings/src/main/kotlin/com/psplauncher/feature/settings/ui/SettingsNavHost.kt`
 - Any Player Status host composables found during implementation
 
 Actions:
@@ -286,7 +286,7 @@ Actions:
 
 **New file:**
 
-- `feature/feature-xmb/src/test/kotlin/com/playfieldportal/feature/xmb/ui/detail/PlayerStatusViewModelTest.kt`
+- `feature/feature-xmb/src/test/kotlin/com/psplauncher/feature/xmb/ui/detail/PlayerStatusViewModelTest.kt`
 
 Test cases:
 

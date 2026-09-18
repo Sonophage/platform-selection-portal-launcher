@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace  = "com.playfieldportal.core.domain"
+    namespace  = "com.psplauncher.core.domain"
     compileSdk = 37
     defaultConfig { minSdk = 29 }
     compileOptions {

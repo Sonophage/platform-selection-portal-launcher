@@ -38,7 +38,7 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "com.playfieldportal.studio.MainKt"
+        mainClass = "com.psplauncher.studio.MainKt"
         // Disable release minification: Compose bundles a Java 21 JBR the default ProGuard can't
         // read, and minifying strips reflection/entry-point classes the app needs at startup
         // ("Failed to launch JVM"). An unminified distribution is larger but launches reliably.

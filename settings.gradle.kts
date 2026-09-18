@@ -31,14 +31,10 @@ dependencyResolutionManagement {
                 includeGroup("com.github.haroldadmin")
             }
         }
-        // Vendored Discord Social SDK aars (Git LFS). A flatDir repo lets the library module
-        // resolve them as real transitive dependencies — direct files("*.aar") deps are rejected
-        // in library modules and wouldn't propagate the SDK's classes/.so to the app.
-        flatDir { dirs(rootDir.resolve("discord/discord-native/libs")) }
     }
 }
 
-rootProject.name = "PlayFieldPortal"
+rootProject.name = "PSPLauncher"
 
 include(":app")
 
@@ -54,11 +50,7 @@ include(":core:core-data")
 include(":core:core-ui")
 include(":core:core-navigation")
 
-// Discord Social integration
-include(":discord:discord-native")
-
 // Feature modules
-include(":feature:feature-social")
 include(":feature:feature-xmb")
 include(":feature:feature-library")
 include(":feature:feature-launcher")

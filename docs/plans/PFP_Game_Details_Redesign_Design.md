@@ -29,12 +29,12 @@ This is a redesign and navigation migration, not a reduction of the current feat
 
 Claude must inspect these files before making changes:
 
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/GameDetailScreen.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/GameDetailViewModel.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/detail/DetailComponents.kt`
-- `feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/XMBShell.kt`
-- `core/core-navigation/src/main/kotlin/com/playfieldportal/core/navigation/NavigationEngine.kt`
-- `feature/feature-settings/src/main/kotlin/com/playfieldportal/feature/settings/ui/ControllerNavigation.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/GameDetailScreen.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/GameDetailViewModel.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/detail/DetailComponents.kt`
+- `feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/XMBShell.kt`
+- `core/core-navigation/src/main/kotlin/com/psplauncher/core/navigation/NavigationEngine.kt`
+- `feature/feature-settings/src/main/kotlin/com/psplauncher/feature/settings/ui/ControllerNavigation.kt`
 
 Also inspect the App Drawer and App Picker implementations for the approved permanent helper-footer behavior and controller glyph mapping.
 

@@ -2,9 +2,8 @@ name: Unit tests
 
 # Guards against unit-test drift: assembleDebug skips unit tests, so broken tests (a stale fake that
 # stops implementing an interface that grew, or a ViewModel refactor that outpaces its test) can land
-# unnoticed. This runs every module's JVM unit tests on each push/PR, excluding only :app and
-# :discord:discord-native — the sole targets that pull the Discord SDK aar (Git LFS) + NDK. Every
-# library module (core-*, feature-*) is pure JVM and needs no aar, no NDK, and no device.
+# unnoticed. This runs every module's JVM unit tests on each push/PR. Nothing here needs an aar, an
+# NDK or a device.
 on:
   push:
   pull_request:
@@ -18,10 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Actions are pinned to commit SHAs so a repointed release tag can't inject code into CI.
-      - name: Checkout (LFS off — the SDK aar isn't needed for these tests)
+      - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          lfs: false
           # No later step needs git auth — don't leave the token in .git/config.
           persist-credentials: false
 
@@ -34,17 +32,8 @@ jobs:
       - name: Set up Gradle (with caching)
         uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
 
-      # gradle.properties pins a Windows JDK path + the Windows-ROOT truststore (a local
-      # SSL-interception workaround). Both are invalid on a Linux runner, so strip them here — the
-      # runner's own JDK 17 (JAVA_HOME) and default truststore take over.
-      - name: Neutralize Windows-only Gradle properties
-        run: sed -i '/org\.gradle\.java\.home/d; /trustStoreType=Windows-ROOT/d' gradle.properties
-
-      # All module unit tests except :app and :discord:discord-native, which are the only targets that
-      # pull the Discord SDK aar (Git LFS) + NDK. Excluding those two tasks keeps them (and the native
-      # module's compilation) out of the graph, so no aar/NDK is needed.
       - name: Run JVM unit tests
-        run: ./gradlew test -x :app:test -x :discord:discord-native:test --no-daemon --stacktrace
+        run: ./gradlew test --no-daemon --stacktrace
 
       - name: Upload test reports on failure
         if: failure()

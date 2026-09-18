@@ -43,7 +43,7 @@ private fun ssEncoded(prop: String, envName: String): Pair<String, String> {
 }
 
 android {
-    namespace  = "com.playfieldportal.feature.artwork"
+    namespace  = "com.psplauncher.feature.artwork"
     compileSdk = 37
     defaultConfig {
         minSdk = 29

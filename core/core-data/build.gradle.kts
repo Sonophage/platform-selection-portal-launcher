@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace  = "com.playfieldportal.core.data"
+    namespace  = "com.psplauncher.core.data"
     compileSdk = 37
     defaultConfig { minSdk = 29 }
     compileOptions {
@@ -79,12 +79,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.timber)
 
-    // Ktor — Discord OAuth2 device-authorization grant (QR login) over HTTPS.
-    implementation(libs.bundles.ktor)
-
     testImplementation(libs.bundles.test.unit)
     testImplementation(libs.robolectric)
     testImplementation(libs.room.testing)
     testImplementation(libs.androidx.test.core)
-    testImplementation(libs.ktor.client.mock)
 }

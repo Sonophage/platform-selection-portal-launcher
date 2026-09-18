@@ -1,23 +1,19 @@
-# Play Field Portal — Architecture
+# PSPLauncher — Architecture
 
-Play Field Portal (PFP) is an Android **home-screen launcher** styled after the PSP/PS3
+PSPLauncher (PFP) is an Android **home-screen launcher** styled after the PSP/PS3
 **XMB** (Cross Media Bar). It presents installed apps, emulator ROM libraries, and user
 collections as a horizontal bar of categories with a vertical list of items beneath the
 selected category, and launches games through external emulator apps.
 
-- **Package:** `com.playfieldportal.launcher` (debug builds use the `.debug` suffix)
+- **Package:** `com.psplauncher.launcher` (debug builds use the `.debug` suffix)
 - **Min / Target / Compile SDK:** 29 (Android 10 — Winlator's floor) / 35 / 37
-- **Version:** `1.2.1` (`versionCode` 9)
+- **Version:** declared in [`app/build.gradle.kts`](app/build.gradle.kts) (`versionName` / `versionCode`) — read it there, not here.
 - **Stack:** Kotlin, Jetpack Compose, MVVM + Clean Architecture, Hilt DI, Room, DataStore,
   Coil (image loading), Media3/ExoPlayer, Coroutines/Flow.
-- **Entry points:** [`PFPApplication`](app/src/main/kotlin/com/playfieldportal/launcher/PFPApplication.kt)
+- **Entry points:** [`PFPApplication`](app/src/main/kotlin/com/psplauncher/launcher/PFPApplication.kt)
   (Hilt + first-run DB seeding) and
-  [`MainActivity`](app/src/main/kotlin/com/playfieldportal/launcher/MainActivity.kt)
+  [`MainActivity`](app/src/main/kotlin/com/psplauncher/launcher/MainActivity.kt)
   (declared as the `HOME` launcher).
-
-> **Unreleased.** The subsystems under [Customization](#customization-icons-ui-media-and-motion)
-> — custom icons, UI media, motion wallpapers, theme schema v3 — live on `more-customization`
-> and are not in the 1.2.1 release. `CHANGELOG.md` draws the same line.
 
 ## Design principles
 
@@ -60,17 +56,16 @@ app  ──▶ feature:*  ──▶ core:core-ui ──▶ core:core-data ──
 | `feature:feature-settings` | All settings screens, the first-run setup wizard, PC game import |
 | `feature:feature-appbar` | App drawer, app→category classification, filtering |
 | `feature:feature-backup` | Backup & restore (`.pfpbackup`) |
-| `feature:feature-social` | Discord Social UI — full flavor only |
-| `discord:discord-native` | NDK/CMake bridge to the Discord Social SDK (full flavor only) |
 
 ## Data layer (`core:core-data`)
 
-- **Room** database [`PFPDatabase`](core/core-data/src/main/kotlin/com/playfieldportal/core/data/database/PFPDatabase.kt)
-  (currently **v41**). Migrations are hand-written, one `MIGRATION_n_n+1` per version, registered
-  in [`DatabaseModule`](core/core-data/src/main/kotlin/com/playfieldportal/core/data/database/di/DatabaseModule.kt).
+- **Room** database [`PFPDatabase`](core/core-data/src/main/kotlin/com/psplauncher/core/data/database/PFPDatabase.kt)
+  — the `version` in its `@Database` annotation is the current schema version. Migrations are
+  hand-written, one `MIGRATION_n_n+1` per version, registered
+  in [`DatabaseModule`](core/core-data/src/main/kotlin/com/psplauncher/core/data/database/di/DatabaseModule.kt).
   **Never** use destructive migration — it would wipe the user's library.
 - **Seeding** is first-run only, gated by a DataStore flag, in
-  [`DatabaseInitializer`](core/core-data/src/main/kotlin/com/playfieldportal/core/data/database/seeder/DatabaseInitializer.kt).
+  [`DatabaseInitializer`](core/core-data/src/main/kotlin/com/psplauncher/core/data/database/seeder/DatabaseInitializer.kt).
   Definition changes that must reach already-seeded installs ship as migrations (e.g. the v13
   Xbox 360 platform) or as idempotent per-launch reconciles (built-in categories).
 - **Key entities:** `GameEntity` (games *and* app-shortcut rows, distinguished by `content_type`
@@ -83,7 +78,7 @@ app  ──▶ feature:*  ──▶ core:core-ui ──▶ core:core-data ──
 
 ## Library scanning (`feature:feature-library`)
 
-[`LibraryScanner`](feature/feature-library/src/main/kotlin/com/playfieldportal/feature/library/scanner/LibraryScanner.kt)
+[`LibraryScanner`](feature/feature-library/src/main/kotlin/com/psplauncher/feature/library/scanner/LibraryScanner.kt)
 is the single owner of ROM-survey policy: source resolution, one-upsert-per-path across multiple
 sources, optional Missing reconciliation, changed-only persistence, per-card single-flight, and IO
 execution. Both the settings interface and the trigger path delegate to it — see
@@ -104,12 +99,12 @@ system broadcast — the guards and the rejected alternatives are recorded in
 
 ## Game / emulator launching (`feature:feature-launcher`)
 
-**Detection.** [`KnownEmulatorCatalog`](feature/feature-launcher/src/main/kotlin/com/playfieldportal/feature/launcher/KnownEmulatorCatalog.kt)
+**Detection.** [`KnownEmulatorCatalog`](feature/feature-launcher/src/main/kotlin/com/psplauncher/feature/launcher/KnownEmulatorCatalog.kt)
 lists supported emulators (package, launch activity, intent shape, supported platforms);
-[`EmulatorDetector`](feature/feature-launcher/src/main/kotlin/com/playfieldportal/feature/launcher/EmulatorDetector.kt)
+[`EmulatorDetector`](feature/feature-launcher/src/main/kotlin/com/psplauncher/feature/launcher/EmulatorDetector.kt)
 scans installed packages (plus RetroArch cores) into `EmulatorProfile`s on startup.
 
-**Resolution.** [`EmulatorLaunchResolver`](feature/feature-launcher/src/main/kotlin/com/playfieldportal/feature/launcher/EmulatorLaunchResolver.kt)
+**Resolution.** [`EmulatorLaunchResolver`](feature/feature-launcher/src/main/kotlin/com/psplauncher/feature/launcher/EmulatorLaunchResolver.kt)
 walks the configuration ladder and returns a typed `ResolvedLaunch(profile, source, core)` — the
 winning profile *and* the `LaunchSource` enum naming which level decided it, so the UI can attribute
 the choice on screen without matching on strings. Precedence, pinned by tests:
@@ -117,12 +112,12 @@ the choice on screen without matching on strings. Precedence, pinned by tests:
 1. per-game override → 2. Memory Card emulator → 3. platform default → 4. first valid candidate
 
 The resolver is pure: every input is passed in, so it carries no Android, database or Hilt
-dependency. [`EmulatorIntentResolver`](feature/feature-launcher/src/main/kotlin/com/playfieldportal/feature/launcher/EmulatorIntentResolver.kt)
+dependency. [`EmulatorIntentResolver`](feature/feature-launcher/src/main/kotlin/com/psplauncher/feature/launcher/EmulatorIntentResolver.kt)
 then builds the `Intent` (`ACTION_VIEW` with a FileProvider content URI, or a `COMPONENT` intent
 with extras), with fallbacks for emulators whose intent filters omit a MIME type.
 
 **Dispatch.** Every game-path launch funnels through
-[`LaunchDispatcher`](feature/feature-launcher/src/main/kotlin/com/playfieldportal/feature/launcher/LaunchDispatcher.kt),
+[`LaunchDispatcher`](feature/feature-launcher/src/main/kotlin/com/psplauncher/feature/launcher/LaunchDispatcher.kt),
 which owns three things that used to be scattered across call sites:
 
 - **Named failures.** `startActivity` lives here, so an `ActivityNotFoundException` or
@@ -140,9 +135,9 @@ per-system defaults, and copyable diagnostics instead of a dead end.
 
 ## State & the XMB shell (`feature:feature-xmb`)
 
-- [`XMBViewModel`](feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/viewmodel/XMBViewModel.kt)
+- [`XMBViewModel`](feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/viewmodel/XMBViewModel.kt)
   exposes a single `XMBUiState` `StateFlow`. The stateless
-  [`XMBShell`](feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/XMBShell.kt)
+  [`XMBShell`](feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/XMBShell.kt)
   renders it; `XMBShellContainer` wires the ViewModel's callbacks in.
 - **Navigation model:** the Games category root lists synthetic folders — **All Games**,
   **Favorites** (shown only when something is favorited), user collections, then one row per
@@ -155,14 +150,14 @@ per-system defaults, and copyable diagnostics instead of a dead end.
 - **Input:** a gamepad dispatcher routes D-pad/A/B/Y to the focused layer. `hasBlockingOverlay`
   guards the main XMB navigation so input never drives the bar behind a dialog or overlay. Cursor
   movement itself lives in `core:core-navigation`, away from Compose.
-- **Item icons** ([`XMBItemList`](feature/feature-xmb/src/main/kotlin/com/playfieldportal/feature/xmb/ui/XMBItemList.kt)):
+- **Item icons** ([`XMBItemList`](feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/ui/XMBItemList.kt)):
   games show a 144:80 landscape tile; apps with artwork show the same tile, apps without it show
   the launcher icon; folder rows use console / `sysicon_*` art.
 
 ## Icon system (`core:core-ui`)
 
 All built-in category-pick icons live in one catalog,
-[`CategoryIcons`](core/core-ui/src/main/kotlin/com/playfieldportal/core/ui/icons/CategoryIcons.kt):
+[`CategoryIcons`](core/core-ui/src/main/kotlin/com/psplauncher/core/ui/icons/CategoryIcons.kt):
 each `iconKey` maps to an individual drawable (`catbar_*` column glyphs + `sysicon_*` console art,
 all from the [xmb-menu-es-de](https://github.com/anthonycaccese/xmb-menu-es-de) theme).
 `categoryIconFor()` resolves current and legacy keys; `CategoryIconGlyph` renders them. There is
@@ -173,11 +168,11 @@ render tiers: **user pick > theme icon > built-in**.
 
 ## Customization: icons, UI media, and motion
 
-*Unreleased — on `more-customization`.* Four subsystems share one shape: a per-slot file store
+Four subsystems share one shape: a per-slot file store
 under `filesDir/`, a limits object in `core:theme-kit` so the app and the desktop Studio agree on
 the numbers, staged imports, and a DataStore stamp for cache invalidation.
 
-**Custom icons.** [`CustomIconStore`](core/core-data/src/main/kotlin/com/playfieldportal/core/data/repository/CustomIconStore.kt)
+**Custom icons.** [`CustomIconStore`](core/core-data/src/main/kotlin/com/psplauncher/core/data/repository/CustomIconStore.kt)
 keeps one file per slot at `filesDir/custom-icons/<slotKey>.<png|jpg|webp|gif>`. Keys come from
 `CustomizableIcons` (theme slots plus `sysicon_*` console slots) and are used verbatim as
 filenames, which makes key validation load-bearing — it is what stops a crafted key escaping the
@@ -242,22 +237,21 @@ deliberately excluding the device-specific XMB layout adjustment. Applying a the
 
 ## Build & run
 
-The app has two flavors — `full` (ships the Discord Social SDK) and `lite` (omits it;
-use this on x86_64 emulators, the native bridge is arm-only). See the README's
+There is one build — no product flavors. See the README's
 [For Developers](README.md#for-developers) section for the full build guide.
 
 ```bash
-# Build the lite debug APK
-./gradlew :app:assembleLiteDebug
+# Build the debug APK
+./gradlew :app:assembleDebug
 
 # Install to a connected device
-adb install -r app/build/outputs/apk/lite/debug/app-lite-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 If `adb install` reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (debug-signature mismatch),
 uninstall first — note this clears local app data:
 
 ```bash
-adb uninstall com.playfieldportal.launcher.debug
+adb uninstall com.psplauncher.launcher.debug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```

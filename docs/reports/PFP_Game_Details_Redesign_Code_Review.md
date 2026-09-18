@@ -32,7 +32,7 @@ Standards sources used:
 - `.agents/skills/android-kotlin-compose/SKILL.md` (active skill; composer contract, recomposition rules, banlist table)
 - `.agents/skills/android-kotlin-architecture/SKILL.md` (MVI contract, container/content composables)
 - `.agents/skills/android-kotlin-testing/SKILL.md` (fakes over mocks, Compose test semantics)
-- In-repo documented conventions: `core/core-ui/src/main/kotlin/com/playfieldportal/core/ui/preview/PfpPreviewWrapper.kt` KDoc, `feature/feature-settings/.../SettingsScaffold.kt`
+- In-repo documented conventions: `core/core-ui/src/main/kotlin/com/psplauncher/core/ui/preview/PfpPreviewWrapper.kt` KDoc, `feature/feature-settings/.../SettingsScaffold.kt`
 
 Baseline smells (Fowler, ch.3) were applied as judgement calls only, and any documented repo standard overrides them.
 
@@ -206,7 +206,7 @@ No single winner is picked across axes: the two are deliberately separate, and a
 
 ```
 FATAL EXCEPTION: main
-Process: com.playfieldportal.launcher.debug
+Process: com.psplauncher.launcher.debug
 java.lang.ClassCastException: java.lang.Float cannot be cast to kotlin.Unit
 	at GameDetailScreenKt$GameDetailContent$3$1.invokeSuspend(GameDetailScreen.kt:321)
 ```
