@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** not started · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Task 1 done · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -30,13 +30,16 @@ Covers, reading progress, collections, series grouping, PDF/CBZ/MOBI, in-app rea
 the reader app's business: PSPLauncher hands over a file and stops. Covers are the obvious second
 pass and the artwork subsystem is already there when you want them.
 
-## Decisions to make before Task 6
+## Decisions taken (2026-09-18)
 
-1. **Category id.** Your restored database already has a *custom* category named "Books". A
-   built-in with id `books` may collide with it. Either adopt the existing row, or use a distinct
-   id. This must be settled before the seeder changes.
-2. **Category bar art.** There is no books glyph in `core-ui`. Either supply one, or point the new
-   slot at an existing drawable for now. Task 7 is blocked without an answer.
+1. **Category id is `library`**, not `books`. The user already has a custom category called Books,
+   holding a reader app, and a built-in of the same id would collide with it on a restored
+   database. `library` was free: nothing in the codebase uses it as a category id. The section is
+   titled **Library**.
+2. **Category bar art is drawn**, at `core-ui/res/drawable/catbar_library.xml`: an open book, flat
+   white silhouette at the weight of its neighbours. Nothing in the existing set reads as a book,
+   and every catbar drawable is already spoken for, so borrowing one would put two identical icons
+   on the bar. Swap it for other art whenever you like; only the file changes.
 
 ## File map
 
@@ -75,7 +78,7 @@ nothing. `PhotoFileFilter` already solved this; copy its shape.
 **Files:** Create `core/core-data/src/main/kotlin/com/psplauncher/core/data/book/BookFileFilter.kt`,
 Test `core/core-data/src/test/kotlin/com/psplauncher/core/data/book/BookFileFilterTest.kt`
 
-- [ ] Write the failing test first:
+- [x] Write the failing test first:
 
 ```kotlin
 package com.psplauncher.core.data.book
@@ -108,9 +111,9 @@ class BookFileFilterTest {
 }
 ```
 
-- [ ] Run it, confirm RED (the class does not exist):
+- [x] Run it, confirm RED (the class does not exist):
       `./gradlew :core:core-data:testDebugUnitTest --tests '*BookFileFilterTest*'`
-- [ ] Implement:
+- [x] Implement:
 
 ```kotlin
 package com.psplauncher.core.data.book
@@ -139,10 +142,10 @@ object BookFileFilter {
 }
 ```
 
-- [ ] Run it, confirm GREEN.
-- [ ] **Falsify:** delete the octet-stream branch, confirm `an octet-stream epub is accepted on
+- [x] Run it, confirm GREEN.
+- [x] **Falsify:** delete the octet-stream branch, confirm `an octet-stream epub is accepted on
       its extension` goes red by name, restore.
-- [ ] `/cs-verify`, then commit.
+- [x] `/cs-verify`, then commit.
 
 **Verify:** `./gradlew :core:core-data:testDebugUnitTest --tests '*BookFileFilterTest*'`
 
