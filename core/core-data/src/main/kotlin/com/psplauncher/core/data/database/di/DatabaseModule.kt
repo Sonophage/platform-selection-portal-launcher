@@ -32,10 +32,12 @@ import com.psplauncher.core.data.database.dao.VideoPlaylistDao
 import com.psplauncher.core.data.repository.CategoryRepositoryImpl
 import com.psplauncher.core.data.repository.GameRepositoryImpl
 import com.psplauncher.core.data.repository.MusicRepositoryImpl
+import com.psplauncher.core.data.repository.BookRepositoryImpl
 import com.psplauncher.core.data.repository.PhotoRepositoryImpl
 import com.psplauncher.core.data.repository.VideoRepositoryImpl
 import com.psplauncher.core.domain.repository.GameRepository
 import com.psplauncher.core.domain.repository.MusicRepository
+import com.psplauncher.core.domain.repository.BookRepository
 import com.psplauncher.core.domain.repository.PhotoRepository
 import com.psplauncher.core.domain.repository.VideoRepository
 import dagger.Binds
@@ -161,4 +163,7 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindPhotoRepository(impl: PhotoRepositoryImpl): PhotoRepository
+
+    @Binds
+    abstract fun bindBookRepository(impl: BookRepositoryImpl): BookRepository
 }

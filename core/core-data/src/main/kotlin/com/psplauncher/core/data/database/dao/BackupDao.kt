@@ -11,6 +11,8 @@ import com.psplauncher.core.data.database.entity.HiddenPlacementEntity
 import com.psplauncher.core.data.database.entity.MemoryCardEntity
 import com.psplauncher.core.data.database.entity.MusicFolderEntity
 import com.psplauncher.core.data.database.entity.MusicTrackEntity
+import com.psplauncher.core.data.database.entity.BookEntity
+import com.psplauncher.core.data.database.entity.BookLibraryEntity
 import com.psplauncher.core.data.database.entity.PhotoEntity
 import com.psplauncher.core.data.database.entity.PhotoLibraryEntity
 import com.psplauncher.core.data.database.entity.PlatformEntity
@@ -54,6 +56,8 @@ interface BackupDao {
     @Query("SELECT * FROM video_playlist_items")  suspend fun getVideoPlaylistItems(): List<VideoPlaylistItemEntity>
     @Query("SELECT * FROM photo_libraries")       suspend fun getPhotoLibraries(): List<PhotoLibraryEntity>
     @Query("SELECT * FROM photos")                suspend fun getPhotos(): List<PhotoEntity>
+    @Query("SELECT * FROM book_libraries")        suspend fun getBookLibraries(): List<BookLibraryEntity>
+    @Query("SELECT * FROM books")                 suspend fun getBooks(): List<BookEntity>
 
     // ── Bulk insert (REPLACE so explicit primary keys from the backup are honoured) ──
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertMemoryCards(rows: List<MemoryCardEntity>)
@@ -72,6 +76,8 @@ interface BackupDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertVideoPlaylistItems(rows: List<VideoPlaylistItemEntity>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertPhotoLibraries(rows: List<PhotoLibraryEntity>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertPhotos(rows: List<PhotoEntity>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBookLibraries(rows: List<BookLibraryEntity>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBooks(rows: List<BookEntity>)
 
     // ── Wipe (child rows first; parents rely on this ordering, not just FK cascade) ──
     @Query("DELETE FROM collection_games")      suspend fun clearCollectionGames()
@@ -86,6 +92,8 @@ interface BackupDao {
     @Query("DELETE FROM video_libraries")       suspend fun clearVideoLibraries()
     @Query("DELETE FROM photos")                suspend fun clearPhotos()
     @Query("DELETE FROM photo_libraries")       suspend fun clearPhotoLibraries()
+    @Query("DELETE FROM books")                 suspend fun clearBooks()
+    @Query("DELETE FROM book_libraries")        suspend fun clearBookLibraries()
     @Query("DELETE FROM memory_cards")          suspend fun clearMemoryCards()
     @Query("DELETE FROM app_overrides")         suspend fun clearAppOverrides()
     @Query("DELETE FROM hidden_placements")     suspend fun clearHiddenPlacements()

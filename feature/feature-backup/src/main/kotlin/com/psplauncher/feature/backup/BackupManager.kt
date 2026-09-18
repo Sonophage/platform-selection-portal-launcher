@@ -22,6 +22,8 @@ import com.psplauncher.core.data.database.entity.HiddenPlacementEntity
 import com.psplauncher.core.data.database.entity.MemoryCardEntity
 import com.psplauncher.core.data.database.entity.MusicFolderEntity
 import com.psplauncher.core.data.database.entity.MusicTrackEntity
+import com.psplauncher.core.data.database.entity.BookEntity
+import com.psplauncher.core.data.database.entity.BookLibraryEntity
 import com.psplauncher.core.data.database.entity.PhotoEntity
 import com.psplauncher.core.data.database.entity.PhotoLibraryEntity
 import com.psplauncher.core.data.database.entity.PlatformEntity
@@ -145,6 +147,8 @@ open class BackupManager @Inject constructor(
             zip.writeJson(BackupEntry.VIDEO_PLAYLIST_ITEMS, json.encodeToString(listSerializer<VideoPlaylistItemEntity>(), backupDao.getVideoPlaylistItems()))
             zip.writeJson(BackupEntry.PHOTO_LIBRARIES,      json.encodeToString(listSerializer<PhotoLibraryEntity>(),      backupDao.getPhotoLibraries()))
             zip.writeJson(BackupEntry.PHOTOS,               json.encodeToString(listSerializer<PhotoEntity>(),             backupDao.getPhotos()))
+            zip.writeJson(BackupEntry.BOOK_LIBRARIES,       json.encodeToString(listSerializer<BookLibraryEntity>(),       backupDao.getBookLibraries()))
+            zip.writeJson(BackupEntry.BOOKS,                json.encodeToString(listSerializer<BookEntity>(),              backupDao.getBooks()))
 
             // Bundled internal-storage assets. Absolute paths in the DB point into filesDir; storing
             // them relative to filesDir lets restore relocate them into whatever package/data-dir the
@@ -229,6 +233,8 @@ open class BackupManager @Inject constructor(
         val videoPlItems   = entries.decodeList<VideoPlaylistItemEntity>(BackupEntry.VIDEO_PLAYLIST_ITEMS)
         val photoLibraries = entries.decodeList<PhotoLibraryEntity>(BackupEntry.PHOTO_LIBRARIES)
         val photos         = entries.decodeList<PhotoEntity>(BackupEntry.PHOTOS)
+        val bookLibraries  = entries.decodeList<BookLibraryEntity>(BackupEntry.BOOK_LIBRARIES)
+        val books          = entries.decodeList<BookEntity>(BackupEntry.BOOKS)
 
         val settings = entries[BackupEntry.SETTINGS]?.let {
             json.decodeFromString(SettingsSnapshot.serializer(), it)
@@ -266,6 +272,8 @@ open class BackupManager @Inject constructor(
         backupDao.clearVideoLibraries()
         backupDao.clearPhotos()
         backupDao.clearPhotoLibraries()
+        backupDao.clearBooks()
+        backupDao.clearBookLibraries()
         backupDao.clearMemoryCards()
         backupDao.clearAppOverrides()
         backupDao.clearHiddenPlacements()
@@ -293,6 +301,8 @@ open class BackupManager @Inject constructor(
         backupDao.insertVideoPlaylists(videoPlaylists)
         backupDao.insertVideoPlaylistItems(videoPlItems)
         backupDao.insertPhotoLibraries(photoLibraries)
+        backupDao.insertBookLibraries(bookLibraries)
+        backupDao.insertBooks(books)
         backupDao.insertPhotos(photos)
 
         // Platforms: merge only the user-editable columns onto the existing seeded catalog so an
@@ -542,6 +552,7 @@ open class BackupManager @Inject constructor(
             // Default players
             stringPreferencesKey("music_default_player_package"),
             stringPreferencesKey("video_default_player"),
+            stringPreferencesKey("books_default_reader"),
             // Library
             stringPreferencesKey("library_root_path"),
             // SAF ROM root grants (newline-joined list; singular key kept for older backups).

@@ -77,6 +77,14 @@ class BackupKeyCoverageTest {
 
 
     @Test
+    fun `the Library section's reader choice is backed up`() {
+        // Book libraries and their rows ride backup as tables. This is the one Library setting
+        // that lives in preferences, so it is the one that can go missing on a restored device
+        // without anything failing: the folders come back and every book opens the wrong app.
+        assertCovered("books_default_reader")
+    }
+
+    @Test
     fun `controller preferences are backed up`() {
         // Every controller preference rides backup; a new one that misses this list silently
         // reverts to its default on a restored device.

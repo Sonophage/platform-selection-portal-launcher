@@ -62,6 +62,8 @@ object BackupEntry {
     const val VIDEO_PLAYLISTS      = "video_playlists.json"
     const val VIDEO_PLAYLIST_ITEMS = "video_playlist_items.json"
     const val PHOTO_LIBRARIES      = "photo_libraries.json"
+    const val BOOK_LIBRARIES       = "book_libraries.json"
+    const val BOOKS                = "books.json"
     const val PHOTOS               = "photos.json"
 }
 

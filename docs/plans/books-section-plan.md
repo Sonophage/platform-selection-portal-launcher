@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** Tasks 1 to 3 done · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Tasks 1 to 4 done · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -264,14 +264,20 @@ Mirror `PhotoRepositoryImpl`. The one new thing is the reader preference, which 
 private val KEY_BOOK_DEFAULT_READER = stringPreferencesKey("books_default_reader")
 ```
 
-- [ ] Add `books_default_reader` to `BACKED_UP_STRING_KEYS` in `BackupManager.kt` beside
+- [x] Add `books_default_reader` to `BACKED_UP_STRING_KEYS` in `BackupManager.kt` beside
       `video_default_player`, and the two new tables to the backup/restore table lists. A setting
       that misses that list reverts silently on a restored device, which is exactly what the
       existing `BackupKeyCoverageTest` is there to catch.
-- [ ] Extend `BackupKeyCoverageTest` with a `books` case.
-- [ ] `/cs-verify`, then commit.
+- [x] Extend `BackupKeyCoverageTest` with a `books` case.
+- [x] `/cs-verify`, then commit.
 
-**Verify:** `./gradlew :feature:feature-backup:testDebugUnitTest`
+**Done 2026-09-18.** `BookIntentResolver` landed here too, rather than waiting for the UI: it
+is what makes the reader preference mean anything, and it carries the one rule that is genuinely
+about books. A scanned row may hold `application/octet-stream`, because that is what the provider
+said, and forwarding it resolves no reader; the resolver asserts the EPUB type instead, which is
+what got the row into the library.
+
+**Verify:** `./gradlew :core:core-data:testDebugUnitTest --tests '*BookIntentResolverTest*' :feature:feature-backup:testDebugUnitTest`
 
 ---
 
