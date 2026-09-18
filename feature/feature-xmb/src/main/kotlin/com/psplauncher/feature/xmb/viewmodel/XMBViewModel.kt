@@ -3039,6 +3039,11 @@ class XMBViewModel @Inject constructor(
                 title    = book.displayTitle,
                 subtitle = bookSubtitle(book),
                 coverUri = book.coverUri,
+                // Same image in both slots on purpose: coverUri draws the list tile, artworkUri is
+                // the shell's hover-background slot. XMBShell already crossfades artworkUri behind
+                // whatever row is selected, for any item type, so a book gets the treatment games
+                // get without a second rendering path.
+                artworkUri = book.coverUri,
                 type     = XMBItemType.LIBRARY_BOOK,
             )
         }

@@ -37,9 +37,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Longest edge of a cached cover, in px. Covers are portrait and drawn in a 40x56 list tile, so
-// this is generous enough for the flyout without keeping a full-size jacket per book on disk.
-private const val COVER_MAX_DIM = 400
+// Longest edge of a cached cover, in px.
+//
+// Sized for the larger of the two things it feeds, not the smaller: the 40x56 list tile would be
+// happy with 400, but the same file is also the full-screen hover background behind the selected
+// row, where 400 is visibly soft on a 1080p panel. A jacket at this size is around 150 KB, so a
+// library of a few hundred books costs tens of megabytes of evictable cache.
+private const val COVER_MAX_DIM = 1200
 
 // Concurrent per-file EPUB reads. Each one opens the archive up to three times and decodes one
 // image, so this is I/O bound; four in flight keeps a folder of large books from monopolising the
