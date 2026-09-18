@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** Tasks 1 to 6 done, usable from Settings · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Tasks 1 to 7 done, the section is on the crossbar · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -343,27 +343,33 @@ reuses it was already showing; it is now a parameter and all four say the right 
 
 ## Task 7 — The XMB section
 
-**Blocked on both decisions at the top of this plan.**
-
 **Files:** Modify `XMBViewModel.kt`, `XMBItemList.kt`, `CategoryRepositoryImpl.kt`, `Category.kt`,
 `CategoryIcons.kt`, `XmbIconOverrides.kt`, `IconSlots.kt`, `StudioIconSet.kt`,
 `DefaultSlotGlyph.kt`, `PreviewModel.kt`
 
-- [ ] `BooksNav` in `XMBViewModel.kt`, mirroring `PhotoNav`: `Root`, `AllBooks`, `Libraries`,
+- [x] `BooksNav` in `XMBViewModel.kt`, mirroring `PhotoNav`: `Root`, `AllBooks`, `Libraries`,
       `Library(id, name)`. Add the nav key, the title, the sibling list and the drill-out rung,
       as the Photo section does in all five places.
-- [ ] `BuiltInCategory.BOOKS` in `Category.kt`, plus the seed row and `PROTECTED_BUILTINS` entry
+- [x] `BuiltInCategory.BOOKS` in `Category.kt`, plus the seed row and `PROTECTED_BUILTINS` entry
       in `CategoryRepositoryImpl.kt`. Append its position after the current last built-in so an
       established database does not collide.
-- [ ] **The icon slot is a three-way pair that must agree**, and two tests enforce it. Add
+- [x] **The icon slot is a three-way pair that must agree**, and two tests enforce it. Add
       `catbar_books` to `IconSlots.kt`, to `StudioIconSet.RESOURCE_SLOTS`, and the matching
       drawable; add the item slots to `DefaultSlotGlyph.kt`. `StudioIconSetTest` and
       `DefaultSlotGlyphTest` fail on a one-sided change, and `DefaultSlotGlyphTest` also asserts a
       hardcoded crossbar-slot COUNT that must be bumped.
-- [ ] The pinned top row: an `XMBItem` that launches the chosen reader with no document. Build it
+- [x] The pinned top row: an `XMBItem` that launches the chosen reader with no document. Build it
       with `MediaOpenIntent` and a null uri path, or `appCategoryRepository.launch(pkg)` if the
       reader is stored as a package. Hide the row when no reader is set.
-- [ ] `/cs-verify`, then commit.
+- [x] `/cs-verify`, then commit.
+
+**Done 2026-09-18.** Five new slots, and the three-way registration held: both guards were
+falsified. Registering a slot in theme-kit but not the Studio fails `StudioIconSetTest` by name,
+and adding the crossbar slot without bumping the pinned count fails `DefaultSlotGlyphTest` with
+`expected:<10> but was:<9>`. The Studio's icon set is narrower than the launcher's: `MenuBook`,
+`AutoStories` and `LibraryBooks` do not exist there, so both sides use `CollectionsBookmark`,
+`ImportContacts`, `Folder` and `Book`, which keeps a theme author previewing what the launcher
+actually draws.
 
 **Verify:** `./gradlew :feature:feature-xmb:testDebugUnitTest :core:theme-kit:test :studio:test`
 

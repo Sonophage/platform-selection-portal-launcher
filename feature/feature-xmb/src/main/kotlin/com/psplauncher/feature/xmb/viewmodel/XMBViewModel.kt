@@ -329,6 +329,17 @@ private val VideoNav.isVideoCollectionChild: Boolean
 // Which Photo sub-screen is open. Mirrors [VideoNav], kept deliberately minimal (PSP memory-card
 // style): the Photo root shows All Photos / Camera / Add Photo Library / the user's Albums;
 // drilling swaps the item list without leaving the Photo category.
+/**
+ * Library (books) sub-navigation. Shelves are the configured root folders; a shelf lists the books
+ * found under it. Deliberately shallower than Photo: no favorites, no collections.
+ */
+sealed interface BooksNav {
+    data object Root : BooksNav
+    data object AllBooks : BooksNav
+    data object Shelves : BooksNav
+    data class Shelf(val id: String, val name: String) : BooksNav
+}
+
 sealed interface PhotoNav {
     data object Root : PhotoNav
     data object AllPhotos : PhotoNav
@@ -504,6 +515,9 @@ enum class DrillOutStep {
     /** A photo album backs out to the Albums list before leaving Photo. */
     PHOTO_LIBRARY,
     PHOTO,
+    /** A shelf backs out to the Shelves list before leaving Library. */
+    LIBRARY_SHELF,
+    LIBRARY,
     ACHIEVEMENTS,
     /** A Games platform folder, collection, All Games or Favorites. */
     PLATFORM_FOLDER,
@@ -662,6 +676,11 @@ data class XMBUiState(
 
     // ── Photo ─────────────────────────────────────────────────────────────
     val photoNav: PhotoNav = PhotoNav.Root,
+    val booksNav: BooksNav = BooksNav.Root,
+    val bookLibraries: List<com.psplauncher.core.domain.model.BookLibrary> = emptyList(),
+    // Package name of the reader a book opens in, or null for the system chooser.
+    val defaultReader: String? = null,
+    val defaultReaderLabel: String? = null,
     val photoLibraries: List<com.psplauncher.core.domain.model.PhotoLibrary> = emptyList(),
     val activePhotoViewer: PhotoViewerRequest? = null,
     val pendingPhotoViewerAction: GamepadAction? = null,
@@ -800,6 +819,8 @@ data class XMBUiState(
             videoNav != VideoNav.Root -> DrillOutStep.VIDEO
             photoNav is PhotoNav.Library -> DrillOutStep.PHOTO_LIBRARY
             photoNav != PhotoNav.Root -> DrillOutStep.PHOTO
+            booksNav is BooksNav.Shelf -> DrillOutStep.LIBRARY_SHELF
+            booksNav != BooksNav.Root -> DrillOutStep.LIBRARY
             achievementsNav != AchievementsNav.Root -> DrillOutStep.ACHIEVEMENTS
             selectedPlatformId != null || selectedCollectionId != null -> DrillOutStep.PLATFORM_FOLDER
             else -> null
@@ -886,6 +907,11 @@ enum class XMBItemType {
     VIDEO_COLLECTIONS,
     PHOTO_ALBUMS,
     PHOTO_FOLDER,
+    // Library (books) rows.
+    LIBRARY_SHELVES,
+    LIBRARY_READER,
+    LIBRARY_FOLDER,
+    LIBRARY_BOOK,
     PHOTO_FILE,
     PHOTO_APPS,
     CAMERA,
@@ -1234,6 +1260,8 @@ class XMBViewModel @Inject constructor(
     private val videoRepository: com.psplauncher.core.domain.repository.VideoRepository,
     private val photoRepository: com.psplauncher.core.domain.repository.PhotoRepository,
     private val photoScanner: com.psplauncher.feature.library.scanner.PhotoScanner,
+    private val bookRepository: com.psplauncher.core.domain.repository.BookRepository,
+    private val bookIntentResolver: com.psplauncher.core.data.book.BookIntentResolver,
     private val hiddenPlacementDao: com.psplauncher.core.data.database.dao.HiddenPlacementDao,
     private val iconDisplayPreferences: com.psplauncher.core.data.repository.IconDisplayPreferences,
     private val artworkStore: com.psplauncher.feature.artwork.store.ArtworkStore,
@@ -1352,6 +1380,7 @@ class XMBViewModel @Inject constructor(
         observeMusic()
         observeVideo()
         observePhoto()
+        observeBooks()
         observeLibraryStanding()
         observeHiddenPlacements()
         observeEmulatorProfiles()
@@ -1981,6 +2010,18 @@ class XMBViewModel @Inject constructor(
                     PhotoNav.PhotoApps -> {
                         val items = photoAppItems()
                         _uiState.update { it.copy(currentItems = items) }
+                    }
+                }
+                BuiltInCategory.LIBRARY -> when (val nav = _uiState.value.booksNav) {
+                    BooksNav.Root -> _uiState.update { it.copy(currentItems = booksRootItems()) }
+                    BooksNav.Shelves -> bookRepository.observeLibraries().collect { shelves ->
+                        _uiState.update { it.copy(bookLibraries = shelves, currentItems = bookShelfItems()) }
+                    }
+                    BooksNav.AllBooks -> bookRepository.observeAllBooks().collect { books ->
+                        _uiState.update { it.copy(currentItems = bookItems(books).ifEmpty { listOf(emptyBooksItem()) }) }
+                    }
+                    is BooksNav.Shelf -> bookRepository.observeBooksByLibrary(nav.id).collect { books ->
+                        _uiState.update { it.copy(currentItems = bookItems(books).ifEmpty { listOf(emptyBooksItem()) }) }
                     }
                 }
                 else -> {
@@ -2618,6 +2659,7 @@ class XMBViewModel @Inject constructor(
             catId == BuiltInCategory.MUSIC -> "music_${musicNavKey(s.musicNav)}"
             catId == BuiltInCategory.VIDEO -> "video_${videoNavKey(s.videoNav)}"
             catId == BuiltInCategory.PHOTO -> "photo_${photoNavKey(s.photoNav)}"
+            catId == BuiltInCategory.LIBRARY -> "books_${booksNavKey(s.booksNav)}"
             catId == BuiltInCategory.ACHIEVEMENTS -> "ach_${achievementsNavKey(s.achievementsNav)}"
             catId == BuiltInCategory.SETTINGS -> "settings_${s.settingsSectionNav?.id ?: "root"}"
             s.selectedCollectionId != null -> "col_${s.selectedCollectionId}"
@@ -2812,6 +2854,165 @@ class XMBViewModel @Inject constructor(
             }
         }
     }
+
+    // ── Library (books) ─────────────────────────────────────────────────────────
+
+    // The shelf list and the chosen reader both drive the Library root, so a change to either
+    // re-renders it while the user is standing there.
+    private fun observeBooks() {
+        viewModelScope.launch {
+            bookRepository.observeLibraries().collect { libraries ->
+                _uiState.update { it.copy(bookLibraries = libraries) }
+                refreshBooksRootIfShowing()
+            }
+        }
+        viewModelScope.launch {
+            bookRepository.observeDefaultReader().collect { reader ->
+                _uiState.update {
+                    it.copy(
+                        defaultReader = reader,
+                        defaultReaderLabel = reader?.let { pkg -> bookIntentResolver.readerLabel(pkg) },
+                    )
+                }
+                refreshBooksRootIfShowing()
+            }
+        }
+    }
+
+    private fun refreshBooksRootIfShowing() {
+        if (currentCategory()?.id == BuiltInCategory.LIBRARY &&
+            _uiState.value.booksNav == BooksNav.Root
+        ) {
+            _uiState.update { it.copy(currentItems = booksRootItems()) }
+        }
+    }
+
+    private fun booksRootItems(): List<XMBItem> {
+        val shelves = _uiState.value.bookLibraries
+        val totalBooks = shelves.sumOf { it.bookCount }
+        val hasScannedShelf = shelves.any { it.lastScannedAt != null }
+        val reader = _uiState.value.defaultReader
+        return buildList {
+            // The reader, first, so the app you read in is one press away whether or not you are
+            // opening something from the library. Hidden when no reader is set, since there is
+            // nothing to open: the picker lives in Settings.
+            if (reader != null) {
+                add(
+                    XMBItem(
+                        id       = OPEN_READER_ITEM_ID,
+                        title    = _uiState.value.defaultReaderLabel ?: "Open Reader",
+                        subtitle = "Open your reader",
+                        type     = XMBItemType.LIBRARY_READER,
+                    )
+                )
+            }
+            add(
+                XMBItem(
+                    id       = BOOK_SHELVES_ITEM_ID,
+                    title    = "Shelves",
+                    subtitle = "${shelves.size} ${if (shelves.size == 1) "shelf" else "shelves"}",
+                    type     = XMBItemType.LIBRARY_SHELVES,
+                )
+            )
+            add(
+                XMBItem(
+                    id       = ALL_BOOKS_ITEM_ID,
+                    title    = "Books",
+                    subtitle = "$totalBooks ${if (totalBooks == 1) "book" else "books"}",
+                    coverUri = MEMORY_CARD_ASSET_URI,
+                    type     = XMBItemType.MEMORY_CARD,
+                )
+            )
+            // Getting-started prompt, gone once a shelf has been scanned even if it found nothing.
+            if (!hasScannedShelf) {
+                add(
+                    XMBItem(
+                        id       = ADD_BOOK_FOLDER_ITEM_ID,
+                        title    = "Add Book Folder",
+                        subtitle = "Point the Library at a folder of EPUBs",
+                        type     = XMBItemType.ADD_ACTION,
+                    )
+                )
+            }
+        }
+    }
+
+    private fun bookItems(books: List<com.psplauncher.core.domain.model.Book>): List<XMBItem> =
+        books.map { book ->
+            XMBItem(
+                id       = "book_${book.id}",
+                title    = book.displayTitle,
+                subtitle = book.author,
+                type     = XMBItemType.LIBRARY_BOOK,
+            )
+        }
+
+    private fun emptyBooksItem(): XMBItem = XMBItem(
+        id       = "books_empty",
+        title    = "No books yet",
+        subtitle = "Add a folder of EPUBs in Settings, then rescan",
+        type     = XMBItemType.EMPTY,
+    )
+
+    private fun bookShelfItems(): List<XMBItem> =
+        _uiState.value.bookLibraries.map {
+            XMBItem(
+                id       = "shelf_${it.id}",
+                title    = it.displayName,
+                subtitle = "${it.bookCount} ${if (it.bookCount == 1) "book" else "books"}",
+                type     = XMBItemType.LIBRARY_FOLDER,
+            )
+        }
+
+    /** Returns true when [item] was a Library row and has been handled. */
+    private fun handleBooksSelection(item: XMBItem): Boolean = when {
+        item.id == OPEN_READER_ITEM_ID -> {
+            menuSound.play(MenuSound.LAUNCH)
+            val reader = _uiState.value.defaultReader
+            val error = reader?.let { bookIntentResolver.launchReader(it) }
+            if (error != null) {
+                _uiState.update { it.copy(infoDialog = InfoDialogState(title = "Library", message = error)) }
+            }
+            true
+        }
+        item.id == BOOK_SHELVES_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openBooksView(BooksNav.Shelves); true }
+        item.id == ALL_BOOKS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openBooksView(BooksNav.AllBooks); true }
+        item.id == ADD_BOOK_FOLDER_ITEM_ID -> {
+            menuSound.play(MenuSound.SELECT)
+            _uiState.update { it.copy(activeSettingsScreen = "settings_books") }
+            true
+        }
+        item.type == XMBItemType.LIBRARY_FOLDER -> {
+            menuSound.play(MenuSound.SELECT)
+            openBooksView(BooksNav.Shelf(item.id.removePrefix("shelf_"), item.title))
+            true
+        }
+        item.type == XMBItemType.LIBRARY_BOOK -> { openBook(item.id.removePrefix("book_")); true }
+        else -> false
+    }
+
+    /** Hands the book to the chosen reader, or to the chooser when none is set. */
+    private fun openBook(bookId: String) {
+        menuSound.play(MenuSound.LAUNCH)
+        viewModelScope.launch {
+            val book = bookRepository.getBook(bookId) ?: return@launch
+            val error = bookIntentResolver.launch(book, _uiState.value.defaultReader)
+            if (error != null) {
+                _uiState.update { it.copy(infoDialog = InfoDialogState(title = book.displayTitle, message = error)) }
+            }
+        }
+    }
+
+    private fun booksNavKey(nav: BooksNav): String = when (nav) {
+        BooksNav.Root     -> "root"
+        BooksNav.AllBooks -> "all"
+        BooksNav.Shelves  -> "shelves"
+        is BooksNav.Shelf -> "shelf_${nav.id}"
+    }
+
+    private fun openBooksView(nav: BooksNav) = navigateRememberingCursor { it.copy(booksNav = nav) }
+
+    private fun closeBooksView() = openBooksView(BooksNav.Root)
 
     // ── Photo ───────────────────────────────────────────────────────────────────
 
@@ -3783,6 +3984,13 @@ class XMBViewModel @Inject constructor(
             PhotoNav.Root       -> null
         }
         if (photoTitle != null) return photoTitle
+        val booksTitle = when (val nav = s.booksNav) {
+            BooksNav.AllBooks -> "Books"
+            BooksNav.Shelves  -> "Shelves"
+            is BooksNav.Shelf -> nav.name
+            BooksNav.Root     -> null
+        }
+        if (booksTitle != null) return booksTitle
         return when {
             s.selectedCollectionId != null ->
                 s.collections.firstOrNull { it.id == s.selectedCollectionId }?.name ?: "Collection"
@@ -6394,6 +6602,8 @@ class XMBViewModel @Inject constructor(
             // An album drill-in backs out via the Albums list first.
             DrillOutStep.PHOTO_LIBRARY -> openPhotoView(PhotoNav.Albums)
             DrillOutStep.PHOTO -> closePhotoView()
+            DrillOutStep.LIBRARY_SHELF -> openBooksView(BooksNav.Shelves)
+            DrillOutStep.LIBRARY -> closeBooksView()
             DrillOutStep.ACHIEVEMENTS -> closeAchievementsView()
             DrillOutStep.PLATFORM_FOLDER -> closePlatformFolder()
             null -> return false
@@ -6431,6 +6641,9 @@ class XMBViewModel @Inject constructor(
 
         // Photo rows (the All Photos card, Camera, Add Photo Library, Album cards, photo files).
         if (category?.id == BuiltInCategory.PHOTO && item != null && handlePhotoSelection(item)) return
+
+        // Library rows (the reader, shelves, a shelf, a book).
+        if (category?.id == BuiltInCategory.LIBRARY && item != null && handleBooksSelection(item)) return
 
         // Shiba Coins rows (summary → settings, lens rows → drill). Game/coin rows fall through to
         // the shared game handler below, which opens Game Detail.
@@ -8031,6 +8244,10 @@ class XMBViewModel @Inject constructor(
         private const val CAMERA_ITEM_ID = "photo_camera"
         private const val ADD_PHOTO_LIBRARY_ITEM_ID = "add_photo_library"
         private const val PHOTO_ALBUMS_ITEM_ID = "photo_albums"
+        private const val OPEN_READER_ITEM_ID = "library_open_reader"
+        private const val BOOK_SHELVES_ITEM_ID = "library_shelves"
+        private const val ALL_BOOKS_ITEM_ID = "all_books"
+        private const val ADD_BOOK_FOLDER_ITEM_ID = "add_book_folder"
         private const val PHOTO_APPS_ITEM_ID = "photo_apps_item"
         private const val ADD_PHOTO_APPS_ITEM_ID = "add_photo_apps"
         private const val PHOTO_APPS_CATEGORY_ID = "photos"

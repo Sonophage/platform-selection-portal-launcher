@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Category-bar glyph for the Library section. Drawn rather than borrowed: every existing catbar_*
+  drawable is already spoken for, and reusing one would put two identical icons side by side on
+  the bar. Flat white silhouette at the same weight as its neighbours, so PortalIcon's tint and
+  the legibility matte behave the same way here as everywhere else.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.1,6.2 C8.9,4.7 5.6,4.4 3.2,5.1 C2.8,5.2 2.6,5.5 2.6,5.9 V18.6 C2.6,19.2 3.1,19.6 3.7,19.4 C5.9,18.9 8.8,19.2 11.1,20.4 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12.9,6.2 C15.1,4.7 18.4,4.4 20.8,5.1 C21.2,5.2 21.4,5.5 21.4,5.9 V18.6 C21.4,19.2 20.9,19.6 20.3,19.4 C18.1,18.9 15.2,19.2 12.9,20.4 Z" />
+</vector>

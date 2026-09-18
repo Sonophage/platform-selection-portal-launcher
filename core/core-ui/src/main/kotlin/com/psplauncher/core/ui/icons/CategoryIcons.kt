@@ -24,6 +24,7 @@ val CATEGORY_ICON_CATALOG: List<CategoryIcon> = listOf(
     CategoryIcon("ic_games",     "Games",     R.drawable.catbar_games),
     CategoryIcon("ic_network",   "Network",   R.drawable.catbar_network),
     CategoryIcon("ic_appstore",  "App Store", R.drawable.catbar_appstore),
+    CategoryIcon("ic_library",   "Library",   R.drawable.catbar_library),
     CategoryIcon("ic_achievements", "Shiba Coins", R.drawable.catbar_achievements),
     CategoryIcon("ic_favorites", "Favorites", R.drawable.catbar_favorites),
     // ── Console icons (sysicon_* art, also used for memory-card media) ────────────

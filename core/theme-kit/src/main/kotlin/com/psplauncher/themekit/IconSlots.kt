@@ -54,6 +54,7 @@ object IconSlots {
         catbar("catbar_network", "Network"),
         catbar("catbar_appstore", "App Store"),
         catbar("catbar_favorites", "Favorites"),
+        catbar("catbar_library", "Library"),
         catbar("catbar_achievements", "Shiba Coins"),
 
         // ── First-level item glyphs (one key per semantic slot, not per shape:
@@ -79,6 +80,10 @@ object IconSlots {
         item("item_photo_file", "Photo file"),
         item("item_photo_albums", "Photo albums"),
         item("item_photo_apps", "Photo apps"),
+        item("item_library_shelves", "Book shelves"),
+        item("item_library_reader", "Reader app"),
+        item("item_library_folder", "Book folder"),
+        item("item_library_book", "Book"),
         item("item_camera", "Camera"),
         item("item_music_track", "Music track"),
         item("item_playlist", "Playlist"),

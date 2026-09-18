@@ -40,6 +40,9 @@ import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.ImportContacts
+import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
@@ -374,6 +377,10 @@ internal fun itemSlotKeyFor(type: XMBItemType): String? = when (type) {
     XMBItemType.PHOTO_FILE -> "item_photo_file"
     XMBItemType.PHOTO_ALBUMS -> "item_photo_albums"
     XMBItemType.PHOTO_APPS -> "item_photo_apps"
+    XMBItemType.LIBRARY_SHELVES -> "item_library_shelves"
+    XMBItemType.LIBRARY_READER -> "item_library_reader"
+    XMBItemType.LIBRARY_FOLDER -> "item_library_folder"
+    XMBItemType.LIBRARY_BOOK -> "item_library_book"
     XMBItemType.CAMERA -> "item_camera"
     XMBItemType.MUSIC_TRACK -> "item_music_track"
     XMBItemType.PLAYLIST -> "item_playlist"
@@ -945,6 +952,27 @@ private fun XmbItemLeadingIcon(
         item.type == XMBItemType.PHOTO_ALBUMS -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
                 ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.PhotoLibrary, null, iconTint, Modifier.size(48.dp))
+            }
+        }
+        // Library (books) rows. Same glyphs the Theme Studio previews these slots with.
+        item.type == XMBItemType.LIBRARY_SHELVES -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.CollectionsBookmark, null, iconTint, Modifier.size(46.dp))
+            }
+        }
+        item.type == XMBItemType.LIBRARY_READER -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.ImportContacts, null, iconTint, Modifier.size(46.dp))
+            }
+        }
+        item.type == XMBItemType.LIBRARY_FOLDER -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Folder, null, iconTint, Modifier.size(46.dp))
+            }
+        }
+        item.type == XMBItemType.LIBRARY_BOOK -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Book, null, iconTint, Modifier.size(44.dp))
             }
         }
         // The "Photo Apps" section row at the Photo root (distinct glyph from Albums and Camera).

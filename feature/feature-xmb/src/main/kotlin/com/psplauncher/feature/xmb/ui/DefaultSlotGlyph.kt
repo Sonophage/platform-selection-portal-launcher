@@ -5,10 +5,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.ImportContacts
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
@@ -116,6 +119,10 @@ private val ITEM_VECTORS: Map<String, ImageVector> = mapOf(
     "item_photo_folder" to Icons.Filled.Folder,
     "item_photo_file" to Icons.Filled.Photo,
     "item_photo_albums" to Icons.Filled.PhotoLibrary,
+    "item_library_shelves" to Icons.Filled.CollectionsBookmark,
+    "item_library_reader" to Icons.Filled.ImportContacts,
+    "item_library_folder" to Icons.Filled.Folder,
+    "item_library_book" to Icons.Filled.Book,
     "item_photo_apps" to Icons.Filled.Collections,
     "item_camera" to Icons.Filled.PhotoCamera,
     "item_music_track" to Icons.Filled.MusicNote,

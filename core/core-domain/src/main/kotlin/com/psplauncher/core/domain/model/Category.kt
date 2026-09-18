@@ -43,6 +43,12 @@ object BuiltInCategory {
     const val APP_DRAWER       = "app_drawer"
     const val SETTINGS         = "settings"
     const val ACHIEVEMENTS     = "achievements"
+    /**
+     * The Library section (books). Deliberately not "books": a user-made custom category of
+     * that name already exists on established databases, and a built-in sharing its id would
+     * collide with it.
+     */
+    const val LIBRARY          = "library"
 
     /**
      * Built-in categories this build no longer has. A row for one of these can still reach a live
