@@ -970,9 +970,29 @@ private fun XmbItemLeadingIcon(
                 ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Folder, null, iconTint, Modifier.size(46.dp))
             }
         }
+        // Books show the cover extracted from the EPUB, falling back to a book glyph for a file
+        // that declares none. The tile is portrait, unlike video's and photo's landscape ones,
+        // because a book jacket cropped to landscape is unrecognisable.
         item.type == XMBItemType.LIBRARY_BOOK -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
-                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Book, null, iconTint, Modifier.size(44.dp))
+                if (item.coverUri != null) {
+                    AsyncImage(
+                        model = item.coverUri,
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.size(width = 40.dp, height = 56.dp).clip(RoundedCornerShape(4.dp)),
+                    )
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(width = 40.dp, height = 56.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF1B1B27)),
+                    ) {
+                        ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Book, null, iconTint, Modifier.size(26.dp))
+                    }
+                }
             }
         }
         // The "Photo Apps" section row at the Photo root (distinct glyph from Albums and Camera).

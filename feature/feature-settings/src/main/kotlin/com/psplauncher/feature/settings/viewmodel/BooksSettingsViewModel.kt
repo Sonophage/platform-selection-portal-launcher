@@ -111,15 +111,22 @@ class BooksSettingsViewModel @Inject constructor(
     /**
      * Reconciles the library rows with the configured roots (dropping rows whose root is gone)
      * and scans every root.
+     *
+     * [deep] reopens every book and regenerates every cover. A normal rescan reads only files that
+     * are new or whose timestamp moved, because reading a book's series and cover means opening
+     * the archive, which a cursor-only walk never had to do.
      */
-    fun rescan() {
+    fun rescan(deep: Boolean = false) {
         viewModelScope.launch {
             val roots = mediaRootRepository.getAll(MediaRootKind.BOOK)
             if (roots.isEmpty()) {
                 _ui.value = _ui.value.copy(scanMessage = "Add a root folder first.")
                 return@launch
             }
-            _ui.value = _ui.value.copy(scanning = true, scanMessage = "Scanning…")
+            _ui.value = _ui.value.copy(
+                scanning = true,
+                scanMessage = if (deep) "Reading every book…" else "Scanning…",
+            )
 
             // Roots removed here take their library rows, and their books, with them.
             bookRepository.getLibraries()
@@ -132,10 +139,15 @@ class BooksSettingsViewModel @Inject constructor(
                 val library = syncLibraryForRoot(root)
                 val taskId = "book_scan_${library.id}"
                 notifier.running(taskId, "Scanning ${library.displayName}", null)
-                bookScanner.scan(library).collect { result ->
+                // The existing rows are what makes a quick scan quick: an unchanged book is
+                // carried forward from here rather than reopened.
+                val existing = bookRepository.getBooksForLibrary(library.id)
+                bookScanner.scan(library, deep = deep, existing = existing).collect { result ->
                     when (result) {
                         is BookScanResult.Progress ->
-                            _ui.value = _ui.value.copy(scanMessage = "${result.booksFound} books")
+                            _ui.value = _ui.value.copy(
+                                scanMessage = "${result.booksFound} of ${result.filesSeen} books",
+                            )
                         is BookScanResult.Complete -> {
                             bookRepository.replaceBooksForLibrary(
                                 result.libraryId, result.books, System.currentTimeMillis(),
@@ -175,6 +187,17 @@ class BooksSettingsViewModel @Inject constructor(
     }
 
     fun dismissMessage() { _ui.value = _ui.value.copy(scanMessage = null) }
+
+    /**
+     * Deletes every cached cover. The rows keep pointing at files that are now gone, which the
+     * next rescan notices and regenerates, so this is safe to run at any time.
+     */
+    fun clearCoverCache() {
+        viewModelScope.launch {
+            val removed = bookScanner.clearCoverCache()
+            _ui.value = _ui.value.copy(scanMessage = "Cleared $removed cover(s). Rescan to rebuild.")
+        }
+    }
 
     // Ensures one BookLibrary exists for [root] — other roots keep their own rows.
     private suspend fun syncLibraryForRoot(root: String): BookLibrary {

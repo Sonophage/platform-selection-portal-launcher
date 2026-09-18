@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** Tasks 1 to 7 done, the section is on the crossbar · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Tasks 1 to 7 and 9 to 11 done · Task 8 (on the device) still open · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -26,9 +26,12 @@ Tests are pure-JVM JUnit4 + MockK, with Robolectric where a resource or a real D
 
 ## Non-goals (first pass)
 
-Covers, reading progress, collections, series grouping, PDF/CBZ/MOBI, in-app reading. Progress is
-the reader app's business: PSPLauncher hands over a file and stops. Covers are the obvious second
-pass and the artwork subsystem is already there when you want them.
+Reading progress, collections, PDF/CBZ/MOBI, in-app reading. Progress is the reader app's business:
+PSPLauncher hands over a file and stops.
+
+**Covers and series grouping were non-goals here and became tasks 9 to 11 on 2026-09-18**, at the
+user's request. They are one piece of work, not two: both come out of the same read of the EPUB's
+package document, and building them separately would open and parse every book twice.
 
 ## Decisions taken (2026-09-18)
 
@@ -398,3 +401,105 @@ additive and `CREATE TABLE IF NOT EXISTS` only; no existing table is touched. Ta
 resolvers that are on the music and video launch paths, which is the one place in this plan where
 a regression would be user-visible without a test failing first, so run the existing music and
 video suites before committing it.
+
+
+---
+
+# Second pass: covers and series (2026-09-18)
+
+## Goal
+
+Sort a book list by series, and show each book's cover.
+
+## Why they are one task
+
+Both facts live in the same file. An EPUB is a ZIP; `META-INF/container.xml` names a package
+document, and that document carries the title, the author, the series AND the path to the cover
+image. One parse gets everything, so splitting them would mean opening every book twice.
+
+## Decisions taken
+
+1. **Series is a sort mode, not a browse level.** `XmbSortMode.SERIES` joins the existing Sort
+   control (X / Square, or the status-bar chip) rather than a Series rung beside Shelves. It is
+   the smaller change and it is what was asked for. A drill level remains available later; the data
+   work here is what either would need.
+2. **Rescan stays quick by default.** The first pass walked directory cursors and did no per-file
+   I/O, which is why it returned in seconds. Reading covers and series means opening every book, so
+   the scan gains the quick/deep split `PhotoScanner` and `MusicScanner` already have, and a
+   **Deep Rescan** row to force the slow path. Worth recording: `deep = true` had no caller
+   anywhere in this codebase before this task. Music, Photo and Video all carry the parameter, the
+   documentation and the branch, and all three only ever call `deep = false`.
+3. **DOM, not the pull parser.** `EsDeGamelistParser` sets the `XmlPullParser` precedent, but a
+   package document is a few kilobytes where a gamelist is megabytes, and `android.util.Xml` needs
+   Robolectric to run in a test. `DocumentBuilderFactory` is on both platforms, needs no new
+   dependency, and keeps the parser tests on a plain JVM.
+4. **Both series conventions are read.** Calibre writes `calibre:series` / `calibre:series_index`
+   metas; EPUB 3 writes `belongs-to-collection` refined by `collection-type` and `group-position`.
+   A file carrying both was written by Calibre, so Calibre wins. A file carrying neither has no
+   series, and is never guessed at from its file name.
+
+## Task 9 — Read the EPUB
+
+**Files:** Create `core/core-data/.../book/EpubMetadata.kt`,
+Test `core/core-data/src/test/kotlin/.../book/EpubMetadataReaderTest.kt`,
+Modify `core/core-data/build.gradle.kts`
+
+- [x] `EpubMetadata` (title, author, series, seriesIndex, coverEntry) and `EpubMetadataReader`.
+- [x] Read through `BoundedZipReader` from `core:core-archive`, never a second `ZipInputStream`.
+      Add the module dependency explicitly rather than inheriting it through theme-kit's `api`.
+- [x] `EPUB_ZIP_LIMITS`: the stock `ZipLimits` were sized for theme bundles and refuse a normal
+      book at 512 entries.
+- [x] One forward pass per entry, `stop()` at the match, so archive order cannot matter.
+- [x] Disable doctype declarations. The file is the user's own and is still outside input.
+- [x] **Falsified:** dropping the EPUB 3 branch, matching `properties` by substring, and skipping
+      percent-decoding each turn exactly one named test red.
+
+**Verify:** `./gradlew :core:core-data:testDebugUnitTest --tests '*EpubMetadataReaderTest*'` (17 tests)
+
+## Task 10 — Migration v44 → v45
+
+**Files:** Modify `PFPDatabase.kt`, `DatabaseModule.kt`, `BookEntity.kt`, `Book.kt`;
+Create `Migration44To45Test.kt`, `schemas/.../45.json`
+
+- [x] `ALTER TABLE books ADD COLUMN` × 3: `series TEXT`, `series_index REAL`, `cover_uri TEXT`.
+      REAL because a novella between books 2 and 3 is numbered 2.5.
+- [x] No backfill. Existing rows stay null until a rescan reads them.
+- [x] Commit `45.json`, or every later migration test fails with `FileNotFoundException`.
+- [x] **Falsified:** adding `DELETE FROM books` to the migration fails the test with
+      `expected:<1> but was:<0>`, not with a schema error, so it really does test data survival.
+
+**Verify:** `./gradlew :core:core-data:testDebugUnitTest --tests '*Migration44To45*'`
+
+## Task 11 — Scan, sort and draw
+
+**Files:** Modify `BookScanner.kt`, `BooksSettingsViewModel.kt`, `BooksSettingsScreen.kt`,
+`XMBViewModel.kt`, `XMBItemList.kt`;
+Create `BookQuickScanTest.kt`, `XmbBookSortTest.kt`
+
+- [x] `BookScanner.scan(library, deep, existing)` with bounded parallelism, covers cached to
+      `cacheDir/book_covers` and downsampled at decode.
+- [x] `canReuse` as a pure top-level rule. A row from before this task has every metadata field
+      null and must be reparsed once, which is why the rule is "has been parsed" and not "has a
+      cover": those two are indistinguishable for a book with no cover art.
+- [x] `XmbSortMode.SERIES` + `BOOK_SORTS`, and `bookSorted()`. Books with no series sort last.
+- [x] **`sortModeFor` / `withSortMode`**: the three `when` blocks keyed on list identity, each
+      ending `else -> gameSortMode`, collapsed to one read and one write. A section wired into
+      `activeSortModes` but missed in one of them did not fail, it silently cycled the games mode
+      and printed the games label over the wrong list.
+- [x] `coverUri` on `LIBRARY_BOOK` items, drawn as a 40x56 portrait tile. Video and photo crop
+      landscape; a book jacket cropped landscape is unrecognisable.
+- [x] Deep Rescan and Clear Cover Cache rows on the settings screen.
+- [x] **Falsified:** dropping `BOOK_SORTS` from `withSortMode` fails the round-trip test by name;
+      dropping either half of the reuse rule fails its own named test.
+
+**Verify:** `./gradlew :core:core-data:testDebugUnitTest :feature:feature-library:testDebugUnitTest :feature:feature-xmb:testDebugUnitTest`
+
+## Still open
+
+Task 8 above, the on-device walk, now also covers: confirm covers appear, confirm a Calibre library
+reports series, confirm Deep Rescan is the thing that fixes a book whose metadata was edited in
+place. None of that can be proven off the device.
+
+A restored backup keeps `cover_uri` pointing at cache files that no longer exist, so covers are
+blank until the first rescan. This matches what Video and Photo already do with their cached
+thumbnails, so it was left alone rather than given books their own fourth behaviour.

@@ -551,6 +551,7 @@ data class XMBUiState(
     val gameSortMode: XmbSortMode = XmbSortMode.TITLE,
     val musicSortMode: XmbSortMode = XmbSortMode.TITLE,
     val videoSortMode: XmbSortMode = XmbSortMode.TITLE,
+    val bookSortMode: XmbSortMode = XmbSortMode.TITLE,
     val sortLabel: String? = null,
     // In-app music player: visible when a song is selected; playback state mirrors the controller.
     val musicPlayerVisible: Boolean = false,
@@ -928,11 +929,32 @@ enum class XmbSortMode(val label: String) {
     ALBUM("Album"),
     RECENT_PLAYED("Recently Played"),
     DATE_ADDED("Date Added"),
+    SERIES("Series"),
 }
 
 private val MUSIC_SORTS = listOf(XmbSortMode.TITLE, XmbSortMode.ARTIST, XmbSortMode.ALBUM, XmbSortMode.DATE_ADDED)
 private val GAME_SORTS  = listOf(XmbSortMode.TITLE, XmbSortMode.RECENT_PLAYED, XmbSortMode.DATE_ADDED)
 private val VIDEO_SORTS = listOf(XmbSortMode.TITLE, XmbSortMode.DATE_ADDED, XmbSortMode.RECENT_PLAYED)
+private val BOOK_SORTS  = listOf(XmbSortMode.TITLE, XmbSortMode.SERIES, XmbSortMode.DATE_ADDED)
+
+/**
+ * Book ordering. SERIES groups a series together and puts it in reading order, which is the whole
+ * point of the mode: a series read alphabetically by title is in no useful order at all.
+ *
+ * Books with no series sort last rather than first. Not every EPUB declares one, so on a mixed
+ * library the alternative is a wall of unrelated titles above the series the user asked to see.
+ * Within a series, an unnumbered book sorts after the numbered ones for the same reason.
+ */
+internal fun List<com.psplauncher.core.domain.model.Book>.bookSorted(mode: XmbSortMode): List<com.psplauncher.core.domain.model.Book> = when (mode) {
+    XmbSortMode.SERIES -> sortedWith(
+        compareBy<com.psplauncher.core.domain.model.Book> { it.seriesName == null }
+            .thenBy { it.seriesName?.lowercase() ?: "" }
+            .thenBy { it.seriesIndex ?: Double.MAX_VALUE }
+            .thenBy { it.displayTitle.lowercase() }
+    )
+    XmbSortMode.DATE_ADDED -> sortedByDescending { it.dateAdded ?: 0L }
+    else -> sortedBy { it.displayTitle.lowercase() }
+}
 
 internal fun List<com.psplauncher.core.domain.model.Video>.videoSorted(mode: XmbSortMode): List<com.psplauncher.core.domain.model.Video> = when (mode) {
     XmbSortMode.RECENT_PLAYED -> sortedByDescending { it.lastWatchedAt ?: 0L }
@@ -1055,11 +1077,38 @@ fun XMBUiState.activeSortModes(): List<XmbSortMode>? {
         cat.id == BuiltInCategory.VIDEO &&
             (videoNav == VideoNav.AllVideos || videoNav == VideoNav.Favorites ||
                 videoNav is VideoNav.Library) -> VIDEO_SORTS
+        // Book lists sort; the Library root and the shelf list are fixed rows, not a library.
+        cat.id == BuiltInCategory.LIBRARY &&
+            (booksNav == BooksNav.AllBooks || booksNav is BooksNav.Shelf) -> BOOK_SORTS
         cat.id == BuiltInCategory.GAMES &&
             (selectedPlatformId != null || selectedCollectionId != null) -> GAME_SORTS
         cat.isGamingCategory -> GAME_SORTS
         else -> null
     }
+}
+
+/**
+ * The sort mode [cycle] is currently on, and the state with it changed.
+ *
+ * These two exist as a pair because the alternative was three `when` blocks keyed on list identity
+ * whose last branch is `else -> gameSortMode`: one to read the mode for the status-bar label, one
+ * to read it for the cycle, one to write the next one. A section added to [activeSortModes] but
+ * missed in any of them does not fail, it silently cycles the GAMES mode and prints the games
+ * label over somebody else's list. Two functions is the fewest that can express read and write, and
+ * they are pure so the round trip is unit-testable.
+ */
+internal fun XMBUiState.sortModeFor(cycle: List<XmbSortMode>): XmbSortMode = when {
+    cycle === MUSIC_SORTS -> musicSortMode
+    cycle === VIDEO_SORTS -> videoSortMode
+    cycle === BOOK_SORTS  -> bookSortMode
+    else                  -> gameSortMode
+}
+
+internal fun XMBUiState.withSortMode(cycle: List<XmbSortMode>, mode: XmbSortMode): XMBUiState = when {
+    cycle === MUSIC_SORTS -> copy(musicSortMode = mode)
+    cycle === VIDEO_SORTS -> copy(videoSortMode = mode)
+    cycle === BOOK_SORTS  -> copy(bookSortMode = mode)
+    else                  -> copy(gameSortMode = mode)
 }
 
 /**
@@ -2018,10 +2067,10 @@ class XMBViewModel @Inject constructor(
                         _uiState.update { it.copy(bookLibraries = shelves, currentItems = bookShelfItems()) }
                     }
                     BooksNav.AllBooks -> bookRepository.observeAllBooks().collect { books ->
-                        _uiState.update { it.copy(currentItems = bookItems(books).ifEmpty { listOf(emptyBooksItem()) }) }
+                        _uiState.update { it.copy(currentItems = bookItems(books.bookSorted(it.bookSortMode)).ifEmpty { listOf(emptyBooksItem()) }) }
                     }
                     is BooksNav.Shelf -> bookRepository.observeBooksByLibrary(nav.id).collect { books ->
-                        _uiState.update { it.copy(currentItems = bookItems(books).ifEmpty { listOf(emptyBooksItem()) }) }
+                        _uiState.update { it.copy(currentItems = bookItems(books.bookSorted(it.bookSortMode)).ifEmpty { listOf(emptyBooksItem()) }) }
                     }
                 }
                 else -> {
@@ -2942,10 +2991,29 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "book_${book.id}",
                 title    = book.displayTitle,
-                subtitle = book.author,
+                subtitle = bookSubtitle(book),
+                coverUri = book.coverUri,
                 type     = XMBItemType.LIBRARY_BOOK,
             )
         }
+
+    /**
+     * What sits under a book's title: where it falls in its series, and who wrote it.
+     *
+     * The series is shown whatever the sort mode, not only when sorting by series. A list sorted
+     * by title is exactly where "book 3 of something" is the fact the user is missing.
+     */
+    private fun bookSubtitle(book: com.psplauncher.core.domain.model.Book): String? {
+        val series = book.seriesName?.let { name ->
+            // A whole number is written without its decimal: "Dune #2", not "Dune #2.0". A .5
+            // keeps it, because that IS the information (a novella between two books).
+            val index = book.seriesIndex?.let { i ->
+                if (i == Math.floor(i)) "#${i.toInt()}" else "#$i"
+            }
+            listOfNotNull(name, index).joinToString(" ")
+        }
+        return listOfNotNull(series, book.author).joinToString(" · ").takeIf { it.isNotBlank() }
+    }
 
     private fun emptyBooksItem(): XMBItem = XMBItem(
         id       = "books_empty",
@@ -3914,23 +3982,15 @@ class XMBViewModel @Inject constructor(
         }
         val cycle = activeSortContext() ?: return
         val isMusic = cycle === MUSIC_SORTS
-        val isVideo = cycle === VIDEO_SORTS
-        val current = when {
-            isMusic -> _uiState.value.musicSortMode
-            isVideo -> _uiState.value.videoSortMode
-            else    -> _uiState.value.gameSortMode
-        }
+        val current = _uiState.value.sortModeFor(cycle)
         val next = cycle[(cycle.indexOf(current).coerceAtLeast(0) + 1) % cycle.size]
         menuSound.play(MenuSound.SYSTEM_BROWSE)
         // Re-sorting moves the cursor back to the top item so the user sees the new ordering from
         // the start, and bumps the scroll token so the list snaps to the top every time (not just
         // the first sort after the cursor moved).
         _uiState.update {
-            (when {
-                isMusic -> it.copy(musicSortMode = next)
-                isVideo -> it.copy(videoSortMode = next)
-                else    -> it.copy(gameSortMode = next)
-            }).copy(selectedItemIndex = 0, scrollToTopToken = it.scrollToTopToken + 1)
+            it.withSortMode(cycle, next)
+                .copy(selectedItemIndex = 0, scrollToTopToken = it.scrollToTopToken + 1)
         }
         // Music track lists re-sort instantly from the cached raw list — no DB round-trip, so the
         // reorder is always visible immediately. A playlist keeps its trailing "Add Tracks" row.
@@ -4148,12 +4208,7 @@ class XMBViewModel @Inject constructor(
     // Status-bar hint for the current list ("Sort: Title"), or null when the list isn't sortable.
     private fun currentSortLabel(): String? {
         val cycle = activeSortContext() ?: return null
-        val mode = when {
-            cycle === MUSIC_SORTS -> _uiState.value.musicSortMode
-            cycle === VIDEO_SORTS -> _uiState.value.videoSortMode
-            else                  -> _uiState.value.gameSortMode
-        }
-        return "Sort: ${mode.label}"
+        return "Sort: ${_uiState.value.sortModeFor(cycle).label}"
     }
 
     private fun emptyCategoryItem(category: Category): XMBItem {

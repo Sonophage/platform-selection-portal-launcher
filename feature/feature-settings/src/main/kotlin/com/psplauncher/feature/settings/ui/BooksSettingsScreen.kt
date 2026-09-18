@@ -61,7 +61,9 @@ fun BooksSettingsScreen(
             relinkRootPicker.launch(runCatching { Uri.parse(row.treeUri) }.getOrNull())
         },
         onRemoveRoot          = { viewModel.removeRoot(it.treeUri) },
-        onRescan              = viewModel::rescan,
+        onRescan              = { viewModel.rescan(deep = false) },
+        onDeepRescan          = { viewModel.rescan(deep = true) },
+        onClearCoverCache     = viewModel::clearCoverCache,
         onOpenReaderPicker    = viewModel::openReaderPicker,
         onDismissReaderPicker = viewModel::dismissReaderPicker,
         onChooseReader        = viewModel::chooseReader,
@@ -78,6 +80,8 @@ fun BooksSettingsContent(
     onRelinkRoot: (RootFolderRow) -> Unit,
     onRemoveRoot: (RootFolderRow) -> Unit,
     onRescan: () -> Unit,
+    onDeepRescan: () -> Unit,
+    onClearCoverCache: () -> Unit,
     onOpenReaderPicker: () -> Unit,
     onDismissReaderPicker: () -> Unit,
     onChooseReader: (String?) -> Unit,
@@ -112,10 +116,20 @@ fun BooksSettingsContent(
                 sublabel = when {
                     state.scanning            -> "Scanning…"
                     state.scanMessage != null -> state.scanMessage
-                    else                      -> "Find the EPUBs in every root folder"
+                    else                      -> "Read new and changed books only"
                 },
                 focusKey = "books_rescan",
                 onClick  = if (state.scanning || !state.hasRoots) null else onRescan,
+            )
+
+            // Reading a book's series and cover means opening the archive, so a normal rescan
+            // skips books whose file has not changed. This is the way back in when the metadata
+            // was edited without the timestamp moving, or when a cover looks wrong.
+            SettingsRow(
+                label    = "Deep Rescan",
+                sublabel = "Reopen every book and rebuild every cover. Slow on a large library.",
+                focusKey = "books_deep_rescan",
+                onClick  = if (state.scanning || !state.hasRoots) null else onDeepRescan,
             )
 
             if (state.scanning) {
@@ -134,6 +148,15 @@ fun BooksSettingsContent(
                 value    = state.defaultReaderLabel,
                 focusKey = "books_default_reader",
                 onClick  = onOpenReaderPicker,
+            )
+
+            SettingsGroup("Maintenance")
+
+            SettingsRow(
+                label    = "Clear Cover Cache",
+                sublabel = "Delete the extracted covers. A rescan regenerates them.",
+                focusKey = "books_clear_covers",
+                onClick  = onClearCoverCache,
             )
         }
     }
@@ -199,6 +222,8 @@ private fun BooksSettingsContentPreview() {
             onRelinkRoot          = {},
             onRemoveRoot          = {},
             onRescan              = {},
+            onDeepRescan          = {},
+            onClearCoverCache     = {},
             onOpenReaderPicker    = {},
             onDismissReaderPicker = {},
             onChooseReader        = {},
