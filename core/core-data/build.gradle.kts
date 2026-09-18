@@ -54,6 +54,9 @@ tasks.withType<Test>().configureEach {
 
 dependencies {
     implementation(project(":core:theme-kit"))
+    // EpubMetadataReader opens EPUBs, which are ZIPs. Named explicitly rather than inherited
+    // through theme-kit's api() line, so this does not break when theme-kit stops re-exporting it.
+    implementation(project(":core:core-archive"))
     implementation(project(":core:core-domain"))
     implementation(project(":core:core-common"))
     // CustomIconStore decodes user-picked icons into core-ui's CustomIcon type and gates

@@ -113,7 +113,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
         BookLibraryEntity::class,
         BookEntity::class,
     ],
-    version = 44,
+    version = 45,
     exportSchema = true,        // schema JSON exported to /schemas/ for migration auditing
 )
 @TypeConverters(PFPTypeConverters::class)
@@ -1327,6 +1327,22 @@ abstract class PFPDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_books_library_id` ON `books` (`library_id`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_books_uri` ON `books` (`uri`)")
+            }
+        }
+
+        /**
+         * v45 — series and cover art on `books`.
+         *
+         * Three nullable columns, no backfill. Every existing row keeps a null series and a null
+         * cover until the scan that reads them runs, which is what makes this safe to apply to a
+         * library of any size: the migration does no file I/O, and a book whose EPUB carries no
+         * series metadata stays null forever rather than being guessed at from its file name.
+         */
+        val MIGRATION_44_45 = object : Migration(44, 45) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN series TEXT")
+                db.execSQL("ALTER TABLE books ADD COLUMN series_index REAL")
+                db.execSQL("ALTER TABLE books ADD COLUMN cover_uri TEXT")
             }
         }
     }

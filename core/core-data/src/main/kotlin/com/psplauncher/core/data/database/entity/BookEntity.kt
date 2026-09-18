@@ -10,7 +10,8 @@ import com.psplauncher.core.domain.model.Book
 
 // One row per scanned book file. uri is a SAF document uri string. Cascade-deletes with its
 // library so removing a library removes its books; indexed by library_id for per-library queries.
-// title and author are nullable and unread for now, so a later metadata pass needs no migration.
+// title, author, series and cover_uri are all filled by the scanner's EPUB metadata pass and stay
+// null for a book whose package document does not declare them.
 @Serializable
 @Entity(
     tableName = "books",
@@ -39,6 +40,20 @@ data class BookEntity(
     val title: String? = null,
     val author: String? = null,
 
+    /** Series name from the EPUB's package document; null when it declares none. */
+    val series: String? = null,
+
+    /**
+     * Position within [series]. REAL rather than INTEGER because a novella between books 2 and 3
+     * is conventionally numbered 2.5, and Calibre stores it that way.
+     */
+    @ColumnInfo(name = "series_index")
+    val seriesIndex: Double? = null,
+
+    /** file:// uri of the cached cover thumbnail, or null when the book has no usable cover. */
+    @ColumnInfo(name = "cover_uri")
+    val coverUri: String? = null,
+
     @ColumnInfo(name = "last_modified")
     val lastModified: Long? = null,
 
@@ -62,6 +77,9 @@ fun BookEntity.toDomain() = Book(
     displayName  = displayName,
     title        = title,
     author       = author,
+    series       = series,
+    seriesIndex  = seriesIndex,
+    coverUri     = coverUri,
     lastModified = lastModified,
     sizeBytes    = sizeBytes,
     mimeType     = mimeType,
@@ -76,6 +94,9 @@ fun Book.toEntity() = BookEntity(
     displayName  = displayName,
     title        = title,
     author       = author,
+    series       = series,
+    seriesIndex  = seriesIndex,
+    coverUri     = coverUri,
     lastModified = lastModified,
     sizeBytes    = sizeBytes,
     mimeType     = mimeType,
