@@ -390,7 +390,8 @@ enum class SettingsSection(
 ) {
     LIBRARY     ("settings_section_library",      "Library",      "Library Manager, collections, artwork & hidden games"),
     EMULATORS   ("settings_section_emulators",    "Emulators",    "Launch profiles & RetroArch cores"),
-    INTERFACE   ("settings_section_interface",    "Interface",    "Categories, themes, display & controller"),
+    APPEARANCE  ("settings_section_appearance",   "Appearance",   "Theme, wallpaper, layout & boot"),
+    INTERFACE   ("settings_section_interface",    "Interface",    "Sound, categories, controls & touch"),
     MEDIA       ("settings_section_media",        "Media",        "Music, video & photo settings"),
     SYSTEM      ("settings_section_system",       "System",       "About, logs, backup, setup & credits"),
 }
@@ -419,15 +420,20 @@ fun settingsSectionItems(section: SettingsSection): List<XMBItem> = when (sectio
         // many of its games override that (with bulk clearing of those overrides).
         XMBItem(id = "settings_emulators_assign", title = "Per-System Defaults", subtitle = "Default emulator & core per console, and per-game overrides"),
     )
+    SettingsSection.APPEARANCE -> listOf(
+        XMBItem(id = "settings_themes",     title = "Theme",            subtitle = "Colour scheme, accent & theme packs"),
+        XMBItem(id = "settings_appearance", title = "Wallpaper & Text", subtitle = "Wallpaper, wave, motion & legibility"),
+        XMBItem(id = "settings_layout",     title = "Layout",           subtitle = "XMB layout, custom icons & orientation"),
+        XMBItem(id = "settings_boot",       title = "Boot",             subtitle = "Boot sequence, boot video & GameBoot"),
+    )
     SettingsSection.INTERFACE -> listOf(
-        XMBItem(id = "settings_display",    title = "Display",    subtitle = "Wave, wallpaper, boot & icons"),
         // Phase 3 of the seven-sounds plan: renamed Audio → Sound (it owns the boot sound now).
         // The id deliberately stays settings_audio — the route, SETTINGS_SCREEN_ROUTES, the row
         // focus keys (audio_<slot>) and SettingsHierarchyTest all key off it.
         XMBItem(id = "settings_audio",      title = "Sound",      subtitle = "Menu & boot sounds"),
         XMBItem(id = "settings_categories", title = "Categories", subtitle = "Manage XMB categories"),
-        XMBItem(id = "settings_themes",     title = "Themes",     subtitle = "XMB appearance & color scheme"),
         XMBItem(id = "settings_controller", title = "Controller", subtitle = "Button mapping"),
+        XMBItem(id = "settings_touch",      title = "Touch",      subtitle = "On-screen button, swipe & hints"),
     )
     SettingsSection.MEDIA -> listOf(
         XMBItem(id = "settings_music", title = "Music", subtitle = "Music folders & default player"),
@@ -439,6 +445,7 @@ fun settingsSectionItems(section: SettingsSection): List<XMBItem> = when (sectio
         XMBItem(id = "settings_about",  title = "About",            subtitle = "PSPLauncher"),
         XMBItem(id = "settings_logs",   title = "Logs",             subtitle = "Debug & error log viewer"),
         XMBItem(id = "settings_backup", title = "Backup & Restore", subtitle = "Export & import"),
+        XMBItem(id = "settings_performance", title = "Performance", subtitle = "Thermal, battery saver & direct launch"),
         XMBItem(id = XMBViewModel.INITIAL_SETUP_SCREEN_ID, title = "Setup Wizard", subtitle = "Guided folder & account setup"),
         XMBItem(id = "settings_credits", title = "Credits",         subtitle = "Artwork & attributions"),
     )

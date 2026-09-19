@@ -55,10 +55,22 @@ import com.psplauncher.core.ui.theme.solveScrimColor
 import com.psplauncher.feature.settings.viewmodel.DisplaySettingsUiState
 import com.psplauncher.feature.settings.viewmodel.DisplaySettingsViewModel
 
+/**
+ * Which part of this screen to show. Display had grown into eight groups covering wallpaper, XMB
+ * layout, boot animations, screen orientation, touch input, thermal behaviour and whether Confirm
+ * launches a game — it was where a setting went when it had no obvious home, which is why nothing
+ * could be found in it.
+ *
+ * The screen is unchanged; each entry point renders only its own groups. Same idea as
+ * [EmulatorSettingsSection], and null still renders everything.
+ */
+enum class DisplaySection { APPEARANCE, LAYOUT, BOOT, INPUT, PERFORMANCE }
+
 @Composable
 fun DisplaySettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    section: DisplaySection? = null,
     onOpenXmbLayoutAdjust: () -> Unit = {},
     onOpenCustomIcons: () -> Unit = {},
     onPreviewBootSequence: () -> Unit = {},
@@ -222,309 +234,321 @@ fun DisplaySettingsScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState),
         ) {
-            SettingsGroup("Appearance")
+            if (section == null || section == DisplaySection.APPEARANCE) {
+                SettingsGroup("Appearance")
 
-            // Setting a wallpaper automatically replaces the wave; resetting it brings
-            // the wave back. No separate mode toggle needed.
+                // Setting a wallpaper automatically replaces the wave; resetting it brings
+                // the wave back. No separate mode toggle needed.
 
-            // ── Wallpaper controls ────────────────────────────────────────
-            if (state.wallpaperImporting) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 48.dp, vertical = 8.dp),
-                )
-            } else {
-                SettingsRow(
-                    label    = "Choose Wallpaper",
-                    sublabel = if (state.motionWallpaperPath != null) "Motion wallpaper set — a looping video replaces the wave"
-                               else if (state.customWallpaperPath != null) "Custom wallpaper set — replaces the wave"
-                               else "Pick an image or a short video (PNG, JPG, WEBP, MP4, WEBM, GIF) — replaces the wave",
-                    onClick  = ::launchWallpaperPicker,
-                )
-
-                SettingsRow(
-                    label    = "Preview Wallpaper",
-                    sublabel = "See the selected wallpaper full-screen",
-                    onClick  = { viewModel.showWallpaperPreview() },
-                )
-
-                if (state.customWallpaperPath != null) {
+                // ── Wallpaper controls ────────────────────────────────────────
+                if (state.wallpaperImporting) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 48.dp, vertical = 8.dp),
+                    )
+                } else {
                     SettingsRow(
-                        label    = "Reset Wallpaper",
-                        sublabel = "Remove custom wallpaper and restore the default background",
-                        onClick  = { viewModel.clearWallpaper() },
+                        label    = "Choose Wallpaper",
+                        sublabel = if (state.motionWallpaperPath != null) "Motion wallpaper set — a looping video replaces the wave"
+                                   else if (state.customWallpaperPath != null) "Custom wallpaper set — replaces the wave"
+                                   else "Pick an image or a short video (PNG, JPG, WEBP, MP4, WEBM, GIF) — replaces the wave",
+                        onClick  = ::launchWallpaperPicker,
+                    )
+
+                    SettingsRow(
+                        label    = "Preview Wallpaper",
+                        sublabel = "See the selected wallpaper full-screen",
+                        onClick  = { viewModel.showWallpaperPreview() },
+                    )
+
+                    if (state.customWallpaperPath != null) {
+                        SettingsRow(
+                            label    = "Reset Wallpaper",
+                            sublabel = "Remove custom wallpaper and restore the default background",
+                            onClick  = { viewModel.clearWallpaper() },
+                        )
+                    }
+                }
+
+                // ── Wave Style — only relevant when no wallpaper is set. When a MOTION wallpaper
+                // is set, the same cycle shows as "Background Motion" (one setting governs "how
+                // lively is my background" regardless of which background is active — both write
+                // KEY_WAVE_STYLE, so a user who set Static for the wave gets a still poster the
+                // moment they pick a video).
+                if (state.customWallpaperPath == null) {
+                    SettingsValueRow(
+                        label    = "Wave Style",
+                        sublabel = "Animated   |   Reduced (dimmer, calmer)   |   Static (frozen)   |   Reduced + Static",
+                        value    = state.waveStyleLabel,
+                        onClick  = { viewModel.cycleWaveStyle() },
+                    )
+                } else if (state.motionWallpaperPath != null) {
+                    SettingsValueRow(
+                        label    = "Background Motion",
+                        sublabel = "Animated   |   Reduced (slower, calmer)   |   Static (still image)",
+                        value    = state.waveStyleLabel,
+                        onClick  = { viewModel.cycleWaveStyle() },
                     )
                 }
-            }
 
-            // ── Wave Style — only relevant when no wallpaper is set. When a MOTION wallpaper
-            // is set, the same cycle shows as "Background Motion" (one setting governs "how
-            // lively is my background" regardless of which background is active — both write
-            // KEY_WAVE_STYLE, so a user who set Static for the wave gets a still poster the
-            // moment they pick a video).
-            if (state.customWallpaperPath == null) {
+                // Icon legibility is an appearance choice, NOT gated on a wallpaper being set —
+                // it matters most over a wallpaper, but still applies over the wave.
                 SettingsValueRow(
-                    label    = "Wave Style",
-                    sublabel = "Animated   |   Reduced (dimmer, calmer)   |   Static (frozen)   |   Reduced + Static",
-                    value    = state.waveStyleLabel,
-                    onClick  = { viewModel.cycleWaveStyle() },
-                )
-            } else if (state.motionWallpaperPath != null) {
-                SettingsValueRow(
-                    label    = "Background Motion",
-                    sublabel = "Animated   |   Reduced (slower, calmer)   |   Static (still image)",
-                    value    = state.waveStyleLabel,
-                    onClick  = { viewModel.cycleWaveStyle() },
-                )
-            }
-
-            // Icon legibility is an appearance choice, NOT gated on a wallpaper being set —
-            // it matters most over a wallpaper, but still applies over the wave.
-            SettingsValueRow(
-                label    = "Icon Legibility",
-                sublabel = "How XMB icons separate from the background.  " +
-                    "None  |  Offset Shadow  |  Contour (Dark)  |  Contour (Light)  |  Contour (Auto — follows the icon color)",
-                value    = state.iconLegibility.label,
-                onClick  = { viewModel.cycleIconLegibility() },
-            )
-
-            SettingsToggleRow(
-                label    = "Solid Unfocused Icons",
-                sublabel = "Draw unselected icons at full opacity — selection still reads by size and label",
-                checked  = state.solidUnfocusedIcons,
-                onToggle = { viewModel.setSolidUnfocusedIcons(it) },
-            )
-
-            // Default on: the shadow is subtle and helper text over bright wallpaper reads far
-            // better with it. Users on static dark wallpapers can turn it off.
-            SettingsToggleRow(
-                label    = "Text Shadow",
-                sublabel = "Drop shadow behind row helper text — keeps it readable over bright wallpaper regions",
-                checked  = state.textShadow,
-                onToggle = { viewModel.setTextShadow(it) },
-            )
-
-            // ── Font Colour ──────────────────────────────────────────────────
-            // Deliberately next to Text Shadow: the two answer the same question (how does text
-            // survive the wallpaper), and AUTO reads the shadow toggle as "may I use a shadow?".
-            SettingsValueRow(
-                label    = "Font Colour",
-                sublabel = "Colour for labels and body text across the interface",
-                value    = state.textColorArgb
-                    ?.let { hexOf(Color(it and 0xFFFFFFFFL)) }
-                    ?: "Theme Default",
-                onClick  = {
-                    val seed = state.textColorArgb ?: 0xFFFFFFFFL
-                    val hsv = FloatArray(3)
-                    android.graphics.Color.colorToHSV((seed and 0xFFFFFF).toInt(), hsv)
-                    pickerHue = hsv[0]; pickerSat = hsv[1]; pickerVal = hsv[2]
-                    pickerChannel = 0
-                    fontPickerOpen = true
-                },
-            )
-
-            if (state.textColorArgb != null) {
-                SettingsRow(
-                    label    = "Reset Font Colour",
-                    sublabel = "Go back to the colour the current theme supplies",
-                    onClick  = { viewModel.setTextColor(null) },
+                    label    = "Icon Legibility",
+                    sublabel = "How XMB icons separate from the background.  " +
+                        "None  |  Offset Shadow  |  Contour (Dark)  |  Contour (Light)  |  Contour (Auto — follows the icon color)",
+                    value    = state.iconLegibility.label,
+                    onClick  = { viewModel.cycleIconLegibility() },
                 )
 
                 SettingsToggleRow(
-                    label    = "Use My Exact Colour",
-                    sublabel = "Render the colour exactly as picked. Legibility protection still " +
-                        "applies — text may get a shadow or a plate behind it",
-                    checked  = state.textColorExact,
-                    onToggle = { viewModel.setTextColorExact(it) },
+                    label    = "Solid Unfocused Icons",
+                    sublabel = "Draw unselected icons at full opacity — selection still reads by size and label",
+                    checked  = state.solidUnfocusedIcons,
+                    onToggle = { viewModel.setSolidUnfocusedIcons(it) },
                 )
+
+                // Default on: the shadow is subtle and helper text over bright wallpaper reads far
+                // better with it. Users on static dark wallpapers can turn it off.
+                SettingsToggleRow(
+                    label    = "Text Shadow",
+                    sublabel = "Drop shadow behind row helper text — keeps it readable over bright wallpaper regions",
+                    checked  = state.textShadow,
+                    onToggle = { viewModel.setTextShadow(it) },
+                )
+
+                // ── Font Colour ──────────────────────────────────────────────────
+                // Deliberately next to Text Shadow: the two answer the same question (how does text
+                // survive the wallpaper), and AUTO reads the shadow toggle as "may I use a shadow?".
+                SettingsValueRow(
+                    label    = "Font Colour",
+                    sublabel = "Colour for labels and body text across the interface",
+                    value    = state.textColorArgb
+                        ?.let { hexOf(Color(it and 0xFFFFFFFFL)) }
+                        ?: "Theme Default",
+                    onClick  = {
+                        val seed = state.textColorArgb ?: 0xFFFFFFFFL
+                        val hsv = FloatArray(3)
+                        android.graphics.Color.colorToHSV((seed and 0xFFFFFF).toInt(), hsv)
+                        pickerHue = hsv[0]; pickerSat = hsv[1]; pickerVal = hsv[2]
+                        pickerChannel = 0
+                        fontPickerOpen = true
+                    },
+                )
+
+                if (state.textColorArgb != null) {
+                    SettingsRow(
+                        label    = "Reset Font Colour",
+                        sublabel = "Go back to the colour the current theme supplies",
+                        onClick  = { viewModel.setTextColor(null) },
+                    )
+
+                    SettingsToggleRow(
+                        label    = "Use My Exact Colour",
+                        sublabel = "Render the colour exactly as picked. Legibility protection still " +
+                            "applies — text may get a shadow or a plate behind it",
+                        checked  = state.textColorExact,
+                        onToggle = { viewModel.setTextColorExact(it) },
+                    )
+                }
+
+                SettingsValueRow(
+                    label    = "Text Legibility",
+                    sublabel = "How text separates from what is behind it.  " +
+                        "Automatic  |  None  |  Drop Shadow  |  Outline  |  Contrast Plate",
+                    value    = state.textLegibility.label,
+                    onClick  = { viewModel.cycleTextLegibility() },
+                )
+
             }
+            if (section == null || section == DisplaySection.LAYOUT) {
+                SettingsGroup("XMB Layout")
+                Text(
+                    text     = "Position the XMB live for this screen — scale it, and shift the crossbar " +
+                        "up/down and left/right — over the real interface. Each screen size (handheld, " +
+                        "foldable, tablet) keeps its own tuning.",
+                    color    = SettingsSubtext,
+                    fontSize = 12.sp,
+                    // Same helper-text shadow as the row family — this paragraph sits directly
+                    // over the translucent backdrop too.
+                    style    = androidx.compose.ui.text.TextStyle(shadow = SettingsTextShadow),
+                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),
+                )
 
-            SettingsValueRow(
-                label    = "Text Legibility",
-                sublabel = "How text separates from what is behind it.  " +
-                    "Automatic  |  None  |  Drop Shadow  |  Outline  |  Contrast Plate",
-                value    = state.textLegibility.label,
-                onClick  = { viewModel.cycleTextLegibility() },
-            )
+                SettingsRow(
+                    label    = "Adjust XMB Layout",
+                    sublabel = "Live editor — scale + reposition the crossbar with the D-pad or sliders",
+                    onClick  = onOpenXmbLayoutAdjust,
+                )
 
-            SettingsGroup("XMB Layout")
-            Text(
-                text     = "Position the XMB live for this screen — scale it, and shift the crossbar " +
-                    "up/down and left/right — over the real interface. Each screen size (handheld, " +
-                    "foldable, tablet) keeps its own tuning.",
-                color    = SettingsSubtext,
-                fontSize = 12.sp,
-                // Same helper-text shadow as the row family — this paragraph sits directly
-                // over the translucent backdrop too.
-                style    = androidx.compose.ui.text.TextStyle(shadow = SettingsTextShadow),
-                modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),
-            )
+                // Greyed out while this screen size's saved layout IS the preset; any change saved from
+                // the editor above, a reset to default included, brings it back.
+                SettingsRow(
+                    label    = "Biblically Accurate PSP XMB",
+                    sublabel = if (state.pspLayoutApplied) {
+                        "Applied to this screen. Change the layout with Adjust XMB Layout to use it again"
+                    } else {
+                        "Apply the PSP's own proportions to this screen"
+                    },
+                    enabled  = !state.pspLayoutApplied,
+                    onClick  = { pspConfirmFocus = PSP_CONFIRM_CANCEL },
+                )
 
-            SettingsRow(
-                label    = "Adjust XMB Layout",
-                sublabel = "Live editor — scale + reposition the crossbar with the D-pad or sliders",
-                onClick  = onOpenXmbLayoutAdjust,
-            )
+                SettingsRow(
+                    label    = "Customize XMB Icons",
+                    sublabel = "Replace any icon with your own image or GIF — live over the XMB",
+                    onClick  = onOpenCustomIcons,
+                )
 
-            // Greyed out while this screen size's saved layout IS the preset; any change saved from
-            // the editor above, a reset to default included, brings it back.
-            SettingsRow(
-                label    = "Biblically Accurate PSP XMB",
-                sublabel = if (state.pspLayoutApplied) {
-                    "Applied to this screen. Change the layout with Adjust XMB Layout to use it again"
-                } else {
-                    "Apply the PSP's own proportions to this screen"
-                },
-                enabled  = !state.pspLayoutApplied,
-                onClick  = { pspConfirmFocus = PSP_CONFIRM_CANCEL },
-            )
+            }
+            if (section == null || section == DisplaySection.BOOT) {
+                SettingsGroup("Boot Sequence")
 
-            SettingsRow(
-                label    = "Customize XMB Icons",
-                sublabel = "Replace any icon with your own image or GIF — live over the XMB",
-                onClick  = onOpenCustomIcons,
-            )
+                SettingsToggleRow(
+                    label    = "Show Boot Sequence",
+                    sublabel = "PSP-style boot animation on every launch",
+                    onFocusChangedExternal = { if (it) focusedSlot = null },
+                    checked  = state.showBootSequence,
+                    onToggle = { viewModel.setShowBootSequence(it) },
+                )
 
-            SettingsGroup("Boot Sequence")
+                SettingsToggleRow(
+                    label    = "Show Boot Sequence on Resume",
+                    sublabel = "Also play when returning from a game",
+                    onFocusChangedExternal = { if (it) focusedSlot = null },
+                    checked  = state.showBootOnResume,
+                    onToggle = { viewModel.setShowBootOnResume(it) },
+                )
 
-            SettingsToggleRow(
-                label    = "Show Boot Sequence",
-                sublabel = "PSP-style boot animation on every launch",
-                onFocusChangedExternal = { if (it) focusedSlot = null },
-                checked  = state.showBootSequence,
-                onToggle = { viewModel.setShowBootSequence(it) },
-            )
-
-            SettingsToggleRow(
-                label    = "Show Boot Sequence on Resume",
-                sublabel = "Also play when returning from a game",
-                onFocusChangedExternal = { if (it) focusedSlot = null },
-                checked  = state.showBootOnResume,
-                onToggle = { viewModel.setShowBootOnResume(it) },
-            )
-
-            // ONE field, the same shape as GameBoot below and as every row on the Sound screen:
-            // the boot sequence is the built-in logo animation until a clip replaces the whole
-            // thing. Boot SOUND is deliberately not here — it is the seventh row of
-            // Interface ▸ Sound, which owns every sound in the app.
-            MediaAssignmentRow(
-                label    = "Boot Video",
-                focusKey = "display_${UiMediaSlot.BOOT_VIDEO.key}",
-                sublabel = "Play your own video instead of the PFP logo animation " +
-                    "(MP4 or WebM, up to 10 seconds)",
-                value    = state.bootVideoLabel,
-                isAssigned = state.bootVideoAssigned,
-                onPick   = { pickUiMedia(UiMediaSlot.BOOT_VIDEO) },
-                onPreview = onPreviewBootSequence,
-                onUseDefault = { viewModel.clearUiMedia(UiMediaSlot.BOOT_VIDEO) },
-                onFocusChanged = { focusedSlot = if (it) UiMediaSlot.BOOT_VIDEO else null },
-            )
-
-            SettingsGroup("GameBoot")
-
-            SettingsToggleRow(
-                label    = "GameBoot",
-                sublabel = "A short presentation between confirming a game and the emulator " +
-                    "opening — five seconds built in, up to ten with your own clip — skippable " +
-                    "with Confirm or Back.  Off is a silent launch — no animation, no sound.",
-                onFocusChangedExternal = { if (it) focusedSlot = null },
-                checked  = state.gameBootEnabled,
-                onToggle = { viewModel.setGameBootEnabled(it) },
-            )
-
-            // The field only means anything while GameBoot is on — replacing or previewing a
-            // presentation that never plays is a row that lies about what it does.
-            if (state.gameBootEnabled) {
+                // ONE field, the same shape as GameBoot below and as every row on the Sound screen:
+                // the boot sequence is the built-in logo animation until a clip replaces the whole
+                // thing. Boot SOUND is deliberately not here — it is the seventh row of
+                // Interface ▸ Sound, which owns every sound in the app.
                 MediaAssignmentRow(
-                    label    = "GameBoot Video",
-                    focusKey = "display_${UiMediaSlot.GAMEBOOT_VIDEO.key}",
-                    sublabel = "Replace the built-in sequence with your own clip, which plays with " +
-                        "its own sound — even with Menu Sounds off (MP4 or WebM, up to 10 seconds)",
-                    value    = state.gameBootVideoLabel,
-                    isAssigned = state.gameBootVideoAssigned,
-                    onPick   = { pickUiMedia(UiMediaSlot.GAMEBOOT_VIDEO) },
-                    onPreview = onPreviewGameBoot,
-                    onUseDefault = { viewModel.clearUiMedia(UiMediaSlot.GAMEBOOT_VIDEO) },
-                    onFocusChanged = { focusedSlot = if (it) UiMediaSlot.GAMEBOOT_VIDEO else null },
+                    label    = "Boot Video",
+                    focusKey = "display_${UiMediaSlot.BOOT_VIDEO.key}",
+                    sublabel = "Play your own video instead of the PFP logo animation " +
+                        "(MP4 or WebM, up to 10 seconds)",
+                    value    = state.bootVideoLabel,
+                    isAssigned = state.bootVideoAssigned,
+                    onPick   = { pickUiMedia(UiMediaSlot.BOOT_VIDEO) },
+                    onPreview = onPreviewBootSequence,
+                    onUseDefault = { viewModel.clearUiMedia(UiMediaSlot.BOOT_VIDEO) },
+                    onFocusChanged = { focusedSlot = if (it) UiMediaSlot.BOOT_VIDEO else null },
                 )
+
+                SettingsGroup("GameBoot")
+
+                SettingsToggleRow(
+                    label    = "GameBoot",
+                    sublabel = "A short presentation between confirming a game and the emulator " +
+                        "opening — five seconds built in, up to ten with your own clip — skippable " +
+                        "with Confirm or Back.  Off is a silent launch — no animation, no sound.",
+                    onFocusChangedExternal = { if (it) focusedSlot = null },
+                    checked  = state.gameBootEnabled,
+                    onToggle = { viewModel.setGameBootEnabled(it) },
+                )
+
+                // The field only means anything while GameBoot is on — replacing or previewing a
+                // presentation that never plays is a row that lies about what it does.
+                if (state.gameBootEnabled) {
+                    MediaAssignmentRow(
+                        label    = "GameBoot Video",
+                        focusKey = "display_${UiMediaSlot.GAMEBOOT_VIDEO.key}",
+                        sublabel = "Replace the built-in sequence with your own clip, which plays with " +
+                            "its own sound — even with Menu Sounds off (MP4 or WebM, up to 10 seconds)",
+                        value    = state.gameBootVideoLabel,
+                        isAssigned = state.gameBootVideoAssigned,
+                        onPick   = { pickUiMedia(UiMediaSlot.GAMEBOOT_VIDEO) },
+                        onPreview = onPreviewGameBoot,
+                        onUseDefault = { viewModel.clearUiMedia(UiMediaSlot.GAMEBOOT_VIDEO) },
+                        onFocusChanged = { focusedSlot = if (it) UiMediaSlot.GAMEBOOT_VIDEO else null },
+                    )
+                }
+
             }
+            if (section == null || section == DisplaySection.LAYOUT) {
+                SettingsGroup("Orientation")
 
-            SettingsGroup("Orientation")
+                SettingsValueRow(
+                    label    = "Screen Orientation",
+                    sublabel = "PFP is designed for landscape use",
+                    value    = "Landscape (fixed)",
+                )
 
-            SettingsValueRow(
-                label    = "Screen Orientation",
-                sublabel = "PFP is designed for landscape use",
-                value    = "Landscape (fixed)",
-            )
+                // (The old "Icon Style" option lived here — replaced by Artwork ▸ Game Icon
+                // Display, which offers the same cartridge look via Physical Media mode.)
 
-            // (The old "Icon Style" option lived here — replaced by Artwork ▸ Game Icon
-            // Display, which offers the same cartridge look via Physical Media mode.)
+            }
+            if (section == null || section == DisplaySection.INPUT) {
+                SettingsGroup("Interface")
 
-            SettingsGroup("Interface")
+                SettingsValueRow(
+                    label    = "Touch Navigation Button",
+                    sublabel = "On-screen App Drawer / Back button.  Auto — show only while using touch  |  " +
+                        "Always Show  |  Always Hide (controller-only)",
+                    value    = viewModel.touchNavButtonLabel(),
+                    onClick  = { viewModel.cycleTouchNavButtonMode() },
+                )
 
-            SettingsValueRow(
-                label    = "Touch Navigation Button",
-                sublabel = "On-screen App Drawer / Back button.  Auto — show only while using touch  |  " +
-                    "Always Show  |  Always Hide (controller-only)",
-                value    = viewModel.touchNavButtonLabel(),
-                onClick  = { viewModel.cycleTouchNavButtonMode() },
-            )
+                SettingsValueRow(
+                    label    = "Touch Sensitivity",
+                    sublabel = "How far a swipe travels per XMB step.  Low — steadier  |  Normal  |  High — faster scrubbing",
+                    value    = viewModel.touchSensitivityLabel(),
+                    onClick  = { viewModel.cycleTouchSensitivity() },
+                )
 
-            SettingsValueRow(
-                label    = "Touch Sensitivity",
-                sublabel = "How far a swipe travels per XMB step.  Low — steadier  |  Normal  |  High — faster scrubbing",
-                value    = viewModel.touchSensitivityLabel(),
-                onClick  = { viewModel.cycleTouchSensitivity() },
-            )
+                SettingsToggleRow(
+                    label    = "Context Menu Hint",
+                    sublabel = "Show the idle “Options” pill over XMB items with a context menu",
+                    checked  = state.contextMenuHintEnabled,
+                    onToggle = { viewModel.setContextMenuHintEnabled(it) },
+                )
 
-            SettingsToggleRow(
-                label    = "Context Menu Hint",
-                sublabel = "Show the idle “Options” pill over XMB items with a context menu",
-                checked  = state.contextMenuHintEnabled,
-                onToggle = { viewModel.setContextMenuHintEnabled(it) },
-            )
+                SettingsSliderRow(
+                    label     = "Hint Delay",
+                    sublabel  = "Show after ${formatHintDelay(state.contextMenuHintDelaySeconds)} of inactivity (1–5 seconds)",
+                    value     = state.contextMenuHintDelaySeconds,
+                    onValueChange = viewModel::setContextMenuHintDelaySeconds,
+                    valueRange = 1f..5f,
+                    steps     = 7,
+                    enabled  = state.contextMenuHintEnabled,
+                    valueFormatter = { formatHintDelay(it) },
+                )
 
-            SettingsSliderRow(
-                label     = "Hint Delay",
-                sublabel  = "Show after ${formatHintDelay(state.contextMenuHintDelaySeconds)} of inactivity (1–5 seconds)",
-                value     = state.contextMenuHintDelaySeconds,
-                onValueChange = viewModel::setContextMenuHintDelaySeconds,
-                valueRange = 1f..5f,
-                steps     = 7,
-                enabled  = state.contextMenuHintEnabled,
-                valueFormatter = { formatHintDelay(it) },
-            )
+            }
+            if (section == null || section == DisplaySection.PERFORMANCE) {
+                SettingsGroup("Performance")
 
-            SettingsGroup("Performance")
+                SettingsToggleRow(
+                    label    = "Thermal Throttle Awareness",
+                    sublabel = "Automatically reduce background quality when device runs hot",
+                    checked  = state.thermalThrottleAware,
+                    onToggle = { viewModel.setThermalThrottleAware(it) },
+                )
 
-            SettingsToggleRow(
-                label    = "Thermal Throttle Awareness",
-                sublabel = "Automatically reduce background quality when device runs hot",
-                checked  = state.thermalThrottleAware,
-                onToggle = { viewModel.setThermalThrottleAware(it) },
-            )
+                SettingsToggleRow(
+                    label    = "Battery Saver Mode",
+                    sublabel = "Freeze the background (wave or motion wallpaper) when Battery Saver is active",
+                    checked  = state.respectBatterySaver,
+                    onToggle = { viewModel.setRespectBatterySaver(it) },
+                )
 
-            SettingsToggleRow(
-                label    = "Battery Saver Mode",
-                sublabel = "Freeze the background (wave or motion wallpaper) when Battery Saver is active",
-                checked  = state.respectBatterySaver,
-                onToggle = { viewModel.setRespectBatterySaver(it) },
-            )
+                // (The old "Sound" group lived here — Menu Sounds moved to Settings ▸ Interface ▸
+                // Audio, which owns the same `sound_menu_enabled` pref plus the per-event sound
+                // assignments. No duplicate row may remain.)
 
-            // (The old "Sound" group lived here — Menu Sounds moved to Settings ▸ Interface ▸
-            // Audio, which owns the same `sound_menu_enabled` pref plus the per-event sound
-            // assignments. No duplicate row may remain.)
+                SettingsGroup("Games")
 
-            SettingsGroup("Games")
+                SettingsToggleRow(
+                    label    = "Launch Games Directly",
+                    sublabel = "Confirm starts the game immediately instead of opening Game Details — use \"View Game Details\" in a game's Options menu to edit",
+                    checked  = state.directLaunch,
+                    onToggle = { viewModel.setDirectLaunch(it) },
+                )
 
-            SettingsToggleRow(
-                label    = "Launch Games Directly",
-                sublabel = "Confirm starts the game immediately instead of opening Game Details — use \"View Game Details\" in a game's Options menu to edit",
-                checked  = state.directLaunch,
-                onToggle = { viewModel.setDirectLaunch(it) },
-            )
-
+            }
         }
     }
 

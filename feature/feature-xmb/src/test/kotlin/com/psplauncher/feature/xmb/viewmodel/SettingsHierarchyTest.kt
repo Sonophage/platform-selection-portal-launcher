@@ -15,12 +15,13 @@ class SettingsHierarchyTest {
 
     // ── Root ─────────────────────────────────────────────────────────────────
 
-    @Test fun `root is Android Settings followed by the six sections in order`() {
+    @Test fun `root is Android Settings followed by the sections in order`() {
         assertEquals(
             listOf(
                 "settings_android_system",
                 "settings_section_library",
                 "settings_section_emulators",
+                "settings_section_appearance",
                 "settings_section_interface",
                 "settings_section_media",
                 "settings_section_system",
@@ -57,12 +58,18 @@ class SettingsHierarchyTest {
             ),
             settingsSectionItems(SettingsSection.EMULATORS).map { it.id },
         )
+        // Appearance owns everything visual. Display used to hold eight unrelated groups, so its
+        // parts are now separate entry points into the same screen.
         assertEquals(
-            listOf("settings_display", "settings_audio", "settings_categories", "settings_themes", "settings_controller"),
+            listOf("settings_themes", "settings_appearance", "settings_layout", "settings_boot"),
+            settingsSectionItems(SettingsSection.APPEARANCE).map { it.id },
+        )
+        assertEquals(
+            listOf("settings_audio", "settings_categories", "settings_controller", "settings_touch"),
             settingsSectionItems(SettingsSection.INTERFACE).map { it.id },
         )
         assertEquals(
-            listOf("settings_about", "settings_logs", "settings_backup", "settings_initial_setup", "settings_credits"),
+            listOf("settings_about", "settings_logs", "settings_backup", "settings_performance", "settings_initial_setup", "settings_credits"),
             settingsSectionItems(SettingsSection.SYSTEM).map { it.id },
         )
     }

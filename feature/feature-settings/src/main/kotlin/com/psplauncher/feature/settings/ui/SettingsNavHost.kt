@@ -31,6 +31,13 @@ val SETTINGS_SCREEN_ROUTES: Set<String> = setOf(
     "settings_themes",
     "settings_collections",
     "settings_display",
+    // Display's groups, each reachable on its own. The screen is one file; these pick which part
+    // of it renders, the same way the emulator rows do.
+    "settings_appearance",
+    "settings_layout",
+    "settings_boot",
+    "settings_touch",
+    "settings_performance",
     "settings_audio",
     "settings_controller",
     "settings_backup",
@@ -122,6 +129,27 @@ fun SettingsNavHost(
                 onPreviewBootSequence = onPreviewBootSequence,
                 onPreviewGameBoot = onPreviewGameBoot,
                 modifier = modifier,
+            )
+            "settings_appearance" -> DisplaySettingsScreen(
+                onBack = onBack, section = DisplaySection.APPEARANCE, modifier = modifier,
+            )
+            "settings_layout"     -> DisplaySettingsScreen(
+                onBack = onBack, section = DisplaySection.LAYOUT,
+                onOpenXmbLayoutAdjust = onOpenXmbLayoutAdjust,
+                onOpenCustomIcons = onOpenCustomIcons,
+                modifier = modifier,
+            )
+            "settings_boot"       -> DisplaySettingsScreen(
+                onBack = onBack, section = DisplaySection.BOOT,
+                onPreviewBootSequence = onPreviewBootSequence,
+                onPreviewGameBoot = onPreviewGameBoot,
+                modifier = modifier,
+            )
+            "settings_touch"      -> DisplaySettingsScreen(
+                onBack = onBack, section = DisplaySection.INPUT, modifier = modifier,
+            )
+            "settings_performance" -> DisplaySettingsScreen(
+                onBack = onBack, section = DisplaySection.PERFORMANCE, modifier = modifier,
             )
             "settings_audio"      -> AudioSettingsScreen(
                 onBack = onBack,
