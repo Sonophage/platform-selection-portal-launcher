@@ -42,7 +42,7 @@ class SettingsHierarchyTest {
 
     @Test fun `each section exposes its L2 rows in the planned order`() {
         assertEquals(
-            listOf("settings_library", "settings_windows_games", "settings_collections", "settings_artwork", "settings_app_visibility"),
+            listOf("settings_library", "settings_windows_games", "settings_collections", "settings_artwork", "settings_artwork_sources", "settings_app_visibility"),
             settingsSectionItems(SettingsSection.LIBRARY).map { it.id },
         )
         assertEquals(

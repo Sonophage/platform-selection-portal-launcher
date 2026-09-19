@@ -20,6 +20,7 @@ val SETTINGS_SCREEN_ROUTES: Set<String> = setOf(
     "settings_books",
     "settings_categories",
     "settings_artwork",
+    "settings_artwork_sources",
     "settings_artwork_import",
     "settings_emulators",
     // Emulators section entry points — distinct ids keep the L2 list keys stable until
@@ -109,7 +110,12 @@ fun SettingsNavHost(
             "settings_photo"      -> PhotoSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_books"      -> BooksSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_categories" -> CategoryManagerScreen(onBack = onBack, modifier = modifier)
-            "settings_artwork"    -> ArtworkSettingsScreen(onBack = onBack, modifier = modifier)
+            "settings_artwork"    -> ArtworkSettingsScreen(
+                onBack = onBack, section = ArtworkSection.ARTWORK, modifier = modifier,
+            )
+            "settings_artwork_sources" -> ArtworkSettingsScreen(
+                onBack = onBack, section = ArtworkSection.SOURCES, modifier = modifier,
+            )
             "settings_artwork_import" -> ArtworkImportScreen(onBack = onBack, modifier = modifier)
             "settings_emulators"  -> EmulatorsSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_emulators_installed" -> EmulatorsSettingsScreen(onBack = onBack, section = EmulatorSettingsSection.INSTALLED, modifier = modifier)

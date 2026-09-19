@@ -407,7 +407,8 @@ fun settingsSectionItems(section: SettingsSection): List<XMBItem> = when (sectio
         XMBItem(id = "settings_library",        title = "Library Manager",    subtitle = "ROM sources & scanning"),
         XMBItem(id = "settings_windows_games",  title = "Windows Games", subtitle = "PC games, launchers & imports"),
         XMBItem(id = "settings_collections",    title = "Collections",  subtitle = "Create & manage game collections"),
-        XMBItem(id = "settings_artwork",        title = "Artwork",      subtitle = "Scraping sources & cache"),
+        XMBItem(id = "settings_artwork", title = "Artwork", subtitle = "Your art, scraping & cache"),
+        XMBItem(id = "settings_artwork_sources", title = "Scraping Sources", subtitle = "Source priority & service accounts"),
         XMBItem(id = "settings_app_visibility", title = "Hidden Items", subtitle = "Review apps & games you've hidden"),
     )
     SettingsSection.EMULATORS -> listOf(
