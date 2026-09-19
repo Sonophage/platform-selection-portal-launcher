@@ -1,5 +1,6 @@
 [versions]
 agp                     = "9.4.0"
+benchmark               = "1.5.0"
 kotlin                  = "2.4.10"
 junit                   = "4.13.2"
 mockk                   = "1.14.11"
@@ -82,6 +83,12 @@ lifecycle-runtime-compose       = { group = "androidx.lifecycle",     name = "li
 navigation-compose              = { group = "androidx.navigation",    name = "navigation-compose",          version.ref = "navigation" }
 
 # Hilt DI
+# Baseline profile generation. benchmark-macro drives a real device; profileinstaller is
+# already present transitively but is named here so the release APK cannot silently lose it.
+benchmark-macro-junit4          = { group = "androidx.benchmark",     name = "benchmark-macro-junit4",      version.ref = "benchmark" }
+androidx-profileinstaller       = { group = "androidx.profileinstaller", name = "profileinstaller",         version = "1.4.1" }
+androidx-uiautomator            = { group = "androidx.test.uiautomator", name = "uiautomator",              version = "2.3.0" }
+androidx-test-ext-junit         = { group = "androidx.test.ext",      name = "junit",                       version = "1.2.1" }
 hilt-android                    = { group = "com.google.dagger",      name = "hilt-android",                version.ref = "hilt" }
 hilt-compiler                   = { group = "com.google.dagger",      name = "hilt-android-compiler",       version.ref = "hilt" }
 hilt-navigation-compose         = { group = "androidx.hilt",          name = "hilt-navigation-compose",     version = "1.4.0" }
@@ -182,6 +189,10 @@ test-android            = ["junit", "kotlin-test-junit", "mockk-android", "kotli
 [plugins]
 android-application     = { id = "com.android.application",                version.ref = "agp" }
 android-library         = { id = "com.android.library",                     version.ref = "agp" }
+android-test            = { id = "com.android.test",                        version.ref = "agp" }
+# Tracks androidx.benchmark, NOT AGP: the Baseline Profile plugin ships on the benchmark
+# release train, so its version must match the benchmark-macro-junit4 dependency below.
+baselineprofile         = { id = "androidx.baselineprofile",                 version.ref = "benchmark" }
 kotlin-jvm              = { id = "org.jetbrains.kotlin.jvm",                 version.ref = "kotlin" }
 kotlin-compose          = { id = "org.jetbrains.kotlin.plugin.compose",     version.ref = "kotlin" }
 kotlin-serialization    = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

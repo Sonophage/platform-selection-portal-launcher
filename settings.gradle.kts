@@ -40,6 +40,7 @@ include(":app")
 
 // Desktop companion (Compose Multiplatform Desktop — Windows/Linux/macOS)
 include(":studio")
+include(":baselineprofile")   // com.android.test: generates the startup profile, never shipped
 
 // Core modules
 include(":core:theme-kit")   // pure JVM: theme parsing/conversion shared with the desktop companion

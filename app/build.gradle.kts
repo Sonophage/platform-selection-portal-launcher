@@ -6,6 +6,13 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    // Consumes baseline-prof.txt from :baselineprofile and compiles it into the release APK.
+    alias(libs.plugins.baselineprofile)
+}
+
+baselineProfile {
+    // Never drive hardware as a side effect of an ordinary build; generating is an explicit run.
+    automaticGenerationDuringBuild = false
 }
 
 // Load release signing config from keystore.properties (gitignored).
@@ -74,6 +81,11 @@ android {
 }
 
 dependencies {
+    // Installs the baseline profile on first run. Present transitively via Compose already;
+    // named explicitly so a dependency change cannot silently drop it from the release APK.
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
+
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)
     implementation(libs.androidx.core.ktx)
