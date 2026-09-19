@@ -1,6 +1,6 @@
 # Books section
 
-**Status:** Tasks 1 to 7 and 9 to 11 done · Task 8 (on the device) still open · **Branch:** `feat/books-section` · **Written:** 2026-09-18
+**Status:** Tasks 1 to 7 and 9 to 13 done and walked on the device · **Branch:** `feat/books-section` · **Written:** 2026-09-18
 
 ## Goal
 
@@ -494,12 +494,69 @@ Create `BookQuickScanTest.kt`, `XmbBookSortTest.kt`
 
 **Verify:** `./gradlew :core:core-data:testDebugUnitTest :feature:feature-library:testDebugUnitTest :feature:feature-xmb:testDebugUnitTest`
 
-## Still open
+## Task 12 — The cover behind the selected book
 
-Task 8 above, the on-device walk, now also covers: confirm covers appear, confirm a Calibre library
-reports series, confirm Deep Rescan is the thing that fixes a book whose metadata was edited in
-place. None of that can be proven off the device.
+**Files:** Modify `XMBViewModel.kt` (`bookItems`), `BookScanner.kt`
+
+- [x] Book rows set `artworkUri` as well as `coverUri`, both from `Book.coverUri`. `XMBShell`
+      already crossfades `artworkUri` behind the selected row for any item type, so this needed no
+      new rendering path.
+- [x] `COVER_MAX_DIM` 400 to 1200, sized for the larger of the two consumers. An existing cache
+      keeps its 400px files until a Deep Rescan, because a quick scan reuses any cover on disk.
+
+**Known limit:** a portrait jacket cropped to a 16:9 background shows a band through the middle of
+the art, not the whole cover. Verified on the device and it is noticeable on a cover with large
+title text. Matches every other section's background slot; the alternative, the whole jacket
+centred over a blurred copy of itself, is a different rendering path and was not built.
+
+## Task 13 — Browse by series
+
+**Files:** Modify `XMBViewModel.kt`, `XMBItemList.kt`, `IconSlots.kt`, `StudioIconSet.kt`,
+`DefaultSlotGlyph.kt`; Test `XmbBookSortTest.kt`
+
+Reverses the first-pass decision recorded above. Sort-by-series shipped first and the browse level
+was asked for after living with it, which is the right order: the data work was shared, so the
+folder was a small addition rather than a second build.
+
+- [x] `BooksNav.SeriesList` and `BooksNav.Series(name)`, keyed by name because a series has no id.
+- [x] `seriesGroups()` derives the groups from the books. Nothing is stored, so there is no second
+      copy to keep in step and no migration.
+- [x] `BY_SERIES_POSITION` is the single definition of where a book sits inside its series, shared
+      by the `SERIES` sort mode and the folder, with a test comparing the two orders directly.
+- [x] A series folder offers no sort. Reading order is the point of it.
+- [x] No "No series" bucket: the Books row already lists everything, and on this library that
+      bucket would hold 44 of 80.
+- [x] `item_library_series` registered in all four places, `Icons.Filled.Bookmarks` on both sides.
+
+**Verify:** `./gradlew :feature:feature-xmb:testDebugUnitTest :core:theme-kit:test :studio:test`
+
+## Task 8 — On the device
+
+Walked on 2026-09-18 against a real library of 80 EPUBs on an SD card.
+
+- [x] Migration v44 to v45 on the live database, all 80 rows intact.
+- [x] Scan reads metadata: 80 titles, 80 authors, 77 covers, 36 series.
+- [x] Covers draw in the list, and behind the selected row.
+- [x] `Sort: Series` reachable and working (the X button, not the status-bar chip, which has no
+      usable touch target).
+- [x] Series root row, the series list, and a series folder all browse correctly.
+- [ ] **Opening a book in a reader is still unverified.** No default reader is set on the device,
+      so the reader row is absent from the Library root and no book has ever been handed over.
+- [ ] Deep Rescan has not been run since `COVER_MAX_DIM` was raised, so the cached covers on the
+      device are still the 400px ones.
+- [ ] Backup and restore of the book tables has not been exercised.
+
+## Still open
 
 A restored backup keeps `cover_uri` pointing at cache files that no longer exist, so covers are
 blank until the first rescan. This matches what Video and Photo already do with their cached
 thumbnails, so it was left alone rather than given books their own fourth behaviour.
+
+44 of the 80 books declare no series. Checked against the files, not assumed: the six sampled all
+genuinely lack one, and two of them (`Cryptonomicon`, `Snow Crash`) carry Calibre's orphan
+`calibre:series_index` with no `calibre:series`, which the reader correctly ignores rather than
+inventing a series. Every book filed in a subfolder has a series; every book missing one sits loose
+at the library root. A folder-name fallback was considered and would gain exactly zero books.
+
+**`deep = true` still has only one caller.** Books added the Deep Rescan row; Music, Photo and
+Video each carry the parameter, the documentation and the branch, and still only ever pass false.
