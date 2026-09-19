@@ -228,21 +228,51 @@ data class MetadataPreviewUi(
 }
 
 // ── Options menu ──────────────────────────────────────────────────────────────
-enum class DetailAction(val label: String) {
-    FAVORITE("Favorite"),
-    COLLECTIONS("Collections"),
-    ARTWORK("Artwork"),
-    SAVES("Saves"),
-    EMULATOR("Emulator"),
-    MANUAL("Manual"),
-    REFRESH("Refresh"),
-    METADATA("Update Metadata"),
-    EXPORT("Export Game"),
-    RENAME("Edit Title"),
-    EDIT("Edit Note"),
-    LOCATION("Open Location"),
-    REMOVE("Remove"),
+/**
+ * The Options menu on a game, in the order it is drawn. [section] groups the run of actions it
+ * heads; the screen turns each change of section into a heading, so THIS ORDER IS THE MENU, and
+ * reordering an entry moves it on screen.
+ *
+ * Grouped because thirteen flat rows put Remove immediately under Open Location with nothing
+ * between them, and overflowed the panel besides.
+ */
+enum class DetailAction(val label: String, val section: String) {
+    // Favorite stays first: the menu opens with the cursor on row one, and toggling a favorite is
+    // the one action worth reaching in two presses. Grouping must not cost that.
+    FAVORITE("Favorite", ORGANIZE_SECTION),
+    COLLECTIONS("Collections", ORGANIZE_SECTION),
+
+    RENAME("Edit Title", EDIT_SECTION),
+    EDIT("Edit Note", EDIT_SECTION),
+    ARTWORK("Artwork", EDIT_SECTION),
+    METADATA("Update Metadata", EDIT_SECTION),
+    REFRESH("Refresh", EDIT_SECTION),
+
+    EMULATOR("Emulator", PLAY_SECTION),
+    SAVES("Saves", PLAY_SECTION),
+    MANUAL("Manual", PLAY_SECTION),
+
+    LOCATION("Open Location", FILE_SECTION),
+    EXPORT("Export Game", FILE_SECTION),
+    REMOVE("Remove", FILE_SECTION),
 }
+
+/**
+ * The heading to draw above each action, or null where the action continues the run above it.
+ *
+ * Runs are computed AFTER filtering, which is the whole point: hiding Emulator on a
+ * package-backed game must promote Saves to carry the "Play" heading, not leave the heading
+ * stranded on a group that no longer starts there.
+ */
+fun sectionHeadings(actions: List<DetailAction>): List<String?> =
+    actions.mapIndexed { index, action ->
+        action.section.takeIf { it != actions.getOrNull(index - 1)?.section }
+    }
+
+private const val ORGANIZE_SECTION = "Organize"
+private const val EDIT_SECTION = "Edit"
+private const val PLAY_SECTION = "Play"
+private const val FILE_SECTION = "File"
 
 private const val WINDOWS_PLATFORM_ID = "windows"
 private const val ANDROID_PLATFORM_ID = "android"

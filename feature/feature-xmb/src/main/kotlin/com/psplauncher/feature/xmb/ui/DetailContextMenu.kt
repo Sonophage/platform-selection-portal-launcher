@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
+import com.psplauncher.core.ui.theme.solveScrimColor
 
 // A themed, PSP-style right-edge context menu for the detail screens (Game / Photo / Video) whose
 // option popups are driven by their own ViewModels rather than the XMB context-menu state. Visually
@@ -40,16 +42,32 @@ import com.psplauncher.core.ui.theme.menuCursorEdge
 
 private val DetailMenuWidth = 300.dp
 
+/**
+ * Panel opacity. It was 0.75, and at that value the page behind read straight through the list:
+ * the game's title and its Launch button were legible ACROSS the menu rows. Raising it is the
+ * whole fix -- solveScrimColor below does not help here, because it solves for text contrast,
+ * which 0.75 already passed while still showing the page.
+ */
+private const val PANEL_ALPHA = 0.94f
+
 private val DetailMenuTextShadow = Shadow(
     color = Color.Black.copy(alpha = 0.75f),
     offset = Offset(0f, 2f),
     blurRadius = 4f,
 )
 
-/** One row in a [DetailContextMenu]. */
+/**
+ * One row in a [DetailContextMenu].
+ *
+ * [section] is a heading drawn ABOVE this row, not a row of its own. It rides on the row it
+ * precedes so that a caller's row list stays index-for-index with the action list it was built
+ * from: [selectedIndex] and [onRowClick] index the same list either way, and adding a heading can
+ * never shift a selection onto the wrong action.
+ */
 data class DetailMenuRow(
     val label: String,
     val isDestructive: Boolean = false,
+    val section: String? = null,
 )
 
 @Composable
@@ -86,14 +104,18 @@ fun DetailContextMenu(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(DetailMenuWidth)
-                .background(colors.waveColor.copy(alpha = 0.75f))
+                // solveScrimColor still guards the mirror case [PANEL_ALPHA] cannot: a theme
+                // whose wave is itself near-white, where white rows would vanish at any opacity.
+                // It darkens the wave along its own hue by the least amount that carries white
+                // body text. Same solver the settings backdrop uses.
+                .background(solveScrimColor(colors.waveColor, alpha = PANEL_ALPHA).copy(alpha = PANEL_ALPHA))
                 // Consume clicks inside the panel so the scrim's dismiss doesn't fire.
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = {},
                 )
-                .padding(start = 28.dp, end = 40.dp),
+                .padding(start = 28.dp, end = 40.dp, top = 24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
@@ -115,9 +137,12 @@ fun DetailContextMenu(
 
             LazyColumn(
                 state = listState,
-                modifier = Modifier.padding(top = 10.dp),
+                // A list longer than the panel used to end flush with the screen edge, so the
+                // last row (Remove, on a game) was cut in half even while selected.
+                contentPadding = PaddingValues(top = 10.dp, bottom = 32.dp),
             ) {
                 itemsIndexed(rows) { index, row ->
+                    row.section?.let { DetailMenuSectionHeader(it, isFirst = index == 0) }
                     DetailMenuRowView(
                         row = row,
                         isSelected = index == selectedIndex,
@@ -127,6 +152,19 @@ fun DetailContextMenu(
             }
         }
     }
+}
+
+@Composable
+private fun DetailMenuSectionHeader(label: String, isFirst: Boolean) {
+    Text(
+        text = label.uppercase(),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 2.4.sp,
+        color = Color.White.copy(alpha = 0.45f),
+        style = TextStyle(shadow = DetailMenuTextShadow),
+        modifier = Modifier.padding(top = if (isFirst) 0.dp else 18.dp, bottom = 4.dp),
+    )
 }
 
 @Composable

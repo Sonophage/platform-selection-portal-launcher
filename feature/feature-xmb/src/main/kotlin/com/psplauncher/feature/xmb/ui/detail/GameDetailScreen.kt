@@ -569,11 +569,14 @@ private fun GameDetailOverlays(
         AnimatedVisibility(state.showOptions, enter = fadeIn(), exit = fadeOut()) {
             DetailContextMenu(
                 title = "Options",
-                rows = state.visibleActions.map { action ->
-                    DetailMenuRow(
-                        label = action.dynamicLabel(game.isFavorite, state.isFetchingArtwork),
-                        isDestructive = action == DetailAction.REMOVE,
-                    )
+                rows = sectionHeadings(state.visibleActions).let { headings ->
+                    state.visibleActions.mapIndexed { index, action ->
+                        DetailMenuRow(
+                            label = action.dynamicLabel(game.isFavorite, state.isFetchingArtwork),
+                            isDestructive = action == DetailAction.REMOVE,
+                            section = headings[index],
+                        )
+                    }
                 },
                 selectedIndex = state.optionsIndex,
                 onRowClick = { viewModel.onOptionRowTapped(state.visibleActions[it]) },
