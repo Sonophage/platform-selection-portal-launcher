@@ -3,14 +3,12 @@ package com.psplauncher.feature.settings.viewmodel
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
-import com.psplauncher.core.data.achievement.AchievementCredentialsProvider
 import com.psplauncher.core.data.repository.MediaRootKind
 import com.psplauncher.core.data.repository.MediaRootRepository
 import com.psplauncher.core.data.repository.CoreInventory
 import com.psplauncher.core.data.repository.RetroArchLink
 import com.psplauncher.core.data.repository.RomRootRepository
 import com.psplauncher.core.data.repository.Vita3KLibrary
-import com.psplauncher.feature.achievements.provider.steam.SteamRemoteDataSource
 import com.psplauncher.feature.artwork.MetadataApiKeyProvider
 import com.psplauncher.feature.artwork.api.ArtworkImportManager
 import com.psplauncher.feature.artwork.api.IgdbApi
@@ -57,8 +55,6 @@ class InitialSetupViewModelTest {
     private val autoConfig = mockk<EmulatorAutoConfigService>(relaxed = true)
     private val sgdbKeys = mockk<SgdbApiKeyProvider>(relaxed = true)
     private val metadataKeys = mockk<MetadataApiKeyProvider>(relaxed = true)
-    private val credentials = mockk<AchievementCredentialsProvider>(relaxed = true)
-    private val steamApi = mockk<SteamRemoteDataSource>()
     private val igdbApi = mockk<IgdbApi>()
     private val screenScraperApi = mockk<ScreenScraperApi>()
     private val scanRunner = mockk<com.psplauncher.feature.settings.media.WizardMediaScanRunner>(relaxed = true)
@@ -67,7 +63,7 @@ class InitialSetupViewModelTest {
 
     private fun buildVm() = InitialSetupViewModel(
         context, romRoots, mediaRoots, artworkImport, retroArchLink, vita3KLibrary, autoConfig,
-        sgdbKeys, metadataKeys, credentials, steamApi, igdbApi, screenScraperApi,
+        sgdbKeys, metadataKeys, igdbApi, screenScraperApi,
         scanRunner, romRootScanRunner,
         mockk(relaxed = true), // romScanner (B3 create-standard-folders)
         mockk(relaxed = true), // folderHintResolver
@@ -88,8 +84,6 @@ class InitialSetupViewModelTest {
         every { metadataKeys.tgdbKeyFlow } returns flowOf(null)
         every { metadataKeys.igdbClientIdFlow } returns flowOf(null)
         every { metadataKeys.ssUsernameFlow } returns flowOf(null)
-        every { credentials.raUsernameFlow } returns flowOf(null)
-        every { credentials.steamId64Flow } returns flowOf(null)
         coEvery { screenScraperApi.isEnabled() } returns true
         coEvery { retroArchLink.inventory() } returns CoreInventory.Unlinked
         vm = buildVm()
@@ -108,7 +102,7 @@ class InitialSetupViewModelTest {
             advanceUntilIdle()
             val expected = listOf(
                 SetupStep.WELCOME, SetupStep.ROM_ROOTS, SetupStep.MUSIC, SetupStep.VIDEO,
-                SetupStep.PHOTO, SetupStep.ARTWORK, SetupStep.SERVICES, SetupStep.ACHIEVEMENTS,
+                SetupStep.PHOTO, SetupStep.ARTWORK, SetupStep.SERVICES,
                 SetupStep.FINISH,
             )
             expected.forEachIndexed { index, step ->
@@ -152,7 +146,7 @@ class InitialSetupViewModelTest {
 
             listOf(
                 SetupStep.ROM_ROOTS, SetupStep.MUSIC, SetupStep.VIDEO, SetupStep.PHOTO,
-                SetupStep.ARTWORK, SetupStep.SERVICES, SetupStep.ACHIEVEMENTS,
+                SetupStep.ARTWORK, SetupStep.SERVICES,
                 SetupStep.VITA, SetupStep.RETROARCH, SetupStep.FINISH,
             ).forEach { step ->
                 vm.nextStep()
@@ -178,7 +172,7 @@ class InitialSetupViewModelTest {
 
             listOf(
                 SetupStep.ROM_ROOTS, SetupStep.MUSIC, SetupStep.VIDEO, SetupStep.PHOTO,
-                SetupStep.ARTWORK, SetupStep.SERVICES, SetupStep.ACHIEVEMENTS,
+                SetupStep.ARTWORK, SetupStep.SERVICES,
                 SetupStep.VITA, SetupStep.FINISH,
             ).forEach { step ->
                 vm.nextStep()
@@ -387,23 +381,6 @@ class InitialSetupViewModelTest {
 
     // ── Services (unchanged behavior) ───────────────────────────────────────────
 
-    @Test fun `connectSteam keeps a 17-digit id without resolving`() = runTest(dispatcher) {
-        vm.connectSteam("76561197960287930", "key")
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { steamApi.resolveVanity(any()) }
-        coVerify { credentials.saveSteam("76561197960287930", "key") }
-        coVerify { credentials.setEnabled(true) }
-    }
-
-    @Test fun `connectRetroAchievements saves and enables tracking`() = runTest(dispatcher) {
-        vm.connectRetroAchievements("player", "api-key")
-        advanceUntilIdle()
-
-        coVerify { credentials.saveRetroAchievements("player", "api-key") }
-        coVerify { credentials.setEnabled(true) }
-    }
-
     @Test fun `testIgdbCredentials reports valid and invalid`() = runTest(dispatcher) {
         coEvery { igdbApi.testCredentials("id", "secret") } returns true
         val job = collectState()
@@ -473,14 +450,10 @@ class InitialSetupViewModelTest {
         vm.connectSgdb("  ")
         vm.connectTgdb("  ")
         vm.connectIgdb("client-id", "")
-        vm.connectRetroAchievements("", "key")
-        vm.connectSteam("id", " ")
         advanceUntilIdle()
 
         coVerify(exactly = 0) { sgdbKeys.saveKey(any()) }
         coVerify(exactly = 0) { metadataKeys.saveTgdbKey(any()) }
         coVerify(exactly = 0) { metadataKeys.saveIgdbCredentials(any(), any()) }
-        coVerify(exactly = 0) { credentials.saveRetroAchievements(any(), any()) }
-        coVerify(exactly = 0) { credentials.saveSteam(any(), any()) }
     }
 }

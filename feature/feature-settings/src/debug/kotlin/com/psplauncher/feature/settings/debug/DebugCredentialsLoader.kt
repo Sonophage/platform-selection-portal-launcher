@@ -1,8 +1,6 @@
 package com.psplauncher.feature.settings.debug
 
 import com.psplauncher.core.common.security.SecretProtection
-import com.psplauncher.core.data.achievement.AchievementCredentialsProvider
-import com.psplauncher.feature.achievements.provider.steam.SteamRemoteDataSource
 import com.psplauncher.feature.artwork.MetadataApiKeyProvider
 import com.psplauncher.feature.artwork.api.SgdbApiKeyProvider
 import kotlinx.coroutines.CancellationException
@@ -13,7 +11,7 @@ import javax.inject.Inject
 
 // ── Debug credentials file (debug source set only) ────────────────────────────
 //
-// One `.properties` file fills every artwork and achievement credential at once, so a fresh debug
+// One `.properties` file fills every artwork credential at once, so a fresh debug
 // install does not need each key typed in again. Every value still goes through its normal store,
 // so secrets are sealed with the Keystore exactly as if they had been entered by hand. The release
 // variant has a stub loader in its place (src/release), so none of this code ships.
@@ -24,10 +22,6 @@ import javax.inject.Inject
 //   igdb.clientSecret=
 //   screenscraper.username=
 //   screenscraper.password=
-//   retroachievements.username=
-//   retroachievements.apiKey=
-//   steam.id=            (SteamID64 or vanity name)
-//   steam.apiKey=
 
 /** What a credentials file holds. A null entry was absent or blank and is left untouched. */
 data class DebugCredentialsFile(
@@ -35,13 +29,11 @@ data class DebugCredentialsFile(
     val theGamesDbKey: String? = null,
     val igdb: Pair<String, String>? = null,
     val screenScraper: Pair<String, String>? = null,
-    val retroAchievements: Pair<String, String>? = null,
-    val steam: Pair<String, String>? = null,
     /** Half-filled pairs and unknown keys: said out loud rather than silently dropped. Never values. */
     val problems: List<String> = emptyList(),
 ) {
     val isEmpty: Boolean
-        get() = listOf(steamGridDbKey, theGamesDbKey, igdb, screenScraper, retroAchievements, steam).all { it == null }
+        get() = listOf(steamGridDbKey, theGamesDbKey, igdb, screenScraper).all { it == null }
 
     companion object {
         private const val SGDB_KEY = "steamgriddb.apiKey"
@@ -50,13 +42,9 @@ data class DebugCredentialsFile(
         private const val IGDB_SECRET = "igdb.clientSecret"
         private const val SS_USER = "screenscraper.username"
         private const val SS_PASSWORD = "screenscraper.password"
-        private const val RA_USER = "retroachievements.username"
-        private const val RA_KEY = "retroachievements.apiKey"
-        private const val STEAM_ID = "steam.id"
-        private const val STEAM_KEY = "steam.apiKey"
 
         private val KNOWN_KEYS = setOf(
-            SGDB_KEY, TGDB_KEY, IGDB_ID, IGDB_SECRET, SS_USER, SS_PASSWORD, RA_USER, RA_KEY, STEAM_ID, STEAM_KEY,
+            SGDB_KEY, TGDB_KEY, IGDB_ID, IGDB_SECRET, SS_USER, SS_PASSWORD,
         )
 
         /** Throws [IllegalArgumentException] for a malformed file (a bad `\u` escape). */
@@ -84,8 +72,6 @@ data class DebugCredentialsFile(
                 theGamesDbKey = value(TGDB_KEY),
                 igdb = pair(IGDB_ID, IGDB_SECRET),
                 screenScraper = pair(SS_USER, SS_PASSWORD),
-                retroAchievements = pair(RA_USER, RA_KEY),
-                steam = pair(STEAM_ID, STEAM_KEY),
                 problems = problems,
             )
         }
@@ -106,8 +92,6 @@ data class DebugCredentialsReport(
 class DebugCredentialsLoader @Inject constructor(
     private val sgdbKeyProvider: SgdbApiKeyProvider,
     private val metadataKeyProvider: MetadataApiKeyProvider,
-    private val achievementCredentials: AchievementCredentialsProvider,
-    private val steamApi: SteamRemoteDataSource,
 ) {
     /** Parses [text], saves what it holds, and describes the outcome in one status line. */
     suspend fun load(text: String): DebugCredentialsResult {
@@ -160,29 +144,8 @@ class DebugCredentialsLoader @Inject constructor(
         file.screenScraper?.let { (user, password) ->
             attempt("ScreenScraper") { metadataKeyProvider.saveSsCredentials(user, password) }
         }
-        file.retroAchievements?.let { (user, key) ->
-            attempt("RetroAchievements") { achievementCredentials.saveRetroAchievements(user, key) }
-        }
-        file.steam?.let { (id, key) ->
-            attempt("Steam") {
-                // The connect screen's order: the key is saved first because vanity resolution reads
-                // it back, then a resolved SteamID64 replaces the raw name.
-                val saved = achievementCredentials.saveSteam(id, key)
-                if (id.matches(STEAM_ID64)) return@attempt saved
-                val resolved = steamApi.resolveVanity(id)
-                if (resolved != null) return@attempt achievementCredentials.saveSteam(resolved, key)
-                // Not claimed as loaded: the key is stored, but the account id is not usable yet.
-                if (saved != SecretProtection.PROTECTED) unprotected = true
-                problems += "Steam key saved, but \"$id\" couldn't be resolved: use your SteamID64"
-                null
-            }
-        }
         return DebugCredentialsReport(loaded, failed, problems, unprotected)
     }
 
     private fun List<String>.suffix(): String = if (isEmpty()) "" else joinToString("; ", prefix = " — ")
-
-    private companion object {
-        val STEAM_ID64 = Regex("\\d{17}")
-    }
 }

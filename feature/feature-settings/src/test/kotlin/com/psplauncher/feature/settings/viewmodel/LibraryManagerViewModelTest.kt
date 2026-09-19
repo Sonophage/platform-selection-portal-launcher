@@ -1,15 +1,13 @@
 package com.psplauncher.feature.settings.viewmodel
 
 import android.content.Context
-import com.psplauncher.core.data.achievement.AchievementCredentialsProvider
 import com.psplauncher.core.data.platform.PlatformFolderHintResolver
 import com.psplauncher.core.data.repository.MemoryCardRepository
 import com.psplauncher.core.data.repository.RomRootRepository
 import com.psplauncher.core.data.repository.Vita3KLibrary
 import com.psplauncher.core.data.repository.WindowsLibrarySetup
 import com.psplauncher.core.domain.repository.GameRepository
-import com.psplauncher.feature.achievements.provider.localsteam.LocalSteamSchemaGenerator
-import com.psplauncher.feature.achievements.provider.vita.VitaGameScanner
+import com.psplauncher.feature.library.scanner.VitaGameScanner
 import com.psplauncher.feature.appbar.LauncherShortcutRepository
 import com.psplauncher.feature.launcher.EmulatorProfileRepository
 import com.psplauncher.feature.library.scanner.LibraryScanner
@@ -55,8 +53,6 @@ class LibraryManagerViewModelTest {
     private val launcherShortcutRepository = mockk<LauncherShortcutRepository>(relaxed = true)
     private val windowsLibrarySetup = mockk<WindowsLibrarySetup>(relaxed = true)
     private val pcGameScanner = mockk<PcGameScanner>(relaxed = true)
-    private val localSteamSchemaGenerator = mockk<LocalSteamSchemaGenerator>(relaxed = true)
-    private val credentials = mockk<AchievementCredentialsProvider>(relaxed = true)
     private val vita3KLibrary = mockk<Vita3KLibrary>(relaxed = true)
     private val vitaGameScanner = mockk<VitaGameScanner>(relaxed = true)
     private val libraryScanner = mockk<LibraryScanner>(relaxed = true)
@@ -84,8 +80,6 @@ class LibraryManagerViewModelTest {
             launcherShortcutRepository,
             windowsLibrarySetup,
             pcGameScanner,
-            localSteamSchemaGenerator,
-            credentials,
             vita3KLibrary,
             vitaGameScanner,
             libraryScanner,

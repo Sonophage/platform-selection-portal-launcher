@@ -157,8 +157,6 @@ data class XMBContextMenu(
     val photoFileId: String? = null,
     // Set on a photo library (Album) card's options menu.
     val photoLibraryId: String? = null,
-    // Set on a Shiba Coins hub row's options menu (Sync All Coins).
-    val achievementsHubMenu: Boolean = false,
 )
 
 data class XMBContextMenuItem(
@@ -376,14 +374,8 @@ sealed interface MusicNav {
     data object MusicApps : MusicNav
 }
 
-// The Shiba Coins hub is a single root list (All Tracked and Untracked open fullscreen overlays);
 // this stays a sealed interface so the drill/back plumbing keeps a stable type.
-sealed interface AchievementsNav {
-    data object Root : AchievementsNav
-}
 
-/** Which fullscreen Shiba Coins library overlay is open. */
-enum class ShibaLibraryMode { TRACKED, UNTRACKED }
 
 // ── Settings hierarchy ────────────────────────────────────────────────────────
 // The Settings category root shows the Android system-settings leaf plus these six nested L1
@@ -399,7 +391,6 @@ enum class SettingsSection(
     LIBRARY     ("settings_section_library",      "Library",      "Library Manager, collections, artwork & hidden games"),
     EMULATORS   ("settings_section_emulators",    "Emulators",    "Launch profiles & RetroArch cores"),
     INTERFACE   ("settings_section_interface",    "Interface",    "Categories, themes, display & controller"),
-    ACHIEVEMENTS("settings_section_achievements", "Achievements", "RetroAchievements & Steam"),
     MEDIA       ("settings_section_media",        "Media",        "Music, video & photo settings"),
     SYSTEM      ("settings_section_system",       "System",       "About, logs, backup, setup & credits"),
 }
@@ -437,13 +428,6 @@ fun settingsSectionItems(section: SettingsSection): List<XMBItem> = when (sectio
         XMBItem(id = "settings_categories", title = "Categories", subtitle = "Manage XMB categories"),
         XMBItem(id = "settings_themes",     title = "Themes",     subtitle = "XMB appearance & color scheme"),
         XMBItem(id = "settings_controller", title = "Controller", subtitle = "Button mapping"),
-    )
-    SettingsSection.ACHIEVEMENTS -> listOf(
-        // Same first-pass note as Emulators: the combined Shiba Coins screen, distinct ids.
-        XMBItem(id = "settings_achievements_player_card",   title = "Player Card",          subtitle = "Levels, ranks & sync status"),
-        XMBItem(id = "settings_achievements_credentials",   title = "Provider Credentials", subtitle = "RetroAchievements & Steam accounts"),
-        XMBItem(id = "settings_achievements_local_windows", title = "Local Windows",        subtitle = "Track local Windows (Steam-emu) games"),
-        XMBItem(id = "settings_achievements_update",        title = "Update Achievements",  subtitle = "Sync & auto-match tracked games"),
     )
     SettingsSection.MEDIA -> listOf(
         XMBItem(id = "settings_music", title = "Music", subtitle = "Music folders & default player"),
@@ -530,7 +514,6 @@ enum class DrillOutStep {
     /** A series backs out to the Series list before leaving Library. */
     LIBRARY_SERIES,
     LIBRARY,
-    ACHIEVEMENTS,
     /** A Games platform folder, collection, All Games or Favorites. */
     PLATFORM_FOLDER,
 }
@@ -663,10 +646,6 @@ data class XMBUiState(
     val pendingDrawerAction: GamepadAction? = null,
     val pendingGameDetailAction: GamepadAction? = null,
     val activeGameId: Long? = null,
-    // The dedicated Shiba Coins screen overlay (set from the game context menu / glance strip /
-    // hub rows) — a library game or an account entry with no library copy.
-    val activeShibaCoinsTarget: com.psplauncher.feature.xmb.ui.detail.ShibaCoinsTarget? = null,
-    val pendingShibaCoinsAction: GamepadAction? = null,
     // True when the Game Detail screen should fire its Play action as soon as the game loads —
     // set by direct-launch confirms and the Options menu's "Launch Game" entry; cleared on close.
     val activeGameAutoLaunch: Boolean = false,
@@ -703,22 +682,6 @@ data class XMBUiState(
     // ── Context menu (Y/Triangle) ─────────────────────────────────────────
     val activeContextMenu: XMBContextMenu? = null,
 
-    // ── Shiba Coins hub: Root (summary + lenses) → Rarest Earned drill ─────
-    val achievementsNav: AchievementsNav = AchievementsNav.Root,
-    val libraryStanding: com.psplauncher.core.domain.achievement.LibraryStanding =
-        com.psplauncher.core.domain.achievement.LibraryStanding(),
-    // True once RA or Steam credentials are connected — shows the player card before any sync.
-    val achievementsConnected: Boolean = false,
-    // (done, total) while the hub's "Sync All Coins" runs; null when idle.
-    val hubSyncAll: Pair<Int, Int>? = null,
-    // True while the hub's "Auto-Matching" pass runs (hubSyncAll then carries match progress).
-    val hubMatching: Boolean = false,
-    // Fullscreen All Tracked / Untracked overlay (null = closed).
-    val activeShibaLibrary: ShibaLibraryMode? = null,
-    val pendingShibaLibraryAction: GamepadAction? = null,
-    // Fullscreen player status view, opened from the Shiba Coin player card (XMB + Settings).
-    val activePlayerStatus: Boolean = false,
-    val pendingPlayerStatusAction: GamepadAction? = null,
 
     // ── Color-scheme picker (Settings ▸ Themes ▸ Color Scheme) ─────────────
     val colorSchemePicker: ColorSchemePickerState? = null,
@@ -837,7 +800,6 @@ data class XMBUiState(
             booksNav is BooksNav.Series -> DrillOutStep.LIBRARY_SERIES
             booksNav is BooksNav.Shelf -> DrillOutStep.LIBRARY_SHELF
             booksNav != BooksNav.Root -> DrillOutStep.LIBRARY
-            achievementsNav != AchievementsNav.Root -> DrillOutStep.ACHIEVEMENTS
             selectedPlatformId != null || selectedCollectionId != null -> DrillOutStep.PLATFORM_FOLDER
             else -> null
         }
@@ -876,9 +838,6 @@ data class XMBUiState(
             activeSettingsScreen != null ||
             activeAppDrawerFilter != null ||
             activeGameId != null ||
-            activeShibaCoinsTarget != null ||
-            activeShibaLibrary != null ||
-            activePlayerStatus ||
             activeAppId != null ||
             activeVideoId != null ||
             activePhotoViewer != null ||
@@ -1097,11 +1056,6 @@ fun XMBItem.hasContextMenu(state: XMBUiState): Boolean {
                 (type == XMBItemType.PHOTO_FOLDER && id.startsWith("plib_")) ||
                 (state.photoNav == PhotoNav.PhotoApps && packageName != null)
         ) -> true
-        // Achievements hub: the summary / all / untracked rows.
-        categoryId == BuiltInCategory.ACHIEVEMENTS &&
-            (id == XMBViewModel.ACH_ALL_ITEM_ID ||
-                id == XMBViewModel.ACH_SUMMARY_ITEM_ID ||
-                id == XMBViewModel.ACH_UNTRACKED_ITEM_ID) -> true
         gameId != null -> true
         collectionId != null && type == XMBItemType.COLLECTION -> true
         type == XMBItemType.ALL_GAMES -> true
@@ -1312,14 +1266,10 @@ data class XMBItem(
     // Playlist id on PLAYLIST rows.
     val playlistId: Long? = null,
     // Text-only row: never draws a leading icon/tile and always shows its label, regardless of
-    // selection. Used by the Shiba Coins "Untracked" list so games read as plain text + reason.
+    // selection: the row reads as plain text plus a reason rather than an icon and a title.
     val textOnly: Boolean = false,
-    // When set, the leading slot draws a tinted circle with this text centered (e.g. "Lv 27") —
-    // the Shiba Coins player-card summary row.
-    val levelBadge: String? = null,
     // Prestige Bones earned (player-card summary row only); renders "• N [bone glyph]" after the
     // title when greater than zero.
-    val boneCount: Int = 0,
     val type: XMBItemType = XMBItemType.STANDARD,
 )
 
@@ -1414,15 +1364,10 @@ class XMBViewModel @Inject constructor(
     private val iconDisplayPreferences: com.psplauncher.core.data.repository.IconDisplayPreferences,
     private val artworkStore: com.psplauncher.feature.artwork.store.ArtworkStore,
     private val gameLaunchPreferences: com.psplauncher.core.data.repository.GameLaunchPreferences,
-    private val achievementRepository: com.psplauncher.feature.achievements.AchievementController,
-    private val achievementAutoMatcher: com.psplauncher.feature.achievements.match.AchievementAutoMatcher,
-    private val achievementCredentials: com.psplauncher.core.data.achievement.AchievementCredentialsProvider,
     private val windowsLibrarySetup: com.psplauncher.core.data.repository.WindowsLibrarySetup,
     private val pcShortcutImporter: com.psplauncher.feature.launcher.PcShortcutImporter,
     private val pcGameScanner: com.psplauncher.feature.settings.pc.PcGameScanner,
     private val pcGameExporter: com.psplauncher.feature.settings.pc.PcGameExporter,
-    private val localSteamSchemaGenerator: com.psplauncher.feature.achievements.provider.localsteam.LocalSteamSchemaGenerator,
-    private val localSteamDiscovery: com.psplauncher.feature.achievements.provider.localsteam.LocalSteamDiscovery,
     private val launchDispatcher: com.psplauncher.feature.launcher.LaunchDispatcher,
     private val setupStateProvider: com.psplauncher.feature.launcher.SetupStateProvider,
     private val customIconStore: CustomIconStore,
@@ -1434,37 +1379,6 @@ class XMBViewModel @Inject constructor(
     private val uiMediaAudioPlayer: com.psplauncher.core.ui.media.UiMediaAudioPlayer,
 ) : ViewModel() {
 
-    // Drives the "convert detected games?" multi-select picker after a Windows-card scan; the same
-    // controller and dialog serve the Library Manager (see LibraryManagerViewModel).
-    private val convertPickerController =
-        com.psplauncher.feature.achievements.provider.localsteam.LocalSteamConvertPickerController(
-            localSteamSchemaGenerator, viewModelScope,
-        )
-    val convertPicker: StateFlow<com.psplauncher.feature.achievements.provider.localsteam.LocalSteamConvertPickerController.Picker?> =
-        convertPickerController.picker
-
-    fun onConvertToggle(index: Int) = convertPickerController.toggle(index)
-    fun onConvertSelectAll() = convertPickerController.setAll(true)
-    fun onConvertSelectNone() = convertPickerController.setAll(false)
-    fun onConvertConfirm() = convertPickerController.confirm()
-    fun onConvertCancel() = convertPickerController.cancel()
-
-    private fun convertOutcomeMessage(
-        outcome: com.psplauncher.feature.achievements.provider.localsteam.LocalSteamConvertPickerController.Outcome,
-    ): String? {
-        if (outcome.converted == 0 && outcome.noAchievements == 0 &&
-            outcome.noKey == 0 && outcome.failed == 0
-        ) {
-            return null
-        }
-        return buildString {
-            append("Converted ${outcome.converted} game(s)")
-            if (outcome.noAchievements > 0) append(", ${outcome.noAchievements} had no achievements")
-            if (outcome.noKey > 0) append(", ${outcome.noKey} need a Steam Web API key")
-            if (outcome.failed > 0) append(", ${outcome.failed} failed")
-            append(". Play each game to start earning coins.")
-        }
-    }
 
     // The track list currently on screen (in display/sort order), used as the in-app player's queue
     // when a song is picked. [currentMusicTracksRaw] is the same set in DB order, kept so a sort
@@ -1529,7 +1443,6 @@ class XMBViewModel @Inject constructor(
         observeVideo()
         observePhoto()
         observeBooks()
-        observeLibraryStanding()
         observeHiddenPlacements()
         observeEmulatorProfiles()
         collectGamepadActions()
@@ -1944,7 +1857,7 @@ class XMBViewModel @Inject constructor(
     private val nonCollectionCategoryIds = setOf(
         BuiltInCategory.FAVORITES, BuiltInCategory.RECENTLY_PLAYED, BuiltInCategory.MUSIC,
         BuiltInCategory.VIDEO, BuiltInCategory.PHOTO, BuiltInCategory.ANDROID,
-        BuiltInCategory.APP_DRAWER, BuiltInCategory.SETTINGS, BuiltInCategory.ACHIEVEMENTS,
+        BuiltInCategory.APP_DRAWER, BuiltInCategory.SETTINGS,
     )
 
     /** True for categories that render collection rows: gaming categories, and the generic app
@@ -1997,13 +1910,6 @@ class XMBViewModel @Inject constructor(
                             currentItems = items,
                             selectedItemIndex = state.selectedItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)),
                         )
-                    }
-                }
-                BuiltInCategory.ACHIEVEMENTS -> {
-                    // Rebuilt reactively by observeLibraryStanding() and on nav change; a one-shot
-                    // build from the current standing is enough here.
-                    _uiState.update {
-                        it.copy(currentItems = achievementsItems(it.libraryStanding, it.achievementsNav, it.achievementsConnected, it.hubSyncAll, it.hubMatching))
                     }
                 }
                 BuiltInCategory.GAMES -> {
@@ -2823,7 +2729,6 @@ class XMBViewModel @Inject constructor(
             catId == BuiltInCategory.VIDEO -> "video_${videoNavKey(s.videoNav)}"
             catId == BuiltInCategory.PHOTO -> "photo_${photoNavKey(s.photoNav)}"
             catId == BuiltInCategory.LIBRARY -> "books_${booksNavKey(s.booksNav)}"
-            catId == BuiltInCategory.ACHIEVEMENTS -> "ach_${achievementsNavKey(s.achievementsNav)}"
             catId == BuiltInCategory.SETTINGS -> "settings_${s.settingsSectionNav?.id ?: "root"}"
             s.selectedCollectionId != null -> "col_${s.selectedCollectionId}"
             s.selectedPlatformId != null   -> "plat_${s.selectedPlatformId}"
@@ -4601,124 +4506,6 @@ class XMBViewModel @Inject constructor(
         )
     }
 
-    // ── Shiba Coins hub ─────────────────────────────────────────────────────────
-
-    private fun observeLibraryStanding() {
-        viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(
-                achievementRepository.observeLibraryStanding(),
-                achievementCredentials.raUsernameFlow,
-                achievementCredentials.steamId64Flow,
-            ) { standing, raUser, steamId ->
-                standing to (!raUser.isNullOrBlank() || !steamId.isNullOrBlank())
-            }.collect { (standing, connected) ->
-                _uiState.update { it.copy(libraryStanding = standing, achievementsConnected = connected) }
-                // Refresh the hub in place when it is the visible category.
-                if (currentCategory()?.id == BuiltInCategory.ACHIEVEMENTS) {
-                    loadItemsForCategory(currentCategory())
-                }
-            }
-        }
-    }
-
-    private fun achievementsNavKey(nav: AchievementsNav): String = when (nav) {
-        AchievementsNav.Root -> "root"
-    }
-
-    // The hub is a single root list (All Tracked and Untracked are fullscreen overlays).
-    private fun achievementsItems(
-        standing: com.psplauncher.core.domain.achievement.LibraryStanding,
-        nav: AchievementsNav,
-        connected: Boolean,
-        syncAll: Pair<Int, Int>? = null,
-        matching: Boolean = false,
-    ): List<XMBItem> = when (nav) {
-        AchievementsNav.Root -> achievementsRootItems(standing, connected, syncAll, matching)
-    }
-
-    private fun achievementsRootItems(
-        standing: com.psplauncher.core.domain.achievement.LibraryStanding,
-        connected: Boolean,
-        syncAll: Pair<Int, Int>? = null,
-        matching: Boolean = false,
-    ): List<XMBItem> {
-        val untrackedRow = if (standing.untracked.isEmpty()) emptyList() else listOf(
-            XMBItem(id = ACH_UNTRACKED_ITEM_ID, title = "Untracked", subtitle = "${standing.untracked.size} games", type = XMBItemType.STANDARD),
-        )
-        // Nothing connected yet: the connect prompt is the only entry. Once RA or Steam credentials
-        // are saved the player card shows immediately (Lv 1 / 0 coins) and fills in as syncs land.
-        if (!connected && standing.gamesTracked == 0) {
-            val connect = XMBItem(
-                id = ACH_CONNECT_ITEM_ID,
-                title = "Connect accounts",
-                subtitle = "Set up Shiba Coins and auto-match your library",
-                type = XMBItemType.STANDARD,
-            )
-            return listOf(connect) + untrackedRow
-        }
-        val w = standing.wallet
-        val allTrackedRow = if (standing.gamesTracked == 0) emptyList() else listOf(
-            XMBItem(
-                id = ACH_ALL_ITEM_ID,
-                title = "All Tracked Games",
-                subtitle = syncAll?.let { (done, total) ->
-                    if (matching) "Auto-matching…  $done / $total" else "Syncing coins…  $done / $total"
-                } ?: "${standing.gamesTracked} games",
-                type = XMBItemType.STANDARD,
-            ),
-        )
-        // While nothing is tracked yet there is no All Tracked row to carry the sync progress,
-        // so the Player Card itself shows it (its menu is where that first sync starts).
-        // Coins read as earned/available COUNTS (user decision 2026-07-16); the weighted value
-        // stays the level economy behind the Lv badge.
-        val summarySubtitle = if (standing.gamesTracked == 0 && syncAll != null) {
-            if (matching) "Auto-matching…  ${syncAll.first} / ${syncAll.second}"
-            else "Syncing coins…  ${syncAll.first} / ${syncAll.second}"
-        } else {
-            "${"%,d".format(standing.coinsEarned)} / ${"%,d".format(standing.coinsAvailable)} coins  •  " +
-                "${standing.gamesTracked} tracked  •  ${standing.gamesMastered} mastered"
-        }
-        return listOf(
-            XMBItem(
-                id = ACH_SUMMARY_ITEM_ID,
-                title = w.rank.label,
-                subtitle = summarySubtitle,
-                levelBadge = "Lv ${w.level}",
-                boneCount = w.bones,
-                type = XMBItemType.STANDARD,
-            ),
-        ) + allTrackedRow + untrackedRow
-    }
-
-    private fun openAchievementsView(nav: AchievementsNav) =
-        navigateRememberingCursor { it.copy(achievementsNav = nav) }
-
-    private fun closeAchievementsView() = openAchievementsView(AchievementsNav.Root)
-
-    // Handles a tap/select in the Shiba Coins category. Returns true when consumed; a game/coin row
-    // inside a lens returns false so the shared game handler opens its Game Detail page.
-    private fun handleAchievementsSelection(item: XMBItem): Boolean {
-        when (item.id) {
-            ACH_CONNECT_ITEM_ID -> {
-                // Connect accounts lands straight on Provider Credentials (RetroAchievements &
-                // Steam) rather than the achievements root — the only next step on first run.
-                menuSound.play(MenuSound.SELECT)
-                _uiState.update { it.copy(activeSettingsScreen = "settings_achievements_credentials") }
-                return true
-            }
-            ACH_SUMMARY_ITEM_ID -> {
-                // The player card opens the fullscreen player status view.
-                menuSound.play(MenuSound.SELECT)
-                openPlayerStatus()
-                return true
-            }
-            ACH_ALL_ITEM_ID     -> { menuSound.play(MenuSound.SELECT); openShibaLibrary(ShibaLibraryMode.TRACKED); return true }
-            ACH_UNTRACKED_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openShibaLibrary(ShibaLibraryMode.UNTRACKED); return true }
-            EMPTY_CATEGORY_ITEM_ID -> return true // placeholder, not selectable
-        }
-        return false
-    }
-
     private fun tintWaveForCategory(category: Category?) {
         // PSP-authentic: one theme color across the whole XMB — no per-category wave re-tint.
         _uiState.update { it.copy(themeColors = baseThemeColors) }
@@ -5028,22 +4815,6 @@ class XMBViewModel @Inject constructor(
                 _uiState.update { it.copy(pendingVideoDetailAction = action) }
                 return
             }
-            state.activeShibaCoinsTarget != null -> {
-                // Forward everything so the coins screen can move focus, sync, and close on BACK.
-                _uiState.update { it.copy(pendingShibaCoinsAction = action) }
-                return
-            }
-            state.activeShibaLibrary != null -> {
-                // Forward everything so the fullscreen library can move focus and close on BACK.
-                _uiState.update { it.copy(pendingShibaLibraryAction = action) }
-                return
-            }
-            state.activePlayerStatus -> {
-                // Forward everything so the player status view can move focus, open a coin's
-                // details, and close on BACK.
-                _uiState.update { it.copy(pendingPlayerStatusAction = action) }
-                return
-            }
             state.activeGameId != null -> {
                 // Forward everything (incl. BACK) so the Details page can close its own inner
                 // overlays first and only then pop back to the XMB (via onCloseGameDetail).
@@ -5157,7 +4928,6 @@ class XMBViewModel @Inject constructor(
                     item != null && openMusicContextMenu(item) -> Unit
                     item != null && openVideoContextMenu(item) -> Unit
                     item != null && openPhotoContextMenu(item) -> Unit
-                    item != null && openAchievementsContextMenu(item) -> Unit
                     item?.gameId != null -> openGameContextMenu(item)
                     item?.collectionId != null && item.type == XMBItemType.COLLECTION -> openCollectionRowContextMenu(item.collectionId)
                     item?.type == XMBItemType.ALL_GAMES -> openAllGamesContextMenu()
@@ -5274,81 +5044,6 @@ class XMBViewModel @Inject constructor(
         )}
     }
 
-    // Opens the △ options menu for a Shiba Coins hub row — the Player Card, All Tracked Games,
-    // and Untracked all carry Sync All Coins and Auto-Matching, so the first-ever match/sync
-    // (nothing tracked yet, no All Tracked row) is reachable from the card. Returns true when
-    // [item] is one it owns.
-    private fun openAchievementsContextMenu(item: XMBItem): Boolean {
-        if (currentCategory()?.id != BuiltInCategory.ACHIEVEMENTS) return false
-        if (item.id != ACH_ALL_ITEM_ID && item.id != ACH_SUMMARY_ITEM_ID && item.id != ACH_UNTRACKED_ITEM_ID) return false
-        val matching = _uiState.value.hubMatching
-        val syncing = _uiState.value.hubSyncAll != null && !matching
-        _uiState.update {
-            it.copy(
-                activeContextMenu = XMBContextMenu(
-                    title = when (item.id) {
-                        ACH_SUMMARY_ITEM_ID -> "Player Card"
-                        ACH_UNTRACKED_ITEM_ID -> "Untracked"
-                        else -> "All Tracked Games"
-                    },
-                    items = listOf(
-                        XMBContextMenuItem(
-                            "ach_auto_match",
-                            if (matching) "Auto-Matching…" else "Auto-Matching",
-                        ),
-                        XMBContextMenuItem(
-                            "ach_sync_all",
-                            if (syncing) "Syncing…" else "Sync All Coins",
-                        ),
-                    ),
-                    achievementsHubMenu = true,
-                ),
-            )
-        }
-        return true
-    }
-
-    // Auto-matches every unlinked game (the batch matcher's full ladder — RA hashes, Steam,
-    // Local Steam), then chains straight into Sync All so fresh links land with their coins.
-    // One run at a time; the hub rows show "Auto-matching… n / m" while the match pass runs.
-    private fun autoMatchFromHub() {
-        if (_uiState.value.hubSyncAll != null || _uiState.value.hubMatching) return
-        viewModelScope.launch {
-            _uiState.update { it.copy(hubMatching = true, hubSyncAll = 0 to 0) }
-            refreshAchievementsHubIfVisible()
-            runCatching {
-                achievementAutoMatcher.matchUnlinked { done, total ->
-                    _uiState.update { it.copy(hubSyncAll = done to total) }
-                    refreshAchievementsHubIfVisible()
-                }
-            }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-            _uiState.update { it.copy(hubMatching = false, hubSyncAll = null) }
-            refreshAchievementsHubIfVisible()
-            syncAllCoinsFromHub()
-        }
-    }
-
-    // Refreshes coin data for every linked game, with progress on the hub row. One run at a time;
-    // re-triggering while active is a no-op (the menu label reads "Syncing…" then).
-    private fun syncAllCoinsFromHub() {
-        if (_uiState.value.hubSyncAll != null) return
-        viewModelScope.launch {
-            _uiState.update { it.copy(hubSyncAll = 0 to 0) }
-            refreshAchievementsHubIfVisible()
-            runCatching {
-                achievementRepository.syncAllLinked { done, total ->
-                    _uiState.update { it.copy(hubSyncAll = done to total) }
-                    refreshAchievementsHubIfVisible()
-                }
-            }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-            _uiState.update { it.copy(hubSyncAll = null) }
-            refreshAchievementsHubIfVisible()
-        }
-    }
-
-    private fun refreshAchievementsHubIfVisible() {
-        if (currentCategory()?.id == BuiltInCategory.ACHIEVEMENTS) loadItemsForCategory(currentCategory())
-    }
 
     private fun openGameContextMenu(item: XMBItem) {
         val gameId = item.gameId
@@ -5381,12 +5076,6 @@ class XMBViewModel @Inject constructor(
             // Multi-disc sets: pick which disc to boot — the only way to reach a non-primary
             // disc when direct launch skips Game Detail's picker. Launches the chosen disc.
             if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))
-            // Android games can never have achievements — no Shiba Coins entry for them.
-            if (item.platformId != ANDROID_PLATFORM_ID) {
-                add(XMBContextMenuItem("view_shiba_coins", "View Shiba Coins"))
-            }
-            // Emulated PC (Local Steam) games can have their Goldberg achievement data installed on
-            // demand — gated per-game at dispatch on the installer toggle being on.
             if (item.platformId == WINDOWS_PLATFORM_ID) {
                 add(XMBContextMenuItem("install_goldberg", "Install Goldberg Achievements"))
                 // Writes this game's .pfpgame file so a fresh install can bring it back with its
@@ -5749,10 +5438,6 @@ class XMBViewModel @Inject constructor(
         }
 
         when {
-            menu.achievementsHubMenu -> when (itemId) {
-                "ach_sync_all" -> syncAllCoinsFromHub()
-                "ach_auto_match" -> autoMatchFromHub()
-            }
             menu.musicTrackId == MUSIC_PLAYER_MENU_MARKER -> when (itemId) {
                 "music_background" -> musicPlayInBackground()
                 "music_playpause"  -> musicPlayPause()
@@ -5820,10 +5505,6 @@ class XMBViewModel @Inject constructor(
                     it.copy(activeGameId = menu.gameId, activeGameAutoLaunch = false)
                 }
                 "choose_disc"             -> openDiscPickerMenu(menu.gameId)
-                "view_shiba_coins"       -> _uiState.update {
-                    it.copy(activeShibaCoinsTarget = com.psplauncher.feature.xmb.ui.detail.ShibaCoinsTarget.LibraryGame(menu.gameId))
-                }
-                "install_goldberg"       -> installGoldbergForGame(menu.gameId)
                 "export_game"            -> exportGameFromMenu(menu.gameId)
                 "edit_app"               -> openAppDetail(menu.gameId, menu.packageName ?: return)
                 "favorite"               -> toggleGameFavorite(menu.gameId, true)
@@ -6156,37 +5837,6 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    private fun installGoldbergForGame(gameId: Long) {
-        viewModelScope.launch {
-            val game = gameRepository.getById(gameId) ?: return@launch
-            fun info(message: String) = _uiState.update {
-                it.copy(infoDialog = InfoDialogState(title = game.displayTitle, message = message))
-            }
-            if (!achievementCredentials.goldbergInstallerEnabled()) {
-                info(
-                    "No proper achievements.json for this game. Turn on \"Install Goldberg & " +
-                        "Convert Games\" in Achievement settings to generate one.",
-                )
-                return@launch
-            }
-            val key = normalizePcTitleKey(game.displayTitle)
-            val folder = localSteamDiscovery.scanAll().firstOrNull { normalizePcTitleKey(it.folderName) == key }
-            when {
-                folder == null -> info("No Steam-emu setup (steam_settings) found for this game.")
-                folder.hasSchema -> info("${game.displayTitle} already has achievement data.")
-                else -> when (localSteamSchemaGenerator.generate(folder)) {
-                    is com.psplauncher.feature.achievements.provider.localsteam.LocalSteamSchemaGenerator.Result.Written ->
-                        info("Installed Goldberg achievements. Play it through the emulator to start earning coins.")
-                    is com.psplauncher.feature.achievements.provider.localsteam.LocalSteamSchemaGenerator.Result.NoAchievements ->
-                        info("This game has no achievements to install.")
-                    is com.psplauncher.feature.achievements.provider.localsteam.LocalSteamSchemaGenerator.Result.NoKey ->
-                        info("Add your Steam Web API key in Achievement settings first.")
-                    is com.psplauncher.feature.achievements.provider.localsteam.LocalSteamSchemaGenerator.Result.Failed ->
-                        info("Couldn't install achievements for this game.")
-                }
-            }
-        }
-    }
 
     // Folder-name/title match key, mirroring LocalSteamGameImporter.normalizeTitle.
     private fun normalizePcTitleKey(title: String): String =
@@ -6670,7 +6320,7 @@ class XMBViewModel @Inject constructor(
         // activeAppDrawerFilter is cleared as an invariant: landing on a category always shows the
         // plain XMB (the drawer can't normally be open here, but this keeps the contextual button
         // state correct no matter which path selected the category).
-        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = restore, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, achievementsNav = AchievementsNav.Root, settingsSectionNav = null, activeAppDrawerFilter = null) }
+        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = restore, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, settingsSectionNav = null, activeAppDrawerFilter = null) }
         tintWaveForCategory(category)
         loadItemsForCategory(category)
     }
@@ -6816,7 +6466,6 @@ class XMBViewModel @Inject constructor(
             DrillOutStep.LIBRARY_SERIES -> openBooksView(BooksNav.SeriesList)
             DrillOutStep.LIBRARY_SHELF -> openBooksView(BooksNav.Shelves)
             DrillOutStep.LIBRARY -> closeBooksView()
-            DrillOutStep.ACHIEVEMENTS -> closeAchievementsView()
             DrillOutStep.PLATFORM_FOLDER -> closePlatformFolder()
             null -> return false
         }
@@ -6856,10 +6505,6 @@ class XMBViewModel @Inject constructor(
 
         // Library rows (the reader, shelves, a shelf, a book).
         if (category?.id == BuiltInCategory.LIBRARY && item != null && handleBooksSelection(item)) return
-
-        // Shiba Coins rows (summary → settings, lens rows → drill). Game/coin rows fall through to
-        // the shared game handler below, which opens Game Detail.
-        if (category?.id == BuiltInCategory.ACHIEVEMENTS && item != null && handleAchievementsSelection(item)) return
 
         // Sound: launch for items that boot something immediately; select for opening a folder,
         // detail, picker, or settings; silent for non-selectable placeholder rows.
@@ -7099,50 +6744,6 @@ class XMBViewModel @Inject constructor(
 
     // ── Game detail overlay ───────────────────────────────────────────────────
 
-    fun openShibaCoins(gameId: Long) =
-        openShibaCoins(com.psplauncher.feature.xmb.ui.detail.ShibaCoinsTarget.LibraryGame(gameId))
-
-    fun openShibaCoins(target: com.psplauncher.feature.xmb.ui.detail.ShibaCoinsTarget) {
-        _uiState.update { it.copy(activeShibaCoinsTarget = target) }
-    }
-
-    fun onCloseShibaCoins() {
-        _uiState.update { it.copy(activeShibaCoinsTarget = null, pendingShibaCoinsAction = null) }
-    }
-
-    fun onShibaCoinsActionConsumed() {
-        _uiState.update { it.copy(pendingShibaCoinsAction = null) }
-    }
-
-    fun openShibaLibrary(mode: ShibaLibraryMode) {
-        _uiState.update { it.copy(activeShibaLibrary = mode) }
-    }
-
-    fun onCloseShibaLibrary() {
-        _uiState.update { it.copy(activeShibaLibrary = null, pendingShibaLibraryAction = null) }
-    }
-
-    fun onShibaLibraryActionConsumed() {
-        _uiState.update { it.copy(pendingShibaLibraryAction = null) }
-    }
-
-    fun openPlayerStatus() {
-        _uiState.update { it.copy(activePlayerStatus = true) }
-    }
-
-    fun openPlayerStatusFromSettings() {
-        _uiState.update {
-            it.copy(activeSettingsScreen = null, pendingSettingsAction = null, activePlayerStatus = true)
-        }
-    }
-
-    fun onClosePlayerStatus() {
-        _uiState.update { it.copy(activePlayerStatus = false, pendingPlayerStatusAction = null) }
-    }
-
-    fun onPlayerStatusActionConsumed() {
-        _uiState.update { it.copy(pendingPlayerStatusAction = null) }
-    }
 
     private fun launchGameDirectly(gameId: Long, discId: Long? = null) {
         // Keep the XMB selection untouched. The detail overlay is only an editing surface; direct
@@ -8397,11 +7998,6 @@ class XMBViewModel @Inject constructor(
         private const val EMPTY_COLLECTION_ITEM_ID = "empty_collection"
         private const val EMPTY_FAVORITES_ITEM_ID = "empty_favorites"
         private const val EMPTY_CATEGORY_ITEM_ID = "empty_category"
-        // Shiba Coins hub root rows.
-        private const val ACH_CONNECT_ITEM_ID = "ach_connect"
-        internal const val ACH_SUMMARY_ITEM_ID = "ach_summary"
-        internal const val ACH_ALL_ITEM_ID      = "ach_all"
-        internal const val ACH_UNTRACKED_ITEM_ID = "ach_untracked"
         private const val ALL_GAMES_ITEM_ID = "all_games"
         private const val ALL_GAMES_PLATFORM_ID = "__all_games__"
         private const val FAVORITES_ITEM_ID = "favorites_folder"

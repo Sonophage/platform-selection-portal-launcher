@@ -42,7 +42,6 @@ object GameDetailKeys {
     const val MANUAL = "game-detail:manual"
     const val OPTIONS_ACTION = "game-detail:options-action"
     const val DISCS = "game-detail:discs"
-    const val COINS = "game-detail:shiba-coins"
     const val OVERVIEW = "game-detail:overview"
     const val INFO = "game-detail:info"
     const val MEDIA = "game-detail:media"
@@ -95,8 +94,6 @@ data class GameDetailNavContent(
     val showEmulatorControls: Boolean = false,
     /** Disc members in visual order; empty unless this is a multi-disc set. */
     val discIds: List<Long> = emptyList(),
-    /** Shiba Coins row is shown (never for Android entries). */
-    val showCoins: Boolean = false,
     /** The overview row is shown. */
     val showOverview: Boolean = false,
     /** The structured information band has anything to show. */
@@ -234,9 +231,6 @@ class GameDetailNav(
                     NavigationNode(GameDetailKeys.disc(discId), onSelect = { activate(GameDetailKeys.disc(discId)) })
                 },
             )
-        }
-        if (content.showCoins) {
-            nodes += NavigationNode(GameDetailKeys.COINS, onSelect = { activate(GameDetailKeys.COINS) })
         }
         if (content.showOverview) {
             nodes += NavigationNode(GameDetailKeys.OVERVIEW, onSelect = { activate(GameDetailKeys.OVERVIEW) })

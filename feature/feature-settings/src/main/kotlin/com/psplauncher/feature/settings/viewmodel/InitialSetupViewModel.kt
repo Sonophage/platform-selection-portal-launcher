@@ -8,7 +8,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.psplauncher.core.data.achievement.AchievementCredentialsProvider
 import com.psplauncher.core.data.datastore.pfpDataStore
 import com.psplauncher.core.data.repository.FolderLinkStatus
 import com.psplauncher.core.data.repository.MediaRootKind
@@ -18,7 +17,6 @@ import com.psplauncher.core.data.repository.RetroArchLink
 import com.psplauncher.core.data.repository.RomRootRepository
 import com.psplauncher.core.data.repository.Vita3KLibrary
 import com.psplauncher.core.data.repository.SafGrants
-import com.psplauncher.feature.achievements.provider.steam.SteamRemoteDataSource
 import com.psplauncher.feature.artwork.MetadataApiKeyProvider
 import com.psplauncher.feature.artwork.api.ArtworkImportManager
 import com.psplauncher.feature.artwork.api.IgdbApi
@@ -39,7 +37,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** The pages of the first-run wizard, in order. RetroArch and Vita3K exist only when installed. */
-enum class SetupStep { WELCOME, ROM_ROOTS, MUSIC, VIDEO, PHOTO, ARTWORK, SERVICES, ACHIEVEMENTS, VITA, RETROARCH, FINISH }
+enum class SetupStep { WELCOME, ROM_ROOTS, MUSIC, VIDEO, PHOTO, ARTWORK, SERVICES, VITA, RETROARCH, FINISH }
 
 /** A detected artwork source offered for the embedded quick-import (label + system count). */
 @Immutable
@@ -67,8 +65,6 @@ data class InitialSetupUiState(
     // ScreenScraper accounts only matter when the build ships dev credentials.
     val ssEnabled: Boolean = false,
     val ssUsername: String = "",
-    val raUsername: String = "",
-    val steamId64: String = "",
     // RetroArch cores link.
     val retroArchLinked: Boolean = false,
     val retroArchCoreCount: Int? = null,
@@ -98,8 +94,6 @@ data class InitialSetupUiState(
             return if (idx >= 0) idx + 1 else 1
         }
     val hasScreenScraper: Boolean get() = ssUsername.isNotBlank()
-    val hasRetroAchievements: Boolean get() = raUsername.isNotBlank()
-    val hasSteam: Boolean get() = steamId64.isNotBlank()
     val anyFolderSet: Boolean get() =
         romRoots.isNotEmpty() || musicRoots.isNotEmpty() || videoRoots.isNotEmpty() ||
             photoRoots.isNotEmpty() || artworkFolderName != null
@@ -132,8 +126,6 @@ private data class ServiceIdentities(
     val hasTgdb: Boolean,
     val igdbClientId: String,
     val ssUsername: String,
-    val raUsername: String,
-    val steamId64: String,
 )
 
 // Must match XMBViewModel.KEY_INITIAL_SETUP_SEEN — both read/write the same pref.
@@ -150,7 +142,7 @@ private val VITA3K_PACKAGES = listOf("org.vita3k.emulator", "org.vita3k.emulator
  * Roots → Music → Video → Photo → Artwork → Online Services → Vita* → RetroArch* → Finish
  * (* only when the matching app is installed). Each folder section is multi-root exactly like Settings ▸ Library
  * ROM Root Access and the Music/Video/Photo screens, artwork is one folder with an embedded
- * quick-import offer, and services mirror Settings ▸ Artwork/Shiba. Pure glue — every value is
+ * quick-import offer, and services mirror Settings ▸ Artwork. Pure glue — every value is
  * stored through the same repository/provider the corresponding settings screen uses, so
  * anything configured here shows up there and vice versa. Everything is optional.
  */
@@ -165,8 +157,6 @@ class InitialSetupViewModel @Inject constructor(
     private val autoConfig: EmulatorAutoConfigService,
     private val sgdbKeys: SgdbApiKeyProvider,
     private val metadataKeys: MetadataApiKeyProvider,
-    private val achievementCredentials: AchievementCredentialsProvider,
-    private val steamApi: SteamRemoteDataSource,
     private val igdbApi: IgdbApi,
     private val screenScraperApi: ScreenScraperApi,
     private val wizardMediaScanRunner: com.psplauncher.feature.settings.media.WizardMediaScanRunner,
@@ -239,16 +229,12 @@ class InitialSetupViewModel @Inject constructor(
         artworkKeys,
         metadataKeys.igdbClientIdFlow,
         metadataKeys.ssUsernameFlow,
-        achievementCredentials.raUsernameFlow,
-        achievementCredentials.steamId64Flow,
-    ) { keys, igdbId, ssUser, raUser, steamId ->
+    ) { keys, igdbId, ssUser ->
         ServiceIdentities(
             hasSgdb      = keys.hasSgdb,
             hasTgdb      = keys.hasTgdb,
             igdbClientId = igdbId.orEmpty(),
             ssUsername   = ssUser.orEmpty(),
-            raUsername   = raUser.orEmpty(),
-            steamId64    = steamId.orEmpty(),
         )
     }
 
@@ -266,8 +252,6 @@ class InitialSetupViewModel @Inject constructor(
             hasTgdb           = services.hasTgdb,
             igdbClientId      = services.igdbClientId,
             ssUsername        = services.ssUsername,
-            raUsername        = services.raUsername,
-            steamId64         = services.steamId64,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), scratch.value)
 
@@ -645,26 +629,6 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    fun connectRetroAchievements(username: String, apiKey: String) {
-        if (username.isBlank() || apiKey.isBlank()) return
-        viewModelScope.launch {
-            achievementCredentials.saveRetroAchievements(username, apiKey)
-            achievementCredentials.setEnabled(true)
-            scratch.update { it.copy(message = "RetroAchievements connected") }
-        }
-    }
-
-    /** Same connect flow as Settings ▸ Shiba Coins (shared via [ServiceConnectors]). */
-    fun connectSteam(idOrVanity: String, apiKey: String) {
-        if (idOrVanity.isBlank() || apiKey.isBlank()) return
-        viewModelScope.launch {
-            achievementCredentials.setEnabled(true)
-            val message = ServiceConnectors.connectSteam(
-                achievementCredentials, steamApi, idOrVanity, apiKey,
-            )
-            scratch.update { it.copy(message = message) }
-        }
-    }
 
     fun dismissMessage() = scratch.update { it.copy(message = null) }
 }

@@ -89,10 +89,6 @@ data class GameDetailUiState(
     val artworkMessage: String? = null,
     val launchError: String? = null,
 
-    // Shiba Coins summary for the glance strip; null when this game isn't tracked yet.
-    val coins: com.psplauncher.core.domain.achievement.GameCoins? = null,
-    // Set true to request opening the dedicated Shiba Coins screen (strip tap / SELECT on it).
-    val openCoins: Boolean = false,
 
     // Stored media surfaced on the page (resolved once per load via ArtworkStore.find).
     val videoUri: String? = null,        // the game's video — playable from the Video button/strip
@@ -276,7 +272,6 @@ class GameDetailViewModel @Inject constructor(
     private val artworkRecordDao: com.psplauncher.core.data.database.dao.ArtworkRecordDao,
     private val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer,
     private val launcherShortcutRepository: com.psplauncher.feature.appbar.LauncherShortcutRepository,
-    private val achievementRepository: com.psplauncher.feature.achievements.AchievementController,
     private val launchDispatcher: com.psplauncher.feature.launcher.LaunchDispatcher,
     private val pcGameExporter: com.psplauncher.feature.settings.pc.PcGameExporter,
 ) : ViewModel() {
@@ -358,8 +353,6 @@ class GameDetailViewModel @Inject constructor(
             // so they get no emulator nodes at all.
             showEmulatorControls = loaded && s.showEmulatorAction,
             discIds     = if (s.showDiscPicker) s.discMembers.map { it.id } else emptyList(),
-            // Android games can never have achievements.
-            showCoins   = loaded && game.platformId != ANDROID_PLATFORM_ID,
             showOverview = loaded,
             showInfo    = loaded && s.showInfoBand,
             mediaIds    = s.detailMedia.map { mediaStableId(it) },
@@ -378,7 +371,6 @@ class GameDetailViewModel @Inject constructor(
             key == GameDetailKeys.MANUAL -> openManual()
             key == GameDetailKeys.OPTIONS_ACTION -> openOptions()
             key == GameDetailKeys.INFO -> if (_uiState.value.showEmulatorAction) requestChangeEmulator()
-            key == GameDetailKeys.COINS -> requestOpenCoins()
             key == GameDetailKeys.OVERVIEW -> toggleDescriptionExpanded()
             key.startsWith(DISC_KEY_PREFIX) ->
                 key.removePrefix(DISC_KEY_PREFIX).toLongOrNull()?.let(::selectDisc)
@@ -605,8 +597,6 @@ class GameDetailViewModel @Inject constructor(
         if (aligning) nav.beginRecoveryLock() else nav.endRecoveryLock()
     }
 
-    // ── Shiba Coins strip ─────────────────────────────────────────────────
-
     fun prepareForOpen() {
         _uiState.update {
             it.copy(
@@ -639,12 +629,6 @@ class GameDetailViewModel @Inject constructor(
      *   when the id isn't a member (stale row, single-disc game).
      */
     fun loadGame(id: Long, requestedDiscId: Long? = null) {
-        // Offline-first coin summary for the glance strip — streams straight from Room.
-        viewModelScope.launch {
-            achievementRepository.observeGameCoins(id).collect { coins ->
-                _uiState.update { it.copy(coins = coins) }
-            }
-        }
         viewModelScope.launch {
             // Loading is a fresh page: every overlay closes with it, and the engine's modal stack
             // unwinds from the state (below) rather than being left on top of a new graph.
@@ -830,11 +814,6 @@ class GameDetailViewModel @Inject constructor(
         }
         finishInput()
     }
-
-    // ── Shiba Coins strip ─────────────────────────────────────────────────
-
-    fun requestOpenCoins() = _uiState.update { it.copy(openCoins = true) }
-    fun onOpenCoinsConsumed() = _uiState.update { it.copy(openCoins = false) }
 
     // ── Artwork Studio open / close ───────────────────────────────────────
 

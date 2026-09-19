@@ -80,8 +80,6 @@ class GameDetailScreenContentTest {
         // The information band's inline emulator field is gone, not disabled.
         assertAbsent("Emulator", "a package-backed entry must not offer an emulator action")
         assertAbsent("MEDIA PREVIEW", "an entry with no media must not show a media band")
-        // Android entries can never have achievements, so the coins strip is absent too.
-        assertAbsent("SHIBA COINS", "an Android entry must not show the Shiba Coins strip")
         // The page itself is still a page: Launch and its footer documentation are present.
         assertPresent("Launch", "the primary action must survive an entry with no extra content")
         assertPresent("Options", "the helper footer must document Options on the base page")
@@ -119,7 +117,6 @@ class GameDetailScreenContentTest {
         assertPresent("MEDIA PREVIEW", "the media band appears once the strip has an asset")
         // The named plate on a playable tile: "this is playable" never rests on the glyph alone.
         assertPresent("VIDEO", "a video tile must be named, not just glyphed")
-        assertPresent("SHIBA COINS", "a non-Android entry keeps the coins strip")
         // Field labels are uppercase chrome; the values keep their own casing.
         assertPresent("RELEASED", "the information band shows the values it has")
         assertPresent("1996", "the information band shows the values it has")

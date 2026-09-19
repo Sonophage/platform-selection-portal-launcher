@@ -22,7 +22,6 @@ class GameDetailNavTest {
         hasManual: Boolean = true,
         emulatorControls: Boolean = true,
         discs: List<Long> = emptyList(),
-        coins: Boolean = true,
         overview: Boolean = true,
         info: Boolean = true,
         media: List<String> = emptyList(),
@@ -32,7 +31,6 @@ class GameDetailNavTest {
         hasManual = hasManual,
         showEmulatorControls = emulatorControls,
         discIds = discs,
-        showCoins = coins,
         showOverview = overview,
         showInfo = info,
         mediaIds = media,
@@ -124,8 +122,6 @@ class GameDetailNavTest {
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // quick actions → Favorite
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // discs
         assertEquals(GameDetailKeys.disc(1L), nav.focusedKey)
-        nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // Shiba Coins
-        assertEquals(GameDetailKeys.COINS, nav.focusedKey)
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // overview
         assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // information band
@@ -147,7 +143,7 @@ class GameDetailNavTest {
 
     @Test
     fun `media strip boundaries stop at the ends`() {
-        val nav = readyNav(content(media = listOf("i:a", "i:b"), coins = false, overview = false, info = false))
+        val nav = readyNav(content(media = listOf("i:a", "i:b"), overview = false, info = false))
         repeat(3) { nav.handleAction(GamepadAction.NAVIGATE_DOWN) }
         assertEquals(GameDetailKeys.media("i:a"), nav.focusedKey)
 
@@ -176,22 +172,22 @@ class GameDetailNavTest {
 
     @Test
     fun `vertical order follows reported geometry, not registration order`() {
-        // Registered order is coins-then-overview; on screen they are the other way round, and the
-        // cursor must follow what the user sees.
+        // Registered order is overview-then-info; on screen they are the other way round here, and
+        // the cursor must follow what the user sees.
         val nav = readyNav(
-            content = content(info = false),
+            content = content(),
             geometry = mapOf(
                 GameDetailKeys.LAUNCH to 0f,
                 GameDetailKeys.ACTIONS to 60f,
-                GameDetailKeys.OVERVIEW to 200f,
-                GameDetailKeys.COINS to 320f,
+                GameDetailKeys.INFO to 200f,
+                GameDetailKeys.OVERVIEW to 320f,
             ),
         )
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // Favorite
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
+        assertEquals(GameDetailKeys.INFO, nav.focusedKey)
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.COINS, nav.focusedKey)
+        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
     }
 
     // ── Dynamic content ───────────────────────────────────────────────────
@@ -224,7 +220,7 @@ class GameDetailNavTest {
     @Test
     fun `a package-backed entry keeps Options but has no emulator information field`() {
         val nav = readyNav(content(emulatorControls = false))
-        assertTrue(GameDetailKeys.COINS in nav.reachableKeys())
+        assertTrue(GameDetailKeys.OVERVIEW in nav.reachableKeys())
         // Options is the context menu, which every entry has; only the emulator field is ROM-only.
         assertTrue(GameDetailKeys.OPTIONS_ACTION in nav.reachableKeys())
 
@@ -249,9 +245,9 @@ class GameDetailNavTest {
         assertEquals(GameDetailKeys.INFO, nav.focusedKey)
     }
 
-    /** Walks Launch → quick actions → coins → overview → information band. */
+    /** Walks Launch → quick actions → overview → information band. */
     private fun focusInfo(nav: GameDetailNav) {
-        repeat(4) { nav.handleAction(GamepadAction.NAVIGATE_DOWN) }
+        repeat(3) { nav.handleAction(GamepadAction.NAVIGATE_DOWN) }
         assertEquals(GameDetailKeys.INFO, nav.focusedKey)
     }
 
@@ -342,7 +338,7 @@ class GameDetailNavTest {
 
         nav.endRecoveryLock()
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.COINS, nav.focusedKey)
+        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
     }
 
     // ── Modal contexts ────────────────────────────────────────────────────

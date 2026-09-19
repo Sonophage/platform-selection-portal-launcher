@@ -27,12 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.achievement.LocalSteamConvertPickerDialog
-import com.psplauncher.core.ui.achievement.LocalSteamConvertRow
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
-import com.psplauncher.feature.achievements.provider.localsteam.LocalSteamConvertPickerController
 import com.psplauncher.feature.launcher.PcLauncherAdapters
 import com.psplauncher.feature.settings.viewmodel.ADD_CONSOLE_FOCUS_KEY
 import com.psplauncher.feature.settings.viewmodel.EmulatorOption
@@ -57,7 +54,6 @@ fun LibraryManagerScreen(
     viewModel: LibraryManagerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    val convertPicker by viewModel.convertPicker.collectAsState()
 
     LaunchedEffect(startInImportPc, startAtWindowsCard) {
         when {
@@ -78,7 +74,6 @@ fun LibraryManagerScreen(
 
     LibraryManagerContent(
         state = state,
-        convertPicker = convertPicker,
         onBack = { if (!viewModel.onBack()) onBack() },
         onAddAndroidApps = onAddAndroidApps,
         onAddRomRoot = { it?.let { viewModel.addRomRoot(it) } },
@@ -119,11 +114,6 @@ fun LibraryManagerScreen(
         onImportAllPcGames = { viewModel.importAllPcGames() },
         onTestLaunchPcGame = { l, id, s -> viewModel.testLaunchPcGame(l, id, s) },
         onAddPcGameById = { l, id, t, s -> viewModel.addPcGameById(l, id, t, s) },
-        onConvertToggle = { viewModel.onConvertToggle(it) },
-        onConvertSelectAll = { viewModel.onConvertSelectAll() },
-        onConvertSelectNone = { viewModel.onConvertSelectNone() },
-        onConvertConfirm = { viewModel.onConvertConfirm() },
-        onConvertCancel = { viewModel.onConvertCancel() },
         homeRoleIntentProvider = { viewModel.homeRoleIntent() },
         modifier = modifier
     )
@@ -132,7 +122,6 @@ fun LibraryManagerScreen(
 @Composable
 private fun LibraryManagerContent(
     state: LibraryManagerUiState,
-    convertPicker: LocalSteamConvertPickerController.Picker?,
     onBack: () -> Unit,
     onAddAndroidApps: () -> Unit,
     onAddRomRoot: (Uri?) -> Unit,
@@ -171,11 +160,6 @@ private fun LibraryManagerContent(
     onImportAllPcGames: () -> Unit,
     onTestLaunchPcGame: (PcLauncherRow, String, String?) -> Unit,
     onAddPcGameById: (PcLauncherRow, String, String, String?) -> Unit,
-    onConvertToggle: (Int) -> Unit,
-    onConvertSelectAll: () -> Unit,
-    onConvertSelectNone: () -> Unit,
-    onConvertConfirm: () -> Unit,
-    onConvertCancel: () -> Unit,
     homeRoleIntentProvider: () -> android.content.Intent?,
     modifier: Modifier = Modifier,
 ) {
@@ -188,18 +172,6 @@ private fun LibraryManagerContent(
         LibraryStep.SCAN_PROMPT   -> ScanPromptContent(state, onBack = handleBack, onConfirmAddConsole = onConfirmAddConsole, modifier = modifier)
         LibraryStep.CARD_DETAIL   -> CardDetailContent(state, onBack = handleBack, onAddAndroidApps = onAddAndroidApps, onLoadEmulatorOptions = onLoadEmulatorOptions, onRemoveExtension = onRemoveExtension, onAddExtension = onAddExtension, onScanConsole = onScanConsole, onBeginRename = onBeginRename, onToggleEnabled = onToggleEnabled, onTogglePinned = onTogglePinned, onMoveCard = onMoveCard, onRemoveCard = onRemoveCard, onSetEmulatorForDetail = onSetEmulatorForDetail, onOpenImportPcGames = onOpenImportPcGames, onSetVita3KFolder = onSetVita3KFolder, onScanVitaGames = onScanVitaGames, onRemoveApp = onRemoveApp, modifier = modifier)
         LibraryStep.IMPORT_PC     -> ImportPcGamesContent(state, onBack = handleBack, onRefreshHomeStatus = onRefreshHomeStatus, onScanPcGamesFolder = onScanPcGamesFolder, onExportManualPcGames = onExportManualPcGames, onImportPcGame = onImportPcGame, onImportAllPcGames = onImportAllPcGames, onTestLaunchPcGame = onTestLaunchPcGame, onAddPcGameById = onAddPcGameById, onDismissMessage = onDismissMessage, homeRoleIntentProvider = homeRoleIntentProvider, modifier = modifier)
-    }
-
-    // ── Convert-detected-games picker (after a PC scan, when the installer is on) ──
-    convertPicker?.let { picker ->
-        LocalSteamConvertPickerDialog(
-            rows = picker.rows.map { LocalSteamConvertRow(it.folderName, it.appId, it.selected) },
-            onToggle = onConvertToggle,
-            onSelectAll = onConvertSelectAll,
-            onSelectNone = onConvertSelectNone,
-            onConfirm = onConvertConfirm,
-            onCancel = onConvertCancel,
-        )
     }
 
     // ── Rename dialog ─────────────────────────────────────────────────────────
@@ -844,7 +816,6 @@ fun LibraryManagerScreenPreview() {
     PfpPreview {
         LibraryManagerContent(
             state = SettingsPreviewData.libraryListState,
-            convertPicker = null,
             onBack = {},
             onAddAndroidApps = {},
             onAddRomRoot = {},
@@ -883,11 +854,6 @@ fun LibraryManagerScreenPreview() {
             onImportAllPcGames = {},
             onTestLaunchPcGame = { _, _, _ -> },
             onAddPcGameById = { _, _, _, _ -> },
-            onConvertToggle = {},
-            onConvertSelectAll = {},
-            onConvertSelectNone = {},
-            onConvertConfirm = {},
-            onConvertCancel = {},
             homeRoleIntentProvider = { null }
         )
     }

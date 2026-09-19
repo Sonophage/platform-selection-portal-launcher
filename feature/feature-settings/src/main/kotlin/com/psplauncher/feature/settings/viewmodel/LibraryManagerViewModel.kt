@@ -140,10 +140,8 @@ class LibraryManagerViewModel @Inject constructor(
     private val launcherShortcutRepository: LauncherShortcutRepository,
     private val windowsLibrarySetup: com.psplauncher.core.data.repository.WindowsLibrarySetup,
     private val pcGameScanner: com.psplauncher.feature.settings.pc.PcGameScanner,
-    private val localSteamSchemaGenerator: com.psplauncher.feature.achievements.provider.localsteam.LocalSteamSchemaGenerator,
-    private val credentials: com.psplauncher.core.data.achievement.AchievementCredentialsProvider,
     private val vita3KLibrary: com.psplauncher.core.data.repository.Vita3KLibrary,
-    private val vitaGameScanner: com.psplauncher.feature.achievements.provider.vita.VitaGameScanner,
+    private val vitaGameScanner: com.psplauncher.feature.library.scanner.VitaGameScanner,
     private val libraryScanner: LibraryScanner,
     private val romRootScanRunner: RomRootScanRunner,
     private val pcGameExporter: com.psplauncher.feature.settings.pc.PcGameExporter,
@@ -153,18 +151,6 @@ class LibraryManagerViewModel @Inject constructor(
 
     // Drives the "convert detected games?" multi-select picker after a PC scan; the same controller
     // and dialog serve the XMB Windows card (see XMBViewModel).
-    private val convertPickerController =
-        com.psplauncher.feature.achievements.provider.localsteam.LocalSteamConvertPickerController(
-            localSteamSchemaGenerator, viewModelScope,
-        )
-    val convertPicker: StateFlow<com.psplauncher.feature.achievements.provider.localsteam.LocalSteamConvertPickerController.Picker?> =
-        convertPickerController.picker
-
-    fun onConvertToggle(index: Int) = convertPickerController.toggle(index)
-    fun onConvertSelectAll() = convertPickerController.setAll(true)
-    fun onConvertSelectNone() = convertPickerController.setAll(false)
-    fun onConvertConfirm() = convertPickerController.confirm()
-    fun onConvertCancel() = convertPickerController.cancel()
 
     init {
         // Reactive, not one-shot: roots granted anywhere (the first-run wizard, a restore) show
@@ -828,22 +814,6 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    private fun convertOutcomeMessage(
-        outcome: com.psplauncher.feature.achievements.provider.localsteam.LocalSteamConvertPickerController.Outcome,
-    ): String? {
-        if (outcome.converted == 0 && outcome.noAchievements == 0 &&
-            outcome.noKey == 0 && outcome.failed == 0
-        ) {
-            return null
-        }
-        return buildString {
-            append("Converted ${outcome.converted} game(s)")
-            if (outcome.noAchievements > 0) append(", ${outcome.noAchievements} had no achievements")
-            if (outcome.noKey > 0) append(", ${outcome.noKey} need a Steam Web API key")
-            if (outcome.failed > 0) append(", ${outcome.failed} failed")
-            append(". Play each game through the emulator to start earning coins.")
-        }
-    }
 
     // ── Windows Games card helpers ────────────────────────────────────────────
     //

@@ -96,7 +96,6 @@ import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
-import com.psplauncher.core.ui.achievement.BoneGlyph
 import com.psplauncher.core.ui.components.ControllerPromptGlyphs
 import com.psplauncher.core.ui.icons.GameIconStyle
 import com.psplauncher.core.ui.icons.LocalXmbIconOverrides
@@ -308,7 +307,7 @@ private fun SiblingIcon(item: XMBItem, selected: Boolean, solidUnfocusedIcons: B
     val videoGlyph = when (item.type) {
         // Missing takes the vector path rather than console art: there is no sysicon for it, and
         // the console fallback is the blank sysicon_default. Same "?" glyph the Untracked row in
-        // the Shiba hub uses — both mean "we know about this entry but can't account for it".
+        // both meaning "we know about this entry but can't account for it".
         XMBItemType.MISSING         -> Icons.Filled.HelpOutline
         XMBItemType.VIDEO_FOLDER    -> Icons.Filled.Folder
         XMBItemType.VIDEO_LIBRARY   -> Icons.Filled.VideoLibrary
@@ -718,19 +717,6 @@ private fun XmbVerticalListRow(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
                         )
-                        // Prestige Bones: "• N [bone glyph]" after the rank, player-card row only.
-                        if (item.boneCount > 0) {
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "•  ${item.boneCount}",
-                                color = titleColor,
-                                fontSize = if (isSelected) 13.sp else 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            BoneGlyph(tint = titleColor, size = 14.dp)
-                        }
                     }
                     item.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
                         Text(
@@ -1031,7 +1017,7 @@ private fun XmbItemLeadingIcon(
             }
         }
         // Missing sits beside All Games / Favorites but is not console art — it gets the same "?"
-        // glyph as the Shiba hub's Untracked row, at the memory-card icon size so it lines up with
+        // a help glyph, at the memory-card icon size so it lines up with
         // the cards above it. Themeable via the item_missing slot like any other vector row.
         item.type == XMBItemType.MISSING -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
@@ -1200,51 +1186,12 @@ private fun XmbItemLeadingIcon(
                 }
             }
         }
-        // Shiba Coins player-card summary: a ring with the level centered in it (e.g. "Lv 27"),
-        // sized like the other item icons. Ring and text follow the theme's icon color; no fill.
-        item.levelBadge != null -> {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(LEADING_ICON_SIZE * 0.8f)
-                        .clip(CircleShape)
-                        .border(2.dp, iconTint, CircleShape),
-                ) {
-                    Text(
-                        text = item.levelBadge,
-                        color = iconTint,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-        // "All Tracked Games" reads as a memory card (its list is the tracked games), using the
-        // bundled physical-media card art tinted with the theme icon color — and the matte,
-        // like every other silhouette glyph.
-        item.id == "ach_all" -> {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
-                BundledSilhouetteIcon(
-                    assetUri = MEMORY_CARD_DEFAULT_ART,
-                    modifier = Modifier.size(LEADING_ICON_SIZE),
-                )
-            }
-        }
-        // Other Shiba Coins hub lens rows get a per-row Material glyph at the item-icon size (no
-        // background), keyed by exact id so the untracked/coin rows keep their own treatment.
-        achievementsGlyphFor(item.id) != null -> {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
-                ThemedGlyph("", achievementsGlyphFor(item.id)!!, null, iconTint, Modifier.size(LEADING_ICON_SIZE))
-            }
-        }
         else -> Spacer(modifier = Modifier.width(12.dp))
     }
 }
 
-// The bundled physical-media silhouettes (collections without a picked icon, the ach_all
-// card, memory cards falling back to the default card art), decoded to a bitmap once and
+// The bundled physical-media silhouettes (collections without a picked icon, and memory cards
+// falling back to the default card art), decoded to a bitmap once and
 // rendered through PortalIcon so they get the theme tint AND the icon-legibility matte like
 // every other silhouette glyph. AsyncImage cannot host the matte — its intrinsic size is
 // unknown until the image loads, which would desync the matte geometry. A decode failure
@@ -1269,13 +1216,6 @@ internal fun BundledSilhouetteIcon(assetUri: String, modifier: Modifier = Modifi
     } else {
         AsyncImage(model = assetUri, contentDescription = null, modifier = modifier)
     }
-}
-
-// The leading glyph for a Shiba Coins hub lens row, or null if the id isn't one of them.
-private fun achievementsGlyphFor(id: String): androidx.compose.ui.graphics.vector.ImageVector? = when (id) {
-    "ach_untracked" -> Icons.Filled.HelpOutline
-    "ach_connect" -> Icons.Filled.Link
-    else -> null
 }
 
 @Composable

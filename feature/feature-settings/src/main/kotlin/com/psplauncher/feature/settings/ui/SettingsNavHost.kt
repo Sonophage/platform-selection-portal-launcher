@@ -21,16 +21,9 @@ val SETTINGS_SCREEN_ROUTES: Set<String> = setOf(
     "settings_categories",
     "settings_artwork",
     "settings_artwork_import",
-    "settings_achievements",
-    // Achievements section entry points (Settings ▸ Achievements flyout) — first pass routes them
-    // to the combined Shiba Coins screen; distinct ids keep the L2 list keys stable until
-    // per-section focus targets land.
-    "settings_achievements_player_card",
-    "settings_achievements_credentials",
-    "settings_achievements_local_windows",
-    "settings_achievements_update",
     "settings_emulators",
-    // Emulators section entry points — same first-pass note as the achievements ones above.
+    // Emulators section entry points — distinct ids keep the L2 list keys stable until
+    // per-section focus targets land.
     "settings_emulators_installed",
     "settings_emulators_custom",
     "settings_emulators_retroarch",
@@ -68,8 +61,6 @@ fun SettingsNavHost(
     onPreviewBootSequence: () -> Unit = {},
     onPreviewGameBoot: () -> Unit = {},
     onAddAndroidApps: () -> Unit = {},
-    onOpenPlayerStatus: () -> Unit = {},
-    onOpenPlayerStatusFromSettings: () -> Unit = {},
     onOpenLibraryManager: () -> Unit = {},
     onGoToLibrary: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -113,21 +104,6 @@ fun SettingsNavHost(
             "settings_categories" -> CategoryManagerScreen(onBack = onBack, modifier = modifier)
             "settings_artwork"    -> ArtworkSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_artwork_import" -> ArtworkImportScreen(onBack = onBack, modifier = modifier)
-            "settings_achievements" -> AchievementsSettingsScreen(onBack = onBack, onOpenPlayerStatus = onOpenPlayerStatus, modifier = modifier)
-            "settings_achievements_player_card" -> {
-                // This branch is intentionally a tiny launch surface: selection opens the host-owned
-                // Player Status overlay rather than composing the combined Achievements settings page.
-                androidx.compose.runtime.LaunchedEffect(Unit) { onOpenPlayerStatusFromSettings() }
-            }
-            "settings_achievements_credentials" -> AchievementsSettingsScreen(
-                onBack = onBack, onOpenPlayerStatus = onOpenPlayerStatus, section = AchievementsSettingsSection.PROVIDER_CREDENTIALS, modifier = modifier,
-            )
-            "settings_achievements_local_windows" -> AchievementsSettingsScreen(
-                onBack = onBack, onOpenPlayerStatus = onOpenPlayerStatus, section = AchievementsSettingsSection.LOCAL_WINDOWS, modifier = modifier,
-            )
-            "settings_achievements_update" -> AchievementsSettingsScreen(
-                onBack = onBack, onOpenPlayerStatus = onOpenPlayerStatus, section = AchievementsSettingsSection.UPDATE, modifier = modifier,
-            )
             "settings_emulators"  -> EmulatorsSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_emulators_installed" -> EmulatorsSettingsScreen(onBack = onBack, section = EmulatorSettingsSection.INSTALLED, modifier = modifier)
             "settings_emulators_custom" -> EmulatorsSettingsScreen(onBack = onBack, section = EmulatorSettingsSection.CUSTOM, modifier = modifier)

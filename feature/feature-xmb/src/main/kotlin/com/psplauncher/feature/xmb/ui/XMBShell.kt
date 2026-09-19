@@ -81,10 +81,6 @@ import com.psplauncher.feature.settings.ui.SettingsNavHost
 import com.psplauncher.feature.xmb.preview.PreviewData
 import com.psplauncher.feature.xmb.ui.app.AppDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
-import com.psplauncher.feature.xmb.ui.detail.PlayerStatusScreen
-import com.psplauncher.feature.xmb.ui.detail.ShibaCoinsScreen
-import com.psplauncher.feature.xmb.ui.detail.ShibaCoinsTarget
-import com.psplauncher.feature.xmb.ui.detail.ShibaLibraryScreen
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.XMBUiState
@@ -194,16 +190,6 @@ fun XMBShellContainer(
         onCloseAppDrawer = viewModel::onCloseAppDrawer,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
         onCloseGameDetail = viewModel::onCloseGameDetail,
-        onCloseShibaCoins = viewModel::onCloseShibaCoins,
-        onOpenShibaCoins = { gameId -> viewModel.openShibaCoins(gameId) },
-        onOpenShibaCoinsTarget = { target -> viewModel.openShibaCoins(target) },
-        onShibaCoinsActionConsumed = viewModel::onShibaCoinsActionConsumed,
-        onCloseShibaLibrary = viewModel::onCloseShibaLibrary,
-        onShibaLibraryActionConsumed = viewModel::onShibaLibraryActionConsumed,
-        onClosePlayerStatus = viewModel::onClosePlayerStatus,
-        onPlayerStatusActionConsumed = viewModel::onPlayerStatusActionConsumed,
-        onOpenPlayerStatus = viewModel::openPlayerStatus,
-        onOpenPlayerStatusFromSettings = viewModel::openPlayerStatusFromSettings,
         onOpenLibraryManager = viewModel::openLibraryManager,
         onGoToLibrary = viewModel::goToLibrary,
         onGameDetailActionConsumed = viewModel::consumeGameDetailAction,
@@ -271,22 +257,6 @@ fun XMBShellContainer(
         onOpenAndroidLibraryPicker = viewModel::openAndroidLibraryPicker,
     )
 
-    // Multi-select picker to convert detected emu games after a Windows-card scan (when the
-    // Goldberg installer is on). Same dialog + controller the Library Manager uses.
-    val convertPicker by viewModel.convertPicker.collectAsStateWithLifecycle()
-    convertPicker?.let { picker ->
-        com.psplauncher.core.ui.achievement.LocalSteamConvertPickerDialog(
-            rows = picker.rows.map {
-                com.psplauncher.core.ui.achievement.LocalSteamConvertRow(it.folderName, it.appId, it.selected)
-            },
-            onToggle = viewModel::onConvertToggle,
-            onSelectAll = viewModel::onConvertSelectAll,
-            onSelectNone = viewModel::onConvertSelectNone,
-            onConfirm = viewModel::onConvertConfirm,
-            onCancel = viewModel::onConvertCancel,
-        )
-    }
-
 }
 
 @OptIn(UnstableApi::class)
@@ -328,16 +298,6 @@ fun XMBShell(
     onCloseAppDrawer: () -> Unit = {},
     onDrawerActionConsumed: () -> Unit = {},
     onCloseGameDetail: () -> Unit = {},
-    onCloseShibaCoins: () -> Unit = {},
-    onOpenShibaCoins: (Long) -> Unit = {},
-    onOpenShibaCoinsTarget: (ShibaCoinsTarget) -> Unit = {},
-    onShibaCoinsActionConsumed: () -> Unit = {},
-    onCloseShibaLibrary: () -> Unit = {},
-    onShibaLibraryActionConsumed: () -> Unit = {},
-    onClosePlayerStatus: () -> Unit = {},
-    onPlayerStatusActionConsumed: () -> Unit = {},
-    onOpenPlayerStatus: () -> Unit = {},
-    onOpenPlayerStatusFromSettings: () -> Unit = {},
     onOpenLibraryManager: () -> Unit = {},
     onGoToLibrary: () -> Unit = {},
     onGameDetailActionConsumed: () -> Unit = {},
@@ -462,8 +422,6 @@ fun XMBShell(
             // video player. Settings/dialogs use a see-through scrim, so the wave keeps animating there.
             val waveCovered = uiState.showBootSequence ||
                 uiState.activeVideoId != null || uiState.activeGameId != null ||
-                uiState.activeShibaCoinsTarget != null || uiState.activeShibaLibrary != null ||
-                uiState.activePlayerStatus ||
                 uiState.activePhotoViewer != null ||
                 uiState.activeAppId != null || uiState.activeAppDrawerFilter != null ||
                 uiState.musicPlayerVisible ||
@@ -564,9 +522,6 @@ fun XMBShell(
                 uiState.musicBrowser == null &&
                 uiState.activeSettingsScreen == null &&
                 uiState.activeGameId == null &&
-                uiState.activeShibaCoinsTarget == null &&
-                uiState.activeShibaLibrary == null &&
-                !uiState.activePlayerStatus &&
                 uiState.activeVideoId == null &&
                 uiState.activeAppId == null &&
                 uiState.activePhotoViewer == null &&
@@ -848,7 +803,7 @@ fun XMBShell(
             if (uiState.colorSchemePicker == null) {
                 // Hidden while the player status view is open on top of it (opened from the
                 // Settings player card); closing that view brings Settings straight back.
-                if (!uiState.activePlayerStatus) uiState.activeSettingsScreen?.let { screenId ->
+                uiState.activeSettingsScreen?.let { screenId ->
                     SettingsNavHost(
                         screenId = screenId,
                         onBack = onCloseSettingsScreen,
@@ -864,8 +819,6 @@ fun XMBShell(
                         onPreviewBootSequence = onPreviewBootSequence,
                         onPreviewGameBoot = onPreviewGameBoot,
                         onAddAndroidApps = onOpenAndroidLibraryPicker,
-                        onOpenPlayerStatus = onOpenPlayerStatus,
-                        onOpenPlayerStatusFromSettings = onOpenPlayerStatusFromSettings,
                         onOpenLibraryManager = onOpenLibraryManager,
                         onGoToLibrary = onGoToLibrary,
                         modifier = Modifier.fillMaxSize(),
@@ -1057,8 +1010,7 @@ fun XMBShell(
                     text = {
                         Text(
                             "A PC game was added, but the Windows Games library has no folder " +
-                                "yet. Set it up in Library Manager so game folders and " +
-                                "achievements can be scanned.",
+                                "yet. Set it up in Library Manager so game folders can be scanned.",
                         )
                     },
                     confirmButton = { TextButton(onClick = onWindowsSetupConfirm) { Text("Set Up") } },
@@ -1113,62 +1065,14 @@ fun XMBShell(
                 )
             }
 
-            // Hidden while the Shiba Coins overlay is open so it fully covers the detail page;
-            // clearing activeShibaCoinsTarget brings this page straight back.
-            if (uiState.activeShibaCoinsTarget == null) {
-                uiState.activeGameId?.let { gameId ->
-                    GameDetailScreen(
-                        gameId = gameId,
-                        onBack = onCloseGameDetail,
-                        autoLaunch = uiState.activeGameAutoLaunch,
-                        initialDiscId = uiState.activeGameDiscId,
-                        pendingGamepadAction = uiState.pendingGameDetailAction,
-                        onGamepadActionConsumed = onGameDetailActionConsumed,
-                        showTouchControls = uiState.resolvedShowTouchButton,
-                        onTouchInput = onTouchInput,
-                        onOpenShibaCoins = onOpenShibaCoins,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-
-            uiState.activeShibaCoinsTarget?.let { coinsTarget ->
-                ShibaCoinsScreen(
-                    target = coinsTarget,
-                    onClose = onCloseShibaCoins,
-                    pendingGamepadAction = uiState.pendingShibaCoinsAction,
-                    onGamepadActionConsumed = onShibaCoinsActionConsumed,
-                    showTouchControls = uiState.resolvedShowTouchButton,
-                    onTouchInput = onTouchInput,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            // Hidden while a game's Shiba Coins overlay is open (opened from a tracked row);
-            // closing the coins overlay brings the library straight back, keeping its place.
-            if (uiState.activeShibaCoinsTarget == null) {
-                uiState.activeShibaLibrary?.let { mode ->
-                    ShibaLibraryScreen(
-                        mode = mode,
-                        onClose = onCloseShibaLibrary,
-                        onOpenCoins = onOpenShibaCoinsTarget,
-                        pendingGamepadAction = uiState.pendingShibaLibraryAction,
-                        onGamepadActionConsumed = onShibaLibraryActionConsumed,
-                        showTouchControls = uiState.resolvedShowTouchButton,
-                        onTouchInput = onTouchInput,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-
-            // Player status view — hidden while a coin's Shiba Coins overlay is open on top of it
-            // (opened from a recent/rarest row); closing that overlay brings it straight back.
-            if (uiState.activeShibaCoinsTarget == null && uiState.activePlayerStatus) {
-                PlayerStatusScreen(
-                    onClose = onClosePlayerStatus,
-                    onOpenCoins = onOpenShibaCoinsTarget,
-                    pendingGamepadAction = uiState.pendingPlayerStatusAction,
-                    onGamepadActionConsumed = onPlayerStatusActionConsumed,
+            uiState.activeGameId?.let { gameId ->
+                GameDetailScreen(
+                    gameId = gameId,
+                    onBack = onCloseGameDetail,
+                    autoLaunch = uiState.activeGameAutoLaunch,
+                    initialDiscId = uiState.activeGameDiscId,
+                    pendingGamepadAction = uiState.pendingGameDetailAction,
+                    onGamepadActionConsumed = onGameDetailActionConsumed,
                     showTouchControls = uiState.resolvedShowTouchButton,
                     onTouchInput = onTouchInput,
                     modifier = Modifier.fillMaxSize(),

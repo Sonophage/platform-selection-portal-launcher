@@ -135,7 +135,6 @@ class GameDetailViewModelTest {
             artworkRecordDao  = artworkRecordDao,
             menuSound         = menuSound,
             launcherShortcutRepository = mockk(relaxed = true),
-            achievementRepository = mockk(relaxed = true),
             launchDispatcher  = launchDispatcher,
             pcGameExporter    = pcGameExporter,
         )
@@ -1372,7 +1371,7 @@ class GameDetailViewModelTest {
     }
 
     @Test
-    fun `a package-backed game exposes neither emulator nor achievement nodes`() = runTest {
+    fun `a package-backed game exposes no emulator nodes`() = runTest {
         coEvery { gameRepository.getById(3L) } returns
             Game(id = 3L, title = "Alto's Odyssey", platformId = "android", packageName = "com.noodlecake.altosodyssey")
         coEvery { platformDao.getById("android") } returns null
@@ -1384,7 +1383,6 @@ class GameDetailViewModelTest {
         val keys = viewModel.focusableNodeKeys()
         assertTrue(GameDetailKeys.LAUNCH in keys)
         assertTrue(GameDetailKeys.OPTIONS_ACTION in keys)
-        assertFalse(GameDetailKeys.COINS in keys)
     }
 
     @Test
@@ -1439,11 +1437,10 @@ class GameDetailViewModelTest {
     fun `a tap and a Cross press on the same node do the same thing`() = runTest {
         loadedAndLaidOut()
 
-        viewModel.onNodeTapped(GameDetailKeys.COINS)
+        viewModel.onNodeTapped(GameDetailKeys.OVERVIEW)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.openCoins)
-        assertEquals(GameDetailKeys.COINS, viewModel.uiState.value.navFocusKey)
+        assertEquals(GameDetailKeys.OVERVIEW, viewModel.uiState.value.navFocusKey)
         // Touch hides the controller cursor without losing the logical node.
         assertFalse(viewModel.uiState.value.cursorVisible)
     }

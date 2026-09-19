@@ -1,4 +1,4 @@
-package com.psplauncher.feature.achievements.provider.vita
+package com.psplauncher.feature.library.scanner
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer

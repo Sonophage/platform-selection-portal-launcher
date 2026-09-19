@@ -1,8 +1,6 @@
 package com.psplauncher.feature.settings.debug
 
 import com.psplauncher.core.common.security.SecretProtection
-import com.psplauncher.core.data.achievement.AchievementCredentialsProvider
-import com.psplauncher.feature.achievements.provider.steam.SteamRemoteDataSource
 import com.psplauncher.feature.artwork.MetadataApiKeyProvider
 import com.psplauncher.feature.artwork.api.SgdbApiKeyProvider
 import io.mockk.coEvery
@@ -16,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The debug-only credentials file: one `.properties` file that fills every artwork and achievement
+ * The debug-only credentials file: one `.properties` file that fills every artwork
  * credential at once, so a fresh debug install does not need each key typed in again.
  *
  * Debug source set only — the release build carries a stub loader and none of this code.
@@ -36,10 +34,6 @@ class DebugCredentialsTest {
             igdb.clientSecret = igdb-secret
             screenscraper.username = ss-user
             screenscraper.password = ss-pass
-            retroachievements.username = ra-user
-            retroachievements.apiKey = ra-key
-            steam.id = 76561197960287930
-            steam.apiKey = steam-key
             """.trimIndent().reader(),
         )
 
@@ -47,8 +41,6 @@ class DebugCredentialsTest {
         assertEquals("tgdb-key", file.theGamesDbKey)
         assertEquals("igdb-id" to "igdb-secret", file.igdb)
         assertEquals("ss-user" to "ss-pass", file.screenScraper)
-        assertEquals("ra-user" to "ra-key", file.retroAchievements)
-        assertEquals("76561197960287930" to "steam-key", file.steam)
         assertTrue(file.problems.isEmpty())
     }
 
@@ -65,12 +57,10 @@ class DebugCredentialsTest {
 
     @Test
     fun `half of a pair is reported and never saved`() {
-        val file = DebugCredentialsFile.parse("igdb.clientId = igdb-id\nretroachievements.apiKey = ra-key\n".reader())
+        val file = DebugCredentialsFile.parse("igdb.clientId = igdb-id\n".reader())
 
         assertNull(file.igdb)
-        assertNull(file.retroAchievements)
         assertTrue(file.problems.any { "igdb.clientSecret" in it })
-        assertTrue(file.problems.any { "retroachievements.username" in it })
     }
 
     @Test
@@ -91,17 +81,13 @@ class DebugCredentialsTest {
 
     private val sgdb = mockk<SgdbApiKeyProvider>(relaxed = true)
     private val metadata = mockk<MetadataApiKeyProvider>(relaxed = true)
-    private val achievements = mockk<AchievementCredentialsProvider>(relaxed = true)
-    private val steamApi = mockk<SteamRemoteDataSource>(relaxed = true)
-    private val loader = DebugCredentialsLoader(sgdb, metadata, achievements, steamApi)
+    private val loader = DebugCredentialsLoader(sgdb, metadata)
 
     private fun protectedSaves() {
         coEvery { sgdb.saveKey(any()) } returns SecretProtection.PROTECTED
         coEvery { metadata.saveTgdbKey(any()) } returns SecretProtection.PROTECTED
         coEvery { metadata.saveIgdbCredentials(any(), any()) } returns SecretProtection.PROTECTED
         coEvery { metadata.saveSsCredentials(any(), any()) } returns SecretProtection.PROTECTED
-        coEvery { achievements.saveRetroAchievements(any(), any()) } returns SecretProtection.PROTECTED
-        coEvery { achievements.saveSteam(any(), any()) } returns SecretProtection.PROTECTED
     }
 
     @Test
@@ -113,8 +99,6 @@ class DebugCredentialsTest {
                 theGamesDbKey = "tgdb-key",
                 igdb = "igdb-id" to "igdb-secret",
                 screenScraper = "ss-user" to "ss-pass",
-                retroAchievements = "ra-user" to "ra-key",
-                steam = "76561197960287930" to "steam-key",
             ),
         )
 
@@ -122,10 +106,8 @@ class DebugCredentialsTest {
         coVerify { metadata.saveTgdbKey("tgdb-key") }
         coVerify { metadata.saveIgdbCredentials("igdb-id", "igdb-secret") }
         coVerify { metadata.saveSsCredentials("ss-user", "ss-pass") }
-        coVerify { achievements.saveRetroAchievements("ra-user", "ra-key") }
-        coVerify { achievements.saveSteam("76561197960287930", "steam-key") }
         assertEquals(
-            listOf("SteamGridDB", "TheGamesDB", "IGDB", "ScreenScraper", "RetroAchievements", "Steam"),
+            listOf("SteamGridDB", "TheGamesDB", "IGDB", "ScreenScraper"),
             report.loaded,
         )
         assertTrue(report.failed.isEmpty())
@@ -139,30 +121,6 @@ class DebugCredentialsTest {
 
         coVerify(exactly = 0) { metadata.saveTgdbKey(any()) }
         coVerify(exactly = 0) { metadata.clearTgdbKey() }
-        coVerify(exactly = 0) { achievements.saveRetroAchievements(any(), any()) }
-        coVerify(exactly = 0) { achievements.clear() }
-    }
-
-    @Test
-    fun `a Steam vanity name is resolved like the connect screen does`() = runTest {
-        protectedSaves()
-        coEvery { steamApi.resolveVanity("gabelogannewell") } returns "76561197960287930"
-
-        val report = loader.apply(DebugCredentialsFile(steam = "gabelogannewell" to "steam-key"))
-
-        coVerify { achievements.saveSteam("76561197960287930", "steam-key") }
-        assertEquals(listOf("Steam"), report.loaded)
-    }
-
-    @Test
-    fun `an unresolvable Steam name is reported, not claimed as loaded`() = runTest {
-        protectedSaves()
-        coEvery { steamApi.resolveVanity(any()) } returns null
-
-        val report = loader.apply(DebugCredentialsFile(steam = "no-such-user" to "steam-key"))
-
-        assertFalse("Steam" in report.loaded)
-        assertTrue(report.problems.any { "no-such-user" in it })
     }
 
     @Test
@@ -176,25 +134,15 @@ class DebugCredentialsTest {
     }
 
     @Test
-    fun `a Steam key stored unencrypted is reported too`() = runTest {
-        protectedSaves()
-        coEvery { achievements.saveSteam(any(), any()) } returns SecretProtection.UNPROTECTED
-
-        val report = loader.apply(DebugCredentialsFile(steam = "76561197960287930" to "steam-key"))
-
-        assertTrue(report.anyUnprotected)
-    }
-
-    @Test
     fun `a store that fails is reported and the rest still save`() = runTest {
         protectedSaves()
         coEvery { metadata.saveTgdbKey(any()) } throws java.io.IOException("disk full")
 
         val report = loader.apply(
-            DebugCredentialsFile(steamGridDbKey = "sgdb-key", theGamesDbKey = "tgdb-key", retroAchievements = "u" to "k"),
+            DebugCredentialsFile(steamGridDbKey = "sgdb-key", theGamesDbKey = "tgdb-key", igdb = "i" to "s"),
         )
 
-        assertEquals(listOf("SteamGridDB", "RetroAchievements"), report.loaded)
+        assertEquals(listOf("SteamGridDB", "IGDB"), report.loaded)
         assertEquals(listOf("TheGamesDB"), report.failed)
     }
 

@@ -1,4 +1,4 @@
-package com.psplauncher.feature.achievements.provider.vita
+package com.psplauncher.feature.library.scanner
 
 import android.content.Context
 import android.net.Uri
@@ -6,11 +6,9 @@ import android.provider.DocumentsContract
 import com.psplauncher.core.data.repository.Vita3KLibrary
 import com.psplauncher.core.data.saf.SafChild
 import com.psplauncher.core.data.saf.querySafChildren
-import com.psplauncher.core.domain.achievement.AchievementProvider
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameContentType
 import com.psplauncher.core.domain.repository.GameRepository
-import com.psplauncher.feature.achievements.AchievementController
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,14 +23,16 @@ import javax.inject.Singleton
  * so the scan enumerates those folders. The folder name is the Title ID (the launch token); the
  * display name comes from `sce_sys/param.sfo` and the tile icon from `sce_sys/icon0.png`. Games are
  * upserted onto the `psvita` platform, keyed by launch token so re-scans converge.
+ *
+ * Moved here out of the achievements module, which is gone: everything below is library work
+ * (enumerate installed titles, read their names and icons, upsert games). The only achievement
+ * part was a trophy-set link, removed with the rest of achievement tracking.
  */
 @Singleton
 class VitaGameScanner @Inject constructor(
     @ApplicationContext private val context: Context,
     private val vita3KLibrary: Vita3KLibrary,
     private val gameRepository: GameRepository,
-    private val trophyDiscovery: VitaTrophyDiscovery,
-    private val achievements: AchievementController,
 ) {
     data class VitaScanResult(val added: Int, val updated: Int, val found: Int, val message: String)
 
@@ -89,13 +89,6 @@ class VitaGameScanner @Inject constructor(
                     gameRepository.upsert(existing.copy(title = title, iconUri = iconUri ?: existing.iconUri))
                 }
                 else -> existing.id
-            }
-
-            // Link the game to its trophy set (NPCOMMID) so Sync All can pull its trophies.
-            runCatching {
-                trophyDiscovery.trophySetIdFor(titleId)?.let { npCommId ->
-                    achievements.linkManually(gameId, AchievementProvider.VITA_TROPHY, npCommId)
-                }
             }
         }
 

@@ -22,7 +22,6 @@ class SettingsHierarchyTest {
                 "settings_section_library",
                 "settings_section_emulators",
                 "settings_section_interface",
-                "settings_section_achievements",
                 "settings_section_media",
                 "settings_section_system",
             ),
@@ -63,15 +62,6 @@ class SettingsHierarchyTest {
             settingsSectionItems(SettingsSection.INTERFACE).map { it.id },
         )
         assertEquals(
-            listOf(
-                "settings_achievements_player_card",
-                "settings_achievements_credentials",
-                "settings_achievements_local_windows",
-                "settings_achievements_update",
-            ),
-            settingsSectionItems(SettingsSection.ACHIEVEMENTS).map { it.id },
-        )
-        assertEquals(
             listOf("settings_about", "settings_logs", "settings_backup", "settings_initial_setup", "settings_credits"),
             settingsSectionItems(SettingsSection.SYSTEM).map { it.id },
         )
@@ -108,7 +98,7 @@ class SettingsHierarchyTest {
         listOf(
             "settings_library", "settings_import_pc", "settings_music", "settings_video",
             "settings_photo", "settings_categories", "settings_collections", "settings_artwork",
-            "settings_artwork_import", "settings_achievements", "settings_emulators",
+            "settings_artwork_import", "settings_emulators",
             "settings_themes", "settings_display", "settings_controller", "settings_backup",
             "settings_logs", "settings_about", "settings_credits",
             "settings_initial_setup", "settings_initial_setup_first",
@@ -126,9 +116,6 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `Update Achievements route is present and distinct`() {
-        assertTrue("Update Achievements route missing", SETTINGS_SCREEN_ROUTES.contains("settings_achievements_update"))
-        assertEquals("Update Achievements", settingsSectionItems(SettingsSection.ACHIEVEMENTS)
-            .first { it.id == "settings_achievements_update" }.title)
     }
 
     @Test fun `Hidden Games is not reachable from Display settings`() {

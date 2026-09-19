@@ -216,13 +216,6 @@ fun InitialSetupScreen(
                 onTestSs = viewModel::testSsCredentials,
                 onConnectSs = viewModel::connectScreenScraper,
                 onContinue = { viewModel.nextStep() },
-                nextLabel = "Achievement Services",
-            )
-            SetupStep.ACHIEVEMENTS -> AchievementsPage(
-                state = state,
-                onConnectRa = viewModel::connectRetroAchievements,
-                onConnectSteam = viewModel::connectSteam,
-                onContinue = { viewModel.nextStep() },
                 nextLabel = if (state.vita3KInstalled) "Vita Data Folder"
                             else if (state.retroArchInstalled) "RetroArch" else "Finish",
             )
@@ -262,7 +255,6 @@ private fun headingFor(step: SetupStep): String = when (step) {
     SetupStep.PHOTO       -> "Choose your photo folders."
     SetupStep.ARTWORK     -> "Choose your artwork folder."
     SetupStep.SERVICES    -> "Connect your artwork sources."
-    SetupStep.ACHIEVEMENTS -> "Connect your achievement services."
     SetupStep.VITA        -> "Set your Vita data folder."
     SetupStep.RETROARCH   -> "Link RetroArch's cores folder."
     SetupStep.FINISH      -> "You're all set!"
@@ -276,7 +268,6 @@ private fun hintFor(step: SetupStep): String? = when (step) {
     SetupStep.PHOTO     -> "Add several roots to span internal storage and an SD card."
     SetupStep.ARTWORK   -> "One folder hosts the artwork library — you can import into it right after."
     SetupStep.SERVICES  -> "All optional and free. SteamGridDB, TheGamesDB, IGDB, and ScreenScraper fetch game artwork and metadata."
-    SetupStep.ACHIEVEMENTS -> "RetroAchievements and Steam track achievements as Shiba Coins."
     SetupStep.VITA      -> "Vita3K is installed — one grant links every installed Vita title for discovery and trophies."
     SetupStep.RETROARCH -> "Lets the launcher know exactly which cores you have, so only those are offered."
     SetupStep.FINISH    -> "Everything below can be adjusted anytime in Settings."
@@ -547,63 +538,6 @@ private fun ServicesPage(
 }
 
 /** Achievement services — RetroAchievements and Steam. A separate page from [ServicesPage]. */
-@Composable
-private fun AchievementsPage(
-    state: InitialSetupUiState,
-    onConnectRa: (String, String) -> Unit,
-    onConnectSteam: (String, String) -> Unit,
-    onContinue: () -> Unit,
-    nextLabel: String,
-) {
-    var raUserDraft by remember(state.hasRetroAchievements) { mutableStateOf("") }
-    var raKeyDraft by remember(state.hasRetroAchievements) { mutableStateOf("") }
-    var steamIdDraft by remember(state.hasSteam) { mutableStateOf("") }
-    var steamKeyDraft by remember(state.hasSteam) { mutableStateOf("") }
-
-    WizardInfoText(
-        "Optional and free. RetroAchievements and Steam track achievements as Shiba Coins."
-    )
-
-    // ── RetroAchievements ─────────────────────────────────────────────────────
-    WizardSectionHeader("RetroAchievements")
-    WizardTextField(
-        label = if (state.hasRetroAchievements) "Username (saved)" else "Username",
-        value = raUserDraft,
-        onValueChange = { raUserDraft = it },
-        placeholder = if (state.hasRetroAchievements) "Tap to replace" else "Your RA username",
-    )
-    WizardTextField(
-        label = if (state.hasRetroAchievements) "Web API Key (saved)" else "Web API Key",
-        value = raKeyDraft,
-        onValueChange = { raKeyDraft = it },
-        placeholder = if (state.hasRetroAchievements) "••••••••  (tap to replace)" else "Paste your RA Web API key",
-        isPassword = true,
-    )
-    if (raUserDraft.isNotBlank() && raKeyDraft.isNotBlank()) {
-        WizardRow(label = "Connect RetroAchievements", onClick = { onConnectRa(raUserDraft, raKeyDraft) })
-    }
-
-    // ── Steam ─────────────────────────────────────────────────────────────────
-    WizardSectionHeader("Steam")
-    WizardTextField(
-        label = if (state.hasSteam) "SteamID64 or vanity name (saved)" else "SteamID64 or vanity name",
-        value = steamIdDraft,
-        onValueChange = { steamIdDraft = it },
-        placeholder = if (state.hasSteam) "Tap to replace" else "7656119… or your custom URL name",
-    )
-    WizardTextField(
-        label = if (state.hasSteam) "Web API Key (saved)" else "Web API Key",
-        value = steamKeyDraft,
-        onValueChange = { steamKeyDraft = it },
-        placeholder = if (state.hasSteam) "••••••••  (tap to replace)" else "Paste your Steam Web API key",
-        isPassword = true,
-    )
-    if (steamIdDraft.isNotBlank() && steamKeyDraft.isNotBlank()) {
-        WizardRow(label = "Connect Steam", onClick = { onConnectSteam(steamIdDraft, steamKeyDraft) })
-    }
-
-    WizardContinueRow(nextLabel, onContinue)
-}
 
 @Composable
 private fun VitaPage(
@@ -699,8 +633,6 @@ private fun FinishPage(
     if (state.ssEnabled) {
         WizardValueRow(label = "ScreenScraper", value = state.ssUsername.ifBlank { "Not set" })
     }
-    WizardValueRow(label = "RetroAchievements", value = state.raUsername.ifBlank { "Not set" })
-    WizardValueRow(label = "Steam", value = if (state.hasSteam) "Connected" else "Not set")
     if (state.vita3KInstalled) {
         WizardValueRow(label = "Vita Data Folder", value = state.vitaFolderName ?: "Not set")
     }
@@ -938,26 +870,6 @@ private fun ServicesPagePreview() {
     }
 }
 
-@CombinedPreviews
-@Composable
-private fun AchievementsPagePreview() {
-    WizardPagePreview(
-        stepNumber = 8,
-        heading = "Connect your achievement services.",
-        hint = "RetroAchievements and Steam track achievements as Shiba Coins.",
-    ) {
-        AchievementsPage(
-            state = InitialSetupUiState(
-                raUsername = "player_one",
-                steamId64 = "76561198012345678",
-            ),
-            onConnectRa = { _, _ -> },
-            onConnectSteam = { _, _ -> },
-            onContinue = {},
-            nextLabel = "RetroArch",
-        )
-    }
-}
 
 @CombinedPreviews
 @Composable
@@ -1021,8 +933,6 @@ private fun FinishPagePreview() {
                 igdbClientId = "client_id_abc",
                 ssEnabled = true,
                 ssUsername = "scraper_user",
-                raUsername = "player_one",
-                steamId64 = "76561198012345678",
                 retroArchInstalled = true,
                 retroArchLinked = true,
                 retroArchCoreCount = 42,

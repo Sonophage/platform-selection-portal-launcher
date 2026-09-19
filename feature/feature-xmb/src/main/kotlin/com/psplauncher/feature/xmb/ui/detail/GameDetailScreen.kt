@@ -138,7 +138,6 @@ fun GameDetailScreen(
     // contextual App Drawer button; any touch on the screen reports back via [onTouchInput].
     showTouchControls: Boolean = true,
     onTouchInput: () -> Unit = {},
-    onOpenShibaCoins: (Long) -> Unit = {},
     // Direct-launch mode: fire the Play action as soon as the game loads. The screen still
     // opens underneath (all launch plumbing lives in the ViewModel) and is what the user
     // returns to when they exit the game.
@@ -193,13 +192,6 @@ fun GameDetailScreen(
         if (state.closed) {
             viewModel.prepareForOpen()
             onBack()
-        }
-    }
-    // Confirm on the Shiba Coins row opens the dedicated screen over this page.
-    LaunchedEffect(state.openCoins) {
-        if (state.openCoins) {
-            onOpenShibaCoins(gameId)
-            viewModel.onOpenCoinsConsumed()
         }
     }
     // While the Artwork Studio is open, its screen consumes the actions instead.
@@ -478,22 +470,6 @@ private fun GameDetailContent(
                 nodeY = nodeY,
                 onSelect = { id -> viewModel.onNodeTapped(GameDetailKeys.disc(id)) },
                 rowModifier = Modifier.detailNode(GameDetailKeys.DISCS, requesterFor, nodeY),
-            )
-        }
-
-        // ── Shiba Coins (never for Android entries — they can have no achievements) ──
-        if (game.platformId != "android") {
-            Spacer(Modifier.height(DetailRowSpacing))
-            val coins = state.coins
-            PfpDetailProgressRow(
-                label = "Shiba Coins",
-                value = coins?.let { "${it.earned.total} / ${it.total.total}" } ?: "Not tracked yet",
-                secondary = coins?.let { "${(it.progress * 100).toInt()}%" },
-                progress = coins?.progress ?: 0f,
-                focused = focus == GameDetailKeys.COINS,
-                disclosure = true,
-                onClick = { viewModel.onNodeTapped(GameDetailKeys.COINS) },
-                modifier = Modifier.detailNode(GameDetailKeys.COINS, requesterFor, nodeY),
             )
         }
 
@@ -878,7 +854,6 @@ private fun confirmLabelFor(state: GameDetailUiState): String {
     val media = state.detailMedia.firstOrNull { GameDetailKeys.media(mediaStableId(it)) == focus }
     return when {
         media != null -> if (media.isVideo) "Play" else "Preview"
-        focus == GameDetailKeys.COINS -> "View"
         focus == GameDetailKeys.OVERVIEW ->
             if (state.descriptionExpanded) "Collapse" else "Read more"
         focus.startsWith("game-detail:disc:") -> "Choose disc"

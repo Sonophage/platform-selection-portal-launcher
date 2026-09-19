@@ -101,9 +101,4 @@ class ContextMenuPredicateTest {
         assertFalse(item.hasContextMenu(state(BuiltInCategory.GAMES, item)))
     }
 
-    @Test
-    fun `achievements summary row has a context menu`() {
-        val item = XMBItem(id = XMBViewModel.ACH_SUMMARY_ITEM_ID, title = "Player Card")
-        assertTrue(item.hasContextMenu(state(BuiltInCategory.ACHIEVEMENTS, item)))
-    }
 }

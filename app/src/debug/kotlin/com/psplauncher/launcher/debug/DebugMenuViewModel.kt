@@ -2,7 +2,6 @@ package com.psplauncher.launcher.debug
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.psplauncher.core.domain.achievement.ShibaRank
 import com.psplauncher.feature.xmb.preview.PreviewData
 import com.psplauncher.feature.xmb.viewmodel.XMBUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,7 +16,6 @@ import javax.inject.Inject
 class DebugMenuViewModel @Inject constructor(
     private val debugController: DebugController,
     private val debugSeeder: DebugSeeder,
-    private val shibaStandingSeeder: ShibaStandingSeeder,
 ) : ViewModel() {
 
     val debugState: StateFlow<DebugState> = debugController.state
@@ -51,17 +49,4 @@ class DebugMenuViewModel @Inject constructor(
         }
     }
 
-    /** Seeds fake Shiba achievement data landing on [rank] (level/bones/tier pills + recent coins). */
-    fun seedShibaStanding(rank: ShibaRank) {
-        viewModelScope.launch {
-            shibaStandingSeeder.seed(rank)
-        }
-    }
-
-    /** Removes the seeded Shiba standing block, restoring the real wallet. */
-    fun clearShibaStanding() {
-        viewModelScope.launch {
-            shibaStandingSeeder.clear()
-        }
-    }
 }
