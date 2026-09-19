@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
+import com.psplauncher.themekit.XmbLayoutSpec
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -957,16 +958,19 @@ fun SettingsGroup(title: String) {
     // Headers are visual landmarks. The scaffold's first-item clamp scrolls the complete
     // settings column to offset zero, ensuring a long screen that starts with this header can
     // always be returned to its true top with UP at the first row.
+    // A landmark, not a banner. The XMB has no chrome: a PS3 settings list separates groups with
+    // space and a quiet label, never a tinted full-width bar. The header is also deliberately
+    // SMALLER than the row labels it introduces now — it used to be the same 15sp, which left
+    // nothing establishing hierarchy except capitals.
     Text(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.1f))
-            .padding(start = 48.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = 48.dp, top = 28.dp, bottom = 8.dp),
         text = title.uppercase(),
-        color = Color.White,
-        fontSize = 15.sp,
+        color = SettingsSubtext,
+        fontSize = 12.sp,
         fontWeight = FontWeight.Bold,
-        letterSpacing = 1.8.sp,
+        letterSpacing = 2.4.sp,
         style = TextStyle(shadow = SettingsTextShadow),
     )
 }
@@ -1067,16 +1071,14 @@ fun SettingsRow(
                     Timber.d("Settings focus: row=\"$label\" clickable=${click != null}")
                 }
             }
-            // One consistent cursor fill for every focused row — read-only rows get the same
-            // highlight as actions. A dimmer tint read as "not navigable" and broke the visual
-            // rhythm, so the cursor now treats every row identically.
-            .background(
-                if (isFocused && cursorVisible && !(hideRowHighlightOnActionFocus && anyActionFocused))
-                    com.psplauncher.core.ui.theme.menuCursorFill()
-                else Color.Transparent
-            )
+            // No fill. Selection is the row growing and thickening, which is the rule the XMB
+            // item list already states in XMBItemList.selectedIconBloom: "selection is conveyed
+            // by the row's scale alone". Neither the PSP nor the PS3 XMB ever drew a highlight
+            // bar, and Settings was the one surface in this app painting one.
             .focusable()
-            .padding(horizontal = 48.dp, vertical = 14.dp),
+            // Roomier now that nothing separates rows but space. The XMB breathes; a settings
+            // list packed to 14dp with hairlines between reads as a table.
+            .padding(horizontal = 48.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -1085,11 +1087,15 @@ fun SettingsRow(
             Spacer(Modifier.width(16.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
+            val rowSelected =
+                isFocused && cursorVisible && !(hideRowHighlightOnActionFocus && anyActionFocused)
             Text(
                 text = label,
-                color = (if (isFocused && cursorVisible && !(hideRowHighlightOnActionFocus && anyActionFocused)) Color.White else SettingsText)
+                color = (if (rowSelected) Color.White else SettingsText)
                     .let { if (enabled) it else it.copy(alpha = it.alpha * DISABLED_ROW_ALPHA) },
-                fontSize = 15.sp,
+                fontSize = if (rowSelected) XmbLayoutSpec.DEFAULT.itemTextSelectedSp.sp
+                           else XmbLayoutSpec.DEFAULT.itemTextSp.sp,
+                fontWeight = if (rowSelected) FontWeight.SemiBold else FontWeight.Normal,
                 style = TextStyle(shadow = SettingsTextShadow),
             )
             if (!sublabel.isNullOrBlank()) {
@@ -1131,7 +1137,7 @@ fun SettingsRow(
             }
         }
     }
-    HorizontalDivider(color = SettingsDivider, modifier = Modifier.padding(start = 48.dp))
+
 }
 
 /**
