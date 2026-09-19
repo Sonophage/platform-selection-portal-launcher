@@ -76,7 +76,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
@@ -246,6 +248,25 @@ val SettingsSelectedBg: Color
 val SETTINGS_COLUMN_MAX_WIDTH = 560.dp
 
 /**
+ * The focused row's explanation, shown ONCE at the bottom of the screen instead of under every
+ * row.
+ *
+ * This is how a PS3 settings list works, and it is not only a style choice: with 212 helper
+ * lines in this app, drawing each one under its own row produced a page that was mostly small
+ * grey text, and the thing you were actually on had no more presence than the eleven things you
+ * were not. One band, for the row you are on, restores the ratio -- and roughly doubles how many
+ * settings fit on a screen, because rows become a single line.
+ *
+ * A MutableState rather than a value, because the writer is the focused ROW, deep inside
+ * content(), and the reader is the scaffold that composed it.
+ */
+val LocalSettingsHelp = compositionLocalOf { mutableStateOf<String?>(null) }
+
+/** Two lines at [SETTINGS_HELP_TEXT_SP], reserved whether or not there is anything to say. */
+private val SETTINGS_HELP_BAND_HEIGHT = 44.dp
+private const val SETTINGS_HELP_TEXT_SP = 13
+
+/**
  * Margin kept between a focused row and either edge of the content viewport, and — the same value
  * on purpose — the height of the fade at the bottom of that viewport. Tying them together is what
  * makes the fade safe: keep-in-view parks a focused row's bottom edge exactly where the fade
@@ -374,6 +395,9 @@ fun SettingsScaffold(
     // Seeded from the host's input mode: opening a screen by touch must not summon the cursor.
     val lastInputWasTouch = LocalSettingsLastInputWasTouch.current
     val cursorVisible = remember { mutableStateOf(!lastInputWasTouch) }
+    // The focused row's explanation. Owned here because the band that shows it is chrome, a
+    // sibling of the scrolling body, and cannot read anything the body composed.
+    val helpText = remember { mutableStateOf<String?>(null) }
     // Root-space centre of the visible content viewport. Touch scrolling hides the cursor;
     // the next controller action reanchors focus to the closest visible node instead of resuming
     // the previously focused (possibly off-screen) row.
@@ -708,6 +732,7 @@ fun SettingsScaffold(
             sliderNodeState.value = null
             notifyTouchInput()
         },
+        LocalSettingsHelp provides helpText,
         LocalSettingsFocusRegistry provides focusRegistry,
         // First clickable row to compose wins the initial-focus slot.
         LocalSettingsRegisterFirstFocusable provides { fr ->
@@ -947,6 +972,32 @@ fun SettingsScaffold(
                         .fillMaxWidth()
                         .dragToScroll(contentScrollState.value),
                 ) {
+                    // The focused row's explanation. A FIXED height, always: a band that grew and
+                    // shrank with each row's text would move the list under the cursor every time
+                    // the cursor moved, which is the one thing a settings list must never do.
+                    //
+                    // Hidden while the cursor is, because then there is no focused row to explain
+                    // and the last one's text would be a lie about where you are.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(SETTINGS_HELP_BAND_HEIGHT)
+                            .padding(horizontal = 48.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        val help = helpText.value?.takeIf { cursorVisible.value && it.isNotBlank() }
+                        if (help != null) {
+                            Text(
+                                text = help,
+                                color = SettingsSubtext,
+                                fontSize = SETTINGS_HELP_TEXT_SP.sp,
+                                lineHeight = (SETTINGS_HELP_TEXT_SP + 4).sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                style = TextStyle(shadow = SettingsTextShadow),
+                            )
+                        }
+                    }
                     if (footer != null) {
                         // Footer chrome (Enter / Back prompts) is display-only — never a focus
                         // target, so UP on the first content row cannot land inside it.
@@ -1036,6 +1087,12 @@ fun SettingsRow(
     enabled: Boolean = true,
 ) {
     val click = onClick?.takeIf { enabled }
+    // waveColor, NOT SettingsAccent. The accent in this app's palettes is a hardcoded white
+    // (XmbPalette.accentColor), so an accent bloom was a white wash that flattened the row it was
+    // meant to lift. The wave colour is the theme's actual hue, which is what a PS3 settings
+    // cursor glows.
+    val bloom = LocalPFPColors.current.waveColor
+    val help = LocalSettingsHelp.current
     val actionFocusCount = remember { mutableIntStateOf(0) }
     val anyActionFocused = actionFocusCount.intValue > 0
     val focusTracker = LocalSettingsFocusTracker.current
@@ -1071,6 +1128,9 @@ fun SettingsRow(
         },
     )
 
+    val rowSelected =
+        isFocused && cursorVisible && !(hideRowHighlightOnActionFocus && anyActionFocused)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1090,17 +1150,37 @@ fun SettingsRow(
                 if (state.isFocused) {
                     focusTracker(click)
                     reportFocused(row.focusRequester)
+                    // The row's explanation goes to the band at the foot of the screen. Written
+                    // on focus GAIN only: clearing it on focus loss would blank the band for a
+                    // frame on every cursor step, because the outgoing row loses focus before the
+                    // incoming one gains it.
+                    help.value = sublabel
                     Timber.d("Settings focus: row=\"$label\" clickable=${click != null}")
                 }
             }
-            // No fill. Selection is the row growing and thickening, which is the rule the XMB
-            // item list already states in XMBItemList.selectedIconBloom: "selection is conveyed
-            // by the row's scale alone". Neither the PSP nor the PS3 XMB ever drew a highlight
-            // bar, and Settings was the one surface in this app painting one.
+            // Selection is the row growing and thickening PLUS a soft bloom from the left.
+            //
+            // The bloom is not the flat highlight bar this screen used to paint and which was
+            // removed for being un-XMB. It is the PS3 settings list's own treatment: a gradient
+            // that is strongest at the left margin and gone by the middle of the row, so nothing
+            // is boxed and no edge is drawn. The same idiom the detail context menus already use,
+            // mirrored, because those menus hang off the right edge and this list off the left.
+            .drawBehind {
+                if (rowSelected) {
+                    drawRect(
+                        Brush.horizontalGradient(
+                            0f to bloom.copy(alpha = 0.62f),
+                            0.5f to bloom.copy(alpha = 0.14f),
+                            1f to Color.Transparent,
+                        )
+                    )
+                }
+            }
             .focusable()
-            // Roomier now that nothing separates rows but space. The XMB breathes; a settings
-            // list packed to 14dp with hairlines between reads as a table.
-            .padding(horizontal = 48.dp, vertical = 18.dp),
+            // 18dp was set when every row carried a second line of helper text and needed the
+            // air. With the helper moved to the foot of the screen the rows are one line, and at
+            // 18dp a screen held three of them. A PS3 settings list is denser than that.
+            .padding(horizontal = 48.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -1108,8 +1188,6 @@ fun SettingsRow(
             leading()
             Spacer(Modifier.width(16.dp))
         }
-        val rowSelected =
-            isFocused && cursorVisible && !(hideRowHighlightOnActionFocus && anyActionFocused)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
@@ -1120,18 +1198,8 @@ fun SettingsRow(
                 fontWeight = if (rowSelected) FontWeight.SemiBold else FontWeight.Normal,
                 style = TextStyle(shadow = SettingsTextShadow),
             )
-            if (!sublabel.isNullOrBlank()) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    sublabel,
-                    color = SettingsSubtext.let { if (enabled) it else it.copy(alpha = it.alpha * DISABLED_ROW_ALPHA) },
-                    fontSize = 12.sp,
-                    // The helper line is the least legible text on screen over a bright
-                    // wallpaper — small, gray, and lowest in the row. The shadow is what keeps
-                    // it readable without a heavier scrim.
-                    style = TextStyle(shadow = SettingsTextShadow),
-                )
-            }
+            // [sublabel] is NOT drawn here any more. It goes to the help band at the foot of
+            // the screen, for the focused row only -- see LocalSettingsHelp.
         }
         if (value != null) {
             Spacer(Modifier.width(24.dp))
@@ -1195,6 +1263,7 @@ fun SettingsFocusable(
     val focusTracker = LocalSettingsFocusTracker.current
     val touchInput = LocalSettingsTouchInput.current
     val reportFocused = LocalSettingsReportFocused.current
+    val help = LocalSettingsHelp.current
     var isFocused by remember { mutableStateOf(false) }
 
     val row = rememberControllerRowRegistration(
@@ -1215,6 +1284,9 @@ fun SettingsFocusable(
                 if (state.isFocused) {
                     focusTracker(onClick)
                     reportFocused(row.focusRequester)
+                    // Nothing to say about this one, and saying nothing is the point: without
+                    // this the band would still be explaining whichever ROW the cursor came from.
+                    help.value = null
                 }
             }
             .pointerInput(onClick) {
@@ -1303,6 +1375,7 @@ fun SettingsTextFieldRow(
     val focusTracker = LocalSettingsFocusTracker.current
     val keyboard = LocalSoftwareKeyboardController.current
     val reportFocused = LocalSettingsReportFocused.current
+    val help = LocalSettingsHelp.current
     var editing by remember { mutableStateOf(false) }
 
     // Always focusable so this field can be the screen's initial-focus target (a screen that
@@ -1379,6 +1452,7 @@ fun SettingsTextFieldRow(
                             // Controller SELECT over the field starts editing (opens the keyboard).
                             focusTracker { editing = true }
                             reportFocused(fr)
+                            help.value = helper
                         } else {
                             editing = false
                         }

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -23,6 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import com.psplauncher.themekit.XmbLayoutSpec
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -70,6 +73,8 @@ fun SettingsSliderRow(
     val touchInput = LocalSettingsTouchInput.current
     val cursorVisible = LocalSettingsCursorVisible.current
     val reportFocused = LocalSettingsReportFocused.current
+    val help = com.psplauncher.feature.settings.ui.LocalSettingsHelp.current
+    val bloom = com.psplauncher.core.ui.theme.LocalPFPColors.current.waveColor
     val enterSliderMode = LocalSettingsEnterSliderMode.current
     val adjusting = LocalSettingsSliderAdjusting.current
     var isFocused by remember { mutableStateOf(false) }
@@ -113,15 +118,26 @@ fun SettingsSliderRow(
                 if (state.isFocused) {
                     focusTracker(enterAdjustment)
                     reportFocused(row.focusRequester)
+                    // Same band as every other row's helper line — see LocalSettingsHelp.
+                    help.value = sublabel
                 }
             }
-            // Same one-consistent cursor fill as every other focused row (see SettingsRow).
-            .background(
-                if (isFocused && cursorVisible) com.psplauncher.core.ui.theme.menuCursorFill()
-                else Color.Transparent
-            )
+            // The same left bloom as every other focused row (see SettingsRow). It was a flat
+            // menuCursorFill, which after the rows moved to the bloom left this one row painting
+            // a pale slab with a hard right edge in the middle of a list that no longer had one.
+            .drawBehind {
+                if (isFocused && cursorVisible) {
+                    drawRect(
+                        Brush.horizontalGradient(
+                            0f to bloom.copy(alpha = 0.62f),
+                            0.5f to bloom.copy(alpha = 0.14f),
+                            1f to Color.Transparent,
+                        )
+                    )
+                }
+            }
             .focusable()
-            .padding(horizontal = 48.dp, vertical = 14.dp),
+            .padding(horizontal = 48.dp, vertical = 12.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -129,23 +145,18 @@ fun SettingsSliderRow(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                // Selection is scale here too, or this row would be the only one in the list
+                // that did not grow under the cursor.
+                val rowSelected = isFocused && cursorVisible
                 Text(
                     text = label,
-                    color = if (isFocused && cursorVisible) Color.White else SettingsText,
-                    fontSize = 15.sp,
+                    color = if (rowSelected) Color.White else SettingsText,
+                    fontSize = if (rowSelected) XmbLayoutSpec.DEFAULT.itemTextSelectedSp.sp
+                               else XmbLayoutSpec.DEFAULT.itemTextSp.sp,
+                    fontWeight = if (rowSelected) FontWeight.SemiBold else FontWeight.Normal,
                     style = TextStyle(shadow = SettingsTextShadow),
                 )
-                if (!sublabel.isNullOrBlank()) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        sublabel,
-                        color = SettingsSubtext,
-                        fontSize = 12.sp,
-                        // Same helper-line shadow as SettingsRow — the slider sublabels are
-                        // equally washed out over a bright wallpaper.
-                        style = TextStyle(shadow = SettingsTextShadow),
-                    )
-                }
+                // [sublabel] is reported to the help band, not drawn here -- see LocalSettingsHelp.
             }
             Spacer(Modifier.width(16.dp))
             Text(
@@ -174,5 +185,7 @@ fun SettingsSliderRow(
             ),
         )
     }
-    HorizontalDivider(color = SettingsDivider, modifier = Modifier.padding(start = 48.dp))
+    // No trailing rule. Row dividers were removed from this screen family when selection became
+    // scale rather than a bar; this one survived because it is drawn by the slider and not by
+    // SettingsRow, and it read as a stray line under whichever slider the cursor was on.
 }
