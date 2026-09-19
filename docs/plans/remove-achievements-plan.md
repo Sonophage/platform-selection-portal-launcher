@@ -1,6 +1,6 @@
 # Remove achievements
 
-**Status:** Planned · **Branch:** `chore/remove-achievements` · **Written:** 2026-09-19
+**Status:** Done 2026-09-19 · **Branch:** `chore/remove-achievements` · **Written:** 2026-09-19
 
 ## Goal
 
@@ -19,7 +19,11 @@ release APK               19.5 MB
 └─ assets/runtime         18.2 MB   pfp_bridge_x64.bin, one reference in the codebase
 ```
 
-Expect roughly **19.5 MB to 1.5 MB**, and about **10,000 lines** gone.
+**Result: 19.46 MB to 10.56 MB**, and about 10,000 lines gone.
+
+The 1.5 MB first written here was wrong: it compared the 18.2 MB *uncompressed* asset against the
+compressed APK total. The binary is stored compressed at roughly 9 MB, so removing it saves that,
+not 18.
 
 ## What is NOT achievements
 
@@ -191,3 +195,66 @@ wrong `when` would not be. Read every `when` after editing it.
 
 `RETIRED_IDS` is the other one. Without decision 2 the Shiba Coins category returns from any
 restored backup, on a build with no code to render it.
+
+
+---
+
+## What the plan got wrong
+
+Recorded because the next removal will have the same shape.
+
+### It missed a second entanglement
+
+The plan found `LocalSteamGameImporter` and called it the one real entanglement. There was another:
+**`VitaGameScanner`** discovers installed PS Vita titles from Vita3K's `ux0` folder and upserts them
+into the library, which is library work, and it lived in `feature-achievements` only because
+trophies were built alongside it. Deleting the module would have taken PS Vita game discovery with
+it and nothing would have failed to say so.
+
+Its coupling was four lines (a trophy-set link). It moved to `feature-library` with `ParamSfo`.
+
+Whatever survey finds one thing of this shape should assume there is another.
+
+### It missed a Hilt binding
+
+`PcShortcutImporter` declared a `PcGameAchievementLinker` interface that the achievements module
+bound. Deleting the module left a graph with no binding for it, and **`compileDebugKotlin` passes
+anyway** because the graph is only validated when Hilt's processor runs for a real build. Four
+tasks were committed green before `:app:assembleRelease` caught it.
+
+**Compiling is not building.** Assemble an APK before believing a module removal is done.
+
+### It did not foresee the schema damage
+
+Room re-exports the schema for the CURRENT version on every build. Compiling after the entities
+were deleted but before the version bump silently overwrote `45.json` with a 30-table schema, and
+it was committed that way. Restored from `dc302e3c^`; the true v45 has 36 tables.
+
+Any migration test that ran against the damaged file was building a database no release ever had.
+**A schema export is a historical record and a build can overwrite it.**
+
+### The order changed
+
+Task 6 (delete the module) ran before Task 4 (delete the domain models), because the module still
+imported the models. Leaf-first was right in spirit and wrong in this detail.
+
+## What the plan got right
+
+- **The two ROM hashers.** `feature-artwork/rom/RomHasher` stayed and still writes `romCrc32`.
+- **`RETIRED_IDS`.** `"achievements"` joined it, so a restored backup cannot resurrect the category.
+- **The slot-count guard.** Removing `catbar_achievements` failed `DefaultSlotGlyphTest` with
+  `expected:<10> but was:<9>`, exactly as predicted.
+- **Reading every `when` after editing it.** No branch was cut by accident this time.
+
+## Verification
+
+- **2225 tests, 10 skipped, 0 failures** (from 2375 before; the difference is achievement tests).
+- `:app:assembleDebug` and `:app:assembleRelease` both build.
+- Release APK **10.56 MB**, down from 19.46 MB.
+- `Migration45To46Test` falsified twice: `DELETE FROM games` in the migration fails it with
+  `expected:<1> but was:<0>`, and leaving one table undropped fails it by that table's name.
+
+## Still unverified
+
+Nothing here has run on the device, which was disconnected throughout. The migration has never
+executed against the real database, and the launcher has not been started once since the removal.
