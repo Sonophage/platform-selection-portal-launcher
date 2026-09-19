@@ -91,10 +91,8 @@ internal fun defaultGlyphFor(slot: IconSlot): SlotGlyphDefault {
     // Status strip; the resource IDs themselves stay private to XmbStatusStrip.kt.
     XmbStatusIcons.forSlotKey(slot.key)?.let { return SlotGlyphDefault.Drawable(it) }
     return when (slot.key) {
-        // The default memory-card art. "All Tracked Games" reads as a card too (its row draws
-        // MEMORY_CARD_DEFAULT_ART directly), so it previews as one.
+        // The default memory-card art.
         "item_memcard_games", "item_memcard_music", "item_memcard_video", "item_memcard_photos",
-        "item_shiba_track",
         -> SlotGlyphDefault.BundledAsset(MEMORY_CARD_DEFAULT_ART)
         // The Settings rows' wrench badge is console art, not a Material glyph.
         "item_settings" -> SlotGlyphDefault.Drawable(systemIconRes("settings"))
@@ -129,9 +127,6 @@ private val ITEM_VECTORS: Map<String, ImageVector> = mapOf(
     "item_music_track" to Icons.Filled.MusicNote,
     "item_playlist" to Icons.Filled.QueueMusic,
     "item_music_apps" to Icons.Filled.LibraryMusic,
-    // Shiba Coins (achievements) hub rows.
-    "item_shiba_connect" to Icons.Filled.Link,
-    "item_shiba_untracked" to Icons.Filled.HelpOutline,
 )
 
 /**

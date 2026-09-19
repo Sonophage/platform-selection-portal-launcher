@@ -31,7 +31,7 @@ class DefaultSlotGlyphTest {
     @Test
     fun `crossbar slots resolve to the catalog drawable`() {
         val slots = CustomizableIcons.ALL.filter { it.group == IconSlot.Group.CATEGORY_BAR }
-        assertEquals(10, slots.size)
+        assertEquals(9, slots.size)
         for (slot in slots) {
             assertTrue(
                 "${slot.key} should resolve to a drawable",
@@ -60,7 +60,6 @@ class DefaultSlotGlyphTest {
             "item_memcard_music",
             "item_memcard_video",
             "item_memcard_photos",
-            "item_shiba_track",
         )
         for (key in keys) {
             assertEquals(

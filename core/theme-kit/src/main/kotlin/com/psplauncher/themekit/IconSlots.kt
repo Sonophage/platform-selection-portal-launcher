@@ -55,7 +55,6 @@ object IconSlots {
         catbar("catbar_appstore", "App Store"),
         catbar("catbar_favorites", "Favorites"),
         catbar("catbar_library", "Library"),
-        catbar("catbar_achievements", "Shiba Coins"),
 
         // ── First-level item glyphs (one key per semantic slot, not per shape:
         //    the video folder and photo folder may diverge in a custom theme) ──
@@ -90,10 +89,6 @@ object IconSlots {
         item("item_playlist", "Playlist"),
         item("item_music_apps", "Music apps"),
 
-        // ── Shiba Coins (achievements) hub rows ──────────────────────────────
-        item("item_shiba_connect", "Connect account"),
-        item("item_shiba_track", "Tracked"),
-        item("item_shiba_untracked", "Untracked"),
 
         // ── Status strip ─────────────────────────────────────────────────────
         status("status_battery_full", "Battery (full)"),

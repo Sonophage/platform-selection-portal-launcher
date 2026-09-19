@@ -77,7 +77,6 @@ object SampleContent {
         Category("catbar_network", "Network"),
         Category("catbar_appstore", "App Store"),
         Category("catbar_library", "Library"),
-        Category("catbar_achievements", "Shiba Coins"),
         Category("catbar_favorites", "Favorites"),
     )
 

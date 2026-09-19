@@ -56,9 +56,6 @@ object StudioIconSet {
         "catbar_appstore" to "xmb/catbar_appstore.png",
         "catbar_favorites" to "xmb/catbar_favorites.png",
         "catbar_library" to "xmb/catbar_library.xml",
-        "catbar_achievements" to "xmb/catbar_achievements.png",   // the Shiba Coin
-        // "All Tracked Games" reads as a memory card in the XMB (MEMORY_CARD_DEFAULT_ART).
-        "item_shiba_track" to "xmb/item_memcard.png",
         // Default memory-card art (launcher: systems/physical-media/_default.png) — one
         // asset, four semantic slots so themes can diverge per category.
         "item_memcard_games" to "xmb/item_memcard.png",
@@ -102,9 +99,6 @@ object StudioIconSet {
         "item_music_track" to Icons.Filled.MusicNote,
         "item_playlist" to Icons.Filled.QueueMusic,
         "item_music_apps" to Icons.Filled.LibraryMusic,
-        // Shiba Coins (achievements) hub rows.
-        "item_shiba_connect" to Icons.Filled.Link,
-        "item_shiba_untracked" to Icons.Filled.HelpOutline,
     )
 
     /** Default painter for a slot key, or a play-arrow stand-in for unknown keys. */
