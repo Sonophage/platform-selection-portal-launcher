@@ -25,9 +25,18 @@ import com.psplauncher.core.domain.model.IntentType
 import com.psplauncher.feature.settings.viewmodel.EmulatorTemplate
 import com.psplauncher.feature.settings.viewmodel.ProfileEditorState
 
-private val EditorText     = Color(0xFFFFFFFF)
-private val EditorSubtext  = Color(0xFF888888)
-private val EditorAccent   = Color(0xFF4A90D9)
+// This screen kept its own palette, which meant its text and accent ignored the user's theme while
+// every other settings screen followed it. Text and accent now read the shared settings roles, the
+// same composable getters SettingsScaffold exposes.
+//
+// Error and border stay fixed on purpose: a destructive red that shifted with the accent would stop
+// reading as a warning, and the border is chrome rather than a signal.
+private val EditorText: Color
+    @Composable get() = SettingsText
+private val EditorSubtext: Color
+    @Composable get() = SettingsSubtext
+private val EditorAccent: Color
+    @Composable get() = SettingsAccent
 private val EditorError    = Color(0xFFE57373)
 private val EditorBorder   = Color(0xFF444444)
 

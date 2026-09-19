@@ -197,10 +197,16 @@ private fun reseedFocus(
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
-// Sourced from the shared palette so the settings rows and the Material dialogs (PFPTheme's
-// dark scheme) can never drift apart on a rebrand.
+// The backdrop scrim is a fixed translucent black: the theme gradient and the wallpaper read
+// through it by design, so tinting it would tint them twice.
 val SettingsBg = Color(0xE6000000)
-val SettingsAccent = com.psplauncher.core.ui.theme.PfpPalette.Accent
+
+// Accent is a composable GETTER for the same reason the two text roles below are: it must follow
+// the user's chosen theme. It read PfpPalette.Accent until 2026-09-19, which is a CONSTANT — a
+// hardcoded blue evaluated once at class load — so every accent in Settings stayed that blue while
+// the XMB next door repainted. Fifteen files read this.
+val SettingsAccent: Color
+    @Composable get() = LocalPFPColors.current.accentColor
 
 // The two text roles are composable GETTERS, not constants: they read the resolved palette out of
 // LocalPfpTextColors, so a user font colour (or a backdrop-driven clamp) repaints ~60 call sites
@@ -223,8 +229,13 @@ val SettingsTextShadow = Shadow(
     offset = Offset(0f, 2f),
     blurRadius = 4f,
 )
+// Divider stays neutral: it separates rows rather than signalling anything, and a tinted hairline
+// reads as decoration at every accent.
 val SettingsDivider = com.psplauncher.core.ui.theme.PfpPalette.Divider
-val SettingsSelectedBg = com.psplauncher.core.ui.theme.PfpPalette.Accent.copy(alpha = 0.14f)
+
+// The focused-row wash IS the accent, so it follows it.
+val SettingsSelectedBg: Color
+    @Composable get() = LocalPFPColors.current.accentColor.copy(alpha = 0.14f)
 
 /**
  * Margin kept between a focused row and either edge of the content viewport, and — the same value
