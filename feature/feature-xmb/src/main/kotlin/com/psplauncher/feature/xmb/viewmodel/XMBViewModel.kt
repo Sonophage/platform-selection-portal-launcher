@@ -407,7 +407,7 @@ fun settingsSectionItems(section: SettingsSection): List<XMBItem> = when (sectio
         XMBItem(id = "settings_windows_games",  title = "Windows Games", subtitle = "PC games, launchers & imports"),
         XMBItem(id = "settings_collections",    title = "Collections",  subtitle = "Create & manage game collections"),
         XMBItem(id = "settings_artwork",        title = "Artwork",      subtitle = "Scraping sources & cache"),
-        XMBItem(id = "settings_app_visibility", title = "Hidden Games", subtitle = "Review apps & games you've hidden"),
+        XMBItem(id = "settings_app_visibility", title = "Hidden Items", subtitle = "Review apps & games you've hidden"),
     )
     SettingsSection.EMULATORS -> listOf(
         // First pass: all three open the combined Emulators screen (plan §4); distinct ids keep
@@ -433,7 +433,7 @@ fun settingsSectionItems(section: SettingsSection): List<XMBItem> = when (sectio
         XMBItem(id = "settings_music", title = "Music", subtitle = "Music folders & default player"),
         XMBItem(id = "settings_video", title = "Video", subtitle = "Video libraries, scanning & playback"),
         XMBItem(id = "settings_photo", title = "Photo", subtitle = "Photo libraries & scanning"),
-        XMBItem(id = "settings_books", title = "Library", subtitle = "Book folders & reader"),
+        XMBItem(id = "settings_books", title = "Books", subtitle = "Book folders & reader"),
     )
     SettingsSection.SYSTEM -> listOf(
         XMBItem(id = "settings_about",  title = "About",            subtitle = "PSPLauncher"),

@@ -89,7 +89,7 @@ fun BooksSettingsContent(
 ) {
     SettingsScaffold(
         title    = "Settings",
-        subtitle = "Library",
+        subtitle = "Books",
         onBack   = onBack,
         modifier = modifier,
     ) {
