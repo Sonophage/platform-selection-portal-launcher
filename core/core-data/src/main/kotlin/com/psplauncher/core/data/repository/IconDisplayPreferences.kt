@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.psplauncher.core.data.datastore.pfpDataStore
 import com.psplauncher.core.domain.model.IconDisplayMode
+import com.psplauncher.core.domain.model.VideoSnapPlacement
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -39,12 +40,22 @@ class IconDisplayPreferences @Inject constructor(
             prefs[KEY_PLATFORM_MODES] = encodePlatformModes(updated)
         }
 
-    // "Animated icons" master switch for ICON1 video snaps in the icon slot (ICON0 mode only).
+    // "Animated icons" master switch for ICON1 video snaps. Whether one plays at all; where it
+    // plays is [snapPlacementFlow].
     val animatedIconsFlow: Flow<Boolean> = context.pfpDataStore.data
         .map { it[KEY_ANIMATED_ICONS] ?: true }
 
     suspend fun setAnimatedIcons(enabled: Boolean) =
         context.pfpDataStore.edit { it[KEY_ANIMATED_ICONS] = enabled }
+
+    // Where an approved snap plays: in the tile, or full-bleed behind the crossbar. Separate from
+    // the master switch because it is a placement and not a second on/off, and because folding
+    // the two together would mean migrating a preference that is already persisted and restored.
+    val snapPlacementFlow: Flow<VideoSnapPlacement> = context.pfpDataStore.data
+        .map { VideoSnapPlacement.fromName(it[KEY_SNAP_PLACEMENT]) ?: VideoSnapPlacement.DEFAULT }
+
+    suspend fun setSnapPlacement(placement: VideoSnapPlacement) =
+        context.pfpDataStore.edit { it[KEY_SNAP_PLACEMENT] = placement.name }
 
     // How long the cursor must rest on a game (ICON0 tile) before its ICON1 video snap plays.
     // Seconds, clamped to 1..5; the 1.5 s default keeps the PSP's rest-then-animate cadence.
@@ -60,6 +71,7 @@ class IconDisplayPreferences @Inject constructor(
         private val KEY_ANIMATED_ICONS = androidx.datastore.preferences.core.booleanPreferencesKey("pref_animated_icons")
         private val KEY_ICON1_LINGER_DELAY_SECONDS =
             floatPreferencesKey("pref_icon1_linger_delay_seconds")
+        private val KEY_SNAP_PLACEMENT = stringPreferencesKey("pref_video_snap_placement")
 
         // "platformId=MODE" per line. Pure and internal-free so the encoding is unit-testable;
         // anything unparseable is dropped rather than failing the whole read, so one bad entry

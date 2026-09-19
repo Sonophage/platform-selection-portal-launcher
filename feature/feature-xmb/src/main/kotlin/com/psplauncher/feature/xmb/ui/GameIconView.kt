@@ -49,6 +49,7 @@ import coil3.compose.AsyncImage
 import com.psplauncher.core.ui.image.ArtworkRevisions
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.domain.model.IconDisplayMode
+import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.core.ui.icons.GameIconStyle
 import com.psplauncher.feature.artwork.store.ArtworkDimensions
 import com.psplauncher.feature.xmb.R
@@ -158,8 +159,10 @@ fun GameIcon(
                 }
 
                 else -> {
-                    val video = LocalFocusedGameVideo.current
-                        ?.takeIf { it.gameId == item.gameId && resolved.mode == IconDisplayMode.ICON0 }
+                    val video = LocalFocusedGameVideo.current?.takeIf {
+                        it.gameId == item.gameId &&
+                            snapSiteFor(it.placement, resolved.mode) == SnapSite.TILE
+                    }
                     Box(modifier = modifier) {
                         PspIcon0Icon(
                             artworkUri  = resolved.uri,

@@ -1,5 +1,6 @@
 package com.psplauncher.feature.settings.viewmodel
 
+import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.feature.artwork.api.ArtworkStatus
 import com.psplauncher.feature.artwork.api.ScrapeOptions
 import com.psplauncher.feature.settings.debug.DebugCredentialsLoader
@@ -64,6 +65,7 @@ class ArtworkSettingsDebugCredentialsTest {
             iconDisplayPreferences = mockk(relaxed = true) {
                 every { modeFlow } returns flowOf(com.psplauncher.core.domain.model.IconDisplayMode.DEFAULT)
                 every { animatedIconsFlow } returns flowOf(true)
+                every { snapPlacementFlow } returns flowOf(VideoSnapPlacement.ICON)
                 every { lingerDelaySecondsFlow } returns flowOf(1.5f)
             },
             cropPreviewPreferences = mockk(relaxed = true) { every { enabledFlow } returns flowOf(true) },

@@ -60,8 +60,11 @@ data class ArtworkSettingsUiState(
     // game's Icon Display options menu).
     val iconDisplayMode: com.psplauncher.core.domain.model.IconDisplayMode =
         com.psplauncher.core.domain.model.IconDisplayMode.DEFAULT,
-    // ICON1 video snaps in the focused icon slot (Custom Icon mode only).
+    // Whether ICON1 video snaps play at all. Where they play is [snapPlacement].
     val animatedIcons: Boolean = true,
+    // Icon tile (PSP, Custom Icon mode only) or full-bleed behind the crossbar (PS3, any mode).
+    val snapPlacement: com.psplauncher.core.domain.model.VideoSnapPlacement =
+        com.psplauncher.core.domain.model.VideoSnapPlacement.DEFAULT,
     // How long the cursor must rest on a game before its video snap plays (Video Snap Delay,
     // under the Animated Icons toggle). Seconds, clamped 1..5; default 1.5 matches the PSP.
     val icon1LingerDelaySeconds: Float = 1.5f,
@@ -104,6 +107,11 @@ class ArtworkSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iconDisplayPreferences.animatedIconsFlow.collect { enabled ->
                 _extra.update { it.copy(animatedIcons = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            iconDisplayPreferences.snapPlacementFlow.collect { placement ->
+                _extra.update { it.copy(snapPlacement = placement) }
             }
         }
         viewModelScope.launch {
@@ -446,6 +454,13 @@ class ArtworkSettingsViewModel @Inject constructor(
     fun setAnimatedIcons(enabled: Boolean) {
         _extra.update { it.copy(animatedIcons = enabled) }
         viewModelScope.launch { iconDisplayPreferences.setAnimatedIcons(enabled) }
+    }
+
+    /** Cycles where an approved video snap plays: the icon tile, or behind the crossbar. */
+    fun cycleSnapPlacement() {
+        val entries = com.psplauncher.core.domain.model.VideoSnapPlacement.entries
+        val next = entries[(entries.indexOf(_extra.value.snapPlacement) + 1) % entries.size]
+        viewModelScope.launch { iconDisplayPreferences.setSnapPlacement(next) }
     }
 
     fun setIcon1LingerDelaySeconds(seconds: Float) {

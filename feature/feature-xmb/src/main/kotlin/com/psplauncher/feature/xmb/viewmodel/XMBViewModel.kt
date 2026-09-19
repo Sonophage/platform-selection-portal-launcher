@@ -40,6 +40,7 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.HiddenPlacement
 import com.psplauncher.core.domain.model.HideLocationType
 import com.psplauncher.core.domain.model.IconDisplayMode
+import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.core.domain.model.MemoryCard
 import com.psplauncher.core.domain.model.MusicTrack
 import com.psplauncher.core.domain.model.XmbColorScheme
@@ -751,6 +752,11 @@ data class XMBUiState(
     val textShadow: Boolean = true,
     // The focused game's ICON1 video snap — set only after the linger + battery gates pass.
     val focusedGameVideo: com.psplauncher.feature.xmb.ui.FocusedGameVideo? = null,
+    // Where an approved snap plays. Lives in UiState rather than a @Volatile field because the
+    // eligibility rule below reads it, and that rule is a map over this state: as UiState it
+    // re-evaluates the moment the user changes the setting.
+    val snapPlacement: com.psplauncher.core.domain.model.VideoSnapPlacement =
+        com.psplauncher.core.domain.model.VideoSnapPlacement.DEFAULT,
     val librarySetupComplete: Boolean = false,
     val themeColors: PFPColors = DefaultPFPColors,
     // Custom icon slots of the applied theme (theme slot key → CustomIcon); empty = the
@@ -7767,6 +7773,13 @@ class XMBViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            iconDisplayPreferences.snapPlacementFlow.collect { placement ->
+                // Drop any playing snap on a placement change so it restarts where it now belongs
+                // instead of finishing out in the slot the user just moved it out of.
+                _uiState.update { it.copy(snapPlacement = placement, focusedGameVideo = null) }
+            }
+        }
+        viewModelScope.launch {
             // User-adjustable rest gate (Artwork ▸ Art Preferences ▸ Video Snap Delay). Each new
             // rest starts from the current value; the in-flight delay simply runs out unchanged.
             iconDisplayPreferences.lingerDelaySecondsFlow.collect { seconds ->
@@ -7800,9 +7813,16 @@ class XMBViewModel @Inject constructor(
             _uiState
                 .map { s ->
                     val item = s.currentItems.getOrNull(s.selectedItemIndex)
-                    val eligible = item?.gameId != null && item.isRealGame && !s.hasBlockingOverlay &&
-                        resolveIconDisplay(item, s.iconDisplayMode, s.iconDisplayModeByPlatform).mode ==
-                            IconDisplayMode.ICON0
+                    // Approve only if the snap has somewhere to draw. snapSiteFor is the one
+                    // definition of that, shared with the two render sites -- the in-tile
+                    // placement needs an ICON0 tile to play over, the background placement needs
+                    // nothing and so plays in any icon mode.
+                    val eligible = item?.gameId != null && item.isRealGame &&
+                        !s.hasBlockingOverlay &&
+                        com.psplauncher.feature.xmb.ui.snapSiteFor(
+                            s.snapPlacement,
+                            resolveIconDisplay(item, s.iconDisplayMode, s.iconDisplayModeByPlatform).mode,
+                        ) != null
                     if (eligible) item.gameId else null
                 }
                 .distinctUntilChanged()
@@ -7826,7 +7846,13 @@ class XMBViewModel @Inject constructor(
                     }
                     Timber.d("ICON1: playing snap for game $gameId from $uri")
                     _uiState.update {
-                        it.copy(focusedGameVideo = com.psplauncher.feature.xmb.ui.FocusedGameVideo(gameId, uri))
+                        it.copy(
+                            focusedGameVideo = com.psplauncher.feature.xmb.ui.FocusedGameVideo(
+                                gameId = gameId,
+                                uri = uri,
+                                placement = it.snapPlacement,
+                            ),
+                        )
                     }
                 }
         }

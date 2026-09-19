@@ -1,5 +1,6 @@
 package com.psplauncher.feature.settings.viewmodel
 
+import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.feature.artwork.MetadataApiKeyProvider
 import com.psplauncher.feature.artwork.api.ArtworkRepository
 import com.psplauncher.feature.artwork.api.ArtworkScrapePreferences
@@ -74,6 +75,7 @@ class ArtworkSettingsViewModelTest {
         iconDisplayPreferences = mockk(relaxed = true) {
             every { modeFlow } returns flowOf(com.psplauncher.core.domain.model.IconDisplayMode.DEFAULT)
             every { animatedIconsFlow } returns flowOf(true)
+            every { snapPlacementFlow } returns flowOf(VideoSnapPlacement.ICON)
             every { lingerDelaySecondsFlow } returns flowOf(1.5f)
         }
         coEvery { artworkRepository.computeStatus() }    returns ArtworkStatus(total = 10, complete = 8, missing = 2)

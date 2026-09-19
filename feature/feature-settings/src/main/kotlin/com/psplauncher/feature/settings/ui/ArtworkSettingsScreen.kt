@@ -224,9 +224,17 @@ fun ArtworkSettingsScreen(
 
                 SettingsToggleRow(
                     label    = "Animated Icons",
-                    sublabel = "Play a game's video snap in its icon after resting on it (Custom Icon mode; skipped on low battery)",
+                    sublabel = "Play a game's video snap after resting on it (skipped on low battery)",
                     checked  = state.animatedIcons,
                     onToggle = { viewModel.setAnimatedIcons(it) },
+                )
+
+                SettingsValueRow(
+                    label    = "Video Snap Placement",
+                    sublabel = "In the icon tile, or full-screen behind the crossbar. The tile needs Custom Icon mode; the background plays in any mode",
+                    value    = state.snapPlacement.label,
+                    onClick  = { viewModel.cycleSnapPlacement() },
+                    enabled  = state.animatedIcons,
                 )
 
                 SettingsSliderRow(

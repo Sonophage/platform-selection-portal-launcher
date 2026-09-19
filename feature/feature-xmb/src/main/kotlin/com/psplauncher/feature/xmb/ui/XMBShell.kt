@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.psplauncher.core.ui.image.rememberArtworkModel
+import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.ui.motion.MotionWallpaperPolicy
 import com.psplauncher.core.ui.motion.rememberAppVisible
@@ -484,17 +485,30 @@ fun XMBShell(
 
             // Per-game background art (XMB hover): reads only artworkUri — the dedicated
             // background slot. heroUri is reserved for the Game Detail hero banner.
-            val selectedBg = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.artworkUri
+            val selectedItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
+            val selectedBg = selectedItem?.artworkUri
+            // PS3 placement: the approved snap plays full-bleed here instead of in the tile,
+            // over the still art and UNDER the legibility scrim, so the crossbar keeps the same
+            // contrast it has over a still background. Same FocusedGameVideo, same gates, same
+            // single player — Icon1VideoOverlay centre-crops to whatever bounds it is given.
+            val backgroundSnap = uiState.focusedGameVideo?.takeIf {
+                it.placement == VideoSnapPlacement.BACKGROUND && it.gameId == selectedItem?.gameId
+            }
             Crossfade(targetState = selectedBg, animationSpec = tween(320), label = "xmbGameBackground") { bg ->
-                if (bg != null) {
+                if (bg != null || backgroundSnap != null) {
                     Box(Modifier.fillMaxSize()) {
-                        AsyncImage(
+                        if (bg != null) AsyncImage(
                             model = rememberArtworkModel(bg),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
+                        if (backgroundSnap != null) {
+                            Icon1VideoOverlay(
+                                videoUri = backgroundSnap.uri,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                         // Legibility scrim over the artwork. Deliberately light-handed: heavier
                         // alphas dim the art too much, so darker photos lose their vibrancy — the
                         // icons/labels carry their own contrast (tiles, glows, text shadows).
@@ -507,6 +521,15 @@ fun XMBShell(
                                 )
                             )
                         )
+                        // A second, flat scrim for video only. The gradient above was tuned
+                        // against a STILL image, where the eye settles and the text shadows do
+                        // the rest. A snap does not settle: every frame changes the luminance
+                        // under every label, and a bright one (pixel art, a white menu) takes
+                        // the crossbar with it. Video pays for its own legibility rather than
+                        // dimming every still background to cover the worst frame of a clip.
+                        if (backgroundSnap != null) {
+                            Box(Modifier.fillMaxSize().background(Color(0x5905050C)))
+                        }
                     }
                 }
             }

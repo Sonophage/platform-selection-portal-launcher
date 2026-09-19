@@ -1267,6 +1267,7 @@ fun SettingsValueRow(
     focusKey: String? = null,
     onFocusChangedExternal: ((Boolean) -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     SettingsRow(
         label = label,
@@ -1275,6 +1276,7 @@ fun SettingsValueRow(
         focusKey = focusKey,
         onFocusChangedExternal = onFocusChangedExternal,
         onClick = onClick,
+        enabled = enabled,
     )
 }
 

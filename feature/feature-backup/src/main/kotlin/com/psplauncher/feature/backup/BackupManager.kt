@@ -534,6 +534,8 @@ open class BackupManager @Inject constructor(
         stringPreferencesKey("pref_icon_display_mode"),
         // Per-console icon display overrides, one encoded string for every Memory Card.
         stringPreferencesKey("pref_icon_display_mode_by_platform"),
+        // Where a video snap plays: the icon tile, or behind the whole crossbar.
+        stringPreferencesKey("pref_video_snap_placement"),
         // Theme cascade values. The applied theme's NAME and layout are plain data; the theme's
         // extracted icon files are not bundled, so theme_icons_stamp is deliberately absent —
         // restoring it would point observers at a directory that isn't there.
