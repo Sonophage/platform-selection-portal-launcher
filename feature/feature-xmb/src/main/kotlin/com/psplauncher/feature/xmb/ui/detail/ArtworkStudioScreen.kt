@@ -196,7 +196,7 @@ internal fun ArtworkStudioContent(
         Column(Modifier.fillMaxSize().padding(horizontal = 26.dp, vertical = 14.dp)) {
 
             // ── Header row (36 dp) — back, game title, and the query the providers are asked for ──
-            // Studio-local rather than the shared DetailBreadcrumb: this row carries a trailing
+            // Studio-local rather than a shared breadcrumb: this row carries a trailing
             // query field (L.3), and the breadcrumb's "Artwork Studio › category › source" trail
             // is what the approved mock replaces with flat tabs. The back arrow still walks the
             // level ladder exactly like B (grid → sources → categories → close).

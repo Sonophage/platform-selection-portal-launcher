@@ -5077,7 +5077,6 @@ class XMBViewModel @Inject constructor(
             // disc when direct launch skips Game Detail's picker. Launches the chosen disc.
             if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))
             if (item.platformId == WINDOWS_PLATFORM_ID) {
-                add(XMBContextMenuItem("install_goldberg", "Install Goldberg Achievements"))
                 // Writes this game's .pfpgame file so a fresh install can bring it back with its
                 // artwork (C18 task X.7). Offered on every PC game; the exporter explains a refusal.
                 add(XMBContextMenuItem("export_game", "Export Game"))
@@ -5821,10 +5820,7 @@ class XMBViewModel @Inject constructor(
 
     fun dismissInfoDialog() = _uiState.update { it.copy(infoDialog = null) }
 
-    // Per-game Goldberg conversion from the Shiba/game context menu. When the installer is off the
-    // user is told there is no proper achievements.json (and how to enable generation); when it is
-    // on, the game's emu folder is matched by title and its schema kit is written in place.
-    /** Export Game from the XMB menu (C18 task X.7); the outcome shows like Install Goldberg's. */
+    /** Export Game from the XMB menu (C18 task X.7); the exporter explains any refusal. */
     private fun exportGameFromMenu(gameId: Long) {
         viewModelScope.launch {
             val game = gameRepository.getById(gameId) ?: return@launch

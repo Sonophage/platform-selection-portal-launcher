@@ -537,8 +537,6 @@ private fun ServicesPage(
     WizardContinueRow(nextLabel, onContinue)
 }
 
-/** Achievement services — RetroAchievements and Steam. A separate page from [ServicesPage]. */
-
 @Composable
 private fun VitaPage(
     state: InitialSetupUiState,

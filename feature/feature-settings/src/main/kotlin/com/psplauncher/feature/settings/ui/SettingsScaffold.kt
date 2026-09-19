@@ -1126,7 +1126,7 @@ fun SettingsRow(
 /**
  * Wraps arbitrary [content] as a controller-focusable, confirm/tap-activatable settings element,
  * registering with the scaffold's focus system exactly like [SettingsRow]. Use for custom rows that
- * don't fit the label/sublabel layout (e.g. the Shiba player card). [content] receives whether the
+ * don't fit the label/sublabel layout. [content] receives whether the
  * element currently holds controller focus, so the caller can draw its own highlight.
  */
 @Composable
