@@ -5,6 +5,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.psplauncher.core.data.datastore.pfpDataStore
@@ -164,7 +165,7 @@ class UiMediaStore @Inject constructor(
         // Recorded here rather than by the caller: a slot with a file but no name would render
         // "Custom sound" forever, and there is no second place that knows the source Uri.
         recordDisplayName(slot, uri)
-        context.pfpDataStore.edit { prefs -> prefs[KEY_UI_MEDIA_STAMP] = System.currentTimeMillis() }
+        context.pfpDataStore.edit { prefs -> prefs.bumpUiMediaStamp() }
         ImportResult(true)
     }
 
@@ -181,7 +182,7 @@ class UiMediaStore @Inject constructor(
             context.pfpDataStore.edit { prefs ->
                 // The name goes with the file — a stale one would label the PFP default.
                 prefs.remove(displayNameKey(slot))
-                prefs[KEY_UI_MEDIA_STAMP] = System.currentTimeMillis()
+                prefs.bumpUiMediaStamp()
             }
         }
         removed
@@ -239,7 +240,7 @@ class UiMediaStore @Inject constructor(
         }
 
         if (removedAny) {
-            context.pfpDataStore.edit { it[KEY_UI_MEDIA_STAMP] = System.currentTimeMillis() }
+            context.pfpDataStore.edit { it.bumpUiMediaStamp() }
         }
         removedAny
     }
@@ -297,6 +298,23 @@ class UiMediaStore @Inject constructor(
      */
     private fun mimeGuessFor(file: File): String? =
         UiMediaLimits.mimeForExtension(file.extension.lowercase())
+
+    /**
+     * Moves the stamp on, inside whatever edit the caller is already making.
+     *
+     * The contract on [KEY_UI_MEDIA_STAMP] is that it changes on every import and clear so the
+     * observers reload, and a bare `System.currentTimeMillis()` does not deliver that: two writes
+     * landing in the same millisecond produce the same value, the flow does not emit, and the
+     * reload silently does not happen. `previous + 1` is the floor, so the value still reads as a
+     * timestamp while being strictly increasing.
+     *
+     * One function rather than three copies of the expression, because the three call sites have
+     * to agree and nothing would notice if one of them drifted.
+     */
+    private fun MutablePreferences.bumpUiMediaStamp() {
+        val previous = this[KEY_UI_MEDIA_STAMP] ?: 0L
+        this[KEY_UI_MEDIA_STAMP] = maxOf(previous + 1, System.currentTimeMillis())
+    }
 
     companion object {
         /** User UI media lives here, one file per slot, named `<slotKey>.<ext>`. */

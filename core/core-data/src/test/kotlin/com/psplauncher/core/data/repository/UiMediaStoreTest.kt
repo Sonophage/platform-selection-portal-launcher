@@ -253,6 +253,34 @@ class UiMediaStoreTest {
     // ── clear / clearAll ──────────────────────────────────────────────────────
 
     @Test
+    fun `every bump moves the stamp, even when the clock has not`() = runTest {
+        // The contract on ui_media_stamp is that observers reload on every import and clear, and
+        // an observer only reloads when the VALUE changes. A bare System.currentTimeMillis() write
+        // does not deliver that: two writes inside one millisecond store the same number, the flow
+        // never emits, and the reload silently does not happen. It also made this class's own
+        // "clear bumps the stamp" test fail roughly one run in three.
+        //
+        // The clock is seeded a minute ahead so the collision is exercised on purpose rather than
+        // hoped for: real time cannot reach the seeded value during the test, so every bump below
+        // has to come from the previous-plus-one floor.
+        val ahead = System.currentTimeMillis() + 60_000
+        context.pfpDataStore.edit { it[longPreferencesKey("ui_media_stamp")] = ahead }
+
+        probeReturns(100L)
+        store.import(UiMediaSlot.SOUND_SCROLL, register(wavBytes()))
+        val afterFirst = assertNotNull(stampPref())
+        assertTrue(afterFirst > ahead, "an import must move the stamp past a clock running ahead")
+
+        store.import(UiMediaSlot.SOUND_NOTIFICATION, register(wavBytes()))
+        val afterSecond = assertNotNull(stampPref())
+        assertTrue(afterSecond > afterFirst, "a second import in the same millisecond must move it again")
+
+        store.clear(UiMediaSlot.SOUND_SCROLL)
+        val afterClear = assertNotNull(stampPref())
+        assertTrue(afterClear > afterSecond, "a clear must move it again")
+    }
+
+    @Test
     fun `clear removes the slot file and bumps the stamp`() = runTest {
         probeReturns(100L)
         store.import(UiMediaSlot.SOUND_NOTIFICATION, register(wavBytes()))

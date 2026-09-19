@@ -14,8 +14,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -72,7 +74,7 @@ class DisplaySettingsViewModelFontColorTest {
     }
 
     @Test
-    fun `picking persists the long and clearing removes the key`() = runTest(dispatcher) {
+    fun `picking persists the long and clearing removes the key`() = uiTest {
         assertNull(vm.uiState.first().textColorArgb)
 
         vm.setTextColor(failingColor)
@@ -89,7 +91,7 @@ class DisplaySettingsViewModelFontColorTest {
     }
 
     @Test
-    fun `a colour that cannot pass raises the notice`() = runTest(dispatcher) {
+    fun `a colour that cannot pass raises the notice`() = uiTest {
         vm.setTextColor(failingColor)
         eventually("notice raised") { vm.uiState.first().textContrastNotice != null }
         assertNotNull(vm.uiState.first().textContrastNotice)
@@ -101,14 +103,14 @@ class DisplaySettingsViewModelFontColorTest {
     }
 
     @Test
-    fun `white raises no notice at all`() = runTest(dispatcher) {
+    fun `white raises no notice at all`() = uiTest {
         vm.setTextColor(0xFFFFFFFFL)
         eventually("colour surfaced") { vm.uiState.first().textColorArgb == 0xFFFFFFFFL }
         assertNull("white already passes on the solved scrim", vm.uiState.first().textContrastNotice)
     }
 
     @Test
-    fun `exact suppresses the adjustment notice and persists`() = runTest(dispatcher) {
+    fun `exact suppresses the adjustment notice and persists`() = uiTest {
         vm.setTextColorExact(true)
         eventually("exact persisted") {
             context.pfpDataStore.data.first()[KEY_EXACT] == true
@@ -124,7 +126,7 @@ class DisplaySettingsViewModelFontColorTest {
     }
 
     @Test
-    fun `suppressed stops the notice while adjustment continues`() = runTest(dispatcher) {
+    fun `suppressed stops the notice while adjustment continues`() = uiTest {
         vm.suppressTextContrastNotice()
         eventually("suppression persisted") {
             context.pfpDataStore.data.first()[KEY_NOTICE_SUPPRESSED] == true
@@ -138,7 +140,7 @@ class DisplaySettingsViewModelFontColorTest {
     }
 
     @Test
-    fun `an unknown persisted legibility style surfaces as the default`() = runTest(dispatcher) {
+    fun `an unknown persisted legibility style surfaces as the default`() = uiTest {
         context.pfpDataStore.edit { it[KEY_LEGIBILITY] = "PLATE_HEAVY" }
 
         eventually("stale value tolerated") {
@@ -152,7 +154,7 @@ class DisplaySettingsViewModelFontColorTest {
     }
 
     @Test
-    fun `cycling legibility persists the enum name`() = runTest(dispatcher) {
+    fun `cycling legibility persists the enum name`() = uiTest {
         val expected = TextLegibilityStyle.entries
         val start = expected.indexOf(TextLegibilityStyle.DEFAULT)
 
@@ -161,6 +163,26 @@ class DisplaySettingsViewModelFontColorTest {
             context.pfpDataStore.data.first()[KEY_LEGIBILITY] ==
                 expected[(start + 1) % expected.size].name
         }
+    }
+
+    /**
+     * Runs [body] with a live collector on `uiState` for the whole test.
+     *
+     * Without one, every read here is a race the test loses at random. `uiState` is shared with
+     * `SharingStarted.WhileSubscribed(5_000)`, and `first()` subscribes then leaves immediately
+     * with whatever value is already cached. The upstream it just started hops to
+     * `Dispatchers.IO` (a directory listing plus a DataStore read) while the very next
+     * `advanceUntilIdle()` advances VIRTUAL time past the five-second stop timeout and cancels
+     * it. The real IO lands after the cancellation, the cached value is never replaced, and the
+     * wait spins until it times out with the preference already written and the state still null.
+     *
+     * A subscriber that outlives the polling keeps the upstream alive, so the cached value is
+     * genuinely current and `first()` means what it appears to mean. backgroundScope is cancelled
+     * when the test ends.
+     */
+    private fun uiTest(body: suspend TestScope.() -> Unit) = runTest(dispatcher) {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
+        body()
     }
 
     /** Same wait idiom as the sibling legibility test — see its KDoc. */
