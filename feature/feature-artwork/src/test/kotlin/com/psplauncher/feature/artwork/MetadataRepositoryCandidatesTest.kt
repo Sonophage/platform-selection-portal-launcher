@@ -176,7 +176,10 @@ class MetadataRepositoryCandidatesTest {
                 boxArtUri = null,
                 physicalMediaUri = null,
                 box3dUri = null,
-                scrapedTitle = "Tgdb Title",
+                // The title deliberately does NOT ride this write. COALESCE would overwrite a
+                // name the library already shows, which is the rename this repository was
+                // changed to stop; it goes through the fill-only query asserted below instead.
+                scrapedTitle = null,
                 players = null,
                 ageRating = null,
                 franchise = null,
@@ -189,5 +192,42 @@ class MetadataRepositoryCandidatesTest {
                 romCrc32 = null,
             )
         }
+    }
+
+    /**
+     * The other half of the same contract.
+     *
+     * Asserting only that the title is absent from the COALESCE write would pass just as well if
+     * the scrape never persisted a title at all, which is the opposite bug: a game the scan knew
+     * only as a filename would stay unnamed forever. Both halves are pinned, in the same test
+     * class, because each one alone is satisfied by a broken implementation.
+     */
+    @Test
+    fun `a scrape fills the title through the fill-only write`() = runTest {
+        givenGame()
+        coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns tgdb
+
+        repo.fetchForGame(
+            1L, "raw_rom_name", "snes", romPath = null,
+            options = ScrapeOptions(metadataOnly = true),
+        )
+
+        coVerify(exactly = 1) { gameDao.fillScrapedTitleIfMissing(1L, "Tgdb Title") }
+    }
+
+    @Test
+    fun `a scrape does not touch the title of a game the user has named`() = runTest {
+        // user_title_override outranks scraped_title entirely, so filling the column would be
+        // dead data at best. The guard lives in MetadataRepository, not in the SQL, so the SQL's
+        // own "IS NULL" clause cannot be what catches this.
+        givenGame(userTitleOverride = "The Name I Chose")
+        coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns tgdb
+
+        repo.fetchForGame(
+            1L, "raw_rom_name", "snes", romPath = null,
+            options = ScrapeOptions(metadataOnly = true),
+        )
+
+        coVerify(exactly = 0) { gameDao.fillScrapedTitleIfMissing(any(), any()) }
     }
 }
