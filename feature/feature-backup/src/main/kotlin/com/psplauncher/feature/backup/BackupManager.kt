@@ -612,8 +612,7 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("pref_animated_icons"),
             // Launch behaviour
             booleanPreferencesKey("pref_direct_game_launch"),
-            // Achievements + artwork behaviour
-            booleanPreferencesKey("achievements_enabled"),
+            // Artwork behaviour
             booleanPreferencesKey("artwork_import_move_files"),
             booleanPreferencesKey("pref_dl_manuals"),
             booleanPreferencesKey("pref_dl_video_snaps"),

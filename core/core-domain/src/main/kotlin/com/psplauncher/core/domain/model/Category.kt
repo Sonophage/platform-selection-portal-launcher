@@ -42,7 +42,6 @@ object BuiltInCategory {
     const val ANDROID          = "android"
     const val APP_DRAWER       = "app_drawer"
     const val SETTINGS         = "settings"
-    const val ACHIEVEMENTS     = "achievements"
     /**
      * The Library section (books). Deliberately not "books": a user-made custom category of
      * that name already exists on established databases, and a built-in sharing its id would
@@ -58,5 +57,5 @@ object BuiltInCategory {
      * the same job `UiMediaStore.pruneOrphans()` does for retired media slots. As with those keys,
      * a retired id is deliberately NOT reused.
      */
-    val RETIRED_IDS = setOf("social")
+    val RETIRED_IDS = setOf("social", "achievements")
 }

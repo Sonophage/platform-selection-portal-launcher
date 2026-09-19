@@ -50,7 +50,6 @@ dependencies {
     implementation(project(":feature:feature-settings"))
     implementation(project(":feature:feature-launcher"))
     implementation(project(":feature:feature-artwork"))
-    implementation(project(":feature:feature-achievements"))
     implementation(project(":feature:feature-library"))
     // Renders @Preview composables in Android Studio (same as feature-settings / feature-appbar).
     debugImplementation(libs.compose.ui.tooling)

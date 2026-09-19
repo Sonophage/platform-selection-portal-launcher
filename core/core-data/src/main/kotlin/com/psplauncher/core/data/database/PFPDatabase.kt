@@ -6,8 +6,6 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.psplauncher.core.data.model.StorefrontIdentity
-import com.psplauncher.core.data.database.dao.AccountAchievementDao
-import com.psplauncher.core.data.database.dao.AccountAchievementSetDao
 import com.psplauncher.core.data.database.dao.AppOverrideDao
 import com.psplauncher.core.data.database.dao.ArtworkImportReportDao
 import com.psplauncher.core.data.database.dao.ArtworkRecordDao
@@ -22,7 +20,6 @@ import com.psplauncher.core.data.database.dao.MusicFolderDao
 import com.psplauncher.core.data.database.dao.MusicTrackDao
 import com.psplauncher.core.data.database.dao.PlaylistDao
 import com.psplauncher.core.data.database.dao.PlaySessionDao
-import com.psplauncher.core.data.database.dao.ProviderGameLinkDao
 import com.psplauncher.core.data.database.dao.PlatformDao
 import com.psplauncher.core.data.database.dao.ThemeDao
 import com.psplauncher.core.data.database.dao.UnmatchedRomDao
@@ -32,14 +29,10 @@ import com.psplauncher.core.data.database.dao.BookLibraryDao
 import com.psplauncher.core.data.database.dao.PhotoDao
 import com.psplauncher.core.data.database.dao.PhotoLibraryDao
 import com.psplauncher.core.data.database.dao.ScanTombstoneDao
-import com.psplauncher.core.data.database.dao.SteamOwnedGamesDao
 import com.psplauncher.core.data.database.dao.SsMediaCacheDao
 import com.psplauncher.core.data.database.dao.VideoDao
 import com.psplauncher.core.data.database.dao.VideoLibraryDao
 import com.psplauncher.core.data.database.dao.VideoPlaylistDao
-import com.psplauncher.core.data.database.entity.AccountAchievementEntity
-import com.psplauncher.core.data.database.entity.AccountAchievementSetEntity
-import com.psplauncher.core.data.database.entity.AchievementMatchNoteEntity
 import com.psplauncher.core.data.database.entity.AppOverrideEntity
 import com.psplauncher.core.data.database.entity.ArtworkImportReportEntity
 import com.psplauncher.core.data.database.entity.ArtworkRecordEntity
@@ -56,7 +49,6 @@ import com.psplauncher.core.data.database.entity.MusicTrackEntity
 import com.psplauncher.core.data.database.entity.PlaylistEntity
 import com.psplauncher.core.data.database.entity.PlaylistTrackEntity
 import com.psplauncher.core.data.database.entity.PlaySessionEntity
-import com.psplauncher.core.data.database.entity.ProviderGameLinkEntity
 import com.psplauncher.core.data.database.entity.PlatformEntity
 import com.psplauncher.core.data.database.entity.ThemeEntity
 import com.psplauncher.core.data.database.entity.UnmatchedRomEntity
@@ -67,8 +59,6 @@ import com.psplauncher.core.data.database.entity.PhotoEntity
 import com.psplauncher.core.data.database.entity.PhotoLibraryEntity
 import com.psplauncher.core.data.database.entity.ScanTombstoneEntity
 import com.psplauncher.core.data.database.entity.SsMediaCacheEntity
-import com.psplauncher.core.data.database.entity.SteamNoAchievementsEntity
-import com.psplauncher.core.data.database.entity.SteamOwnedGameEntity
 import com.psplauncher.core.data.database.entity.VideoEntity
 import com.psplauncher.core.data.database.entity.VideoLibraryEntity
 import com.psplauncher.core.data.database.entity.VideoPlaylistEntity
@@ -104,12 +94,6 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
         ArtworkRecordEntity::class,
         ArtworkImportReportEntity::class,
         SsMediaCacheEntity::class,
-        AccountAchievementSetEntity::class,
-        AccountAchievementEntity::class,
-        ProviderGameLinkEntity::class,
-        AchievementMatchNoteEntity::class,
-        SteamOwnedGameEntity::class,
-        SteamNoAchievementsEntity::class,
         BookLibraryEntity::class,
         BookEntity::class,
     ],
@@ -146,11 +130,6 @@ abstract class PFPDatabase : RoomDatabase() {
     abstract fun artworkRecordDao(): ArtworkRecordDao
     abstract fun artworkImportReportDao(): ArtworkImportReportDao
     abstract fun ssMediaCacheDao(): SsMediaCacheDao
-    abstract fun accountAchievementSetDao(): AccountAchievementSetDao
-    abstract fun accountAchievementDao(): AccountAchievementDao
-    abstract fun steamOwnedGamesDao(): SteamOwnedGamesDao
-    abstract fun providerGameLinkDao(): ProviderGameLinkDao
-    abstract fun achievementMatchNoteDao(): com.psplauncher.core.data.database.dao.AchievementMatchNoteDao
 
     companion object {
         const val DATABASE_NAME = "pfp_database"
