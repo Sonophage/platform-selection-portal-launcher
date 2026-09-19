@@ -66,6 +66,7 @@ class ArtworkSettingsDebugCredentialsTest {
                 every { modeFlow } returns flowOf(com.psplauncher.core.domain.model.IconDisplayMode.DEFAULT)
                 every { animatedIconsFlow } returns flowOf(true)
                 every { snapPlacementFlow } returns flowOf(VideoSnapPlacement.ICON)
+                every { gameMetadataFlow } returns flowOf(true)
                 every { lingerDelaySecondsFlow } returns flowOf(1.5f)
             },
             cropPreviewPreferences = mockk(relaxed = true) { every { enabledFlow } returns flowOf(true) },

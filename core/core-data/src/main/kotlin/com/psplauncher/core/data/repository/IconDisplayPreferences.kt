@@ -57,6 +57,14 @@ class IconDisplayPreferences @Inject constructor(
     suspend fun setSnapPlacement(placement: VideoSnapPlacement) =
         context.pfpDataStore.edit { it[KEY_SNAP_PLACEMENT] = placement.name }
 
+    // Whether the focused game's scraped one-liner (year, genre, developer, players) is drawn
+    // under its logo. On by default: a scraped library has the data and the XMB never showed it.
+    val gameMetadataFlow: Flow<Boolean> = context.pfpDataStore.data
+        .map { it[KEY_GAME_METADATA] ?: true }
+
+    suspend fun setGameMetadata(enabled: Boolean) =
+        context.pfpDataStore.edit { it[KEY_GAME_METADATA] = enabled }
+
     // How long the cursor must rest on a game (ICON0 tile) before its ICON1 video snap plays.
     // Seconds, clamped to 1..5; the 1.5 s default keeps the PSP's rest-then-animate cadence.
     val lingerDelaySecondsFlow: Flow<Float> = context.pfpDataStore.data
@@ -72,6 +80,8 @@ class IconDisplayPreferences @Inject constructor(
         private val KEY_ICON1_LINGER_DELAY_SECONDS =
             floatPreferencesKey("pref_icon1_linger_delay_seconds")
         private val KEY_SNAP_PLACEMENT = stringPreferencesKey("pref_video_snap_placement")
+        private val KEY_GAME_METADATA =
+            androidx.datastore.preferences.core.booleanPreferencesKey("pref_xmb_game_metadata")
 
         // "platformId=MODE" per line. Pure and internal-free so the encoding is unit-testable;
         // anything unparseable is dropped rather than failing the whole read, so one bad entry

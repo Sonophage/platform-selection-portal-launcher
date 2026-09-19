@@ -76,6 +76,7 @@ class ArtworkSettingsViewModelTest {
             every { modeFlow } returns flowOf(com.psplauncher.core.domain.model.IconDisplayMode.DEFAULT)
             every { animatedIconsFlow } returns flowOf(true)
             every { snapPlacementFlow } returns flowOf(VideoSnapPlacement.ICON)
+            every { gameMetadataFlow } returns flowOf(true)
             every { lingerDelaySecondsFlow } returns flowOf(1.5f)
         }
         coEvery { artworkRepository.computeStatus() }    returns ArtworkStatus(total = 10, complete = 8, missing = 2)

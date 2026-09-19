@@ -757,6 +757,8 @@ data class XMBUiState(
     // re-evaluates the moment the user changes the setting.
     val snapPlacement: com.psplauncher.core.domain.model.VideoSnapPlacement =
         com.psplauncher.core.domain.model.VideoSnapPlacement.DEFAULT,
+    // Whether the focused game's scraped one-liner is drawn under its logo.
+    val gameMetadataVisible: Boolean = true,
     val librarySetupComplete: Boolean = false,
     val themeColors: PFPColors = DefaultPFPColors,
     // Custom icon slots of the applied theme (theme slot key → CustomIcon); empty = the
@@ -1242,6 +1244,32 @@ fun shouldShowSettingsHint(state: XMBUiState, idleMs: Long): Boolean =
         state.activeSettingsScreen != null &&
         idleMs >= (state.contextMenuHintDelaySeconds * 1_000f).toLong()
 
+/**
+ * The scraped one-liner under a focused game's logo: year, genre, developer, player count, in
+ * that order, separated by a middle dot. Any field the scraper never filled is simply left out
+ * rather than printed empty, and a game with none of them gets null so nothing is drawn at all.
+ *
+ * Pure and top-level so the formatting is testable without a ViewModel: the interesting cases
+ * are all absence, and absence is exactly what a UI test would be worst at catching.
+ */
+internal fun gameMetadataLine(
+    releaseYear: Int?,
+    genre: String?,
+    developer: String?,
+    players: String?,
+): String? {
+    fun String?.clean(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+    val parts = listOfNotNull(
+        // Year 0 is the scraper's "unknown", not the year zero.
+        releaseYear?.takeIf { it > 0 }?.toString(),
+        genre.clean(),
+        developer.clean(),
+        // Stored as "1", "1-2", "1-5". The count is meaningless without the noun.
+        players.clean()?.let { if (it == "1") "1 player" else "$it players" },
+    )
+    return parts.takeIf { it.isNotEmpty() }?.joinToString("   ·   ")
+}
+
 data class XMBItem(
     val id: String,
     val title: String,
@@ -1256,6 +1284,10 @@ data class XMBItem(
     val box3dUri: String? = null,
     val iconDisplayModeOverride: String? = null,
     val subtitle: String? = null,
+    // One-line scraped metadata for a game row, shown under the PIC0 logo when the user has it
+    // on. Formatted once here rather than carrying four nullable columns into the UI, and null
+    // when the game was never scraped.
+    val metadataLine: String? = null,
     val gameId: Long? = null,
     val platformId: String? = null,
     val collectionId: Long? = null,     // set on COLLECTION rows in the Games root
@@ -4508,6 +4540,7 @@ class XMBViewModel @Inject constructor(
             box3dUri     = g.box3dUri,
             iconDisplayModeOverride = g.iconDisplayMode,
             subtitle     = platformEmulatorLabel(g),
+            metadataLine = gameMetadataLine(g.releaseYear, g.genre, g.developer, g.players),
             gameId       = g.id,
             platformId   = g.platformId,
             accentColor  = platformCache[g.platformId]?.accentColor,
@@ -7770,6 +7803,11 @@ class XMBViewModel @Inject constructor(
             iconDisplayPreferences.animatedIconsFlow.collect { enabled ->
                 animatedIconsEnabled = enabled
                 if (!enabled) _uiState.update { it.copy(focusedGameVideo = null) }
+            }
+        }
+        viewModelScope.launch {
+            iconDisplayPreferences.gameMetadataFlow.collect { visible ->
+                _uiState.update { it.copy(gameMetadataVisible = visible) }
             }
         }
         viewModelScope.launch {

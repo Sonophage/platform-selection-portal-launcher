@@ -65,6 +65,8 @@ data class ArtworkSettingsUiState(
     // Icon tile (PSP, Custom Icon mode only) or full-bleed behind the crossbar (PS3, any mode).
     val snapPlacement: com.psplauncher.core.domain.model.VideoSnapPlacement =
         com.psplauncher.core.domain.model.VideoSnapPlacement.DEFAULT,
+    // The focused game's scraped one-liner under its logo on the XMB.
+    val gameMetadata: Boolean = true,
     // How long the cursor must rest on a game before its video snap plays (Video Snap Delay,
     // under the Animated Icons toggle). Seconds, clamped 1..5; default 1.5 matches the PSP.
     val icon1LingerDelaySeconds: Float = 1.5f,
@@ -112,6 +114,11 @@ class ArtworkSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iconDisplayPreferences.snapPlacementFlow.collect { placement ->
                 _extra.update { it.copy(snapPlacement = placement) }
+            }
+        }
+        viewModelScope.launch {
+            iconDisplayPreferences.gameMetadataFlow.collect { visible ->
+                _extra.update { it.copy(gameMetadata = visible) }
             }
         }
         viewModelScope.launch {
@@ -461,6 +468,11 @@ class ArtworkSettingsViewModel @Inject constructor(
         val entries = com.psplauncher.core.domain.model.VideoSnapPlacement.entries
         val next = entries[(entries.indexOf(_extra.value.snapPlacement) + 1) % entries.size]
         viewModelScope.launch { iconDisplayPreferences.setSnapPlacement(next) }
+    }
+
+    fun setGameMetadata(enabled: Boolean) {
+        _extra.update { it.copy(gameMetadata = enabled) }
+        viewModelScope.launch { iconDisplayPreferences.setGameMetadata(enabled) }
     }
 
     fun setIcon1LingerDelaySeconds(seconds: Float) {

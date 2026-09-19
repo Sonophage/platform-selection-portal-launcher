@@ -223,6 +223,13 @@ fun ArtworkSettingsScreen(
                 )
 
                 SettingsToggleRow(
+                    label    = "Game Info Line",
+                    sublabel = "Show the focused game's year, genre, developer and players under its logo",
+                    checked  = state.gameMetadata,
+                    onToggle = { viewModel.setGameMetadata(it) },
+                )
+
+                SettingsToggleRow(
                     label    = "Animated Icons",
                     sublabel = "Play a game's video snap after resting on it (skipped on low battery)",
                     checked  = state.animatedIcons,

@@ -612,6 +612,7 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("display_solid_unfocused_icons"),
             booleanPreferencesKey("display_text_shadow"),
             booleanPreferencesKey("pref_animated_icons"),
+            booleanPreferencesKey("pref_xmb_game_metadata"),
             // Launch behaviour
             booleanPreferencesKey("pref_direct_game_launch"),
             // Artwork behaviour

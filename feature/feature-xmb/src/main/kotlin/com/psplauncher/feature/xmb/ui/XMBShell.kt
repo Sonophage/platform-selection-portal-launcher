@@ -612,6 +612,54 @@ fun XMBShell(
                 }
             }
 
+            // The focused game's scraped one-liner, right-aligned under where the logo sits.
+            // Deliberately NOT a row label: XMBItemList's rule is that a game with a logo shows
+            // no text, because the logo IS the identity. This is the other half of the PS3's
+            // game info -- what the thing IS, not what it is called -- so it lives with the
+            // logo rather than in the list.
+            val metadataLine = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
+                ?.takeIf { uiState.gameMetadataVisible && it.isRealGame }
+                ?.metadataLine
+            var metaVisible by remember(metadataLine) { mutableStateOf(false) }
+            androidx.compose.runtime.LaunchedEffect(metadataLine) {
+                if (metadataLine != null) {
+                    // The same 650 ms as the logo, so the two land together rather than the
+                    // text arriving first and the logo catching up.
+                    kotlinx.coroutines.delay(650)
+                    metaVisible = true
+                }
+            }
+            val metaAlpha by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (metaVisible && metadataLine != null) 1f else 0f,
+                animationSpec = if (metaVisible) tween(500) else androidx.compose.animation.core.snap(),
+                label = "gameMetaFade",
+            )
+            if (metadataLine != null && metaAlpha > 0f) {
+                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                    androidx.compose.material3.Text(
+                        text = metadataLine,
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 12.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        style = androidx.compose.ui.text.TextStyle(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.8f),
+                                offset = androidx.compose.ui.geometry.Offset(0f, 2f),
+                                blurRadius = 5f,
+                            ),
+                        ),
+                        // The logo box is 38% of the height, centred, so its lower edge is at
+                        // 19%. This clears it by a line.
+                        modifier = Modifier
+                            .offset(y = maxHeight * 0.22f)
+                            .padding(end = 44.dp)
+                            .alpha(metaAlpha),
+                    )
+                }
+            }
+
             XmbPspStatusStrip(
                 sortLabel = uiState.sortLabel,
                 showSortButton = uiState.resolvedShowTouchButton,
