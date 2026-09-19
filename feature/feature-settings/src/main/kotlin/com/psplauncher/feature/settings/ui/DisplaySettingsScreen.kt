@@ -159,7 +159,16 @@ fun DisplaySettingsScreen(
 
     SettingsScaffold(
         title    = "Settings",
-        subtitle = "Display",
+        // The header names the entry point, not the file. Five rows open this one screen, and a
+        // breadcrumb reading "Display" for the row you picked called Layout is its own small lie.
+        subtitle = when (section) {
+            DisplaySection.APPEARANCE  -> "Wallpaper & Text"
+            DisplaySection.LAYOUT      -> "Layout"
+            DisplaySection.BOOT        -> "Boot"
+            DisplaySection.INPUT       -> "Touch"
+            DisplaySection.PERFORMANCE -> "Performance"
+            null                       -> "Display"
+        },
         onBack   = onBack,
         modifier = modifier,
         // Empty, not SettingsDefaultHelperItems: SettingsHelperFooter already falls back with

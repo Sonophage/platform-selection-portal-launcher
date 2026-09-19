@@ -70,7 +70,10 @@ fun ArtworkSettingsScreen(
 
     SettingsScaffold(
         title    = "Settings",
-        subtitle = "Artwork",
+        subtitle = when (section) {
+            ArtworkSection.SOURCES -> "Scraping Sources"
+            else                   -> "Artwork"
+        },
         onBack   = onBack,
         modifier = modifier,
     ) {
