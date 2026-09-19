@@ -65,8 +65,15 @@ adb -s $D logcat -d | grep -iE "FATAL|AndroidRuntime|MissingBinding|initializati
 
 ## 2. The migration ran, and took only what it should
 
+**Pull the write-ahead log too, or you are reading a stale snapshot.** SQLite keeps recent writes
+in `-wal` until a checkpoint, so a database copied on its own can be minutes behind. Reading one
+without its WAL during this very check reported a retired category as un-pruned when it had in fact
+been deleted.
+
 ```bash
-adb -s $D exec-out "run-as $P cat databases/pfp_database" > /tmp/after.db
+rm -f /tmp/after.db /tmp/after.db-wal
+adb -s $D exec-out "run-as $P cat databases/pfp_database"     > /tmp/after.db
+adb -s $D exec-out "run-as $P cat databases/pfp_database-wal" > /tmp/after.db-wal
 python3 -c "
 import sqlite3; c=sqlite3.connect('/tmp/after.db')
 print('user_version', c.execute('PRAGMA user_version').fetchone()[0], '(want 46)')
