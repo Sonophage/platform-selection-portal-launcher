@@ -97,7 +97,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
         BookLibraryEntity::class,
         BookEntity::class,
     ],
-    version = 45,
+    version = 46,
     exportSchema = true,        // schema JSON exported to /schemas/ for migration auditing
 )
 @TypeConverters(PFPTypeConverters::class)
@@ -1322,6 +1322,29 @@ abstract class PFPDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE books ADD COLUMN series TEXT")
                 db.execSQL("ALTER TABLE books ADD COLUMN series_index REAL")
                 db.execSQL("ALTER TABLE books ADD COLUMN cover_uri TEXT")
+            }
+        }
+
+        /**
+         * v46 — achievement tracking is gone, and so are its tables.
+         *
+         * Six tables, dropped outright: the feature was removed at the user's request and the rows
+         * are dead weight that every later migration and every backup would otherwise carry
+         * forever. This is the one destructive migration in the project, so it names each table
+         * explicitly rather than looping over a pattern, and it touches nothing else. `games`,
+         * `platforms` and the rest of the library are not referenced here at all.
+         *
+         * `IF EXISTS` on each: a database seeded before the tables existed is upgraded by the same
+         * path, and it must not fail on a table it never had.
+         */
+        val MIGRATION_45_46 = object : Migration(45, 46) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS account_achievements")
+                db.execSQL("DROP TABLE IF EXISTS account_achievement_sets")
+                db.execSQL("DROP TABLE IF EXISTS achievement_match_notes")
+                db.execSQL("DROP TABLE IF EXISTS provider_game_links")
+                db.execSQL("DROP TABLE IF EXISTS steam_owned_games")
+                db.execSQL("DROP TABLE IF EXISTS steam_no_achievements")
             }
         }
     }
