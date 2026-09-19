@@ -21,16 +21,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // JitPack: builds the official RetroAchievements api-kotlin client from source (Maven tag
-        // 2.0.0) plus its NetworkResponseAdapter dep, which is also JitPack-only. Scoped to just
-        // those two groups so it can't shadow anything else.
-        maven {
-            url = uri("https://jitpack.io")
-            content {
-                includeGroup("com.github.RetroAchievements")
-                includeGroup("com.github.haroldadmin")
-            }
-        }
     }
 }
 

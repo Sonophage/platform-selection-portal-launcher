@@ -81,7 +81,7 @@ fun ArtworkSettingsScreen(
                 SettingsRow(
                     label    = "Load Credentials File",
                     sublabel = "Fill every artwork and achievement credential from a .properties file " +
-                        "(steamgriddb.apiKey, thegamesdb.apiKey, igdb.*, screenscraper.*, retroachievements.*, steam.*)",
+                        "(steamgriddb.apiKey, thegamesdb.apiKey, igdb.*, screenscraper.*)",
                     onClick  = { credentialsFilePicker.launch(arrayOf("*/*")) },
                 )
 

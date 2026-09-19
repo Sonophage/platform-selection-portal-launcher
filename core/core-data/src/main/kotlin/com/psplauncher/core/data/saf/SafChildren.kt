@@ -38,8 +38,8 @@ fun safScanStartDocId(context: android.content.Context, uri: Uri): String =
 
 // ── document-id surgery ───────────────────────────────────────────────────────
 // Reaching a file that sits NEXT to one you already hold a grant for: a .cue/.gdi sheet naming its
-// .bin/track siblings. Shared by the library region reader and the achievements disc opener, which
-// live in sibling feature modules and so cannot borrow it from each other.
+// .bin/track siblings. Lives here so any feature module can reach it without borrowing from a
+// sibling.
 
 /**
  * The document id of a file sitting next to [documentId]. Ids are "volume:dirs/name", so the

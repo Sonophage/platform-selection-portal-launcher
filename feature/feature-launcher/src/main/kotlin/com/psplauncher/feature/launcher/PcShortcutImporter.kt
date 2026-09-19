@@ -20,15 +20,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Links a freshly imported PC game to its achievement provider when the id is certain.
- * Declared here so the importer stays achievement-agnostic; feature-achievements binds the
- * STEAM implementation.
- */
-interface PcGameAchievementLinker {
-    suspend fun linkSteam(gameId: Long, appId: String)
-}
-
 /** Outcome of one shortcut import; [setup] tells the caller whether to raise the setup prompt. */
 data class PcShortcutImportResult(
     val gameId: Long,
@@ -56,7 +47,6 @@ class PcShortcutImporter @Inject constructor(
     private val gameRepository: GameRepository,
     private val memoryCards: MemoryCardRepository,
     private val windowsLibrary: WindowsLibrarySetup,
-    private val achievementLinker: PcGameAchievementLinker,
 ) {
     /** The routing gate: true when [hostPackage] is a fingerprint-verified PC launcher. */
     fun isPcLauncher(hostPackage: String?): Boolean =
@@ -173,8 +163,6 @@ class PcShortcutImporter @Inject constructor(
             // GameNative's shortcut ids are Steam appids, so a pin carries a real storefront
             // identity — kept so the game is matchable by id, not only by its label (C16 0.5).
             gameRepository.updateStorefrontIdentity(gameId, "STEAM", appId)
-            runCatching { achievementLinker.linkSteam(gameId, appId) }
-                .onFailure { Timber.e(it, "STEAM link failed for appid $appId") }
         }
         return finish(gameId, added = existing == null, what = "pin \"$label\" from $hostPackage")
     }
@@ -206,10 +194,6 @@ class PcShortcutImporter @Inject constructor(
         // the v43 backfill reads, recorded here at import time instead (C16 task 0.5).
         StorefrontIdentity.fromLaunchIntentUri(intentUri)?.let { (store, storeId) ->
             gameRepository.updateStorefrontIdentity(gameId, store, storeId)
-        }
-        steamAppIdFromIntentUri(intentUri)?.let { appId ->
-            runCatching { achievementLinker.linkSteam(gameId, appId) }
-                .onFailure { Timber.e(it, "STEAM link failed for appid $appId") }
         }
         return finish(gameId, added = existing == null, what = "legacy shortcut \"$label\" from $hostPackage")
     }
@@ -251,7 +235,7 @@ class PcShortcutImporter @Inject constructor(
             return appId?.takeIf { it.isNotEmpty() && it.length <= 12 && it.all(Char::isDigit) }
         }
 
-        // Mirrors the Windows-card dedupe rule (normalizePcTitle / LocalSteamGameImporter).
+        // Mirrors the Windows-card dedupe rule (normalizePcTitle).
         fun normalizeTitle(title: String): String =
             title.lowercase().filter { it.isLetterOrDigit() }
     }

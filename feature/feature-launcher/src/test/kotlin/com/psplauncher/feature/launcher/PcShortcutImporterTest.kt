@@ -31,11 +31,9 @@ class PcShortcutImporterTest {
     private val gameRepository = mockk<GameRepository>()
     private val memoryCards = mockk<MemoryCardRepository>(relaxed = true)
     private val windowsLibrary = mockk<WindowsLibrarySetup>(relaxed = true)
-    private val linker = mockk<PcGameAchievementLinker>(relaxed = true)
 
     private fun importer() = PcShortcutImporter(
-        mockk<Context>(relaxed = true), gameRepository, memoryCards, windowsLibrary, linker,
-    )
+        mockk<Context>(relaxed = true), gameRepository, memoryCards, windowsLibrary, )
 
     private fun ready() {
         coEvery { windowsLibrary.ensure() } returns WindowsSetupState.Ready("/storage/emulated/0/Roms/windows")

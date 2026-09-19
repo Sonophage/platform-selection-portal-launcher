@@ -35,7 +35,7 @@ interface GameDao {
 
     // Multi-disc projection (docs/plans/README.md (C1)): one row per disc set —
     // the primary — for the All Games surface. The unprojected [observeGamesOnly] above stays
-    // untouched for per-disc achievement matching.
+    // untouched per disc.
     @Query(
         """
         SELECT * FROM games

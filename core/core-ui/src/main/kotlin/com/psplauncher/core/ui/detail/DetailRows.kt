@@ -143,7 +143,7 @@ fun PfpDetailInfoRow(
 }
 
 /**
- * A labelled row carrying a progress figure (the Shiba Coins summary): value line plus a bar.
+ * A labelled row carrying a progress figure: value line plus a bar.
  *
  * Progress never depends on colour alone — the earned/total pair and the percentage are both
  * spelled out, and the bar is only the quick read.

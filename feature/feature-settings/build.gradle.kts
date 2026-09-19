@@ -65,7 +65,6 @@ dependencies {
     implementation(project(":core:core-ui"))
     implementation(project(":core:core-navigation"))
     implementation(project(":feature:feature-artwork"))
-    // AchievementCredentialsProvider + SteamAchievementsApi for the Shiba Coins connect screen
     // EmulatorProfileRepository
     implementation(project(":feature:feature-launcher"))
     // BackupManager and workers
