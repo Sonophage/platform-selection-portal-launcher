@@ -247,7 +247,7 @@ fun WizardRootRow(
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "Remove folder",
-                    tint = Color(0xFFE55353),
+                    tint = SettingsSubtext,
                     modifier = Modifier
                         .background(Color.Black.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
                         .padding(4.dp),

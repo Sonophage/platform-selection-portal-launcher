@@ -101,6 +101,7 @@ fun VideoSettingsContent(
                 addLabel    = "Add Video Root",
                 addSublabel = "Grant a root folder (e.g. /Movies) — add several to span locations",
                 emptyLabel   = "No video folders yet",
+                rootKindLabel = "Video folder",
                 onAddRoot   = onAddRoot,
                 onRelinkRoot = onRelinkRoot,
                 onRemoveRoot = onRemoveRoot,

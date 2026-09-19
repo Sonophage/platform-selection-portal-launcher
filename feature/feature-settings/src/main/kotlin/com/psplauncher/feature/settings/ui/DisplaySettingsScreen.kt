@@ -288,14 +288,12 @@ fun DisplaySettingsScreen(
                 if (state.customWallpaperPath == null) {
                     SettingsValueRow(
                         label    = "Wave Style",
-                        sublabel = "Animated   |   Reduced (dimmer, calmer)   |   Static (frozen)   |   Reduced + Static",
                         value    = state.waveStyleLabel,
                         onClick  = { viewModel.cycleWaveStyle() },
                     )
                 } else if (state.motionWallpaperPath != null) {
                     SettingsValueRow(
                         label    = "Background Motion",
-                        sublabel = "Animated   |   Reduced (slower, calmer)   |   Static (still image)",
                         value    = state.waveStyleLabel,
                         onClick  = { viewModel.cycleWaveStyle() },
                     )
@@ -305,8 +303,7 @@ fun DisplaySettingsScreen(
                 // it matters most over a wallpaper, but still applies over the wave.
                 SettingsValueRow(
                     label    = "Icon Legibility",
-                    sublabel = "How XMB icons separate from the background.  " +
-                        "None  |  Offset Shadow  |  Contour (Dark)  |  Contour (Light)  |  Contour (Auto — follows the icon color)",
+                    sublabel = "How XMB icons separate from the background",
                     value    = state.iconLegibility.label,
                     onClick  = { viewModel.cycleIconLegibility() },
                 )
@@ -364,8 +361,7 @@ fun DisplaySettingsScreen(
 
                 SettingsValueRow(
                     label    = "Text Legibility",
-                    sublabel = "How text separates from what is behind it.  " +
-                        "Automatic  |  None  |  Drop Shadow  |  Outline  |  Contrast Plate",
+                    sublabel = "How text separates from what is behind it",
                     value    = state.textLegibility.label,
                     onClick  = { viewModel.cycleTextLegibility() },
                 )
@@ -495,15 +491,14 @@ fun DisplaySettingsScreen(
 
                 SettingsValueRow(
                     label    = "Touch Navigation Button",
-                    sublabel = "On-screen App Drawer / Back button.  Auto — show only while using touch  |  " +
-                        "Always Show  |  Always Hide (controller-only)",
+                    sublabel = "On-screen App Drawer / Back button",
                     value    = viewModel.touchNavButtonLabel(),
                     onClick  = { viewModel.cycleTouchNavButtonMode() },
                 )
 
                 SettingsValueRow(
                     label    = "Touch Sensitivity",
-                    sublabel = "How far a swipe travels per XMB step.  Low — steadier  |  Normal  |  High — faster scrubbing",
+                    sublabel = "How far a swipe travels per XMB step",
                     value    = viewModel.touchSensitivityLabel(),
                     onClick  = { viewModel.cycleTouchSensitivity() },
                 )

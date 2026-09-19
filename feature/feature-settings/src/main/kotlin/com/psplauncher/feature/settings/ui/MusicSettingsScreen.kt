@@ -102,6 +102,7 @@ fun MusicSettingsContent(
                 addLabel    = "Add Music Root",
                 addSublabel = "Grant a root folder (e.g. /Music) — add several to span locations",
                 emptyLabel   = "No music folders yet",
+                rootKindLabel = "Music folder",
                 onAddRoot   = onAddRoot,
                 onRelinkRoot = onRelinkRoot,
                 onRemoveRoot = onRemoveRoot,

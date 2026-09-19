@@ -7,17 +7,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.XYLayout
 import com.psplauncher.core.ui.components.ControllerPromptItem
+
+// Destructive actions rest muted and only turn red once focused: with the row bands gone,
+// a saturated red glyph was the loudest thing on every screen it appeared on.
+private val DangerRed = Color(0xFFE55353)
 
 /**
  * One user-media assignment row: what it is, what is currently assigned, and the two
@@ -50,14 +51,7 @@ fun MediaAssignmentRow(
         focusKey = focusKey,
         onClick = onPick,
         onFocusChangedExternal = onFocusChanged,
-        trailing = {
-            Text(
-                text = value,
-                color = SettingsAccent,
-                fontSize = 13.sp,
-                style = TextStyle(shadow = SettingsTextShadow),
-            )
-        },
+        value = value,
         actions = buildList {
             add(
                 SettingsRowAction(
@@ -78,12 +72,12 @@ fun MediaAssignmentRow(
                 add(
                     SettingsRowAction(
                         "Use the PFP default for $label", onUseDefault,
-                        actionFocusBackgroundColor = lerp(Color(0xFFE55353), Color.Black, 0.50f),
+                        actionFocusBackgroundColor = lerp(DangerRed, Color.Black, 0.50f),
                     ) {
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Use the PFP default for $label",
-                            tint = Color(0xFFE55353),
+                            tint = SettingsSubtext,
                             modifier = Modifier
                                 .background(Color.Black.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
                                 .padding(4.dp),

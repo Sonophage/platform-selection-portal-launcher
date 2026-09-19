@@ -106,6 +106,7 @@ fun BooksSettingsContent(
                 addLabel     = "Add Book Root",
                 addSublabel  = "Grant a root folder (e.g. /Books) — add several to span locations",
                 emptyLabel   = "No book folders yet",
+                rootKindLabel = "Book folder",
                 onAddRoot    = onAddRoot,
                 onRelinkRoot = onRelinkRoot,
                 onRemoveRoot = onRemoveRoot,

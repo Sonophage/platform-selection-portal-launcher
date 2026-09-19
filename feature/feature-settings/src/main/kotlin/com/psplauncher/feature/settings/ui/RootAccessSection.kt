@@ -16,6 +16,10 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import com.psplauncher.feature.settings.viewmodel.RootFolderRow
 
+// Destructive actions rest muted and only turn red once focused: with the row bands gone,
+// a saturated red glyph was the loudest thing on every screen it appeared on.
+private val DangerRed = Color(0xFFE55353)
+
 @Composable
 fun RootAccessSection(
     groupTitle: String,
@@ -26,6 +30,9 @@ fun RootAccessSection(
     // written for; every media section that reuses it was showing that too, which is why it
     // is a parameter rather than a constant.
     emptyLabel: String = "No ROM roots configured",
+    // What a granted root row says under its name. Same reason emptyLabel is a parameter: every
+    // media section reusing this component was calling its folder a ROM root.
+    rootKindLabel: String = "ROM root",
     onAddRoot: () -> Unit,
     onRelinkRoot: (RootFolderRow) -> Unit,
     onRemoveRoot: (RootFolderRow) -> Unit,
@@ -47,7 +54,7 @@ fun RootAccessSection(
                 sublabel = when {
                     !root.linked -> "Access lost — use Edit to re-grant access"
                     root.consoles != null -> "Consoles: ${root.consoles}"
-                    else -> "ROM root"
+                    else -> rootKindLabel
                 },
                 onEdit = { onRelinkRoot(root) },
                 onRemove = { onRemoveRoot(root) },
@@ -93,12 +100,12 @@ fun DirectoryRow(
             },
             SettingsRowAction(
                 "Remove directory", onRemove,
-                actionFocusBackgroundColor = lerp(Color(0xFFE55353), Color.Black, 0.50f),
+                actionFocusBackgroundColor = lerp(DangerRed, Color.Black, 0.50f),
             ) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "Remove directory",
-                    tint = Color(0xFFE55353),
+                    tint = SettingsSubtext,
                     modifier = Modifier
                         .background(Color.Black.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
                         .padding(4.dp)

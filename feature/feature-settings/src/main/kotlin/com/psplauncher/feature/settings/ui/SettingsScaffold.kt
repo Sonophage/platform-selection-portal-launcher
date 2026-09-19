@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.HorizontalDivider
 import com.psplauncher.themekit.XmbLayoutSpec
 import androidx.compose.material3.IconButton
@@ -75,6 +76,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
@@ -198,10 +200,6 @@ private fun reseedFocus(
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
-// The backdrop scrim is a fixed translucent black: the theme gradient and the wallpaper read
-// through it by design, so tinting it would tint them twice.
-val SettingsBg = Color(0xE6000000)
-
 // Accent is a composable GETTER for the same reason the two text roles below are: it must follow
 // the user's chosen theme. It read PfpPalette.Accent until 2026-09-19, which is a CONSTANT — a
 // hardcoded blue evaluated once at class load — so every accent in Settings stayed that blue while
@@ -237,6 +235,15 @@ val SettingsDivider = com.psplauncher.core.ui.theme.PfpPalette.Divider
 // The focused-row wash IS the accent, so it follows it.
 val SettingsSelectedBg: Color
     @Composable get() = LocalPFPColors.current.accentColor.copy(alpha = 0.14f)
+
+/**
+ * How wide the settings column is allowed to get.
+ *
+ * Chosen against the device this is built for: 1920x1080 at 374dpi is 821dp of landscape width,
+ * so this leaves roughly a third of the screen showing the wallpaper, which is the XMB's own
+ * proportion. Wider than any phone in portrait, so it never constrains a small screen.
+ */
+val SETTINGS_COLUMN_MAX_WIDTH = 560.dp
 
 /**
  * Margin kept between a focused row and either edge of the content viewport, and — the same value
@@ -919,7 +926,17 @@ fun SettingsScaffold(
                             )
                         },
                 ) {
-                    content()
+                    // The settings column is left-anchored and capped, not edge to edge. A PS3
+                    // settings list occupies roughly the left half and lets the background hold
+                    // the rest; spanning the full width is what made a 22sp label look marooned
+                    // in the middle of nothing on a 821dp-wide handheld.
+                    //
+                    // widthIn, not fillMaxWidth(fraction): on a phone in portrait the cap is
+                    // wider than the screen and this is a no-op, so narrow devices keep the full
+                    // width they need.
+                    Box(modifier = Modifier.widthIn(max = SETTINGS_COLUMN_MAX_WIDTH)) {
+                        content()
+                    }
                 }
 
                 // Footer band — the other half of the dead zone, wired to the same scroll owner
@@ -996,6 +1013,11 @@ private const val DISABLED_ROW_ALPHA = 0.4f
 fun SettingsRow(
     label: String,
     sublabel: String? = null,
+    // The row's current setting, right-aligned opposite the label. This is the PS3 shape --
+    // "Video Output Settings        HDMI" -- and it is why a value belongs here rather than in
+    // [trailing]: only the row knows whether it is selected, and the value has to grow with the
+    // label or it reads as a footnote pinned to a heading.
+    value: String? = null,
     focusKey: String? = null,
     leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
@@ -1086,9 +1108,9 @@ fun SettingsRow(
             leading()
             Spacer(Modifier.width(16.dp))
         }
+        val rowSelected =
+            isFocused && cursorVisible && !(hideRowHighlightOnActionFocus && anyActionFocused)
         Column(modifier = Modifier.weight(1f)) {
-            val rowSelected =
-                isFocused && cursorVisible && !(hideRowHighlightOnActionFocus && anyActionFocused)
             Text(
                 text = label,
                 color = (if (rowSelected) Color.White else SettingsText)
@@ -1110,6 +1132,23 @@ fun SettingsRow(
                     style = TextStyle(shadow = SettingsTextShadow),
                 )
             }
+        }
+        if (value != null) {
+            Spacer(Modifier.width(24.dp))
+            Text(
+                text = value,
+                // Not SettingsAccent. PfpPalette.Accent (#4A90D9) has relative luminance 0.264,
+                // which caps it at 3.34:1 on pure white and 6.28:1 on pure black. Accent is a
+                // fill/ring/border colour and is structurally incapable of carrying body text; no
+                // shadow fixes that, because a shadow changes the edge and not the fill.
+                color = (if (rowSelected) Color.White else SettingsSubtext)
+                    .let { if (enabled) it else it.copy(alpha = it.alpha * DISABLED_ROW_ALPHA) },
+                fontSize = if (rowSelected) XmbLayoutSpec.DEFAULT.itemTextSelectedSp.sp
+                           else XmbLayoutSpec.DEFAULT.itemTextSp.sp,
+                fontWeight = if (rowSelected) FontWeight.SemiBold else FontWeight.Normal,
+                textAlign = TextAlign.End,
+                style = TextStyle(shadow = SettingsTextShadow),
+            )
         }
         if (trailing != null) {
             Spacer(Modifier.width(16.dp))
@@ -1232,22 +1271,10 @@ fun SettingsValueRow(
     SettingsRow(
         label = label,
         sublabel = sublabel,
+        value = value,
         focusKey = focusKey,
         onFocusChangedExternal = onFocusChangedExternal,
         onClick = onClick,
-        trailing = {
-            Text(
-                // Not SettingsAccent. PfpPalette.Accent (#4A90D9) has relative luminance 0.264,
-                // which caps it at 3.34:1 on pure white and 6.28:1 on pure black — so on this
-                // screen's mid-tone band every "PFP Default" measured 1.05–1.84:1. Accent is a
-                // fill/ring/border colour and is structurally incapable of carrying body text; no
-                // shadow fixes that, because a shadow changes the edge and not the fill.
-                text = value,
-                color = SettingsText,
-                fontSize = 13.sp,
-                style = TextStyle(shadow = SettingsTextShadow),
-            )
-        },
     )
 }
 
