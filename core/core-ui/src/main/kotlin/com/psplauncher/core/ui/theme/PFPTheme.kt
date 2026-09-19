@@ -8,6 +8,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import com.psplauncher.themekit.ColorCascade
 
 data class PFPColors(
     val waveColor: Color,
@@ -25,6 +27,26 @@ data class PFPColors(
     // See docs/icon-system-plan.md.
     val iconColor: Color = Color.White,
 )
+
+/**
+ * Re-tints a palette to [wave] and re-derives the background gradient from it, so the gradient
+ * always matches whatever hue the wave is.
+ *
+ * ONE definition, because three callers must agree on what "the theme, but this colour" means:
+ * the XMB when a category tints the wave, the detail pages when they take their colour from a
+ * game's artwork instead of the user's scheme, and the desktop Theme Studio through the same
+ * ColorCascade math underneath. A second copy would let one surface drift a shade from another
+ * with nothing to catch it.
+ */
+fun PFPColors.withWaveTint(wave: Color): PFPColors {
+    val argb = wave.toArgb().toLong() and 0xFFFFFFFFL
+    val anchors = ColorCascade.lightBackgroundAnchors(argb)
+    return copy(
+        waveColor        = wave,
+        backgroundTop    = Color(anchors.first),
+        backgroundBottom = Color(anchors.second),
+    )
+}
 
 val LocalPFPColors = staticCompositionLocalOf {
     DefaultPFPColors

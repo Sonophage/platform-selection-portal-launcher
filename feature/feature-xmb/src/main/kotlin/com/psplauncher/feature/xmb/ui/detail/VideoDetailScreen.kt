@@ -72,7 +72,6 @@ import com.psplauncher.feature.xmb.video.VideoPlayerScreen
 // Neutral dark surfaces stay fixed; accent colors come from the active theme so this screen
 // follows the chosen color scheme.
 private val PageBg = Color(0xFF06060C)
-private val PlayGreen = Color(0xFF45C46A)
 private val ActionFill = Color(0xFF1B1B26)
 private val TextPrimary = Color(0xFFEEEEEE)
 private val TextMuted = Color(0xAAEEEEEE)
@@ -193,9 +192,9 @@ fun VideoDetailScreen(
 
             val primaries = state.primaryActions
             primaries.forEachIndexed { i, action ->
-                // The lead action (Play when unwatched, Resume when watched) gets the prominent
-                // green fill; Start from Beginning sits below it in the neutral style.
-                val isLead = action == VideoDetailAction.PLAY || action == VideoDetailAction.RESUME
+                // The lead action used to carry a green fill to mark it out. It no longer needs
+                // one: exactly one button is focused, the focused one inverts to near-white, and
+                // that is a louder mark than a colour ever was.
                 DetailButton(
                     label = action.label,
                     icon = when (action) {
@@ -204,8 +203,6 @@ fun VideoDetailScreen(
                         else                      -> Icons.Filled.PlayArrow
                     },
                     focused = state.mainFocus == i,
-                    fill = if (isLead) PlayGreen else ActionFill,
-                    textColor = if (isLead) Color(0xFF06140A) else TextPrimary,
                     onClick = { viewModel.activate(action) },
                 )
             }
@@ -359,8 +356,6 @@ private fun DetailButton(
     label: String,
     icon: ImageVector,
     focused: Boolean,
-    fill: Color,
-    textColor: Color,
     onClick: () -> Unit,
 ) {
     // Auto-scroll into view when a controller focuses this button, so the whole action list is
@@ -371,17 +366,22 @@ private fun DetailButton(
         modifier = Modifier
             .fillMaxWidth()
             .bringIntoViewRequester(bringIntoView)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (focused) fill else fill.copy(alpha = 0.55f))
-            .then(if (focused) Modifier.border(2.dp, com.psplauncher.core.ui.theme.menuCursorEdge(), RoundedCornerShape(12.dp)) else Modifier)
+            // The same pill and the same inversion as the game and app pages, so one idiom
+            // covers every detail page rather than the video page keeping its own.
+            .clip(RoundedCornerShape(percent = 50))
+            .background(
+                if (focused) com.psplauncher.core.ui.detail.DetailButtonFocusFill
+                else com.psplauncher.core.ui.detail.DetailButtonRest
+            )
             .clickable(onClick = onClick)
             .padding(vertical = 14.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = textColor, modifier = Modifier.size(20.dp))
+        val content = if (focused) com.psplauncher.core.ui.detail.DetailButtonFocusText else TextPrimary
+        Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
-        Text(label, color = textColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = content, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

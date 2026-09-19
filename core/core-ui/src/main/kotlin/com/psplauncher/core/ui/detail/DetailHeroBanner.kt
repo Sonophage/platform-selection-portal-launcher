@@ -85,14 +85,22 @@ fun PfpDetailHeroBanner(
             )
             // Readability gradient: transparent at the top, deep at the bottom, so identity stays
             // legible over bright artwork without dimming the art itself.
+            //
+            // It fades into the PAGE's colour, not into black. Fading to black ended the banner
+            // in a dark band that read as the bottom edge of a card sitting on the page; fading
+            // to the page's own tone makes the artwork dissolve into the page instead, which is
+            // what a tvOS hero does. The page tone follows the game's artwork accent, so the
+            // banner dissolves into the game's own colour.
+            val fadeInto = detailPalette().pageTop
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             0f to Color.Black.copy(alpha = 0.05f),
-                            0.55f to Color.Black.copy(alpha = 0.45f),
-                            1f to Color.Black.copy(alpha = 0.86f),
+                            0.55f to Color.Black.copy(alpha = 0.40f),
+                            0.82f to fadeInto.copy(alpha = 0.72f),
+                            1f to fadeInto,
                         )
                     ),
             )

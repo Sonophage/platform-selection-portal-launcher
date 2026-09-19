@@ -52,6 +52,7 @@ class GameDetailViewModelTest {
     private lateinit var autoCoreMemory: com.psplauncher.feature.launcher.AutoCoreMemory
     private lateinit var intentResolver: EmulatorIntentResolver
     private lateinit var artworkRepository: ArtworkRepository
+    private lateinit var artworkAccent: com.psplauncher.core.data.repository.ArtworkAccent
     private lateinit var artworkStore: ArtworkStore
     private lateinit var artworkRecordDao: com.psplauncher.core.data.database.dao.ArtworkRecordDao
     private lateinit var launchDispatcher: com.psplauncher.feature.launcher.LaunchDispatcher
@@ -103,6 +104,10 @@ class GameDetailViewModelTest {
         autoCoreMemory    = mockk(relaxed = true)
         intentResolver    = mockk(relaxed = true)
         artworkRepository = mockk(relaxed = true)
+        artworkAccent     = mockk(relaxed = true)
+        // Default: the game's art has no hue to find, so the page keeps the user's theme. A test
+        // that cares about the colour says so.
+        coEvery { artworkAccent.of(*anyVararg()) } returns null
         artworkStore      = mockk(relaxed = true)
         artworkRecordDao  = mockk(relaxed = true)
         // No portable-library records unless a test adds one (a relaxed mock would invent a record).
@@ -121,7 +126,10 @@ class GameDetailViewModelTest {
         every { profileRepository.getInstalledProfiles() }         returns emptyList()
         coEvery { profileRepository.getProfilesForPlatform(any()) }  returns emptyList()
 
-        viewModel = GameDetailViewModel(
+        viewModel = newViewModel()
+    }
+
+    private fun newViewModel() = GameDetailViewModel(
             context           = context,
             gameRepository    = gameRepository,
             platformDao       = platformDao,
@@ -131,6 +139,7 @@ class GameDetailViewModelTest {
             autoCoreMemory    = autoCoreMemory,
             intentResolver    = intentResolver,
             artworkRepository = artworkRepository,
+            artworkAccent     = artworkAccent,
             artworkStore      = artworkStore,
             artworkRecordDao  = artworkRecordDao,
             menuSound         = menuSound,
@@ -138,6 +147,62 @@ class GameDetailViewModelTest {
             launchDispatcher  = launchDispatcher,
             pcGameExporter    = pcGameExporter,
         )
+
+    // ── The page's colour comes from the game's artwork ───────────────────
+
+    @Test
+    fun `the game's art accent reaches the state`() = runTest {
+        // NOTE what this does and does not cover. It covers that the wiring exists: the page asks
+        // for the game's colour and the answer lands in the state. It does NOT cover the ORDER of
+        // the ask, which is where the real bug was -- resolveArtAccent is launched, and under any
+        // test dispatcher a launched coroutine is serialised after the coroutine that launched it,
+        // so the state always carries the game by the time the answer arrives. Moving the launch
+        // back to its original place leaves every test in this file green and the device wrong.
+        // That ordering is verified on hardware, and the reason it matters is written where the
+        // launch is.
+        coEvery { artworkAccent.of(*anyVararg()) } returns 0xFF1455D9L
+
+        viewModel.loadGame(1L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0xFF1455D9L, viewModel.uiState.value.artAccentArgb)
+    }
+
+    @Test
+    fun `art with no hue leaves the page on the user's theme`() = runTest {
+        // Null is not a failure: a greyscale box shot has no dominant hue, and the page must fall
+        // back to the user's scheme rather than to some default colour of its own.
+        coEvery { artworkAccent.of(*anyVararg()) } returns null
+
+        viewModel.loadGame(1L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.artAccentArgb)
+    }
+
+    @Test
+    fun `opening another game never shows the previous game's colour`() = runTest {
+        coEvery { artworkAccent.of(*anyVararg()) } returns 0xFF1455D9L
+        viewModel.loadGame(1L)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(0xFF1455D9L, viewModel.uiState.value.artAccentArgb)
+
+        // A red game opening over a blue one must not wear blue chrome for even one frame, so the
+        // accent is cleared at the top of the load rather than overwritten at the end of it.
+        coEvery { gameRepository.getById(2L) } returns windowsGame
+        coEvery { platformDao.getById("windows") } returns null
+        coEvery { artworkAccent.of(*anyVararg()) } coAnswers {
+            assertNull(
+                "the outgoing game's accent was still on the page",
+                viewModel.uiState.value.artAccentArgb,
+            )
+            0xFFE03B4FL
+        }
+
+        viewModel.loadGame(2L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0xFFE03B4FL, viewModel.uiState.value.artAccentArgb)
     }
 
     // ── Export Game (C18 task X.7) ────────────────────────────────────────

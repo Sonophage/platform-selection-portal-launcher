@@ -72,9 +72,25 @@ internal val DetailRowEdge: Color @Composable @ReadOnlyComposable get() = detail
 internal val DetailDivider: Color @Composable @ReadOnlyComposable get() = detailPalette().divider
 internal val DetailFocusEdge: Color @Composable @ReadOnlyComposable get() = detailPalette().focus
 
-/** The launch action keeps its restrained green fill and dark label. */
-val DetailLaunchFill = Color(0xFF45C46A)
-val DetailLaunchText = Color(0xFF06210D)
+// ── Button tones ──────────────────────────────────────────────────────────────
+//
+// The detail pages' buttons invert on focus rather than wearing a colour: at rest they are
+// translucent glass over the page, and the focused one becomes a near-white slab with dark text.
+// That is the tvOS idiom, and it reads at arm's length in a way a coloured fill plus a thin ring
+// does not -- the focused control is the brightest thing on the page by a wide margin.
+//
+// It replaced a fixed green Launch button. The green was the one element on these pages that
+// ignored the theme entirely, which mattered more once the pages started taking their colour
+// from the game's own artwork: a green slab sat on top of every game's palette.
+
+/** Resting fill: glass, so the page's colour reads through every button equally. */
+val DetailButtonRest = Color.White.copy(alpha = 0.13f)
+
+/** Focused fill. Not pure white: pure white blooms against a dark page. */
+val DetailButtonFocusFill = Color(0xFFEDEDED)
+
+/** Label on the focused fill. Near-black rather than black, to match the fill's softness. */
+val DetailButtonFocusText = Color(0xFF101014)
 
 /** Readable maximum width for the page body, plus its side margins. */
 val DetailContentMaxWidth: Dp = 920.dp

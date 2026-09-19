@@ -85,6 +85,13 @@ data class GameDetailUiState(
     val isLoading: Boolean = true,
     val isEditingNote: Boolean = false,
     val noteText: String = "",
+    /**
+     * The game's own colour, derived from its artwork, or null while it is still being read and
+     * whenever the art has no saturated hue to find. The page wears it instead of the user's
+     * scheme; null means the page keeps the user's scheme, which is also what it looks like for
+     * the first frame, so the change arrives as a tint settling in rather than a flash.
+     */
+    val artAccentArgb: Long? = null,
     val isFetchingArtwork: Boolean = false,
     val artworkMessage: String? = null,
     val launchError: String? = null,
@@ -298,6 +305,7 @@ class GameDetailViewModel @Inject constructor(
     private val autoCoreMemory: com.psplauncher.feature.launcher.AutoCoreMemory,
     private val intentResolver: EmulatorIntentResolver,
     private val artworkRepository: ArtworkRepository,
+    private val artworkAccent: com.psplauncher.core.data.repository.ArtworkAccent,
     private val artworkStore: ArtworkStore,
     private val artworkRecordDao: com.psplauncher.core.data.database.dao.ArtworkRecordDao,
     private val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer,
@@ -658,6 +666,17 @@ class GameDetailViewModel @Inject constructor(
      *   instead of the primary — the disc an auto-launch then boots. Falls back to the primary
      *   when the id isn't a member (stale row, single-disc game).
      */
+    /**
+     * Reads the game's colour out of its artwork, preferring the art that fills the most of the
+     * page: the hero banner, then the XMB background, then the box, then the icon. The first one
+     * that yields a hue wins; a game whose art is all greyscale keeps the user's theme.
+     */
+    private suspend fun resolveArtAccent(game: Game) {
+        val accent = artworkAccent.of(game.heroUri, game.artworkUri, game.boxArtUri, game.iconUri)
+        // The page may already have moved on to another game while this decoded.
+        _uiState.update { if (it.game?.id == game.id) it.copy(artAccentArgb = accent) else it }
+    }
+
     fun loadGame(id: Long, requestedDiscId: Long? = null) {
         viewModelScope.launch {
             // Loading is a fresh page: every overlay closes with it, and the engine's modal stack
@@ -676,6 +695,9 @@ class GameDetailViewModel @Inject constructor(
                     manualViewerUri = null,
                     imageViewerUri = null,
                     showVideoPlayer = false,
+                    // The OUTGOING game's colour must not stay on the incoming page even for a
+                    // frame: a red game opening over a blue one would flash blue chrome.
+                    artAccentArgb = null,
                 )
             }
             syncNavStack()
@@ -744,6 +766,12 @@ class GameDetailViewModel @Inject constructor(
                     closed            = false,
                 )
             }
+            // AFTER the state carries the game, never before. resolveArtAccent only writes when
+            // the page still shows the game it decoded for, and launching it above meant a cached
+            // accent could come back before `game` was in the state at all -- the guard would then
+            // compare against the PREVIOUS game and throw the answer away. Reliably on a reopen,
+            // where the cache makes it instant.
+            game?.let { g -> viewModelScope.launch { resolveArtAccent(g) } }
             finishInput()
         }
     }

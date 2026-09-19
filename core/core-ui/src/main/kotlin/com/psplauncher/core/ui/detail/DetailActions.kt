@@ -53,36 +53,36 @@ fun PfpDetailLaunchButton(
     focused: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    fill: Color = DetailLaunchFill,
-    textColor: Color = DetailLaunchText,
+    // A caller may tint the RESTING state (the video page marks its lead action this way). The
+    // focused state is never tinted: exactly one control is focused, and it always looks the same
+    // so the eye can find it without reading anything.
+    fill: Color = DetailButtonRest,
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    // A pill, not a rounded rectangle: at this height the radius is half the height, which is what
+    // makes a tvOS button read as a button rather than as a card.
+    val shape = RoundedCornerShape(percent = 50)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 58.dp)
             .clip(shape)
-            // The fill lifts slightly under focus. The border is drawn inside the node's bounds, so
-            // focus changes nothing about the layout.
-            .background(if (focused) lerp(fill, Color.White, 0.10f) else fill)
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = if (focused) DetailFocusEdge else Color.Black.copy(alpha = 0.25f),
-                shape = shape,
-            )
+            .background(if (focused) DetailButtonFocusFill else fill)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(vertical = 15.dp, horizontal = 18.dp),
+            .padding(vertical = 15.dp, horizontal = 26.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val content = if (focused) DetailButtonFocusText else DetailTextPrimary
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = textColor, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
         }
         Text(
             text = label,
-            color = textColor,
+            color = content,
             fontSize = 19.sp,
-            fontWeight = FontWeight.Bold,
+            // Semibold, not bold. The focused pill already carries the emphasis; bold on top of
+            // the inversion is two shouts for one thing.
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -105,26 +105,22 @@ fun PfpDetailQuickAction(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    val shape = RoundedCornerShape(9.dp)
+    // Same pill, same inversion, smaller: the secondary row reads as the same kind of control as
+    // Launch rather than as a different family of tile.
+    val shape = RoundedCornerShape(percent = 50)
+    val content = if (focused) DetailButtonFocusText else DetailTextPrimary
     Row(
         modifier = modifier
             .defaultMinSize(minHeight = 46.dp)
             .clip(shape)
-            // Fill first, so the focus lift paints over the opaque tile rather than under it.
-            .background(DetailRowFill, shape)
-            .detailFocusRing(
-                focused = focused,
-                edge = DetailFocusEdge,
-                fill = DetailFocusEdge.copy(alpha = 0.12f),
-                shape = shape,
-            )
+            .background(if (focused) DetailButtonFocusFill else DetailButtonRest, shape)
             .semantics(mergeDescendants = true) {
                 contentDescription?.let { this.contentDescription = it }
             }
             // Disabled rather than hidden: TalkBack reads it as a dimmed button, and taps do nothing.
             .clickable(enabled = available, role = Role.Button, onClick = onClick)
             .alpha(if (available) 1f else 0.38f)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
@@ -132,13 +128,13 @@ fun PfpDetailQuickAction(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = DetailTextPrimary,
+                tint = content,
                 modifier = Modifier.size(18.dp),
             )
         }
         Text(
             text = label,
-            color = DetailTextPrimary,
+            color = content,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,

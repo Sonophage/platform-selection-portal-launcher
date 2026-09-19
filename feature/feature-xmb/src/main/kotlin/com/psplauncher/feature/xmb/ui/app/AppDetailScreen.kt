@@ -285,8 +285,6 @@ fun AppDetailScreen(
                     label     = "Launch",
                     icon      = Icons.Filled.PlayArrow,
                     focused   = state.mainFocus == 0,
-                    fill      = Color(0xFFF2F2F2),
-                    textColor = Color(0xFF0A0A12),
                     onClick   = viewModel::launchApp,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

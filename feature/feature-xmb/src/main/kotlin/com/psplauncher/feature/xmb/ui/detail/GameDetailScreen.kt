@@ -48,6 +48,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.psplauncher.core.ui.theme.withWaveTint
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -121,7 +123,6 @@ import timber.log.Timber
 
 private val TextPrimary = Color(0xFFEEEEEE)
 private val TextMuted = Color(0xAAB8C6E0)
-private val PlayGreen = Color(0xFF45C46A)
 private val ActionFail = Color(0xFFFF8A8A)
 
 /** Descriptions longer than this get a Confirm-to-expand affordance. */
@@ -231,29 +232,55 @@ fun GameDetailScreen(
     }
 
     // The Artwork Studio fully REPLACES the detail page while open — nothing shows or reacts
-    // behind it; closing restores the page exactly where it was (state is untouched).
+    // behind it; closing restores the page exactly where it was (state is untouched). It is
+    // inside GameThemed for the same reason the page is: it is a view OF this game.
     if (state.showArtworkStudio) {
-        ArtworkStudioScreen(
-            gameId = gameId,
-            onClose = viewModel::onArtworkStudioClosed,
-            pendingGamepadAction = pendingGamepadAction,
-            onGamepadActionConsumed = onGamepadActionConsumed,
-            showTouchControls = showTouchControls,
-            onTouchInput = onTouchInput,
-            modifier = modifier.fillMaxSize(),
-        )
+        GameThemed(state.artAccentArgb) {
+            ArtworkStudioScreen(
+                gameId = gameId,
+                onClose = viewModel::onArtworkStudioClosed,
+                pendingGamepadAction = pendingGamepadAction,
+                onGamepadActionConsumed = onGamepadActionConsumed,
+                showTouchControls = showTouchControls,
+                onTouchInput = onTouchInput,
+                modifier = modifier.fillMaxSize(),
+            )
+        }
         return
     }
 
-    GameDetailContent(
-        state = state,
-        game = game,
-        onBack = onBack,
-        showTouchControls = showTouchControls,
-        onTouchInput = onTouchInput,
-        viewModel = viewModel,
-        modifier = modifier,
-    )
+    GameThemed(state.artAccentArgb) {
+        GameDetailContent(
+            state = state,
+            game = game,
+            onBack = onBack,
+            showTouchControls = showTouchControls,
+            onTouchInput = onTouchInput,
+            viewModel = viewModel,
+            modifier = modifier,
+        )
+    }
+}
+
+/**
+ * Dresses everything inside in the GAME's colour instead of the user's scheme.
+ *
+ * It re-tints the palette rather than replacing it, through the same withWaveTint the XMB uses
+ * for a category tint: the page keeps every other decision the user's theme made (text roles,
+ * overlay, icon tint) and changes only the hue the page is built from. Everything downstream --
+ * detailPalette, the App Drawer colours it derives, the focus ring -- follows with no call site
+ * of its own, which is the point of doing it here and not at each of them.
+ *
+ * A null accent is the no-art and the greyscale-art case, and it deliberately renders exactly
+ * what the page rendered before this existed.
+ */
+@Composable
+private fun GameThemed(accentArgb: Long?, content: @Composable () -> Unit) {
+    val base = LocalPFPColors.current
+    val themed = remember(base, accentArgb) {
+        if (accentArgb == null) base else base.withWaveTint(Color(accentArgb.toInt()))
+    }
+    CompositionLocalProvider(LocalPFPColors provides themed, content = content)
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -392,7 +419,6 @@ private fun GameDetailContent(
                     label = "Launch",
                     icon = Icons.Filled.PlayArrow,
                     focused = focus == GameDetailKeys.LAUNCH,
-                    fill = PlayGreen,
                     onClick = { viewModel.onNodeTapped(GameDetailKeys.LAUNCH) },
                     modifier = Modifier.detailNode(GameDetailKeys.LAUNCH, requesterFor, nodeY),
                 )
@@ -1093,7 +1119,13 @@ private fun EmulatorPickerPanel(
                             )
                         }
                         if (isSelected) {
-                            com.psplauncher.core.ui.components.PfpCheckMark(PlayGreen, Modifier.padding(start = 8.dp))
+                            // The page's own focus colour, not a fixed green: this page now wears
+                            // the game's colour, and a green tick was the last thing on it that
+                            // ignored that.
+                            com.psplauncher.core.ui.components.PfpCheckMark(
+                                com.psplauncher.core.ui.detail.detailPalette().focus,
+                                Modifier.padding(start = 8.dp),
+                            )
                         }
                     }
                 }

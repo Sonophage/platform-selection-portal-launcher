@@ -45,6 +45,7 @@ import com.psplauncher.core.domain.model.MemoryCard
 import com.psplauncher.core.domain.model.MusicTrack
 import com.psplauncher.core.domain.model.XmbColorScheme
 import com.psplauncher.core.domain.model.XmbPalette
+import com.psplauncher.core.ui.theme.withWaveTint
 import com.psplauncher.core.domain.model.displayLabel
 import com.psplauncher.core.domain.model.resolve
 import com.psplauncher.core.domain.repository.GameRepository
@@ -102,17 +103,6 @@ private fun XmbPalette.toPFPColors() = PFPColors(
     backgroundBottom  = androidx.compose.ui.graphics.Color(backgroundBottom),
 )
 
-// Set the wave color AND re-derive the light PSP background gradient from it, so the background
-// always matches whatever hue the wave is (theme default or per-category accent tint).
-private fun PFPColors.withWaveTint(wave: androidx.compose.ui.graphics.Color): PFPColors {
-    val argb = wave.toArgb().toLong() and 0xFFFFFFFFL
-    val anchors = com.psplauncher.core.domain.model.lightBackgroundAnchors(argb)
-    return copy(
-        waveColor        = wave,
-        backgroundTop    = androidx.compose.ui.graphics.Color(anchors.first),
-        backgroundBottom = androidx.compose.ui.graphics.Color(anchors.second),
-    )
-}
 
 // ── Context menu types ────────────────────────────────────────────────────────
 
