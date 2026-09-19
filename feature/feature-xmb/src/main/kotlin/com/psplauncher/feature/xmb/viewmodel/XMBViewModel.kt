@@ -6535,17 +6535,6 @@ class XMBViewModel @Inject constructor(
                         taskId,
                         if (report.newGames == 0) "No new PC games found" else report.message,
                     )
-                    // When the Goldberg installer is on, offer to convert every detected emu folder
-                    // that has steam_settings but no achievements.json yet — the user picks which.
-                    if (achievementCredentials.goldbergInstallerEnabled()) {
-                        convertPickerController.start(report.emu.missingSchema) { outcome ->
-                            convertOutcomeMessage(outcome)?.let { msg ->
-                                val id = "schema_gen_$platformId"
-                                addBackgroundTask(BackgroundTaskInfo(id = id, label = "Achievement schemas", progress = null))
-                                completeBackgroundTask(id, msg)
-                            }
-                        }
-                    }
                 }
                 return@launch
             }

@@ -811,15 +811,6 @@ class LibraryManagerViewModel @Inject constructor(
             if (report.newGames > 0) ensureWindowsCard()
             _scratch.update { it.copy(message = report.message) }
 
-            // When the Goldberg installer is on, offer to convert every detected emu folder that
-            // carries steam_settings but no achievements.json yet — the user picks which to convert.
-            if (credentials.goldbergInstallerEnabled()) {
-                convertPickerController.start(report.emu.missingSchema) { outcome ->
-                    convertOutcomeMessage(outcome)?.let { msg ->
-                        _scratch.update { it.copy(message = msg) }
-                    }
-                }
-            }
         }
     }
 

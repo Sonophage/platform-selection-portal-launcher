@@ -7,8 +7,6 @@ import com.psplauncher.core.data.repository.WindowsLibrarySetup
 import com.psplauncher.core.data.repository.WindowsSetupState
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.repository.GameRepository
-import com.psplauncher.feature.achievements.provider.localsteam.EmuGameImportResult
-import com.psplauncher.feature.achievements.provider.localsteam.LocalSteamGameImporter
 import com.psplauncher.feature.artwork.api.ArtworkImportManager
 import com.psplauncher.feature.launcher.PcShortcutImporter
 import com.psplauncher.feature.library.scanner.PcExportFile
@@ -31,7 +29,6 @@ class PcGameScannerTest {
     private val context = mockk<Context>(relaxed = true)
     private val windowsLibrarySetup = mockk<WindowsLibrarySetup>(relaxed = true)
     private val pcShortcutImporter = mockk<PcShortcutImporter>(relaxed = true)
-    private val emuGameImporter = mockk<LocalSteamGameImporter>(relaxed = true)
     private val romScanner = mockk<RomScanner>(relaxed = true)
     private val gameRepository = mockk<GameRepository>(relaxed = true)
     private val artworkImportManager = mockk<ArtworkImportManager>(relaxed = true)
@@ -41,7 +38,6 @@ class PcGameScannerTest {
         context = context,
         windowsLibrarySetup = windowsLibrarySetup,
         pcShortcutImporter = pcShortcutImporter,
-        emuGameImporter = emuGameImporter,
         romScanner = romScanner,
         gameRepository = gameRepository,
         artworkImportManager = artworkImportManager,
@@ -54,7 +50,6 @@ class PcGameScannerTest {
         coEvery { windowsLibrarySetup.ensure() } returns WindowsSetupState.Ready(null)
         coEvery { windowsLibrarySetup.importFolders() } returns listOf("tree" to "importDocId")
         coEvery { pcShortcutImporter.reconcilePinnedShortcuts() } returns 0
-        coEvery { emuGameImporter.import() } returns EmuGameImportResult(0, 0)
     }
 
     // A pin entry needs no launch-intent check, so it exercises the Fill path without the
