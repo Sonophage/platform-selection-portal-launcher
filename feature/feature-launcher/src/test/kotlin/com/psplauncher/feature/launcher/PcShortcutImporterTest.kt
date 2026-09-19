@@ -63,7 +63,6 @@ class PcShortcutImporterTest {
         assertFalse(result.needsSetup)
         assertEquals("windows", stored.captured.platformId)
         assertEquals("game_1984270", stored.captured.shortcutId)
-        coVerify { linker.linkSteam(42L, "1984270") }
         coVerify { gameRepository.updateStorefrontIdentity(42L, "STEAM", "1984270") }
     }
 
@@ -97,8 +96,8 @@ class PcShortcutImporterTest {
         assertEquals(9L, updated.captured.id)
         assertEquals("MARVELCosmicInvasion", updated.captured.shortcutId)
         assertEquals("com.ludashi.aibench", updated.captured.packageName)
-        // The Ludashi shortcut id carries no appid — no STEAM link may be invented.
-        coVerify(exactly = 0) { linker.linkSteam(any(), any()) }
+        // The Ludashi shortcut id carries no appid — no STEAM identity may be invented.
+        coVerify(exactly = 0) { gameRepository.updateStorefrontIdentity(any(), any(), any()) }
     }
 
     @Test
@@ -141,7 +140,6 @@ class PcShortcutImporterTest {
 
         assertEquals(11L, result.gameId)
         assertTrue(result.added)
-        coVerify { linker.linkSteam(11L, "1451090") }
         coVerify { gameRepository.updateStorefrontIdentity(11L, "STEAM", "1451090") }
     }
 
@@ -156,7 +154,6 @@ class PcShortcutImporterTest {
 
         importer().importLegacyShortcut("com.xiaoji.egggame", "Resonance of Fate", uri)
 
-        coVerify(exactly = 0) { linker.linkSteam(any(), any()) }
         // A localGameId is the launcher's internal id, so there is no storefront identity to record.
         coVerify(exactly = 0) { gameRepository.updateStorefrontIdentity(any(), any(), any()) }
     }
