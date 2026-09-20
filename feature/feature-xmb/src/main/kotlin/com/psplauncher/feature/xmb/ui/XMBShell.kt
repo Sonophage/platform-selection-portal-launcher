@@ -534,18 +534,26 @@ fun XMBShell(
             Crossfade(targetState = selectedBg, animationSpec = tween(320), label = "xmbGameBackground") { bg ->
                 if (bg != null || backgroundSnap != null) {
                     Box(Modifier.fillMaxSize()) {
-                        if (bg != null) AsyncImage(
-                            model = rememberArtworkModel(bg),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        // The clip goes UNDER the still, not over it. With a snap playing, the
+                        // still is masked to the left of the screen and fades out across the
+                        // middle (see XMBGameBackdrop), so the crossbar keeps solid artwork
+                        // behind it and the open right-hand side carries the motion.
                         if (backgroundSnap != null) {
                             Icon1VideoOverlay(
                                 videoUri = backgroundSnap.uri,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
+                        if (bg != null) AsyncImage(
+                            model = rememberArtworkModel(bg),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // Full-bleed with no clip to reveal: masking it then would fade
+                                // the artwork into the bare wallpaper for no reason.
+                                .then(if (backgroundSnap != null) Modifier.xmbStillOverVideo() else Modifier),
+                        )
                         // Legibility scrim over the artwork. Deliberately light-handed: heavier
                         // alphas dim the art too much, so darker photos lose their vibrancy — the
                         // icons/labels carry their own contrast (tiles, glows, text shadows).
