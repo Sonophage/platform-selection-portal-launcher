@@ -451,6 +451,16 @@ enum class DrillOutStep {
     PLATFORM_FOLDER,
 }
 
+/**
+ * [androidx.compose.runtime.Immutable] because the ViewModel only ever REPLACES this object with
+ * `copy`; it never mutates a list it has already published.
+ *
+ * Without the annotation the Compose compiler sees `List`/`Map` fields, judges the whole class
+ * unstable, and `XMBShell` becomes unskippable -- its entire body re-executing on every cursor
+ * step and, while music plays, twice a second when nothing visible changed. The contract is a
+ * promise the writer has to keep: nothing in here may be mutated in place after publication.
+ */
+@androidx.compose.runtime.Immutable
 data class XMBUiState(
     // ── Horizontal axis: platforms (SD cards) + utility tabs ──────────────
     val categories: List<Category> = emptyList(),

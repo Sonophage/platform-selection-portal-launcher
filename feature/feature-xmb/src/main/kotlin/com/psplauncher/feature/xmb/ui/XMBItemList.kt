@@ -69,6 +69,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -537,24 +538,34 @@ fun XMBItemList(
             Column(modifier = Modifier.fillMaxWidth().offset(y = belowTopY)) {
                 val last = minOf(items.size, sel + rowsBelow)
                 for (i in sel until last) {
-                    XmbVerticalListRow(
-                        focusedLogoVisible = focusedLogoVisible,
-                        item = items[i],
-                        isSelected = i == selectedIndex,
-                        // The real PSP XMB labels EVERY first-level item (selected bright, the
-                        // rest dimmed) — labels show unless the caller asks for an icon-only column
-                        // (the drill flyout's memory-card cross).
-                        showText = showLabels,
-                        iconStyle = iconStyle,
-                        onClick = { onItemSelected(i) },
-                        onLongPress = { onItemLongPress(i) },
-                        showIcon = showIcons,
-                        trailingCursor = drillCursorOnSelected && i == selectedIndex,
-                        solidUnfocusedIcons = solidUnfocusedIcons,
-                        textShadow = textShadow,
-                        iconAnimatingAllowed = iconAnimatingAllowed,
-                        modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
-                    )
+                    // Keyed by the row's stable id, NOT by its position.
+                    //
+                    // The window starts at the selected index, so stepping the cursor by one
+                    // makes every call-site slot hold a different item. Unkeyed, Compose
+                    // reuses groups positionally: all ~7 visible rows recompose and each
+                    // AsyncImage inside them starts a fresh request, on every single D-pad
+                    // press. Keyed, it moves the existing groups and composes only the row
+                    // that newly entered the window.
+                    key(items[i].id) {
+                        XmbVerticalListRow(
+                            focusedLogoVisible = focusedLogoVisible,
+                            item = items[i],
+                            isSelected = i == selectedIndex,
+                            // The real PSP XMB labels EVERY first-level item (selected bright, the
+                            // rest dimmed) — labels show unless the caller asks for an icon-only column
+                            // (the drill flyout's memory-card cross).
+                            showText = showLabels,
+                            iconStyle = iconStyle,
+                            onClick = { onItemSelected(i) },
+                            onLongPress = { onItemLongPress(i) },
+                            showIcon = showIcons,
+                            trailingCursor = drillCursorOnSelected && i == selectedIndex,
+                            solidUnfocusedIcons = solidUnfocusedIcons,
+                            textShadow = textShadow,
+                            iconAnimatingAllowed = iconAnimatingAllowed,
+                            modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
+                        )
+                    }
                 }
             }
         }

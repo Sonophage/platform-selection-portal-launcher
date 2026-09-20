@@ -10,9 +10,11 @@ import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.PlaySession
 import com.psplauncher.core.domain.model.RecentPlatform
 import com.psplauncher.core.domain.repository.GameRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import java.io.File
@@ -25,22 +27,22 @@ class GameRepositoryImpl @Inject constructor(
 ) : GameRepository {
 
     override fun observeAll(): Flow<List<Game>> =
-        gameDao.observeAll().map { entities -> entities.map { it.toDomain() } }
+        gameDao.observeAll().map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
     override fun observeGamesOnly(): Flow<List<Game>> =
-        gameDao.observeGamesOnly().map { entities -> entities.map { it.toDomain() } }
+        gameDao.observeGamesOnly().map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
     override fun observeAllGames(): Flow<List<Game>> =
-        gameDao.observeAllGames().map { entities -> entities.map { it.toDomain() } }
+        gameDao.observeAllGames().map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
     override fun observeFavorites(): Flow<List<Game>> =
-        gameDao.observeFavorites().map { entities -> entities.map { it.toDomain() } }
+        gameDao.observeFavorites().map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
     override fun observeByPlatform(platformId: String): Flow<List<Game>> =
-        gameDao.observeByPlatform(platformId).map { entities -> entities.map { it.toDomain() } }
+        gameDao.observeByPlatform(platformId).map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
     override fun observePlatformGames(platformId: String): Flow<List<Game>> =
-        gameDao.observePlatformGames(platformId).map { entities -> entities.map { it.toDomain() } }
+        gameDao.observePlatformGames(platformId).map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
     override suspend fun getByPlatform(platformId: String): List<Game> =
         gameDao.getByPlatformOnce(platformId).map { it.toDomain() }
@@ -185,7 +187,7 @@ class GameRepositoryImpl @Inject constructor(
     }
 
     override fun observeMissing(): Flow<List<Game>> =
-        gameDao.observeMissing().map { entities -> entities.map { it.toDomain() } }
+        gameDao.observeMissing().map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
     override suspend fun markSeen(romPaths: List<String>, seenAt: Long) =
         gameDao.markSeen(romPaths, seenAt)

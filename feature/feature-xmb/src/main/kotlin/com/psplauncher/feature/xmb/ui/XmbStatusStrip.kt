@@ -115,8 +115,8 @@ fun XmbPspStatusStrip(
     val context = LocalContext.current
     var batteryLevel   by remember { mutableIntStateOf(0) }
     var isCharging     by remember { mutableStateOf(false) }
-    var dateString     by remember { mutableStateOf(currentDateString()) }
-    var timeString     by remember { mutableStateOf(currentTimeString()) }
+    var dateString     by remember { mutableStateOf(currentDateString(context)) }
+    var timeString     by remember { mutableStateOf(currentTimeString(context)) }
 
     DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {
@@ -135,9 +135,12 @@ fun XmbPspStatusStrip(
 
     LaunchedEffect(Unit) {
         while (true) {
-            dateString = currentDateString()
-            timeString = currentTimeString()
-            delay(30_000L)
+            dateString = currentDateString(context)
+            timeString = currentTimeString(context)
+            // Sleep to the next minute boundary rather than a flat 30 s, so the displayed minute
+            // is never up to half a minute stale -- and so the strip wakes 2 times a minute at
+            // worst instead of on a rhythm unrelated to what it shows.
+            delay(60_000L - (System.currentTimeMillis() % 60_000L))
         }
     }
 
@@ -331,8 +334,14 @@ private val LowBatteryTint = Color(0xFFFF6B6B)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-private fun currentTimeString(): String =
-    SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
+// The device's own clock settings, not ours.
+//
+// These were SimpleDateFormat("h:mm a") and ("MM/dd/yyyy"). Locale.getDefault() was passed, which
+// looks like it localises them, but the PATTERN is fixed -- so a device set to 24-hour time, or
+// anywhere that does not write dates month-first, was overruled by the launcher. Android exposes
+// the user's actual choice for both, including the 24-hour toggle in system settings.
+private fun currentTimeString(context: Context): String =
+    android.text.format.DateFormat.getTimeFormat(context).format(Date())
 
-private fun currentDateString(): String =
-    SimpleDateFormat("MM/dd/yyyy", Locale.getDefault()).format(Date())
+private fun currentDateString(context: Context): String =
+    android.text.format.DateFormat.getDateFormat(context).format(Date())

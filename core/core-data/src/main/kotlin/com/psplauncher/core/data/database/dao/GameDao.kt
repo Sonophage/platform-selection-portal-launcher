@@ -23,14 +23,14 @@ interface GameDao {
                    WHERE member.disc_set_key = games.disc_set_key
                      AND member.is_missing = 0
                ))
-        ORDER BY title ASC
+        ORDER BY title COLLATE NOCASE ASC
         """
     )
     fun observeAll(): Flow<List<GameEntity>>
 
     // "All Games" aggregate — real games only. App-style entries (content_type != 'GAME',
     // e.g. ANDROID_APP / VIDEO_APP) are excluded so they never show up here automatically.
-    @Query("SELECT * FROM games WHERE content_type = 'GAME'  AND is_missing = 0 ORDER BY title ASC")
+    @Query("SELECT * FROM games WHERE content_type = 'GAME'  AND is_missing = 0 ORDER BY title COLLATE NOCASE ASC")
     fun observeGamesOnly(): Flow<List<GameEntity>>
 
     // Multi-disc projection (docs/plans/README.md (C1)): one row per disc set —
@@ -49,7 +49,7 @@ interface GameDao {
                         AND member.is_missing = 0
                   ))
           )
-        ORDER BY title ASC
+        ORDER BY title COLLATE NOCASE ASC
         """
     )
     fun observeAllGames(): Flow<List<GameEntity>>
@@ -80,7 +80,7 @@ interface GameDao {
     )
     fun observeFavorites(): Flow<List<GameEntity>>
 
-    @Query("SELECT * FROM games WHERE platform_id = :platformId AND is_missing = 0 ORDER BY title ASC")
+    @Query("SELECT * FROM games WHERE platform_id = :platformId AND is_missing = 0 ORDER BY title COLLATE NOCASE ASC")
     fun observeByPlatform(platformId: String): Flow<List<GameEntity>>
 
     // Multi-disc projection (docs/plans/README.md (C1)): one row per disc set —
@@ -99,12 +99,12 @@ interface GameDao {
                         AND member.is_missing = 0
                   ))
           )
-        ORDER BY title ASC
+        ORDER BY title COLLATE NOCASE ASC
         """
     )
     fun observePlatformGames(platformId: String): Flow<List<GameEntity>>
 
-    @Query("SELECT * FROM games WHERE platform_id = :platformId ORDER BY title ASC")
+    @Query("SELECT * FROM games WHERE platform_id = :platformId ORDER BY title COLLATE NOCASE ASC")
     suspend fun getByPlatformOnce(platformId: String): List<GameEntity>
 
     @Query("UPDATE games SET platform_id = :platformId, content_type = :contentType WHERE id = :id")
@@ -276,12 +276,12 @@ interface GameDao {
                    WHERE member.disc_set_key = games.disc_set_key
                      AND member.is_missing = 0
                ))
-        ORDER BY title ASC
+        ORDER BY title COLLATE NOCASE ASC
         """
     )
     fun observeMissing(): Flow<List<GameEntity>>
 
-    @Query("SELECT * FROM games ORDER BY title ASC")
+    @Query("SELECT * FROM games ORDER BY title COLLATE NOCASE ASC")
     suspend fun getAll(): List<GameEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
