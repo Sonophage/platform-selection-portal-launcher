@@ -67,6 +67,7 @@ class LaunchDispatcher @Inject constructor(
     // lives in MenuSoundPlayer; the dispatcher only says "this launch did not happen".
     private val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer,
     private val autoCoreMemory: AutoCoreMemory,
+    private val gameRepository: com.psplauncher.core.domain.repository.GameRepository,
 ) {
     private val _recoveryRequests = MutableStateFlow<LaunchRecoveryRequest?>(null)
     /** Non-null while a recovery sheet should be shown; cleared by [dismissRecovery]. */
@@ -172,13 +173,36 @@ class LaunchDispatcher @Inject constructor(
             // The emulator demonstrably covered the launcher, so the user was inside it. Coming back
             // — even instantly — is a choice, not a failure: closing the emulator right after it
             // opens is a legitimate session and must never pop recovery UI. Duration is irrelevant.
-            Timber.i("Launch session ${clock.now() - p.dispatchedAtMs}ms — emulator covered the launcher — recording success")
+            val playedMs = clock.now() - p.dispatchedAtMs
+            Timber.i("Launch session ${playedMs}ms — emulator covered the launcher — recording success")
             scope.launch {
                 outcomeRecorder.record(
                     outcomeFor(
                         p.game, p.resolved, LaunchOutcomeStatus.SUCCEEDED, reason = null,
                     ).copy(returnedAtMs = clock.now())
                 )
+                // The play session, recorded HERE and nowhere else.
+                //
+                // This branch is the only place the app knows a game was actually played: the
+                // emulator demonstrably covered the launcher, and the user has come back. Stamping
+                // at launch instead would count a launch that never foregrounded as a session, and
+                // recording in the watchdog would count one that may still be running.
+                //
+                // The duration was already being computed for the log line above and thrown away.
+                // Until now nothing called recordPlaySession at all, so `last_played_at` and
+                // `total_play_time_millis` were never written: the Recently Played sort ordered
+                // every game by zero, and Game Detail's "Last played" and "Play time" rows are
+                // null-guarded and so never rendered.
+                runCatching {
+                    gameRepository.recordPlaySession(
+                        com.psplauncher.core.domain.model.PlaySession(
+                            gameId         = p.game.id,
+                            platformId     = p.game.platformId,
+                            launchedAt     = p.dispatchedAtMs,
+                            durationMillis = playedMs,
+                        )
+                    )
+                }.onFailure { Timber.w(it, "Could not record play session for gameId=${p.game.id}") }
             }
         } else {
             // The launcher was never covered, so the emulator never demonstrably took the foreground

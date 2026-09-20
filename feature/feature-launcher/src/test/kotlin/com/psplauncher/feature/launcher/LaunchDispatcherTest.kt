@@ -5,10 +5,12 @@ import android.content.Intent
 import com.psplauncher.core.domain.model.EmulatorProfile
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.IntentType
+import com.psplauncher.core.domain.model.PlaySession
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,6 +69,7 @@ class LaunchDispatcherTest {
         val gameBootGate = GameBootGate(context, gameBootPreferences, uiMediaStore, gameBootAudioPlayer)
         val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer = mockk(relaxed = true)
         val autoCoreMemory: AutoCoreMemory = mockk(relaxed = true)
+        val gameRepository: com.psplauncher.core.domain.repository.GameRepository = mockk(relaxed = true)
 
         val dispatcher = LaunchDispatcher(
             context = context,
@@ -76,6 +79,7 @@ class LaunchDispatcherTest {
             gameBootGate = gameBootGate,
             menuSound = menuSound,
             autoCoreMemory = autoCoreMemory,
+            gameRepository = gameRepository,
         )
     }
 
@@ -334,4 +338,80 @@ class LaunchDispatcherTest {
         failureReason = null,
         launchedAtMs = 1L,
     )
+
+    // ── Play sessions ──────────────────────────────────────────────────────────────
+    //
+    // Until these were written, `recordPlaySession` had exactly two references in the whole repository:
+    // its own interface declaration and its own implementation. Nothing called it. So `last_played_at`
+    // and `total_play_time_millis` were never written, the Recently Played sort ordered every game by
+    // zero, and Game Detail's "Last played" / "Play time" rows are null-guarded and never rendered.
+    //
+    // The rule these pin is WHEN a session counts: only when the emulator demonstrably covered the
+    // launcher and the user came back. A launch that never foregrounded is not play time, and neither
+    // is one that may still be running.
+
+
+    @Test
+    fun `a verified session records the real duration and stamps last played`() = runTest {
+        val h = Harness(this)
+        coEvery { h.recorder.record(any()) } returns Unit
+        assertIs<LaunchDispatchResult.Accepted>(h.dispatcher.launch(game, null, h.intent))
+
+        h.dispatcher.onHostStopped()
+        h.now = 1_800_000L                     // half an hour inside the emulator
+        h.dispatcher.onHostResumed()
+        advanceUntilIdle()
+
+        val session = slot<PlaySession>()
+        coVerify(exactly = 1) { h.gameRepository.recordPlaySession(capture(session)) }
+        assertEquals(7L, session.captured.gameId)
+        assertEquals("psx", session.captured.platformId)
+        // launchedAt is when the game STARTED, not when the user came back — it is what
+        // `last_played_at` is set from, and a session must not be dated by its own end.
+        assertEquals(0L, session.captured.launchedAt)
+        assertEquals(1_800_000L, session.captured.durationMillis)
+    }
+
+    @Test
+    fun `a launch the emulator never foregrounded is not play time`() = runTest {
+        val h = Harness(this)
+        coEvery { h.recorder.record(any()) } returns Unit
+        assertIs<LaunchDispatchResult.Accepted>(h.dispatcher.launch(game, null, h.intent))
+
+        // Back without the launcher ever being covered: the emulator never appeared.
+        h.now = 900L
+        h.dispatcher.onHostResumed()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { h.gameRepository.recordPlaySession(any()) }
+    }
+
+    @Test
+    fun `a failed startActivity is not play time`() = runTest {
+        val h = Harness(this)
+        every { h.context.startActivity(any()) } throws android.content.ActivityNotFoundException()
+        coEvery { h.recorder.record(any()) } returns Unit
+
+        h.dispatcher.launch(game, null, h.intent)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { h.gameRepository.recordPlaySession(any()) }
+    }
+
+    @Test
+    fun `a repository failure never takes the launcher down with it`() = runTest {
+        // Recording is bookkeeping. It must not be able to turn a good session into a crash on the
+        // dispatcher's own scope, which has no supervisor above it.
+        val h = Harness(this)
+        coEvery { h.recorder.record(any()) } returns Unit
+        coEvery { h.gameRepository.recordPlaySession(any()) } throws IllegalStateException("db closed")
+        assertIs<LaunchDispatchResult.Accepted>(h.dispatcher.launch(game, null, h.intent))
+
+        h.dispatcher.onHostStopped()
+        h.now = 60_000L
+        h.dispatcher.onHostResumed()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { h.recorder.record(any()) }
+    }
 }
