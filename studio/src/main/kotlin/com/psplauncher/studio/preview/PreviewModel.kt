@@ -83,7 +83,6 @@ object SampleContent {
     const val SELECTED_CATEGORY = 3 // Video
 
     val rows: List<Row> = listOf(
-        Row("item_video_apps", "Video Apps"),
         // The launcher's "Videos" library row is a memory-card slot, not the library glyph.
         Row("item_memcard_video", "Videos", "132 videos"),
         Row("item_video_recent", "Recently Watched"),

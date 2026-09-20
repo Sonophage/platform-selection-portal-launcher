@@ -84,7 +84,6 @@ object StudioIconSet {
         "item_video_recent" to Icons.Filled.History,
         "item_video_favorites" to Icons.Filled.Star,
         "item_video_collections" to Icons.Filled.Bookmarks,
-        "item_video_apps" to Icons.Filled.Movie,
         "item_video_file" to Icons.Filled.Movie,
         "item_photo_folder" to Icons.Filled.Folder,
         "item_photo_file" to Icons.Filled.Photo,
@@ -94,11 +93,9 @@ object StudioIconSet {
         "item_library_folder" to Icons.Filled.Folder,
         "item_library_book" to Icons.Filled.Book,
         "item_library_series" to Icons.Filled.Bookmarks,
-        "item_photo_apps" to Icons.Filled.Collections,
         "item_camera" to Icons.Filled.PhotoCamera,
         "item_music_track" to Icons.Filled.MusicNote,
         "item_playlist" to Icons.Filled.QueueMusic,
-        "item_music_apps" to Icons.Filled.LibraryMusic,
     )
 
     /** Default painter for a slot key, or a play-arrow stand-in for unknown keys. */

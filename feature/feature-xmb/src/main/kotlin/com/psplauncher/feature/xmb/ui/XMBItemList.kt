@@ -312,13 +312,11 @@ private fun SiblingIcon(item: XMBItem, selected: Boolean, solidUnfocusedIcons: B
         XMBItemType.MISSING         -> Icons.Filled.HelpOutline
         XMBItemType.VIDEO_FOLDER    -> Icons.Filled.Folder
         XMBItemType.VIDEO_LIBRARY   -> Icons.Filled.VideoLibrary
-        XMBItemType.VIDEO_APPS        -> Icons.Filled.Movie
         XMBItemType.VIDEO_RECENT      -> Icons.Filled.History
         XMBItemType.VIDEO_FAVORITES   -> Icons.Filled.Star
         XMBItemType.VIDEO_COLLECTIONS -> Icons.Filled.Bookmarks
         XMBItemType.PHOTO_FOLDER    -> Icons.Filled.Folder
         XMBItemType.PHOTO_ALBUMS    -> Icons.Filled.PhotoLibrary
-        XMBItemType.PHOTO_APPS      -> Icons.Filled.Collections
         // The video "Playlists" section row (PLAYLIST type with no playlistId) uses a playlist glyph.
         XMBItemType.PLAYLIST        -> Icons.Filled.QueueMusic
         else                        -> null
@@ -371,12 +369,10 @@ internal fun itemSlotKeyFor(type: XMBItemType): String? = when (type) {
     XMBItemType.VIDEO_RECENT -> "item_video_recent"
     XMBItemType.VIDEO_FAVORITES -> "item_video_favorites"
     XMBItemType.VIDEO_COLLECTIONS -> "item_video_collections"
-    XMBItemType.VIDEO_APPS -> "item_video_apps"
     XMBItemType.VIDEO_FILE -> "item_video_file"
     XMBItemType.PHOTO_FOLDER -> "item_photo_folder"
     XMBItemType.PHOTO_FILE -> "item_photo_file"
     XMBItemType.PHOTO_ALBUMS -> "item_photo_albums"
-    XMBItemType.PHOTO_APPS -> "item_photo_apps"
     XMBItemType.LIBRARY_SHELVES -> "item_library_shelves"
     XMBItemType.LIBRARY_READER -> "item_library_reader"
     XMBItemType.LIBRARY_FOLDER -> "item_library_folder"
@@ -385,7 +381,6 @@ internal fun itemSlotKeyFor(type: XMBItemType): String? = when (type) {
     XMBItemType.CAMERA -> "item_camera"
     XMBItemType.MUSIC_TRACK -> "item_music_track"
     XMBItemType.PLAYLIST -> "item_playlist"
-    XMBItemType.MUSIC_APPS -> "item_music_apps"
     else -> null
 }
 
@@ -753,21 +748,6 @@ private fun XmbItemLeadingIcon(
                 )
             }
         }
-        // The static "Music Apps" item uses a music-library glyph.
-        item.type == XMBItemType.MUSIC_APPS -> {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.width(LEADING_ICON_SLOT),
-            ) {
-                ThemedGlyph(
-                    slotKey = itemSlotKeyFor(item.type) ?: "",
-                    defaultVector = Icons.Filled.LibraryMusic,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(48.dp),
-                )
-            }
-        }
         // Video files show a landscape thumbnail (a frame grab), falling back to a movie glyph.
         item.type == XMBItemType.VIDEO_FILE -> {
             Box(
@@ -834,11 +814,6 @@ private fun XmbItemLeadingIcon(
         item.type == XMBItemType.VIDEO_COLLECTIONS -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
                 ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Bookmarks, null, iconTint, Modifier.size(46.dp))
-            }
-        }
-        item.type == XMBItemType.VIDEO_APPS -> {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
-                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Movie, null, iconTint, Modifier.size(48.dp))
             }
         }
         // Photos show their cached thumbnail, falling back to a photo glyph for files whose
@@ -941,12 +916,6 @@ private fun XmbItemLeadingIcon(
                         ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Book, null, iconTint, Modifier.size(26.dp))
                     }
                 }
-            }
-        }
-        // The "Photo Apps" section row at the Photo root (distinct glyph from Albums and Camera).
-        item.type == XMBItemType.PHOTO_APPS -> {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
-                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Collections, null, iconTint, Modifier.size(48.dp))
             }
         }
         // The Camera row (only present when a camera app exists).

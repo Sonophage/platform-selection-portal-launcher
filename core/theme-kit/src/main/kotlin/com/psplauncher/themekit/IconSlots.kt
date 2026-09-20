@@ -73,12 +73,10 @@ object IconSlots {
         item("item_video_recent", "Recent videos"),
         item("item_video_favorites", "Favorite videos"),
         item("item_video_collections", "Video collections"),
-        item("item_video_apps", "Video apps"),
         item("item_video_file", "Video file"),
         item("item_photo_folder", "Photo folder"),
         item("item_photo_file", "Photo file"),
         item("item_photo_albums", "Photo albums"),
-        item("item_photo_apps", "Photo apps"),
         item("item_library_shelves", "Book shelves"),
         item("item_library_reader", "Reader app"),
         item("item_library_folder", "Book folder"),
@@ -87,7 +85,6 @@ object IconSlots {
         item("item_camera", "Camera"),
         item("item_music_track", "Music track"),
         item("item_playlist", "Playlist"),
-        item("item_music_apps", "Music apps"),
 
 
         // ── Status strip ─────────────────────────────────────────────────────
