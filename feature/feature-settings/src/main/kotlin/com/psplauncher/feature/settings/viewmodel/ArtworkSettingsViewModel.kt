@@ -54,6 +54,7 @@ data class ArtworkSettingsUiState(
     val scrapeSource: String = "",
     val scrapeAsset: String = "",
     val summary: String? = null,
+    val isRepairingLinks: Boolean = false,
     val confirmRescrapeAll: Boolean = false,
     val diskCacheSizeMb: String = "0 MB",
     // Global default for how game tiles are drawn on the XMB (per-game overrides live in each
@@ -88,6 +89,7 @@ class ArtworkSettingsViewModel @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val sgdbKeyProvider: SgdbApiKeyProvider,
     private val metadataKeyProvider: MetadataApiKeyProvider,
+    private val artworkLinkRepair: com.psplauncher.core.data.repository.ArtworkLinkRepair,
     private val artworkRepository: ArtworkRepository,
     private val scrapePreferences: ArtworkScrapePreferences,
     private val igdbApi: IgdbApi,
@@ -243,6 +245,19 @@ class ArtworkSettingsViewModel @Inject constructor(
                     downloadVideoSnaps = opts.downloadVideoSnaps,
                 )
             }
+        }
+    }
+
+    /**
+     * Repoints every per-game backdrop that no longer resolves. See ArtworkLinkRepair: the column
+     * pointed into an internal store that was emptied, and nothing ever noticed because a missing
+     * backdrop just shows the wallpaper.
+     */
+    fun repairArtworkLinks() {
+        viewModelScope.launch {
+            _extra.update { it.copy(isRepairingLinks = true, summary = null) }
+            val report = artworkLinkRepair.run()
+            _extra.update { it.copy(isRepairingLinks = false, summary = report.message()) }
         }
     }
 

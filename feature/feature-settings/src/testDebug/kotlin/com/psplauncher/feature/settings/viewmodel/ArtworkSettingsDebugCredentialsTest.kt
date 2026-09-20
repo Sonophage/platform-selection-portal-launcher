@@ -54,6 +54,7 @@ class ArtworkSettingsDebugCredentialsTest {
                 every { tgdbKeyFlow } returns flowOf(null)
                 every { ssUsernameFlow } returns flowOf(null)
             },
+            artworkLinkRepair = mockk(relaxed = true),
             artworkRepository = mockk(relaxed = true) { coEvery { computeStatus() } returns ArtworkStatus() },
             scrapePreferences = mockk(relaxed = true) {
                 every { preferSteamGridDbHeroesFlow } returns flowOf(false)

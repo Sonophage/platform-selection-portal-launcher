@@ -134,6 +134,13 @@ fun ArtworkSettingsScreen(
                     onClick  = if (state.isLoadingStatus) null else ({ viewModel.refreshStatus() }),
                 )
 
+                SettingsRow(
+                    label    = "Repair Background Links",
+                    sublabel = if (state.isRepairingLinks) "Checking every game's background…"
+                               else "Point each game's XMB background at art that is actually there",
+                    onClick  = if (state.isRepairingLinks) null else ({ viewModel.repairArtworkLinks() }),
+                )
+
                 // ── Scraping ──────────────────────────────────────────────────────
                 SettingsGroup("Scrape Artwork")
 

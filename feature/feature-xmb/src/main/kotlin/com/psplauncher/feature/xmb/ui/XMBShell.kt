@@ -76,6 +76,7 @@ import com.psplauncher.core.ui.preview.DevicePreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 import com.psplauncher.core.ui.theme.DefaultPFPColors
 import com.psplauncher.core.ui.theme.LocalPFPColors
+import com.psplauncher.core.ui.theme.withWaveTint
 import com.psplauncher.core.ui.theme.PFPTheme
 import com.psplauncher.feature.appbar.AppDrawerScreen
 import com.psplauncher.feature.appbar.AppFilter
@@ -366,21 +367,34 @@ fun XMBShell(
     onWindowsSetupDismiss: () -> Unit = {},
     onLaunchRecoveryAction: (com.psplauncher.feature.launcher.LaunchRecoveryAction) -> Unit = {},
 ) {
-    // The XMB wears the focused game's colour. Animated, because the cursor moves and a colour
-    // that jumped would strobe down a long list; the fade is slower than a cursor step on
-    // purpose, so a fast scroll reads as one drift rather than forty flashes.
+    // The XMB wears the focused game's colour: the wave, the gradient behind it, and the accent
+    // on the cursor. The THEME is the default and the resting state -- land on a row that is not
+    // a game, or a game whose art has no hue, and the screen goes back to the user's colours.
     //
-    // Only the ACCENT is taken. The wave and its gradient stay the user's theme: they are the
-    // whole screen, and repainting the whole screen per row is a different feature from letting
-    // the cursor and the art's scrim pick up the game's colour.
+    // Animated, because the cursor moves. A colour that jumped would strobe down a long list, so
+    // the fade is deliberately slower than a cursor step: a fast scroll reads as one drift rather
+    // than forty flashes, and a cursor that passes straight through a game never fully takes its
+    // colour on before the next one starts pulling it away.
+    val themeWave = uiState.themeColors.waveColor
+    val themeAccent = uiState.themeColors.accentColor
+    val gameColor = uiState.focusedGameAccentArgb?.let { Color(it.toInt()) }
+    val xmbWave by androidx.compose.animation.animateColorAsState(
+        targetValue = gameColor ?: themeWave,
+        animationSpec = tween(durationMillis = 420),
+        label = "xmbGameWave",
+    )
     val xmbGameAccent by androidx.compose.animation.animateColorAsState(
-        targetValue = uiState.focusedGameAccentArgb
-            ?.let { Color(it.toInt()) }
-            ?: uiState.themeColors.accentColor,
+        targetValue = gameColor ?: themeAccent,
         animationSpec = tween(durationMillis = 420),
         label = "xmbGameAccent",
     )
-    PFPTheme(colors = uiState.themeColors.copy(accentColor = xmbGameAccent)) {
+    // withWaveTint re-derives the background anchors from the wave through the same cascade the
+    // theme itself was built with, so a game's colour produces the gradient that colour WOULD
+    // have had as a theme -- not a tint laid over the theme's gradient.
+    val xmbColors = remember(uiState.themeColors, xmbWave, xmbGameAccent) {
+        uiState.themeColors.withWaveTint(xmbWave).copy(accentColor = xmbGameAccent)
+    }
+    PFPTheme(colors = xmbColors) {
       // The applied theme's custom icon slots ride alongside the palette: every themeable
       // glyph (crossbar, item rows, status strip) checks this map before its built-in art.
       CompositionLocalProvider(

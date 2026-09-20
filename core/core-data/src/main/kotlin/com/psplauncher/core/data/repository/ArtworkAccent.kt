@@ -85,6 +85,12 @@ class ArtworkAccent @Inject constructor(
     /** A readable image and, if it had one, its colour. */
     data class Resolved(val uri: String, val accent: Long?)
 
+    /** The first candidate that decodes, without caring what colour it is. */
+    suspend fun firstReadable(vararg candidates: String?): String? = resolve(*candidates)?.uri
+
+    /** Whether this one image decodes. Shares the same cache as [resolve], so it is free twice. */
+    suspend fun isReadable(uri: String): Boolean = resolve(uri) != null
+
     private fun accentOf(bitmap: Bitmap, uri: String): Long? {
         return try {
             // Small on purpose: the deriver stride-samples ~6000 pixels anyway, so a bigger

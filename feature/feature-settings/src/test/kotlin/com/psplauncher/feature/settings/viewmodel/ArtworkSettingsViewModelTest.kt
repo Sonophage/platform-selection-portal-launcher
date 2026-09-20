@@ -94,6 +94,7 @@ class ArtworkSettingsViewModelTest {
         context             = mockk(relaxed = true),
         sgdbKeyProvider     = sgdbKeyProvider,
         metadataKeyProvider = metadataKeyProvider,
+        artworkLinkRepair   = mockk(relaxed = true),
         artworkRepository   = artworkRepository,
         scrapePreferences   = scrapePreferences,
         igdbApi             = igdbApi,
