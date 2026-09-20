@@ -1,6 +1,6 @@
 # Apps in every category
 
-**Status:** Phase 0 answered on the device — the apps exist, one level too deep · **Branch:** none yet · **Written:** 2026-09-20
+**Status:** Phases 1, 2 and 5 done and device-checked (`1b44a38c`) · Phases 3 and 4 open · **Written:** 2026-09-20
 
 ## Goal
 
@@ -64,7 +64,7 @@ thing the owner actually asked for, which is one fewer button press.
 
 ---
 
-# Phase 1 — apps at the root of their category, Add at the end
+# Phase 1 — apps at the root of their category, Add at the end ✅
 
 **The ask:** Video's root should list the video apps directly, with **Add Video Apps** as the last
 row, instead of a **Video Apps** row that drills into them.
@@ -72,33 +72,34 @@ row, instead of a **Video Apps** row that drills into them.
 **Files:** Modify `XMBViewModel.kt` — `videoRootItems()` (:2553), `musicRootItems()`,
 `photoRootItems()`, and the select branches that currently open the sub-view.
 
-- [ ] **1.1** Video: `videoRootItems()` appends `videoAppItems()` after Collections and Video
+- [x] **1.1** Video: `videoRootItems()` appends `videoAppItems()` after Collections and Video
       Libraries, and ends with the existing `ADD_VIDEO_APPS_ITEM_ID` row. The `VIDEO_APPS` drill
       row goes.
-- [ ] **1.2** Music and Photo the same way. Music's `MusicNav.MusicApps` and the photo equivalent
+- [x] **1.2** Music and Photo the same way. Music's `MusicNav.MusicApps` and the photo equivalent
       become unreachable — delete them with their select branches, or this is dead navigation of
       exactly the kind the remediation plan has been removing all week.
-- [ ] **1.3** Keep the ordering rule explicit and the same in all three: the category's own media
+- [x] **1.3** Keep the ordering rule explicit and the same in all three: the category's own media
       first, then its apps, then Add. A user scanning down should hit content before tools.
-- [ ] **1.4** Check the empty case. A category with no apps installed must show **Add** and not a
+- [x] **1.4** Check the empty case. A category with no apps installed must show **Add** and not a
       lonely empty row, and `emptyCategoryItem`'s "No video apps found." message may now be wrong
       — the category is not empty, it has its media rows.
-- [ ] **1.5** Cursor restore is keyed per view (`viewCursorKey`). Removing a drill level changes
+- [x] **1.5** Cursor restore is keyed per view (`viewCursorKey`). Removing a drill level changes
       those keys; make sure backing out of Video does not land on a remembered index from a list
       that no longer exists. The existing clamp should cover it — verify rather than assume.
-- [ ] **1.6** Device check: one press from the Video column to launching YouTube.
+- [x] **1.6** Device check: one press from the Video column to launching YouTube.
 
 **Watch for:** the drill-out ladder. `DrillOutStep` has rungs for the music and video sub-views;
 removing the apps sub-view must remove its rung too, or Back climbs a level that is not there.
 
 ---
 
-# Phase 2 — Network gets an Add row
+# Phase 2 — Network gets an Add row ✅
 
-Network already receives browser apps directly at its root, with no sub-row, which is now the
-shape all four categories share.
+Already done before this plan was written, and confirmed on the device: Network's generic
+category loader appends `addAppsItem()` to every app section, so the "Add Apps" row was already
+there. No code changed.
 
-- [ ] **2.1** Add an **Add Network Apps** row, last, mirroring `ADD_VIDEO_APPS_ITEM_ID`, so a
+- [x] **2.1** Add an **Add Network Apps** row, last, mirroring `ADD_VIDEO_APPS_ITEM_ID`, so a
       browser or streaming client the classifier missed can be added by hand.
 
 ---
@@ -150,17 +151,17 @@ unassigned, reachable only through the App Drawer.
 
 ---
 
-# Phase 5 — Books gets readers, plural
+# Phase 5 — Books gets readers, plural ✅
 
 Music, Video and Photo each list several apps with an Add row. Books pins exactly one reader
 (`XMBItemType.LIBRARY_READER`).
 
-- [ ] **5.1** Confirm the current behaviour on the device (0.4) before changing it — a single
-      pinned reader may be deliberate, since a book opens in one app and that is the whole
-      interaction.
-- [ ] **5.2** If plural is wanted: a `LIBRARY_APPS` row plus `ADD_LIBRARY_APPS_ITEM_ID`, mirroring
-      Music. The existing pinned reader stays as the default used when opening a book; the new row
-      is for launching a reader on its own.
+- [x] **5.1** Confirmed on the device: the Library root showed Shelves / Books / Add Book Folder
+      and one pinned reader, with no way to reach a second reader from the XMB.
+- [x] **5.2** Done, and without a `LIBRARY_APPS` drill row, since Phase 1 removed that shape
+      everywhere else in the same commit. `bookAppItems()` publishes the apps at the root with
+      `ADD_LIBRARY_APPS_ITEM_ID` last. The pinned reader stays what it was: the app a book opens
+      *in*. These rows launch a reader on its own.
 - [ ] **5.3** Curate the common ones — Moon+ Reader, ReadEra, Librera, KOReader, Kindle, Kobo,
       Google Play Books — again verifying packages on the device.
 

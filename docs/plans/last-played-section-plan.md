@@ -1,6 +1,6 @@
 # Last Played
 
-**Status:** Not started · **Branch:** none yet · **Written:** 2026-09-20
+**Status:** Built and on the device (`718d1127`). The populated shelf is NOT device-verified: the test tablet has no games, so only the empty state was seen. Playing one game on the handheld closes Task 3. · **Written:** 2026-09-20
 
 ## Goal
 
@@ -48,59 +48,61 @@ entries (the whole section is derived; hiding a game already works through `Hidd
 
 ---
 
-# Task 1 — put the category on the bar
+# Task 1 — put the category on the bar ✅
 
 **Files:** Modify `core/core-domain/.../model/Category.kt`
 
-- [ ] **1.1** Add `RECENTLY_PLAYED` to `BUILT_IN_CATEGORIES`, named **Last Played**, icon
+- [x] **1.1** Add `RECENTLY_PLAYED` to `BUILT_IN_CATEGORIES`, named **Last Played**, icon
       `ic_recent` (confirm an icon key exists; add one to the slot vocabulary if not — and note
       `IconSlots` / `DefaultSlotGlyph` / `StudioIconSet` are a four-way mirror that must all agree).
-- [ ] **1.2** Position: appended past the others, the way Library was, so an established database
+- [x] **1.2** Position: appended past the others, the way Library was, so an established database
       gains it without colliding with positions its rows already hold.
-- [ ] **1.3** `CategoryBarFallbackTest` covers ids and positions already and will fail if the new
+- [x] **1.3** `CategoryBarFallbackTest` covers ids and positions already and will fail if the new
       entry collides. Run it rather than assuming.
 
-**Decision for the device session:** where it should sit once reordered. Left of Game is the
-natural home for "what I was doing", but that is a taste call.
+**Decision taken:** appended at position 10 (far right, past Library), because that is what lets
+an established database gain the row without colliding with positions it already holds. Left of
+Game may well be the better home; that is a reorder in Category Manager, not a code change.
 
 ---
 
-# Task 2 — fill it
+# Task 2 — fill it ✅
 
 **Files:** Modify `XMBViewModel.kt` — a `BuiltInCategory.RECENTLY_PLAYED` branch in
 `loadItemsForCategory`.
 
-- [ ] **2.1** Collect `gameRepository.observeRecentlyPlayed(limit)` and publish through the same
+- [x] **2.1** Collect `gameRepository.observeRecentlyPlayed(limit)` and publish through the same
       `publishGameItems` path the platform cards use, so cursor memory, hiding and the context
       menu all work with no new code.
-- [ ] **2.2** Limit: start at 20. It is a "what was I doing" shelf, not an archive.
-- [ ] **2.3** Never user-sorted. `activeSortModes` must not offer a sort cycle here — the order IS
+- [x] **2.2** Limit: start at 20. It is a "what was I doing" shelf, not an archive.
+- [x] **2.3** Never user-sorted. `activeSortModes` must not offer a sort cycle here — the order IS
       the meaning. Check `sortModeFor`, which is a `when` over category with an `else` that
       silently hands back the GAMES mode.
-- [ ] **2.4** Empty state: a first-run device has played nothing. It needs its own message —
+- [x] **2.4** Empty state: a first-run device has played nothing. It needs its own message —
       "Nothing played yet" — not "No games assigned."
-- [ ] **2.5** Respect `HideLocationType`. Hiding a game from All Games should almost certainly hide
+- [x] **2.5** Respect `HideLocationType`. Hiding a game from All Games should almost certainly hide
       it here too; decide deliberately and write the decision down.
 
 ---
 
 # Task 3 — the art
 
-- [ ] **3.1** Nothing to build. Confirm on the device that focusing a row here brings up its
-      backdrop and retints the wave, exactly as in a platform card.
+- [ ] **3.1** Nothing to build, and NOT yet confirmed: the test tablet has no games, so the
+      column has only ever been seen empty. Needs one play session on the handheld.
 - [ ] **3.2** Confirm the **Backdrop & Tint** switch (`e5bb5416`) turns it off here too. It gates
       `XMBShell` centrally, so it should — verify rather than assume.
 
 ---
 
-# Task 4 — tests
+# Task 4 — tests ✅
 
-- [ ] **4.1** The ordering rule as a pure function if any mapping is added; otherwise lean on
+- [x] **4.1** No mapping was added, so this leans on the SQL as planned.
+- [ ] ~~4.1~~ The ordering rule as a pure function if any mapping is added; otherwise lean on
       `observeRecentlyPlayed`'s `ORDER BY last_played_at DESC`, which is SQL and already correct.
-- [ ] **4.2** A DAO test: three games with known `last_played_at`, assert the order and the limit.
+- [x] **4.2** A DAO test: three games with known `last_played_at`, assert the order and the limit.
       `GameDao` has no coverage of this query today.
-- [ ] **4.3** Falsify by reversing the `ORDER BY`.
-- [ ] **4.4** A test that a game with a null `last_played_at` never appears — the query already
+- [x] **4.3** Falsify by reversing the `ORDER BY`.
+- [x] **4.4** A test that a game with a null `last_played_at` never appears — the query already
       filters it, and that filter is what keeps a fresh library's section empty rather than full
       of games in arbitrary id order.
 
