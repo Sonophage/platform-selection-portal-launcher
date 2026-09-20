@@ -43,29 +43,49 @@ class ArtworkAccent @Inject constructor(
      * [candidates] are tried in order and the first that yields a colour wins, so a caller can
      * say "the hero, else the box art, else the icon" without writing the fallback itself.
      */
-    suspend fun of(vararg candidates: String?): Long? = withContext(Dispatchers.IO) {
+    suspend fun of(vararg candidates: String?): Long? =
+        resolve(*candidates)?.accent
+
+    /**
+     * The first candidate that actually decodes, with its colour.
+     *
+     * The URI matters as much as the colour. On this library 125 of 147 games carry an
+     * artwork_uri pointing into the app's internal artwork store, and that store is empty -- the
+     * art lives in the ES-DE tree those games' heroUri points at. Anything that reads the first
+     * NAMED candidate gets a path to nothing; anything that reads the first READABLE one gets the
+     * picture. Both the colour and the backdrop have to make that choice the same way, so they
+     * make it here, once.
+     *
+     * A readable image with no dominant hue returns with a null [accent]: it is still the right
+     * image to show, it just has no colour to offer.
+     */
+    suspend fun resolve(vararg candidates: String?): Resolved? = withContext(Dispatchers.IO) {
         for (uri in candidates) {
             if (uri.isNullOrBlank()) continue
-            cache[uri]?.let { return@withContext it.takeIf { c -> c != NONE } }
-            val derived = derive(uri)
-            cache[uri] = derived ?: NONE
-            if (derived != null) return@withContext derived
+            cache[uri]?.let { cached ->
+                if (cached == UNREADABLE) continue
+                return@withContext Resolved(uri, cached.takeIf { it != NO_HUE })
+            }
+            val bitmap = runCatching { decode(uri) }.getOrElse {
+                Timber.d(it, "ArtworkAccent: read failed for $uri")
+                null
+            }
+            if (bitmap == null) {
+                Timber.d("ArtworkAccent: nothing decoded from $uri")
+                cache[uri] = UNREADABLE
+                continue
+            }
+            val accent = accentOf(bitmap, uri)
+            cache[uri] = accent ?: NO_HUE
+            return@withContext Resolved(uri, accent)
         }
         null
     }
 
-    private fun derive(uri: String): Long? {
-        // Both failure shapes are logged, because they look identical from the outside: a null
-        // decode (unreadable uri, revoked grant, oversize header) throws nothing at all, so
-        // without this line an image that simply never opened is indistinguishable from one
-        // that opened and turned out to be greyscale.
-        val bitmap = runCatching { decode(uri) }.getOrElse {
-            Timber.d(it, "ArtworkAccent: read failed for $uri")
-            null
-        } ?: run {
-            Timber.d("ArtworkAccent: nothing decoded from $uri")
-            return null
-        }
+    /** A readable image and, if it had one, its colour. */
+    data class Resolved(val uri: String, val accent: Long?)
+
+    private fun accentOf(bitmap: Bitmap, uri: String): Long? {
         return try {
             // Small on purpose: the deriver stride-samples ~6000 pixels anyway, so a bigger
             // decode buys nothing but heap.
@@ -114,8 +134,11 @@ class ArtworkAccent @Inject constructor(
     private companion object {
         const val MAX_EDGE = 512
 
-        // A cached "this image has no accent". Cannot collide with a real result, which is always
-        // opaque (0xFF......) because AccentDeriver rebuilds the colour from HSV.
-        const val NONE = 0L
+        // Two different cached negatives, because they mean opposite things to a caller looking
+        // for a backdrop: NO_HUE is a picture worth showing that happens to be greyscale,
+        // UNREADABLE is a path with nothing behind it. Neither can collide with a real result,
+        // which is always opaque (0xFF......) because AccentDeriver rebuilds the colour from HSV.
+        const val NO_HUE = 0L
+        const val UNREADABLE = 1L
     }
 }

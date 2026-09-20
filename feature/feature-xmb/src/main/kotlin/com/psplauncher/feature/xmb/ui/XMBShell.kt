@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -365,7 +366,21 @@ fun XMBShell(
     onWindowsSetupDismiss: () -> Unit = {},
     onLaunchRecoveryAction: (com.psplauncher.feature.launcher.LaunchRecoveryAction) -> Unit = {},
 ) {
-    PFPTheme(colors = uiState.themeColors) {
+    // The XMB wears the focused game's colour. Animated, because the cursor moves and a colour
+    // that jumped would strobe down a long list; the fade is slower than a cursor step on
+    // purpose, so a fast scroll reads as one drift rather than forty flashes.
+    //
+    // Only the ACCENT is taken. The wave and its gradient stay the user's theme: they are the
+    // whole screen, and repainting the whole screen per row is a different feature from letting
+    // the cursor and the art's scrim pick up the game's colour.
+    val xmbGameAccent by androidx.compose.animation.animateColorAsState(
+        targetValue = uiState.focusedGameAccentArgb
+            ?.let { Color(it.toInt()) }
+            ?: uiState.themeColors.accentColor,
+        animationSpec = tween(durationMillis = 420),
+        label = "xmbGameAccent",
+    )
+    PFPTheme(colors = uiState.themeColors.copy(accentColor = xmbGameAccent)) {
       // The applied theme's custom icon slots ride alongside the palette: every themeable
       // glyph (crossbar, item rows, status strip) checks this map before its built-in art.
       CompositionLocalProvider(
@@ -483,10 +498,16 @@ fun XMBShell(
                 modifier            = Modifier.fillMaxSize(),
             )
 
-            // Per-game background art (XMB hover): reads only artworkUri — the dedicated
-            // background slot. heroUri is reserved for the Game Detail hero banner.
+            // Per-game background art (XMB hover).
+            //
+            // It read artworkUri alone -- the dedicated background slot, with heroUri reserved
+            // for the Game Detail banner. That rule was right and the data was not: 125 of the
+            // 147 games here name an internal artwork path that no longer exists, so the slot
+            // resolved to nothing and the wallpaper showed instead. The ViewModel now hands over
+            // the first candidate that actually DECODED, which is the same image its colour came
+            // from, so the backdrop and the tint over it can never be of two different pictures.
             val selectedItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-            val selectedBg = selectedItem?.artworkUri
+            val selectedBg = uiState.focusedGameBackdrop
             // PS3 placement: the approved snap plays full-bleed here instead of in the tile,
             // over the still art and UNDER the legibility scrim, so the crossbar keeps the same
             // contrast it has over a still background. Same FocusedGameVideo, same gates, same
@@ -512,12 +533,20 @@ fun XMBShell(
                         // Legibility scrim over the artwork. Deliberately light-handed: heavier
                         // alphas dim the art too much, so darker photos lose their vibrancy — the
                         // icons/labels carry their own contrast (tiles, glows, text shadows).
+                        //
+                        // Tinted toward the focused game's own colour rather than a neutral
+                        // near-black. Same alphas, so nothing gets darker; the difference is that
+                        // the darkness now belongs to the artwork it is sitting on instead of
+                        // reading as a grey sheet laid over it.
+                        val scrimBase = androidx.compose.ui.graphics.lerp(
+                            Color(0xFF05050C), xmbGameAccent, 0.22f,
+                        )
                         Box(
                             Modifier.fillMaxSize().background(
                                 Brush.horizontalGradient(
-                                    0.0f to Color(0xA605050C),
-                                    0.5f to Color(0x8005050C),
-                                    1.0f to Color(0xBF05050C),
+                                    0.0f to scrimBase.copy(alpha = 0.65f),
+                                    0.5f to scrimBase.copy(alpha = 0.50f),
+                                    1.0f to scrimBase.copy(alpha = 0.75f),
                                 )
                             )
                         )
@@ -636,6 +665,19 @@ fun XMBShell(
             )
             if (metadataLine != null && metaAlpha > 0f) {
                 BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                    // The accent rule: a short bar in the game's own colour, directly above its
+                    // facts. It is the one place the colour is stated OUTRIGHT rather than mixed
+                    // into something else, which is what makes the tint elsewhere read as
+                    // deliberate instead of as a cast on the artwork.
+                    Box(
+                        modifier = Modifier
+                            .offset(y = maxHeight * 0.22f - 14.dp)
+                            .padding(end = 44.dp)
+                            .width(64.dp)
+                            .height(3.dp)
+                            .alpha(metaAlpha)
+                            .background(xmbGameAccent),
+                    )
                     androidx.compose.material3.Text(
                         text = metadataLine,
                         color = Color.White.copy(alpha = 0.72f),

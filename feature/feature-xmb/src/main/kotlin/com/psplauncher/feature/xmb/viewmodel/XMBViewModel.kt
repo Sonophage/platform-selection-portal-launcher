@@ -749,6 +749,21 @@ data class XMBUiState(
         com.psplauncher.core.domain.model.VideoSnapPlacement.DEFAULT,
     // Whether the focused game's scraped one-liner is drawn under its logo.
     val gameMetadataVisible: Boolean = true,
+    /**
+     * The focused game's own colour, read out of its artwork. Null on a non-game row, on art
+     * with no dominant hue, and for the moment before it has been read -- in all three the XMB
+     * keeps the user's theme, which is what it looked like before this existed.
+     */
+    val focusedGameAccentArgb: Long? = null,
+    /**
+     * The image behind the focused game: the first of its art candidates that actually decodes.
+     *
+     * NOT simply artworkUri, which is what this used to read. 125 of the 147 games on the real
+     * library name an internal artwork path that no longer exists, so reading the named slot
+     * showed the wallpaper for all of them and the per-game backdrop only ever appeared for the
+     * five with a content:// one.
+     */
+    val focusedGameBackdrop: String? = null,
     val librarySetupComplete: Boolean = false,
     val themeColors: PFPColors = DefaultPFPColors,
     // Custom icon slots of the applied theme (theme slot key → CustomIcon); empty = the
@@ -1399,6 +1414,7 @@ class XMBViewModel @Inject constructor(
     private val hiddenPlacementDao: com.psplauncher.core.data.database.dao.HiddenPlacementDao,
     private val iconDisplayPreferences: com.psplauncher.core.data.repository.IconDisplayPreferences,
     private val artworkStore: com.psplauncher.feature.artwork.store.ArtworkStore,
+    private val artworkAccent: com.psplauncher.core.data.repository.ArtworkAccent,
     private val gameLaunchPreferences: com.psplauncher.core.data.repository.GameLaunchPreferences,
     private val windowsLibrarySetup: com.psplauncher.core.data.repository.WindowsLibrarySetup,
     private val pcShortcutImporter: com.psplauncher.feature.launcher.PcShortcutImporter,
@@ -1461,6 +1477,7 @@ class XMBViewModel @Inject constructor(
         observeContextMenuHintIdle()
         observeIconDisplayMode()
         observeFocusedGameVideo()
+        observeFocusedGameAccent()
         observeBackgroundSettings()
         observeTouchNavButtonMode()
         observeWallpaper()
@@ -7825,6 +7842,9 @@ class XMBViewModel @Inject constructor(
 
     @Volatile private var animatedIconsEnabled = true
 
+    /** How long the cursor rests before the XMB takes on the focused game's colour. */
+    private val ACCENT_SETTLE_MS = 220L
+
     // Live rest-before-play gate, fed by IconDisplayPreferences.lingerDelaySecondsFlow; starts at
     // the PSP-faithful 1.5 s and tracks the user's Video Snap Delay setting.
     @Volatile private var icon1LingerMs = ICON1_LINGER_MS
@@ -7836,6 +7856,43 @@ class XMBViewModel @Inject constructor(
      * [com.psplauncher.feature.xmb.ui.Icon1VideoOverlay] plays it in-slot. Any focus move,
      * overlay, or mode change clears it immediately (collectLatest cancels the pending linger).
      */
+    /**
+     * The focused game's colour, following the cursor.
+     *
+     * Debounced, and that is the whole difference from the detail page's version of this: there
+     * a page opens on ONE game, here the cursor can cross forty of them in a second, and decoding
+     * every one of those would be forty bitmaps nobody ever sees. The wait is deliberately
+     * shorter than the video snap's -- a colour settling in is cheap and reads as the screen
+     * catching up, where a video starting is an event.
+     */
+    private fun observeFocusedGameAccent() {
+        viewModelScope.launch {
+            _uiState
+                .map { s -> s.currentItems.getOrNull(s.selectedItemIndex)?.takeIf { it.isRealGame } }
+                .distinctUntilChanged { a, b -> a?.gameId == b?.gameId }
+                .collectLatest { item ->
+                    if (item == null) {
+                        _uiState.update {
+                            it.copy(focusedGameAccentArgb = null, focusedGameBackdrop = null)
+                        }
+                        return@collectLatest
+                    }
+                    kotlinx.coroutines.delay(ACCENT_SETTLE_MS)
+                    val art = artworkAccent.resolve(
+                        item.artworkUri, item.heroUri, item.boxArtUri, item.iconUri,
+                    )
+                    // collectLatest cancels this on any cursor move, so reaching here means the
+                    // cursor is still on the game this was read for.
+                    _uiState.update {
+                        it.copy(
+                            focusedGameAccentArgb = art?.accent,
+                            focusedGameBackdrop = art?.uri,
+                        )
+                    }
+                }
+        }
+    }
+
     private fun observeFocusedGameVideo() {
         viewModelScope.launch {
             _uiState
