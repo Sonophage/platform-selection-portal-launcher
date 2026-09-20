@@ -15,10 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 
 // ── Shared, controller-navigable "Add to Collection" picker ──────────────────
 // Used by both the console Game Detail and the Android App Detail screens. The owning
@@ -119,19 +117,20 @@ fun CollectionPickerPanel(
     }
 
     if (ui.showCreateDialog) {
-        AlertDialog(
-            onDismissRequest = onCancelCreate,
-            title = { Text("New Collection") },
-            text = {
-                OutlinedTextField(
-                    value = ui.createText,
-                    onValueChange = onCreateTextChanged,
-                    singleLine = true,
-                    placeholder = { Text("e.g. RPGs, Currently Playing") },
-                )
-            },
-            confirmButton = { TextButton(onClick = onConfirmCreate) { Text("Create") } },
-            dismissButton = { TextButton(onClick = onCancelCreate) { Text("Cancel") } },
+        // In-window, not an AlertDialog. A dialog gets its own platform Window, so while it was up
+        // the Activity's dispatchKeyEvent never ran: on the tablet A, B and the D-pad all did
+        // nothing here and only touch could escape. Both hosts of this panel already answered BACK
+        // for this state (GameDetailViewModel.cancelCreateCollection and AppDetailViewModel's
+        // twin) -- those branches were simply unreachable, and drawing in the launcher's own
+        // window is the whole fix.
+        PfpTextPromptOverlay(
+            title = "New Collection",
+            value = ui.createText,
+            placeholder = "e.g. RPGs, Currently Playing",
+            onValueChange = onCreateTextChanged,
+            onConfirm = onConfirmCreate,
+            onCancel = onCancelCreate,
+            confirmLabel = "Create",
         )
     }
 }

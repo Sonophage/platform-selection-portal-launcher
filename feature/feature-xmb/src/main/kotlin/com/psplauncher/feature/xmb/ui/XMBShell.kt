@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -66,6 +65,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.core.domain.model.BuiltInCategory
@@ -1291,6 +1291,17 @@ fun XMBShell(
 
 }
 
+// ── Name prompts ──────────────────────────────────────────────────────────────
+//
+// Both of these were AlertDialogs, and both were controller-deaf for the reason measured on the
+// tablet: an AlertDialog renders into its own platform Window, so the Activity's dispatchKeyEvent
+// never runs and the gamepad pipeline never sees a press. On the "New Collection" prompt A, B and
+// the D-pad all did nothing and only touch could escape.
+//
+// PfpTextPromptOverlay draws in the launcher's own window instead, which is the whole fix: the
+// BACK branches in XMBViewModel (onCancelAppRename, onCancelCollectionName, onCancelPlaylistName)
+// were always correct and were simply unreachable. They needed no change.
+
 @Composable
 private fun AppRenameDialog(
     currentLabel: String,
@@ -1298,14 +1309,13 @@ private fun AppRenameDialog(
     onCancel: () -> Unit,
 ) {
     var text by remember(currentLabel) { mutableStateOf(currentLabel) }
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text("Rename Shortcut") },
-        text = {
-            OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true)
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(text) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+    PfpTextPromptOverlay(
+        title = "Rename Shortcut",
+        value = text,
+        placeholder = "Shortcut name",
+        onValueChange = { text = it },
+        onConfirm = { onConfirm(text) },
+        onCancel = onCancel,
     )
 }
 
@@ -1317,19 +1327,13 @@ private fun CollectionNameDialog(
     onCancel: () -> Unit,
 ) {
     var text by remember(initialText) { mutableStateOf(initialText) }
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                singleLine = true,
-                placeholder = { Text("e.g. RPGs, Currently Playing") },
-            )
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(text) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+    PfpTextPromptOverlay(
+        title = title,
+        value = text,
+        placeholder = "e.g. RPGs, Currently Playing",
+        onValueChange = { text = it },
+        onConfirm = { onConfirm(text) },
+        onCancel = onCancel,
     )
 }
 
