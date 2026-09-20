@@ -143,13 +143,16 @@ per-system defaults, and copyable diagnostics instead of a dead end.
   **Favorites** (shown only when something is favorited), user collections, then one row per
   enabled Memory Card. Folders are entered by setting `selectedPlatformId` (sentinels
   `__all_games__` / `__favorites__`) or `selectedCollectionId`; BACK clears them.
-- **Settings hierarchy:** two levels, both of them inside the settings screens. The crossbar has
-  a single **Settings** row (plus **Android Settings**) that opens the first screen of the first
-  section; the section rail down the left of every settings page lists all six sections with the
-  open one expanded to its screens. The tree itself is `SETTINGS_CATALOG` in `core:core-domain`,
-  shaped for the rail by `settingsRailRows`, and every row routes through the
-  `SETTINGS_SCREEN_ROUTES` allowlist in `SettingsNavHost`. Pinned by `SettingsRailRowsTest` and
-  `SettingsHierarchyTest`.
+- **Settings hierarchy:** two levels, reachable two ways on purpose. On the crossbar the Settings
+  column lists the six L1 sections (plus **Android Settings**), and drilling one opens its screens
+  in the shared two-pane flyout, exactly as Music/Video/Photo drill — Settings is the one column
+  where the crossbar is the interface rather than a shell around content. Inside a settings screen,
+  the section rail down the left lists all six sections with the open one expanded, so you can move
+  sideways without backing out to the crossbar. The tree itself is `SETTINGS_CATALOG` in
+  `core:core-domain`, shaped for the rail by `settingsRailRows` and for the column by
+  `settingsSectionItems`; every row routes through the `SETTINGS_SCREEN_ROUTES` allowlist in
+  `SettingsNavHost`. `SettingsHierarchyTest` asserts the column and the rail agree about what each
+  section contains; `SettingsRailRowsTest` pins the rail's own shape.
 - **Input:** a gamepad dispatcher routes D-pad/A/B/Y to the focused layer. `hasBlockingOverlay`
   guards the main XMB navigation so input never drives the bar behind a dialog or overlay. Cursor
   movement itself lives in `core:core-navigation`, away from Compose.

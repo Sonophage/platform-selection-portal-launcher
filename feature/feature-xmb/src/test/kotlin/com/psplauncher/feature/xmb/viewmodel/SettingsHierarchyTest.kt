@@ -25,26 +25,28 @@ class SettingsHierarchyTest {
 
     // ── Crossbar root ────────────────────────────────────────────────────────
 
-    @Test fun `the crossbar offers one Settings row and one Android Settings row`() {
+    @Test fun `the crossbar column is Android Settings followed by the six sections`() {
+        // The sections are back on the crossbar. Settings is the one column where the XMB has to
+        // carry its own weight: everywhere else the crossbar is a shell around content, and it
+        // reads as an XMB regardless. Here, drilling a section IS the interface. The section rail
+        // inside the screens stays as well, for moving sideways once you are deep.
         assertEquals(
-            listOf("settings_library", "settings_android_system"),
+            listOf("settings_android_system") + SettingsSectionId.entries.map { it.id },
             XMBViewModel.SETTINGS_ROOT_ITEMS.map { it.id },
-        )
-        assertEquals(
-            listOf("Settings", "Android Settings"),
-            XMBViewModel.SETTINGS_ROOT_ITEMS.map { it.title },
         )
     }
 
-    @Test fun `the Settings row opens the first screen of the first section`() {
-        // Not a hand-written id: reordering the catalog has to move this with it, or the crossbar
-        // would open a screen whose section is no longer the one the rail opens expanded.
-        assertEquals(
-            settingsEntriesIn(SettingsSectionId.entries.first()).first().id,
-            XMBViewModel.SETTINGS_ENTRY_SCREEN_ID,
-        )
-        assertEquals(XMBViewModel.SETTINGS_ENTRY_SCREEN_ID, XMBViewModel.SETTINGS_ROOT_ITEMS.first().id)
-        assertTrue(XMBViewModel.SETTINGS_ENTRY_SCREEN_ID in SETTINGS_SCREEN_ROUTES)
+    @Test fun `each crossbar section drills into exactly the screens the rail expands`() {
+        // The two navigations must agree about what a section contains, or drilling "Library" on
+        // the crossbar and opening Library in the rail would offer different screens.
+        SettingsSectionId.entries.forEach { section ->
+            val drilled = settingsSectionItems(SettingsSection.entries.first { it.catalogId == section })
+                .map { it.id }
+            val railed = settingsRailRows(settingsEntriesIn(section).first().id)
+                .filterNot { it.isSection }
+                .map { it.id }
+            assertEquals("${section.id} differs between the column and the rail", drilled, railed)
+        }
     }
 
     @Test fun `every crossbar row carries a title and a subtitle`() {
