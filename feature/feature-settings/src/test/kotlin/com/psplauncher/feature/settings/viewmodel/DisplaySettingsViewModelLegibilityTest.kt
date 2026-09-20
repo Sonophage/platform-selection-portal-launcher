@@ -43,8 +43,19 @@ class DisplaySettingsViewModelLegibilityTest {
 
     @Before
     fun setUp() {
+        // Order matters. The store is prepared BEFORE Main becomes the test dispatcher.
+        //
+        // DataStore's first touch initialises the file, and on a CLEAN run that is real work. Do
+        // it after setMain and that work is dispatched to a scheduler nobody advances inside
+        // runBlocking, so it never finishes and every later read returns the ViewModel's initial
+        // state instead of the store's. On an incremental run the file already exists, the first
+        // touch short-circuits, and the whole class passes -- which is why this only ever failed
+        // on --rerun-tasks and never in an ordinary build.
+        runBlocking {
+            context.pfpDataStore.edit { it.clear() }
+            context.pfpDataStore.data.first()
+        }
         Dispatchers.setMain(dispatcher)
-        runBlocking { context.pfpDataStore.edit { it.clear() } }
         vm = DisplaySettingsViewModel(
             context,
             UiMediaStore(context),

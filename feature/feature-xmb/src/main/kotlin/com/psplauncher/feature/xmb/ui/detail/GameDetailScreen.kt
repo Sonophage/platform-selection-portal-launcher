@@ -37,6 +37,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.PlayArrow
@@ -48,7 +53,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.psplauncher.core.ui.theme.withWaveTint
+import com.psplauncher.core.ui.theme.withArtTint
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -70,6 +75,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
@@ -278,7 +284,7 @@ fun GameDetailScreen(
 private fun GameThemed(accentArgb: Long?, content: @Composable () -> Unit) {
     val base = LocalPFPColors.current
     val themed = remember(base, accentArgb) {
-        if (accentArgb == null) base else base.withWaveTint(Color(accentArgb.toInt()))
+        if (accentArgb == null) base else base.withArtTint(Color(accentArgb.toInt()))
     }
     CompositionLocalProvider(LocalPFPColors provides themed, content = content)
 }
@@ -387,12 +393,25 @@ private fun GameDetailContent(
             title = game.displayTitle,
             platform = state.platform?.name ?: game.platformId.uppercase(),
             accentColor = accentColor,
-            facts = listOfNotNull(
-                game.lastPlayedAt?.let { "Last played ${relativeDays(it)}" },
-                game.totalPlayTimeMillis.takeIf { it > 0 }?.let { "Play time ${formatPlayTime(it)}" },
-                game.kindLabel(),
-            ),
+            // The facts move to the panel below, where they get an icon each and room to be read.
+            // Repeating them over the art would be the same four strings twice on one screen.
+            facts = emptyList(),
             favorite = game.isFavorite,
+            centered = true,
+            action = {
+                // Launch lives IN the art now, under the name, which is where a store page puts
+                // it and where the eye already is after reading the title. It is still the same
+                // node, so nothing about navigation or the page's cursor changes.
+                PfpDetailLaunchButton(
+                    label = "Launch",
+                    icon = Icons.Filled.PlayArrow,
+                    focused = focus == GameDetailKeys.LAUNCH,
+                    onClick = { viewModel.onNodeTapped(GameDetailKeys.LAUNCH) },
+                    modifier = Modifier
+                        .widthIn(max = 260.dp)
+                        .detailNode(GameDetailKeys.LAUNCH, requesterFor, nodeY),
+                )
+            },
             // Shrinks on short screens so Launch and the quick actions never land under the footer.
             height = detailHeroHeightFor(
                 LocalDetailViewportHeight.current,
@@ -415,13 +434,10 @@ private fun GameDetailContent(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                PfpDetailLaunchButton(
-                    label = "Launch",
-                    icon = Icons.Filled.PlayArrow,
-                    focused = focus == GameDetailKeys.LAUNCH,
-                    onClick = { viewModel.onNodeTapped(GameDetailKeys.LAUNCH) },
-                    modifier = Modifier.detailNode(GameDetailKeys.LAUNCH, requesterFor, nodeY),
-                )
+                // The game's own facts, one per line with an icon, beside its cover. This is the
+                // panel the reference puts next to the box art, and every value in it was already
+                // in the database with nowhere to show.
+                GameFactsPanel(game = game)
                 Row(
                     modifier = Modifier.detailNode(GameDetailKeys.ACTIONS, requesterFor, nodeY),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -924,6 +940,55 @@ private fun Game.kindLabel(): String = when {
     shortcutId != null || launchIntentUri != null -> "PC Shortcut"
     romPath == null && packageName != null        -> "Game App"
     else                                          -> "ROM"
+}
+
+/**
+ * The game's facts beside its cover: one line each, with an icon, in the shape the reference
+ * puts next to the box art.
+ *
+ * Every value here was already stored and shown nowhere, or shown as one run-on line of dots
+ * over the artwork. A line per fact with its own glyph is the difference between a caption and
+ * something you can actually read at a glance.
+ *
+ * Deliberately NOT focusable. These are facts, not controls, and a controller that has to step
+ * through four read-only rows to reach the quick actions is worse for the sake of looking busier.
+ */
+@Composable
+private fun GameFactsPanel(game: Game) {
+    val facts = buildList {
+        if (game.isFavorite) add(Icons.Filled.Favorite to "In favourites")
+        game.totalPlayTimeMillis.takeIf { it > 0 }
+            ?.let { add(Icons.Filled.Schedule to "Time played  ${formatPlayTime(it)}") }
+        game.lastPlayedAt?.let { add(Icons.Filled.Event to "Last played  ${relativeDays(it)}") }
+        game.communityRating?.takeIf { it > 0f }
+            ?.let { add(Icons.Filled.ThumbUp to "${(it * 100).toInt()}%") }
+        game.genre?.trim()?.takeIf { it.isNotEmpty() }
+            ?.let { add(Icons.Filled.LocalOffer to it) }
+        game.releaseYear?.takeIf { it > 0 }
+            ?.let { add(Icons.Filled.CalendarToday to it.toString()) }
+    }
+    // Nothing scraped and never played: draw nothing rather than an empty column holding space.
+    if (facts.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        facts.forEach { (icon, text) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = detailPalette().focus,
+                    modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    text = text,
+                    color = TextMuted,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
 }
 
 private fun formatPlayTime(millis: Long): String {

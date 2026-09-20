@@ -48,6 +48,28 @@ fun PFPColors.withWaveTint(wave: Color): PFPColors {
     )
 }
 
+/**
+ * Re-tints a palette to a colour taken from ARTWORK, for a page that is mostly artwork.
+ *
+ * Not [withWaveTint]. That one builds the XMB's gradient, which lightens toward the wave by 0.28
+ * so the wave has something bright to sit against -- and a saturated artwork colour through it
+ * produced a page that was a sheet of that colour at full strength, with the artwork's own hues
+ * lost in it and muted text nearly gone. A detail page wants the opposite: a DEEP version of the
+ * hue, so the page reads as dark and the colour belongs to the art and the cursor.
+ *
+ * [accentColor] does take the colour at full strength: it is the one thing on the page that is
+ * supposed to be the game's colour outright.
+ */
+fun PFPColors.withArtTint(art: Color): PFPColors {
+    val argb = art.toArgb().toLong() and 0xFFFFFFFFL
+    return copy(
+        accentColor = art,
+        waveColor = art,
+        backgroundTop = Color(ColorCascade.darken(argb, 0.16f)),
+        backgroundBottom = Color(ColorCascade.darken(argb, 0.30f)),
+    )
+}
+
 val LocalPFPColors = staticCompositionLocalOf {
     DefaultPFPColors
 }

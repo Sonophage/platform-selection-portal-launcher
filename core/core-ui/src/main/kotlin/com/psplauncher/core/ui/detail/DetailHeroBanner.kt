@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -65,6 +66,14 @@ fun PfpDetailHeroBanner(
     facts: List<String> = emptyList(),
     favorite: Boolean = false,
     height: Dp = DetailHeroHeight,
+    /**
+     * Centres the identity block and puts the platform ABOVE the title, the way a store page
+     * does it, and leaves room under it for the caller to place the primary action inside the
+     * banner. The bottom-left form is what every other detail page still uses.
+     */
+    centered: Boolean = false,
+    /** Drawn under the identity block when [centered]: the page's primary action, in the art. */
+    action: (@Composable () -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
@@ -74,7 +83,7 @@ fun PfpDetailHeroBanner(
             // Artwork-less fallback: an accent-tinted plate at the SAME height, so a game without a
             // hero keeps the page's geometry exactly.
             .background(accentColor.copy(alpha = 0.16f)),
-        contentAlignment = Alignment.BottomStart,
+        contentAlignment = if (centered) Alignment.Center else Alignment.BottomStart,
     ) {
         if (artworkUri != null) {
             AsyncImage(
@@ -105,25 +114,44 @@ fun PfpDetailHeroBanner(
                     ),
             )
         }
-        Column(modifier = Modifier.padding(horizontal = 26.dp, vertical = 18.dp)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 26.dp, vertical = 18.dp),
+            horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
+        ) {
+            // Centred, the platform reads as a kicker ABOVE the name; left-aligned it reads as a
+            // subtitle below it. Same two strings, and the order is what tells you which.
+            if (centered) {
+                Text(
+                    text = platform,
+                    color = DetailTextMuted,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(shadow = DetailTextShadow),
+                )
+                Spacer(Modifier.height(4.dp))
+            }
             Text(
                 text = title,
                 color = DetailTextPrimary,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
+                maxLines = if (centered) 2 else 1,
+                textAlign = if (centered) TextAlign.Center else TextAlign.Start,
                 overflow = TextOverflow.Ellipsis,
                 style = TextStyle(shadow = DetailTextShadow),
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = platform,
-                color = DetailTextMuted,
-                fontSize = 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = TextStyle(shadow = DetailTextShadow),
-            )
+            if (!centered) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = platform,
+                    color = DetailTextMuted,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(shadow = DetailTextShadow),
+                )
+            }
             if (facts.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -134,6 +162,10 @@ fun PfpDetailHeroBanner(
                     overflow = TextOverflow.Ellipsis,
                     style = TextStyle(shadow = DetailTextShadow),
                 )
+            }
+            if (action != null) {
+                Spacer(Modifier.height(14.dp))
+                action()
             }
         }
         // Favorite state is named, not just tinted — colour alone never carries it.
