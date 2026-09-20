@@ -537,17 +537,13 @@ fun ArtworkSettingsScreen(
     }
 
     if (state.confirmRescrapeAll) {
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelRescrapeAll() },
-            title   = { Text("Re-Scrape All Games?") },
-            text    = {
-                Text(
-                    "This will clear and re-scrape artwork for all ${state.status.total} games. " +
-                        "Existing artwork will be replaced. Continue?"
-                )
-            },
-            confirmButton = { TextButton(onClick = { viewModel.confirmRescrapeAll() }) { Text("Re-Scrape All") } },
-            dismissButton = { TextButton(onClick = { viewModel.cancelRescrapeAll() }) { Text("Cancel") } },
+        SettingsConfirmOverlay(
+            title = "Re-Scrape All Games?",
+            message = "This will clear and re-scrape artwork for all ${state.status.total} games. " +
+                "Existing artwork will be replaced.",
+            confirmLabel = "Re-Scrape All",
+            onConfirm = { viewModel.confirmRescrapeAll() },
+            onCancel = { viewModel.cancelRescrapeAll() },
         )
     }
 }

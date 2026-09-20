@@ -241,26 +241,14 @@ fun EmulatorsSettingsScreen(
     }
 
     if (state.showResetConfirm) {
-        AlertDialog(
-            onDismissRequest = viewModel::cancelResetEmulatorConfig,
-            title = { Text("Reset Emulator Configuration?") },
-            text  = {
-                Text(
-                    "This will clear all auto-detected and custom emulator launch settings, " +
-                    "then restore bundled defaults.\n\n" +
-                    "Your game library, ROM paths, artwork, metadata, and save data are not affected."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = viewModel::confirmResetEmulatorConfig) {
-                    Text("Reset", color = UnavailableColor)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::cancelResetEmulatorConfig) {
-                    Text("Cancel")
-                }
-            },
+        SettingsConfirmOverlay(
+            title = "Reset Emulator Configuration?",
+            message = "This will clear all auto-detected and custom emulator launch settings, " +
+                "then restore bundled defaults. Your game library, ROM paths, artwork, metadata " +
+                "and save data are not affected.",
+            confirmLabel = "Reset",
+            onConfirm = viewModel::confirmResetEmulatorConfig,
+            onCancel = viewModel::cancelResetEmulatorConfig,
         )
     }
 }

@@ -240,21 +240,13 @@ private fun ClearOverridesDialog(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text("Clear $count override${if (count == 1) "" else "s"}?") },
-        text = {
-            Text(
-                "These $platformName games have their own pinned emulator and ignore this " +
-                    "platform's default. Clear them so every game on $platformName uses the default."
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Clear", color = WarnColor) }
-        },
-        dismissButton = {
-            TextButton(onClick = onCancel) { Text("Cancel") }
-        },
+    SettingsConfirmOverlay(
+        title = "Clear $count override${if (count == 1) "" else "s"}?",
+        message = "These $platformName games have their own pinned emulator and ignore this " +
+            "platform's default. Clear them so every game on $platformName uses the default.",
+        confirmLabel = "Clear",
+        onConfirm = onConfirm,
+        onCancel = onCancel,
     )
 }
 

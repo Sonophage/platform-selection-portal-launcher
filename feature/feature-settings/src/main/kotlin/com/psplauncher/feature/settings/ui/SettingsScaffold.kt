@@ -50,8 +50,10 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -141,6 +143,41 @@ val LocalSettingsLeftBacksOut = compositionLocalOf { true }
  */
 val LocalSettingsLastInputWasTouch = compositionLocalOf { false }
 val LocalSettingsCursorVisible = compositionLocalOf { true }
+
+/**
+ * The handler of the in-window overlay a settings screen currently has open, if any.
+ *
+ * A settings screen that puts a prompt on top of itself has to take the pad while it is up, or
+ * the cursor keeps walking the list underneath and Confirm fires the row behind the prompt. The
+ * scaffold checks this before anything else and hands the action straight over.
+ *
+ * It is a single slot rather than a stack on purpose: two overlays open at once on one screen is
+ * not a state this app has, and a stack would make "who owns the pad" a question with a history.
+ * Screens register through [SettingsOverlayInput], which clears the slot when the overlay leaves
+ * the composition -- so an overlay cannot keep the pad after it is gone.
+ */
+internal val LocalSettingsOverlayInput =
+    compositionLocalOf<MutableState<((GamepadAction) -> Unit)?>?> { null }
+
+/**
+ * Gives [onAction] the pad for as long as this composable is in the tree.
+ *
+ * Call it from inside the `if (showing)` that draws the overlay, so registration and the overlay
+ * arrive and leave together.
+ */
+@Composable
+fun SettingsOverlayInput(onAction: (GamepadAction) -> Unit) {
+    // Loud on absence, not silent. A missing slot means this overlay is composed outside
+    // SettingsNavHost, and the consequence would be that it draws perfectly and takes no input at
+    // all -- the exact trap the AlertDialogs had. A crash here is a better outcome than that.
+    val slot = LocalSettingsOverlayInput.current
+        ?: error("SettingsOverlayInput must be composed inside SettingsNavHost")
+    val current by rememberUpdatedState(onAction)
+    DisposableEffect(Unit) {
+        slot.value = { action -> current(action) }
+        onDispose { slot.value = null }
+    }
+}
 
 // Internal tracker: rows register their onClick when they gain focus so the scaffold
 // can invoke the right action on a controller SELECT press.
@@ -460,6 +497,10 @@ fun SettingsScaffold(
         com.psplauncher.core.domain.model.settingsRailRows(screenId)
     }
     val railFocused = remember { mutableStateOf(false) }
+    // Filled by SettingsOverlayInput while a screen has a prompt on top of itself. Provided by
+    // SettingsNavHost rather than created here: the prompts are siblings of this scaffold, so a
+    // slot created here would not be in scope where they register.
+    val overlayInput = LocalSettingsOverlayInput.current
     val railCursor = remember(screenId) {
         mutableIntStateOf(railEntries.indexOfFirst { it.id == screenId }.coerceAtLeast(0))
     }
@@ -703,6 +744,15 @@ fun SettingsScaffold(
             onConsumed()
             return@LaunchedEffect
         }
+        // ── An overlay the screen has open owns everything ──────────────────
+        // Checked before the rail and before the list: while a prompt is up, a press belongs to
+        // the prompt, full stop. Nothing underneath may move.
+        overlayInput?.value?.let { handle ->
+            handle(pendingAction)
+            onConsumed()
+            return@LaunchedEffect
+        }
+
         // ── Section rail ────────────────────────────────────────────────────
         // While the cursor is in the rail it owns vertical movement and Confirm, exactly as the
         // content list does when the cursor is there. RIGHT returns; BACK leaves the screen, so

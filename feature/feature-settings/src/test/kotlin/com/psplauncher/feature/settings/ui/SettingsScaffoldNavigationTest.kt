@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
@@ -75,7 +76,12 @@ class SettingsScaffoldNavigationTest {
                 LaunchedEffect(Unit) {
                     for (action in actions) pendingAction.value = action
                 }
+                // Standing in for SettingsNavHost, which is where the overlay slot really lives:
+                // a screen's prompts are siblings of its scaffold, so the slot has to be provided
+                // above both of them.
+                val overlaySlot = remember { mutableStateOf<((GamepadAction) -> Unit)?>(null) }
                 CompositionLocalProvider(
+                    LocalSettingsOverlayInput provides overlaySlot,
                     LocalSettingsPendingAction provides pendingAction.value,
                     LocalSettingsActionConsumed provides { consumedPlain = true },
                     LocalSettingsLeftBacksOut provides leftBacksOut,
@@ -160,6 +166,43 @@ class SettingsScaffoldNavigationTest {
         press(GamepadAction.NAVIGATE_LEFT)
         assertEquals("LEFT with no rail backs out of the screen", 1, backs)
         assertEquals("and the content keeps its cursor", true, contentCursor)
+    }
+
+    @Test
+    fun `an overlay takes every press while it is open`() {
+        // A prompt drawn over a settings screen has a live list underneath it. Nothing may move
+        // down there while the prompt is up, or DOWN walks the hidden list and A fires whatever
+        // row it landed on -- which is how a confirmation ends up performing something else.
+        val seen = mutableListOf<GamepadAction>()
+        val overlayOpen = mutableStateOf(false)
+        showScreen {
+            SettingsRow(label = "Theme", onClick = {})
+            SettingsRow(label = "Sound", onClick = {})
+            if (overlayOpen.value) SettingsOverlayInput { seen += it }
+        }
+
+        assertFocusedRow("Theme")
+        press(GamepadAction.NAVIGATE_DOWN)
+        assertFocusedRow("Sound")
+
+        composeRule.runOnIdle { overlayOpen.value = true }
+        composeRule.waitForIdle()
+        press(GamepadAction.NAVIGATE_DOWN)
+        press(GamepadAction.SELECT)
+
+        assertEquals(
+            "the overlay must receive the presses",
+            listOf(GamepadAction.NAVIGATE_DOWN, GamepadAction.SELECT),
+            seen,
+        )
+        assertFocusedRow("Sound")
+
+        // And it gives the pad back when it leaves, rather than keeping it forever.
+        composeRule.runOnIdle { overlayOpen.value = false }
+        composeRule.waitForIdle()
+        press(GamepadAction.NAVIGATE_UP)
+        assertFocusedRow("Theme")
+        assertEquals("a closed overlay must not keep receiving presses", 2, seen.size)
     }
 
     @Test

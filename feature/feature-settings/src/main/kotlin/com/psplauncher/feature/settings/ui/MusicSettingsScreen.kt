@@ -141,39 +141,17 @@ fun MusicSettingsContent(
 
     // ── Default player picker: PSPLauncher / System Default / an installed app ──
     if (state.showPlayerPicker) {
-        AlertDialog(
-            onDismissRequest = onDismissPlayerPicker,
-            title   = { Text("Default Music Player") },
-            text    = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    PlayerChoiceRow(
-                        label = "PSPLauncher",
-                        selected = state.defaultPlayer == MusicIntentResolver.BUILTIN,
-                        onClick = { onChoosePlayer(MusicIntentResolver.BUILTIN) },
-                    )
-                    PlayerChoiceRow(
-                        label = "System Default",
-                        selected = state.defaultPlayer == null,
-                        onClick = { onChoosePlayer(null) },
-                    )
-                    state.availablePlayers.forEach { player ->
-                        PlayerChoiceRow(
-                            label = player.label,
-                            selected = state.defaultPlayer == player.packageName,
-                            onClick = { onChoosePlayer(player.packageName) },
-                        )
-                    }
-                    if (state.availablePlayers.isEmpty()) {
-                        Text(
-                            "No other music players found on this device.",
-                            color = SettingsSubtext,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = onDismissPlayerPicker) { Text("Close") } },
+        val choices: List<Pair<String, String?>> = buildList {
+            add("PSPLauncher" to MusicIntentResolver.BUILTIN)
+            add("System Default" to null)
+            state.availablePlayers.forEach { add(it.label to it.packageName) }
+        }
+        SettingsChoiceOverlay(
+            title = "Default Music Player",
+            options = choices.map { it.first },
+            selectedIndex = choices.indexOfFirst { it.second == state.defaultPlayer },
+            onPick = { onChoosePlayer(choices[it].second) },
+            onCancel = onDismissPlayerPicker,
         )
     }
 }

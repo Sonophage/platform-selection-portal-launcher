@@ -6,6 +6,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.core.ui.detail.PfpOverlayCard
+import com.psplauncher.core.ui.detail.PfpOverlayTitle
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
@@ -178,14 +182,12 @@ private fun LibraryManagerContent(
     state.renameTargetPlatformId?.let { targetId ->
         val current = state.cards.firstOrNull { it.platformId == targetId }?.displayName ?: ""
         var text by remember(targetId) { mutableStateOf(current) }
-        AlertDialog(
-            onDismissRequest = onCancelRename,
-            title   = { Text("Rename Memory Card") },
-            text    = {
-                OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true)
-            },
-            confirmButton = { TextButton(onClick = { onConfirmRename(text) }) { Text("Save") } },
-            dismissButton = { TextButton(onClick = onCancelRename) { Text("Cancel") } },
+        SettingsTextPromptOverlay(
+            title = "Rename Memory Card",
+            value = text,
+            onValueChange = { text = it },
+            onConfirm = { onConfirmRename(text) },
+            onCancel = onCancelRename,
         )
     }
 }
@@ -592,12 +594,13 @@ private fun CardDetailContent(
     }
 
     if (showRemoveConfirm) {
-        AlertDialog(
-            onDismissRequest = { showRemoveConfirm = false },
-            title   = { Text("Remove ${card.displayName}?") },
-            text    = { Text("This removes the console and its scanned games from the library. ROM files on disk are not deleted.") },
-            confirmButton = { TextButton(onClick = { showRemoveConfirm = false; onRemoveCard(card.platformId) }) { Text("Remove") } },
-            dismissButton = { TextButton(onClick = { showRemoveConfirm = false }) { Text("Cancel") } },
+        SettingsConfirmOverlay(
+            title = "Remove ${card.displayName}?",
+            message = "This removes the console and its scanned games from the library. " +
+                "ROM files on disk are not deleted.",
+            confirmLabel = "Remove",
+            onConfirm = { showRemoveConfirm = false; onRemoveCard(card.platformId) },
+            onCancel = { showRemoveConfirm = false },
         )
     }
 }
@@ -608,17 +611,14 @@ private fun EmulatorPickerDialog(
     onSelect: (EmulatorOption) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title   = { Text("Set Emulator") },
-        text    = {
-            Column {
-                options.forEach { option ->
-                    SettingsRow(label = option.name, onClick = { onSelect(option) })
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    SettingsChoiceOverlay(
+        title = "Set Emulator",
+        options = options.map { it.name },
+        // Nothing is pre-chosen here: the row that opens this already shows the current
+        // emulator, and marking one as selected would claim a choice the caller has not made.
+        selectedIndex = -1,
+        onPick = { onSelect(options[it]) },
+        onCancel = onDismiss,
     )
 }
 
@@ -747,43 +747,46 @@ private fun AddPcGameDialog(
     var title by remember { mutableStateOf("") }
     var source by remember { mutableStateOf(adapter?.sources?.firstOrNull()) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add ${launcher.name} game") },
-        text = {
-            Column {
-                adapter?.idPrompt?.let { Text(it, color = SettingsSubtext, fontSize = 12.sp) }
-                OutlinedTextField(value = id, onValueChange = { id = it }, label = { Text("Game ID") }, singleLine = true)
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Game name") }, singleLine = true)
-                if (adapter != null && adapter.sources.isNotEmpty()) {
-                    Text("Source", color = SettingsSubtext, fontSize = 12.sp)
-                    Row {
-                        adapter.sources.forEach { s ->
-                            Text(
-                                text = s,
-                                color = if (s == source) SettingsAccent else SettingsSubtext,
-                                modifier = Modifier
-                                    .clickable { source = s }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                            )
-                        }
-                    }
+    // Two fields and a source row: not one of the shared shapes, so it uses the card directly.
+    // A and B are wired the way every other settings prompt is; the fields themselves are typed
+    // into with the keyboard, as they were.
+    SettingsOverlayInput { action ->
+        when (action) {
+            GamepadAction.SELECT -> if (id.isNotBlank() && title.isNotBlank()) onAdd(id, title, source)
+            GamepadAction.BACK -> onDismiss()
+            else -> Unit
+        }
+    }
+    PfpOverlayCard(onScrimTap = onDismiss) {
+        PfpOverlayTitle("Add ${launcher.name} game")
+        Spacer(Modifier.height(10.dp))
+        adapter?.idPrompt?.let { Text(it, color = SettingsSubtext, fontSize = 12.sp) }
+        OutlinedTextField(value = id, onValueChange = { id = it }, label = { Text("Game ID") }, singleLine = true)
+        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Game name") }, singleLine = true)
+        if (adapter != null && adapter.sources.isNotEmpty()) {
+            Text("Source", color = SettingsSubtext, fontSize = 12.sp)
+            Row {
+                adapter.sources.forEach { s ->
+                    Text(
+                        text = s,
+                        color = if (s == source) SettingsAccent else SettingsSubtext,
+                        modifier = Modifier
+                            .clickable { source = s }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
                 }
             }
-        },
-        confirmButton = {
+        }
+        Spacer(Modifier.height(16.dp))
+        Row {
+            TextButton(onClick = { onTest(id, source) }) { Text("Test Launch") }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
             TextButton(
                 onClick = { onAdd(id, title, source) },
                 enabled = id.isNotBlank() && title.isNotBlank(),
             ) { Text("Add") }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = { onTest(id, source) }) { Text("Test Launch") }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
-            }
-        },
-    )
+        }
+    }
 }
 
 // ── Shared bits ─────────────────────────────────────────────────────────────────

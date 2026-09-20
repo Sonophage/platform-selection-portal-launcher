@@ -1,21 +1,10 @@
 package com.psplauncher.core.ui.detail
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
@@ -25,18 +14,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 // ── In-window text prompt ─────────────────────────────────────────────────────
 //
@@ -77,69 +62,35 @@ fun PfpTextPromptOverlay(
     // is reach out and tap the field, which on a controller-first launcher is a dead end.
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xCC000000))
-            // The keyboard covers the bottom of the screen and NOTHING in this app applied an IME
-            // inset before now. Centring inside the padded area keeps the field and its buttons
-            // above the keyboard instead of behind it.
-            .imePadding()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onCancel,
+    PfpOverlayCard(onScrimTap = onCancel, modifier = modifier) {
+        PfpOverlayTitle(title)
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            placeholder = { Text(placeholder, color = DetailTextMuted) },
+            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = detailPalette().focus,
+                unfocusedBorderColor = Color(0x44FFFFFF),
+                focusedTextColor = DetailTextPrimary,
+                unfocusedTextColor = DetailTextPrimary,
+                cursorColor = detailPalette().focus,
             ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier
-                .widthIn(min = 320.dp, max = 520.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xF21A1A22))
-                .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                )
-                .padding(horizontal = 22.dp, vertical = 20.dp),
-        ) {
-            Text(
-                text = title,
-                color = DetailTextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                style = TextStyle(shadow = DetailTextShadow),
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                placeholder = { Text(placeholder, color = DetailTextMuted) },
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = detailPalette().focus,
-                    unfocusedBorderColor = Color(0x44FFFFFF),
-                    focusedTextColor = DetailTextPrimary,
-                    unfocusedTextColor = DetailTextPrimary,
-                    cursorColor = detailPalette().focus,
-                ),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Done,
-                ),
-                // The keyboard's own Done key commits. That is how every other text field in this
-                // app is confirmed, and it is the only commit path a soft keyboard really offers.
-                keyboardActions = KeyboardActions(onDone = { onConfirm() }),
-            )
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onCancel) { Text(cancelLabel, color = DetailTextMuted) }
-                TextButton(onClick = onConfirm) {
-                    Text(confirmLabel, color = detailPalette().focus, fontWeight = FontWeight.SemiBold)
-                }
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Words,
+                imeAction = ImeAction.Done,
+            ),
+            // The keyboard's own Done key commits. That is how every other text field in this app
+            // is confirmed, and it is the only commit path a soft keyboard really offers.
+            keyboardActions = KeyboardActions(onDone = { onConfirm() }),
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onCancel) { Text(cancelLabel, color = DetailTextMuted) }
+            TextButton(onClick = onConfirm) {
+                Text(confirmLabel, color = detailPalette().focus, fontWeight = FontWeight.SemiBold)
             }
         }
     }

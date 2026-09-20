@@ -140,39 +140,23 @@ fun VideoSettingsContent(
 
     // ── Default player picker: PSPLauncher / System Default / an installed app ──
     if (state.showPlayerPicker) {
-        AlertDialog(
-            onDismissRequest = onDismissPlayerPicker,
-            title = { Text("Default Video Player") },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    PlayerChoiceRow(
-                        label = "PSPLauncher",
-                        selected = state.defaultPlayer == null || state.defaultPlayer == "builtin",
-                        onClick = { onChoosePlayer("builtin") },
-                    )
-                    PlayerChoiceRow(
-                        label = "System Default",
-                        selected = state.defaultPlayer == "ask",
-                        onClick = { onChoosePlayer("ask") },
-                    )
-                    state.availablePlayers.forEach { player ->
-                        PlayerChoiceRow(
-                            label = player.label,
-                            selected = state.defaultPlayer == player.packageName,
-                            onClick = { onChoosePlayer(player.packageName) },
-                        )
-                    }
-                    if (state.availablePlayers.isEmpty()) {
-                        Text(
-                            "No external video players found on this device.",
-                            color = SettingsSubtext,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = onDismissPlayerPicker) { Text("Close") } },
+        // The rows and the values they set, as one list: the overlay reports an index, and an
+        // index into two lists that were built separately is how a picker sets the wrong thing.
+        val choices = buildList {
+            add("PSPLauncher" to "builtin")
+            add("System Default" to "ask")
+            state.availablePlayers.forEach { add(it.label to it.packageName) }
+        }
+        val current = when (state.defaultPlayer) {
+            null, "builtin" -> 0
+            else -> choices.indexOfFirst { it.second == state.defaultPlayer }
+        }
+        SettingsChoiceOverlay(
+            title = "Default Video Player",
+            options = choices.map { it.first },
+            selectedIndex = current,
+            onPick = { onChoosePlayer(choices[it].second) },
+            onCancel = onDismissPlayerPicker,
         )
     }
 }

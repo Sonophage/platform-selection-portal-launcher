@@ -45,12 +45,14 @@ fun CategoryManagerScreen(
     // Create-name dialog
     if (state.showCreateNameDialog) {
         var text by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelCreateName() },
-            title   = { Text("New Category") },
-            text    = { OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true) },
-            confirmButton = { TextButton(onClick = { viewModel.confirmCreateName(text) }) { Text("Next") } },
-            dismissButton = { TextButton(onClick = { viewModel.cancelCreateName() }) { Text("Cancel") } },
+        SettingsTextPromptOverlay(
+            title = "New Category",
+            value = text,
+            onValueChange = { text = it },
+            onConfirm = { viewModel.confirmCreateName(text) },
+            onCancel = { viewModel.cancelCreateName() },
+            placeholder = "Category name",
+            confirmLabel = "Next",
         )
     }
 
@@ -58,12 +60,12 @@ fun CategoryManagerScreen(
     state.renameTargetId?.let { id ->
         val current = state.categories.firstOrNull { it.id == id }?.name ?: ""
         var text by remember(id) { mutableStateOf(current) }
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelRename() },
-            title   = { Text("Rename Category") },
-            text    = { OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true) },
-            confirmButton = { TextButton(onClick = { viewModel.confirmRename(text) }) { Text("Save") } },
-            dismissButton = { TextButton(onClick = { viewModel.cancelRename() }) { Text("Cancel") } },
+        SettingsTextPromptOverlay(
+            title = "Rename Category",
+            value = text,
+            onValueChange = { text = it },
+            onConfirm = { viewModel.confirmRename(text) },
+            onCancel = { viewModel.cancelRename() },
         )
     }
 }
@@ -225,12 +227,12 @@ private fun CategoryDetailContent(
     }
 
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title   = { Text("Delete ${cat.name}?") },
-            text    = { Text("This removes the category and its app assignments. Apps are not uninstalled.") },
-            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; vm.delete(cat.id) }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } },
+        SettingsConfirmOverlay(
+            title = "Delete ${cat.name}?",
+            message = "This removes the category and its app assignments. Apps are not uninstalled.",
+            confirmLabel = "Delete",
+            onConfirm = { showDeleteConfirm = false; vm.delete(cat.id) },
+            onCancel = { showDeleteConfirm = false },
         )
     }
 }

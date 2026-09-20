@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,7 +64,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import androidx.compose.foundation.layout.Arrangement
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
+import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
+import com.psplauncher.core.ui.detail.PfpMessageOverlay
+import com.psplauncher.core.ui.detail.PfpOverlayCard
+import com.psplauncher.core.ui.detail.PfpOverlayTitle
 import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.domain.model.VideoSnapPlacement
@@ -1400,12 +1404,9 @@ private fun InfoDialog(
     message: String,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(message) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-    )
+    // In-window: the ViewModel has always closed this on A or B, and could never hear either
+    // while it was an AlertDialog with its own platform Window.
+    PfpMessageOverlay(title = title, message = message, onDismiss = onDismiss)
 }
 
 @Composable
@@ -1413,43 +1414,59 @@ private fun LaunchRecoverySheet(
     recovery: com.psplauncher.feature.launcher.LaunchRecoveryRequest,
     onAction: (com.psplauncher.feature.launcher.LaunchRecoveryAction) -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.DISMISS) },
-        title = { Text("Couldn't launch ${recovery.gameTitle}") },
-        text = {
-            Column {
-                Text(recovery.message)
-                recovery.historyLine?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, style = MaterialTheme.typography.bodySmall)
-                }
-                if (recovery.resolved != null) {
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(
-                        onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.PER_SYSTEM_DEFAULTS) },
-                    ) { Text("Change per-system default") }
-                }
-                TextButton(
-                    onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.COPY_DIAGNOSTIC) },
-                ) { Text("Copy diagnostics") }
+    // This is the surface a failed launch drops you on, which is exactly the moment a controller
+    // has to work -- and as an AlertDialog it was the one place in the app where it could not.
+    // The ViewModel already answers A with Retry and B with Dismiss; the rest are touch targets,
+    // as they were before, and Retry is drawn focused because A is what performs it.
+    PfpOverlayCard(onScrimTap = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.DISMISS) }) {
+        PfpOverlayTitle("Couldn't launch ${recovery.gameTitle}")
+        Spacer(Modifier.height(10.dp))
+        Text(recovery.message, color = Color(0xCCFFFFFF), fontSize = 14.sp)
+        recovery.historyLine?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, color = Color(0x99FFFFFF), fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(16.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PfpDetailLaunchButton(
+                label = "Retry",
+                icon = null,
+                focused = true,
+                onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.RETRY) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            PfpDetailLaunchButton(
+                label = "Change Emulator",
+                icon = null,
+                focused = false,
+                onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.CHANGE_EMULATOR) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (recovery.resolved != null) {
+                PfpDetailLaunchButton(
+                    label = "Change per-system default",
+                    icon = null,
+                    focused = false,
+                    onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.PER_SYSTEM_DEFAULTS) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-        },
-        confirmButton = {
-            Row {
-                TextButton(
-                    onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.CHANGE_EMULATOR) },
-                ) { Text("Change Emulator") }
-                TextButton(
-                    onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.RETRY) },
-                ) { Text("Retry") }
-            }
-        },
-        dismissButton = {
-            TextButton(
+            PfpDetailLaunchButton(
+                label = "Copy diagnostics",
+                icon = null,
+                focused = false,
+                onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.COPY_DIAGNOSTIC) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            PfpDetailLaunchButton(
+                label = "Dismiss",
+                icon = null,
+                focused = false,
                 onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.DISMISS) },
-            ) { Text("Dismiss") }
-        },
-    )
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
 }
 
 @OptIn(UnstableApi::class)

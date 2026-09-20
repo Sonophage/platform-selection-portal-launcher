@@ -210,32 +210,21 @@ fun AudioSettingsScreen(
     }
 
     state.message?.let { message ->
-        AlertDialog(
-            onDismissRequest = viewModel::dismissMessage,
-            title = { Text("Couldn't use that sound") },
-            text = { Text(message) },
-            confirmButton = {
-                TextButton(onClick = viewModel::dismissMessage) { Text("OK") }
-            },
+        SettingsMessageOverlay(
+            title = "Couldn't use that sound",
+            message = message,
+            onDismiss = viewModel::dismissMessage,
         )
     }
 
     if (state.confirmResetVisible) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissReset,
-            title = { Text("Reset Sound to Defaults?") },
-            text = {
-                Text(
-                    "Every menu and boot sound returns to the bundled PFP sample and Menu Sounds " +
-                        "is turned back on. Your Boot Video and GameBoot media are not affected."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = viewModel::confirmReset) { Text("Reset") }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissReset) { Text("Cancel") }
-            },
+        SettingsConfirmOverlay(
+            title = "Reset Sound to Defaults?",
+            message = "Every menu and boot sound returns to the bundled PFP sample and Menu " +
+                "Sounds is turned back on. Your Boot Video and GameBoot media are not affected.",
+            confirmLabel = "Reset",
+            onConfirm = viewModel::confirmReset,
+            onCancel = viewModel::dismissReset,
         )
     }
 }

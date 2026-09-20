@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -61,6 +60,12 @@ import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.Video
+import com.psplauncher.core.ui.detail.PfpConfirmOverlay
+import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
+import com.psplauncher.core.ui.detail.PfpMessageOverlay
+import com.psplauncher.core.ui.detail.PfpOverlayCard
+import com.psplauncher.core.ui.detail.PfpOverlayTitle
+import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 import com.psplauncher.core.ui.components.XmbHeaderPill
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursor
@@ -277,22 +282,27 @@ fun VideoDetailScreen(
         }
 
         if (state.confirmRemove) {
-            AlertDialog(
-                onDismissRequest = { viewModel.handleGamepadAction(GamepadAction.BACK) },
-                confirmButton = { TextButton(onClick = viewModel::confirmRemove) { Text("Remove") } },
-                dismissButton = { TextButton(onClick = { viewModel.handleGamepadAction(GamepadAction.BACK) }) { Text("Cancel") } },
-                title = { Text("Remove from library?") },
-                text = { Text("\"${video.displayTitle}\" will be removed from this library. The file on disk is not deleted.") },
+            // Cancel is drawn focused: it is the safe choice, and B performs it.
+            PfpConfirmOverlay(
+                title = "Remove from library?",
+                message = "\"${video.displayTitle}\" will be removed from this library. " +
+                    "The file on disk is not deleted.",
+                confirmLabel = "Remove",
+                cancelLabel = "Cancel",
+                confirmFocused = false,
+                cancelFocused = true,
+                onConfirm = viewModel::confirmRemove,
+                onCancel = { viewModel.handleGamepadAction(GamepadAction.BACK) },
             )
         }
 
         // External-player launch error (real dialog, controller-dismissible via A/B).
         state.launchError?.let { err ->
-            AlertDialog(
-                onDismissRequest = viewModel::dismissLaunchError,
-                confirmButton = { TextButton(onClick = viewModel::dismissLaunchError) { Text("OK") } },
-                title = { Text("Can't play video") },
-                text = { Text(err) },
+            PfpMessageOverlay(
+                title = "Can't play video",
+                message = err,
+                onDismiss = viewModel::dismissLaunchError,
+                dismissLabel = "OK",
             )
         }
 
@@ -425,22 +435,27 @@ private fun PlaylistPicker(
 
 @Composable
 private fun InfoDialog(video: Video, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
-        title = { Text(video.displayTitle) },
-        text = {
-            Column {
-                InfoRow("Duration", fmtTime(video.durationMs ?: 0))
-                video.resolutionLabel?.let { InfoRow("Resolution", it) }
-                video.codec?.let { InfoRow("Format", it) }
-                video.mimeType?.let { InfoRow("Type", it) }
-                video.sizeBytes?.let { InfoRow("Size", fmtSize(it)) }
-                video.relativePath?.let { InfoRow("Location", it) }
-                InfoRow("File", video.displayName)
-            }
-        },
-    )
+    // A field list rather than a message, so it uses the card directly instead of
+    // PfpMessageOverlay. Same chrome, same scrim-cancels rule.
+    PfpOverlayCard(onScrimTap = onDismiss) {
+        PfpOverlayTitle(video.displayTitle)
+        Spacer(Modifier.height(10.dp))
+        InfoRow("Duration", fmtTime(video.durationMs ?: 0))
+        video.resolutionLabel?.let { InfoRow("Resolution", it) }
+        video.codec?.let { InfoRow("Format", it) }
+        video.mimeType?.let { InfoRow("Type", it) }
+        video.sizeBytes?.let { InfoRow("Size", fmtSize(it)) }
+        video.relativePath?.let { InfoRow("Location", it) }
+        InfoRow("File", video.displayName)
+        Spacer(Modifier.height(18.dp))
+        PfpDetailLaunchButton(
+            label = "OK",
+            icon = null,
+            focused = true,
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 @Composable
@@ -461,12 +476,14 @@ private fun RenameDialog(
     title: String = "Rename Title",
     confirmLabel: String = "Save",
 ) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
-        title = { Text(title) },
-        text = { OutlinedTextField(value = text, onValueChange = onTextChange, singleLine = true) },
+    PfpTextPromptOverlay(
+        title = title,
+        value = text,
+        placeholder = "",
+        onValueChange = onTextChange,
+        onConfirm = onConfirm,
+        onCancel = onCancel,
+        confirmLabel = confirmLabel,
     )
 }
 

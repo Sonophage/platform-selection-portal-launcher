@@ -642,35 +642,23 @@ fun DisplaySettingsScreen(
     // Three actions, matching the decision: transient dismiss, a permanent opt-out of the clamp,
     // and a permanent opt-out of the notice (adjustment carries on).
     if (state.textContrastNotice != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissTextContrastNotice() },
-            title = { Text("Font colour adjusted") },
-            text = { Text(state.textContrastNotice!!) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissTextContrastNotice() }) { Text("OK") }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = { viewModel.setTextColorExact(true) }) {
-                        Text("Use my exact colour")
-                    }
-                    TextButton(onClick = { viewModel.suppressTextContrastNotice() }) {
-                        Text("Don't warn again")
-                    }
-                }
-            },
+        SettingsActionsOverlay(
+            title = "Font colour adjusted",
+            message = state.textContrastNotice!!,
+            actions = listOf(
+                "OK" to { viewModel.dismissTextContrastNotice() },
+                "Use my exact colour" to { viewModel.setTextColorExact(true) },
+                "Don't warn again" to { viewModel.suppressTextContrastNotice() },
+            ),
+            onCancel = { viewModel.dismissTextContrastNotice() },
         )
     }
 
     if (state.wallpaperMessage != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissWallpaperMessage() },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissWallpaperMessage() }) {
-                    Text("OK")
-                }
-            },
-            text = { Text(state.wallpaperMessage!!) },
+        SettingsMessageOverlay(
+            title = "Wallpaper",
+            message = state.wallpaperMessage!!,
+            onDismiss = { viewModel.dismissWallpaperMessage() },
         )
     }
 }

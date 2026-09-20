@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,6 +46,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.Photo
+import com.psplauncher.core.ui.detail.PfpConfirmOverlay
+import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
+import com.psplauncher.core.ui.detail.PfpOverlayCard
+import com.psplauncher.core.ui.detail.PfpOverlayTitle
 import com.psplauncher.core.ui.components.ControllerPromptBar
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.XmbHeaderPill
@@ -319,12 +322,16 @@ fun PhotoViewerScreen(
 
         // ── Remove confirmation ──────────────────────────────────────────────
         if (state.confirmRemove) {
-            AlertDialog(
-                onDismissRequest = viewModel::cancelRemove,
-                confirmButton = { TextButton(onClick = viewModel::confirmRemove) { Text("Remove") } },
-                dismissButton = { TextButton(onClick = viewModel::cancelRemove) { Text("Cancel") } },
-                title = { Text("Remove from library?") },
-                text = { Text("\"${photo.displayName}\" will be removed from this library. The photo on disk is not deleted.") },
+            PfpConfirmOverlay(
+                title = "Remove from library?",
+                message = "\"${photo.displayName}\" will be removed from this library. " +
+                    "The photo on disk is not deleted.",
+                confirmLabel = "Remove",
+                cancelLabel = "Cancel",
+                confirmFocused = false,
+                cancelFocused = true,
+                onConfirm = viewModel::confirmRemove,
+                onCancel = viewModel::cancelRemove,
             )
         }
 
@@ -346,22 +353,25 @@ fun PhotoViewerScreen(
 
 @Composable
 private fun InfoDialog(photo: Photo, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
-        title = { Text(photo.displayName) },
-        text = {
-            Column {
-                photo.resolutionLabel?.let { InfoRow("Resolution", it) }
-                photo.dateTaken?.let { InfoRow("Taken", fmtDate(it)) }
-                photo.lastModified?.let { InfoRow("Modified", fmtDate(it)) }
-                photo.sizeBytes?.let { InfoRow("Size", fmtSize(it)) }
-                photo.mimeType?.let { InfoRow("Type", it) }
-                photo.relativePath?.let { InfoRow("Location", it) }
-                InfoRow("File", photo.displayName)
-            }
-        },
-    )
+    PfpOverlayCard(onScrimTap = onDismiss) {
+        PfpOverlayTitle(photo.displayName)
+        Spacer(Modifier.height(10.dp))
+        photo.resolutionLabel?.let { InfoRow("Resolution", it) }
+        photo.dateTaken?.let { InfoRow("Taken", fmtDate(it)) }
+        photo.lastModified?.let { InfoRow("Modified", fmtDate(it)) }
+        photo.sizeBytes?.let { InfoRow("Size", fmtSize(it)) }
+        photo.mimeType?.let { InfoRow("Type", it) }
+        photo.relativePath?.let { InfoRow("Location", it) }
+        InfoRow("File", photo.displayName)
+        Spacer(Modifier.height(18.dp))
+        PfpDetailLaunchButton(
+            label = "OK",
+            icon = null,
+            focused = true,
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 @Composable

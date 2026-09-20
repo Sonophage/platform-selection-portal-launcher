@@ -165,35 +165,18 @@ fun BooksSettingsContent(
     // ── Reader picker: Ask Every Time, or an installed reader ──────────────────
     // No built-in choice, unlike Music and Video: this launcher does not read EPUBs.
     if (state.showReaderPicker) {
-        AlertDialog(
-            onDismissRequest = onDismissReaderPicker,
-            title = { Text("Default Reader") },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    ReaderChoiceRow(
-                        label = "Ask Every Time",
-                        selected = state.defaultReader == null,
-                        onClick = { onChooseReader(null) },
-                    )
-                    state.availableReaders.forEach { reader ->
-                        ReaderChoiceRow(
-                            label = reader.label,
-                            selected = state.defaultReader == reader.packageName,
-                            onClick = { onChooseReader(reader.packageName) },
-                        )
-                    }
-                    if (state.availableReaders.isEmpty()) {
-                        Text(
-                            "No app on this device says it can open EPUB files. Install a reader, " +
-                                "then reopen this list.",
-                            color = SettingsSubtext,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = onDismissReaderPicker) { Text("Close") } },
+        // Label and value together, so the index the overlay reports cannot address one list
+        // while meaning the other.
+        val choices: List<Pair<String, String?>> = buildList {
+            add("Ask Every Time" to null)
+            state.availableReaders.forEach { add(it.label to it.packageName) }
+        }
+        SettingsChoiceOverlay(
+            title = "Default Reader",
+            options = choices.map { it.first },
+            selectedIndex = choices.indexOfFirst { it.second == state.defaultReader },
+            onPick = { onChooseReader(choices[it].second) },
+            onCancel = onDismissReaderPicker,
         )
     }
 }

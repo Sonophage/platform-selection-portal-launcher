@@ -2,6 +2,8 @@ package com.psplauncher.feature.settings.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.psplauncher.core.domain.model.GamepadAction
 
@@ -76,7 +78,18 @@ fun SettingsNavHost(
     onOpenScreen: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    // The overlay slot lives HERE, not in SettingsScaffold, and the reason is worth writing down:
+    // a screen's prompts are drawn as SIBLINGS of its scaffold, not inside it, so that they cover
+    // the header and footer rather than only the content column. A slot provided by the scaffold
+    // is therefore not in scope where the prompt registers. It crashed on the device the first
+    // time a converted prompt opened, which is what the error() default in the local is for --
+    // a silently absent slot would have meant the prompt drew fine and quietly took no input,
+    // which is the exact trap all of this is here to remove.
+    //
+    // Keyed on screenId so moving between screens cannot leave a departed screen's handler behind.
+    val overlayInput = remember(screenId) { mutableStateOf<((GamepadAction) -> Unit)?>(null) }
     CompositionLocalProvider(
+        LocalSettingsOverlayInput provides overlayInput,
         LocalSettingsScreenId provides screenId,
         LocalSettingsOpenScreen provides onOpenScreen,
         LocalSettingsPendingAction provides pendingGamepadAction,

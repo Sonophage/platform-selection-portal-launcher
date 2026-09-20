@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,7 +29,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.core.ui.detail.PfpOverlayCard
+import com.psplauncher.core.ui.detail.PfpOverlayTitle
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameCollection
@@ -247,19 +252,13 @@ private fun CollectionTextDialog(
     onCancel: () -> Unit,
 ) {
     var text by remember(initial) { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                singleLine = true,
-                placeholder = { Text("Collection name") },
-            )
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(text) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+    SettingsTextPromptOverlay(
+        title = title,
+        value = text,
+        onValueChange = { text = it },
+        onConfirm = { onConfirm(text) },
+        onCancel = onCancel,
+        placeholder = "Collection name",
     )
 }
 
@@ -270,33 +269,12 @@ private fun CollectionCategoryPickerDialog(
     onCategorySelected: (String) -> Unit,
     onCancel: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text("Add to Category") },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                categories.forEach { category ->
-                    TextButton(
-                        onClick = { onCategorySelected(category.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            category.name,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            color = if (category.id == selectedCategoryId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-            }
-        },
+    SettingsChoiceOverlay(
+        title = "Add to Category",
+        options = categories.map { it.name },
+        selectedIndex = categories.indexOfFirst { it.id == selectedCategoryId },
+        onPick = { onCategorySelected(categories[it].id) },
+        onCancel = onCancel,
     )
 }
 
@@ -308,43 +286,47 @@ private fun CollectionIconPickerDialog(
     onPick: (String?) -> Unit,
     onCancel: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text("Collection Icon") },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                TextButton(
-                    onClick = { onPick(null) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        "Default (Memory Card)",
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
-                        color = if (selectedIconKey == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(56.dp),
-                    modifier = Modifier.fillMaxWidth().height(320.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(CATEGORY_ICON_CATALOG, key = { it.key }) { icon ->
-                        Image(
-                            painter = painterResource(icon.resId),
-                            contentDescription = icon.label,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .selectable(
-                                    selected = icon.key == selectedIconKey,
-                                    onClick = { onPick(icon.key) },
-                                ),
-                        )
-                    }
-                }
+    // A grid of fifty-odd icons, picked by eye. The list overlays would turn that into a long
+    // scroll of names, which is worse for the one job this has, so it keeps the grid and uses the
+    // shared card for the chrome.
+    //
+    // Honest limitation: the pad only does B here. Registering the input at least makes the
+    // overlay escapable with the controller, which it was not while it was an AlertDialog, but
+    // moving a cursor around a two-dimensional grid is its own piece of work and this is not it.
+    SettingsOverlayInput { action ->
+        if (action == GamepadAction.BACK) onCancel()
+    }
+    PfpOverlayCard(onScrimTap = onCancel) {
+        PfpOverlayTitle("Collection Icon")
+        Spacer(Modifier.height(12.dp))
+        TextButton(
+            onClick = { onPick(null) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                "Default (Memory Card)",
+                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                color = if (selectedIconKey == null) MaterialTheme.colorScheme.primary else Color.White,
+            )
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(56.dp),
+            modifier = Modifier.fillMaxWidth().height(320.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(CATEGORY_ICON_CATALOG, key = { it.key }) { icon ->
+                Image(
+                    painter = painterResource(icon.resId),
+                    contentDescription = icon.label,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .selectable(
+                            selected = icon.key == selectedIconKey,
+                            onClick = { onPick(icon.key) },
+                        ),
+                )
             }
-        },
-    )
+        }
+    }
 }
