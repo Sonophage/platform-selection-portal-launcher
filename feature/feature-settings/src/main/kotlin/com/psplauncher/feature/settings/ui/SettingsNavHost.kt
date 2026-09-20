@@ -71,9 +71,14 @@ fun SettingsNavHost(
     onAddAndroidApps: () -> Unit = {},
     onOpenLibraryManager: () -> Unit = {},
     onGoToLibrary: () -> Unit = {},
+    // Opens another settings screen without going back out to the crossbar first — what the
+    // section rail down the left of every screen does.
+    onOpenScreen: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     CompositionLocalProvider(
+        LocalSettingsScreenId provides screenId,
+        LocalSettingsOpenScreen provides onOpenScreen,
         LocalSettingsPendingAction provides pendingGamepadAction,
         LocalSettingsActionConsumed provides onGamepadActionConsumed,
         LocalSettingsShowControllerHint provides showControllerHint,

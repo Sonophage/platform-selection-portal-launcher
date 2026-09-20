@@ -173,6 +173,7 @@ fun XMBShellContainer(
         onBootComplete = viewModel::onBootSequenceComplete,
         onSettingsLongPress = onSettingsLongPress,
         onCloseSettingsScreen = viewModel::onCloseSettingsScreen,
+        onOpenSettingsScreen = viewModel::onOpenSettingsScreen,
         onOpenXmbLayoutAdjust = viewModel::openXmbLayoutAdjust,
         onOpenCustomIcons = viewModel::openCustomIcons,
         onPreviewBootSequence = viewModel::previewBootSequence,
@@ -281,6 +282,7 @@ fun XMBShell(
     onBootComplete: () -> Unit = {},
     onSettingsLongPress: () -> Unit = {},
     onCloseSettingsScreen: () -> Unit = {},
+    onOpenSettingsScreen: (String) -> Unit = {},
     onOpenXmbLayoutAdjust: () -> Unit = {},
     onOpenCustomIcons: () -> Unit = {},
     onPreviewBootSequence: () -> Unit = {},
@@ -948,6 +950,7 @@ fun XMBShell(
                         onAddAndroidApps = onOpenAndroidLibraryPicker,
                         onOpenLibraryManager = onOpenLibraryManager,
                         onGoToLibrary = onGoToLibrary,
+                        onOpenScreen = onOpenSettingsScreen,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

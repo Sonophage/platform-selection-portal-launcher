@@ -374,17 +374,22 @@ sealed interface MusicNav {
 // as Music/Video/Photo); selecting an L2 row inside it opens the existing settings screen
 // overlay. L2 row ids ARE screen route ids — SettingsNavHost resolves them, so legacy direct
 // callers keep working during migration.
-enum class SettingsSection(
-    val id: String,
-    val title: String,
-    val subtitle: String,
-) {
-    LIBRARY     ("settings_section_library",      "Library",      "Library Manager, collections, artwork & hidden games"),
-    EMULATORS   ("settings_section_emulators",    "Emulators",    "Launch profiles & RetroArch cores"),
-    APPEARANCE  ("settings_section_appearance",   "Appearance",   "Theme, wallpaper, layout & boot"),
-    INTERFACE   ("settings_section_interface",    "Interface",    "Sound, categories, controls & touch"),
-    MEDIA       ("settings_section_media",        "Media",        "Music, video & photo settings"),
-    SYSTEM      ("settings_section_system",       "System",       "About, logs, backup, setup & credits"),
+/**
+ * The crossbar's Settings sections. A thin XMB-side view of core-domain's
+ * [com.psplauncher.core.domain.model.SettingsSectionId] -- the id, title and subtitle all come
+ * from there, so the column and the settings screens' rail cannot describe the tree differently.
+ */
+enum class SettingsSection(val catalogId: com.psplauncher.core.domain.model.SettingsSectionId) {
+    LIBRARY(com.psplauncher.core.domain.model.SettingsSectionId.LIBRARY),
+    EMULATORS(com.psplauncher.core.domain.model.SettingsSectionId.EMULATORS),
+    APPEARANCE(com.psplauncher.core.domain.model.SettingsSectionId.APPEARANCE),
+    INTERFACE(com.psplauncher.core.domain.model.SettingsSectionId.INTERFACE),
+    MEDIA(com.psplauncher.core.domain.model.SettingsSectionId.MEDIA),
+    SYSTEM(com.psplauncher.core.domain.model.SettingsSectionId.SYSTEM);
+
+    val id: String get() = catalogId.id
+    val title: String get() = catalogId.title
+    val subtitle: String get() = catalogId.subtitle
 }
 
 fun settingsSectionForId(id: String): SettingsSection? =
@@ -393,55 +398,16 @@ fun settingsSectionForId(id: String): SettingsSection? =
 // The L2 rows of a section. Ids must be unique inside the list (list keys + cursor restore) and
 // distinct from every section id (the select handler routes section ids to the flyout and
 // everything else to activeSettingsScreen — see SettingsHierarchyTest).
-fun settingsSectionItems(section: SettingsSection): List<XMBItem> = when (section) {
-    SettingsSection.LIBRARY -> listOf(
-        XMBItem(id = "settings_library",        title = "Library Manager",    subtitle = "ROM sources & scanning"),
-        XMBItem(id = "settings_windows_games",  title = "Windows Games", subtitle = "PC games, launchers & imports"),
-        XMBItem(id = "settings_collections",    title = "Collections",  subtitle = "Create & manage game collections"),
-        XMBItem(id = "settings_artwork", title = "Artwork", subtitle = "Your art, scraping & cache"),
-        XMBItem(id = "settings_artwork_sources", title = "Scraping Sources", subtitle = "Source priority & service accounts"),
-        XMBItem(id = "settings_app_visibility", title = "Hidden Items", subtitle = "Review apps & games you've hidden"),
-    )
-    SettingsSection.EMULATORS -> listOf(
-        // First pass: all three open the combined Emulators screen (plan §4); distinct ids keep
-        // list keys stable so per-section focus targets can land later without migrating callers.
-        XMBItem(id = "settings_emulators_installed", title = "Installed",        subtitle = "Detected emulator profiles"),
-        XMBItem(id = "settings_emulators_custom",    title = "Custom Emulators", subtitle = "Custom profiles & Add Custom Emulator"),
-        XMBItem(id = "settings_emulators_retroarch", title = "RetroArch",        subtitle = "Core detection & linking"),
-        // B4: per-platform assignment screen — which emulator + core each console uses, and how
-        // many of its games override that (with bulk clearing of those overrides).
-        XMBItem(id = "settings_emulators_assign", title = "Per-System Defaults", subtitle = "Default emulator & core per console, and per-game overrides"),
-    )
-    SettingsSection.APPEARANCE -> listOf(
-        XMBItem(id = "settings_themes",     title = "Theme",            subtitle = "Colour scheme, accent & theme packs"),
-        XMBItem(id = "settings_appearance", title = "Wallpaper & Text", subtitle = "Wallpaper, wave, motion & legibility"),
-        XMBItem(id = "settings_layout",     title = "Layout",           subtitle = "XMB layout, custom icons & orientation"),
-        XMBItem(id = "settings_boot",       title = "Boot",             subtitle = "Boot sequence, boot video & GameBoot"),
-    )
-    SettingsSection.INTERFACE -> listOf(
-        // Phase 3 of the seven-sounds plan: renamed Audio → Sound (it owns the boot sound now).
-        // The id deliberately stays settings_audio — the route, SETTINGS_SCREEN_ROUTES, the row
-        // focus keys (audio_<slot>) and SettingsHierarchyTest all key off it.
-        XMBItem(id = "settings_audio",      title = "Sound",      subtitle = "Menu & boot sounds"),
-        XMBItem(id = "settings_categories", title = "Categories", subtitle = "Manage XMB categories"),
-        XMBItem(id = "settings_controller", title = "Controller", subtitle = "Button mapping"),
-        XMBItem(id = "settings_touch",      title = "Touch",      subtitle = "On-screen button, swipe & hints"),
-    )
-    SettingsSection.MEDIA -> listOf(
-        XMBItem(id = "settings_music", title = "Music", subtitle = "Music folders & default player"),
-        XMBItem(id = "settings_video", title = "Video", subtitle = "Video libraries, scanning & playback"),
-        XMBItem(id = "settings_photo", title = "Photo", subtitle = "Photo libraries & scanning"),
-        XMBItem(id = "settings_books", title = "Books", subtitle = "Book folders & reader"),
-    )
-    SettingsSection.SYSTEM -> listOf(
-        XMBItem(id = "settings_about",  title = "About",            subtitle = "PSPLauncher"),
-        XMBItem(id = "settings_logs",   title = "Logs",             subtitle = "Debug & error log viewer"),
-        XMBItem(id = "settings_backup", title = "Backup & Restore", subtitle = "Export & import"),
-        XMBItem(id = "settings_performance", title = "Performance", subtitle = "Thermal, battery saver & direct launch"),
-        XMBItem(id = XMBViewModel.INITIAL_SETUP_SCREEN_ID, title = "Setup Wizard", subtitle = "Guided folder & account setup"),
-        XMBItem(id = "settings_credits", title = "Credits",         subtitle = "Artwork & attributions"),
-    )
-}
+/**
+ * The L2 rows of a section, built from the shared catalog in core-domain.
+ *
+ * It used to spell the tree out here, which made it the only copy -- right up until the settings
+ * screens needed the same tree to draw their section rail, and a second copy in another module
+ * would have been a list and its mirror with nothing keeping them level.
+ */
+fun settingsSectionItems(section: SettingsSection): List<XMBItem> =
+    com.psplauncher.core.domain.model.settingsEntriesIn(section.catalogId)
+        .map { XMBItem(id = it.id, title = it.title, subtitle = it.subtitle) }
 
 // ── Fullscreen music browser (Settings-style, searchable) ───────────────────────
 // Opened from the "Music" and "Playlist" root items as a fullscreen overlay (not the inline XMB
@@ -7038,6 +7004,23 @@ class XMBViewModel @Inject constructor(
     }
 
     // ── Settings overlay ──────────────────────────────────────────────────────
+
+    /**
+     * Moves sideways to another settings screen, from the section rail, without going back out
+     * to the crossbar in between.
+     *
+     * Only ever a screen of the settings tree: the rail is built from the catalog, so a caller
+     * cannot ask for a route the tree does not own. Guarded anyway, because this is reachable
+     * from a CompositionLocal that anything in a settings screen could call.
+     */
+    fun onOpenSettingsScreen(screenId: String) {
+        if (com.psplauncher.core.domain.model.settingsEntryFor(screenId) == null) {
+            Timber.w("Settings rail asked for a screen outside the catalog: %s", screenId)
+            return
+        }
+        Timber.d("Settings rail -> %s", screenId)
+        _uiState.update { it.copy(activeSettingsScreen = screenId) }
+    }
 
     fun onCloseSettingsScreen() {
         Timber.d("Settings closed")

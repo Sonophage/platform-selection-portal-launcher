@@ -100,6 +100,16 @@ import timber.log.Timber
 
 // ── CompositionLocals — provided by SettingsNavHost, consumed by SettingsScaffold ──
 
+/**
+ * Which settings screen is on, so the scaffold can draw the rail of its siblings. Null for a
+ * screen opened from somewhere other than the settings tree (a deep link, the wizard), which
+ * simply gets no rail.
+ */
+val LocalSettingsScreenId = compositionLocalOf<String?> { null }
+
+/** Opens a sibling screen from the rail. A no-op by default so previews and tests need nothing. */
+val LocalSettingsOpenScreen = compositionLocalOf<(String) -> Unit> { {} }
+
 val LocalSettingsPendingAction = compositionLocalOf<GamepadAction?> { null }
 val LocalSettingsActionConsumed = compositionLocalOf<() -> Unit> { {} }
 
@@ -251,6 +261,9 @@ val SettingsSelectedBg: Color
  * proportion. Wider than any phone in portrait, so it never constrains a small screen.
  */
 val SETTINGS_COLUMN_MAX_WIDTH = 560.dp
+
+/** The section rail's width, including its left margin. */
+private val SETTINGS_RAIL_WIDTH = 216.dp
 
 /**
  * The focused row's explanation, shown ONCE at the bottom of the screen instead of under every
@@ -432,6 +445,22 @@ fun SettingsScaffold(
     val helpText = remember { mutableStateOf<String?>(null) }
     // The open picker and the cursor inside it. Cursor lives beside the request rather than in it
     // so re-opening the same setting always starts on its current value.
+    // The section rail: the screens beside this one, and whether the cursor is in it.
+    //
+    // Only for a screen that IS one of the catalog's screens. A deep link or the wizard has no
+    // siblings to show, and an empty rail would be a column of nothing holding the content in.
+    val screenId = LocalSettingsScreenId.current
+    val openScreen = LocalSettingsOpenScreen.current
+    val railEntries = remember(screenId) {
+        screenId?.let { com.psplauncher.core.domain.model.settingsSectionFor(it) }
+            ?.let { com.psplauncher.core.domain.model.settingsEntriesIn(it) }
+            .orEmpty()
+    }
+    val railFocused = remember { mutableStateOf(false) }
+    val railCursor = remember(screenId) {
+        mutableIntStateOf(railEntries.indexOfFirst { it.id == screenId }.coerceAtLeast(0))
+    }
+
     val pickerState = remember { mutableStateOf<SettingsPickerRequest?>(null) }
     val pickerCursor = remember { mutableIntStateOf(0) }
     // Root-space centre of the visible content viewport. Touch scrolling hides the cursor;
@@ -671,6 +700,31 @@ fun SettingsScaffold(
             onConsumed()
             return@LaunchedEffect
         }
+        // ── Section rail ────────────────────────────────────────────────────
+        // While the cursor is in the rail it owns vertical movement and Confirm, exactly as the
+        // content list does when the cursor is there. RIGHT returns; BACK leaves the screen, so
+        // the rail never becomes a place you can get stuck.
+        if (railFocused.value) {
+            when (pendingAction) {
+                GamepadAction.NAVIGATE_UP ->
+                    railCursor.intValue = (railCursor.intValue - 1).coerceAtLeast(0)
+                GamepadAction.NAVIGATE_DOWN ->
+                    railCursor.intValue = (railCursor.intValue + 1).coerceAtMost(railEntries.lastIndex)
+                GamepadAction.NAVIGATE_RIGHT -> railFocused.value = false
+                GamepadAction.SELECT -> {
+                    val target = railEntries.getOrNull(railCursor.intValue)
+                    // Confirming the screen you are already on just puts the cursor back in it,
+                    // rather than reloading the page you can see.
+                    if (target != null && target.id != screenId) openScreen(target.id) 
+                    else railFocused.value = false
+                }
+                GamepadAction.BACK -> onBack()
+                else -> Unit
+            }
+            onConsumed()
+            return@LaunchedEffect
+        }
+
         // ── Picker panel ────────────────────────────────────────────────────
         // Fully modal: while one is open every action belongs to it, including BACK, which closes
         // the picker rather than the screen. Listed ABOVE slider adjust because a picker cannot
@@ -757,8 +811,14 @@ fun SettingsScaffold(
             // mode above, and a screen's own onInterceptAction (remap capture, Themes, Sound).
             GamepadAction.NAVIGATE_LEFT -> {
                 val target = navigationState.moveHorizontal(-1)
-                if (target != null) requestFocusFor(target)
-                else if (leftBacksOut) onBack()
+                when {
+                    target != null -> requestFocusFor(target)
+                    // LEFT at the left edge of the content now steps INTO the rail, which is
+                    // where the eye already is: the sibling screens are drawn there. Leaving the
+                    // screen is one more LEFT, or BACK, from inside it.
+                    railEntries.isNotEmpty() -> railFocused.value = true
+                    leftBacksOut -> onBack()
+                }
             }
 
             GamepadAction.NAVIGATE_RIGHT -> {
@@ -1027,8 +1087,28 @@ fun SettingsScaffold(
                     // widthIn, not fillMaxWidth(fraction): on a phone in portrait the cap is
                     // wider than the screen and this is a no-op, so narrow devices keep the full
                     // width they need.
-                    Box(modifier = Modifier.widthIn(max = SETTINGS_COLUMN_MAX_WIDTH)) {
-                        content()
+                    Row(Modifier.fillMaxSize()) {
+                        // The section rail: the other screens of this section, always on screen,
+                        // the one you are on bright and the rest dimmed. This is the PS5 layout,
+                        // and the reason it earns its width is that settings are a tree you move
+                        // AROUND in -- before it, changing two things in one section meant
+                        // backing out to the crossbar and drilling in again for each.
+                        if (railEntries.isNotEmpty()) {
+                            SettingsSectionRail(
+                                entries = railEntries,
+                                currentId = screenId,
+                                cursorIndex = railCursor.intValue.takeIf {
+                                    railFocused.value && cursorVisible.value
+                                },
+                                onPick = { entry ->
+                                    notifyTouchInput()
+                                    if (entry.id != screenId) openScreen(entry.id)
+                                },
+                            )
+                        }
+                        Box(modifier = Modifier.widthIn(max = SETTINGS_COLUMN_MAX_WIDTH)) {
+                            content()
+                        }
                     }
                 }
 
@@ -1183,6 +1263,66 @@ private val PICKER_EDGE_MARGIN = 24.dp
 // ── Reusable row components ───────────────────────────────────────────────────
 // (Controller-row registration helpers live in ControllerRowRegistration.kt — shared with the
 // first-run wizard's row family so focus behavior can never drift between the two families.)
+
+/**
+ * The list of sibling screens down the left of a settings page.
+ *
+ * Display only as far as the controller is concerned: the scaffold owns which entry the cursor
+ * is on, because while the rail holds the cursor it also owns vertical movement and Confirm, and
+ * that cannot be decided in two places. [cursorIndex] is null whenever the cursor is elsewhere,
+ * which is also how the rail knows to draw nothing as focused.
+ */
+@Composable
+private fun SettingsSectionRail(
+    entries: List<com.psplauncher.core.domain.model.SettingsEntry>,
+    currentId: String?,
+    cursorIndex: Int?,
+    onPick: (com.psplauncher.core.domain.model.SettingsEntry) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(SETTINGS_RAIL_WIDTH)
+            .padding(start = 40.dp, end = 12.dp, top = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        entries.forEachIndexed { index, entry ->
+            val isCurrent = entry.id == currentId
+            val isCursor = index == cursorIndex
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(SETTINGS_ROW_SHAPE)
+                    .background(
+                        if (isCursor) SETTINGS_ROW_SELECTED_FILL else Color.Transparent,
+                        SETTINGS_ROW_SHAPE,
+                    )
+                    .then(
+                        if (isCursor) {
+                            Modifier.border(1.dp, SETTINGS_ROW_SELECTED_EDGE, SETTINGS_ROW_SHAPE)
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .clickable { onPick(entry) }
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = entry.title,
+                    // The page you are on stays bright whether or not the cursor is in the rail:
+                    // it is answering "where am I", not "what am I pointing at". The cursor plate
+                    // answers the second question, and the two are allowed to be on different rows.
+                    color = if (isCurrent) SettingsText else SettingsSubtext,
+                    fontSize = 14.sp,
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(shadow = SettingsTextShadow),
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun SettingsGroup(title: String) {
