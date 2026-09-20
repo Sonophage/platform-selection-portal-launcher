@@ -451,11 +451,8 @@ class ArtworkSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Cycles the global icon display mode (Custom Icon → Box Art → Physical Media → 3D Box). */
-    fun cycleIconDisplayMode() {
-        val entries = com.psplauncher.core.domain.model.IconDisplayMode.entries
-        val next = entries[(entries.indexOf(_extra.value.iconDisplayMode) + 1) % entries.size]
-        viewModelScope.launch { iconDisplayPreferences.setMode(next) }
+    fun setIconDisplayMode(mode: com.psplauncher.core.domain.model.IconDisplayMode) {
+        viewModelScope.launch { iconDisplayPreferences.setMode(mode) }
     }
 
     fun setAnimatedIcons(enabled: Boolean) {
@@ -463,11 +460,9 @@ class ArtworkSettingsViewModel @Inject constructor(
         viewModelScope.launch { iconDisplayPreferences.setAnimatedIcons(enabled) }
     }
 
-    /** Cycles where an approved video snap plays: the icon tile, or behind the crossbar. */
-    fun cycleSnapPlacement() {
-        val entries = com.psplauncher.core.domain.model.VideoSnapPlacement.entries
-        val next = entries[(entries.indexOf(_extra.value.snapPlacement) + 1) % entries.size]
-        viewModelScope.launch { iconDisplayPreferences.setSnapPlacement(next) }
+    /** Where an approved video snap plays: the icon tile, or behind the crossbar. */
+    fun setSnapPlacement(placement: com.psplauncher.core.domain.model.VideoSnapPlacement) {
+        viewModelScope.launch { iconDisplayPreferences.setSnapPlacement(placement) }
     }
 
     fun setGameMetadata(enabled: Boolean) {

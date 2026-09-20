@@ -14,7 +14,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.domain.model.ConfirmBackLayout
+import com.psplauncher.core.domain.model.ControllerDisplayType
 import com.psplauncher.core.domain.model.XYLayout
+import com.psplauncher.core.domain.model.ScrollSpeed
 import com.psplauncher.core.domain.model.displayLabel
 import com.psplauncher.feature.settings.viewmodel.ControllerSettingsViewModel
 
@@ -48,15 +50,17 @@ fun ControllerSettingsScreen(
                 modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),
             )
 
-            SettingsValueRow(
+            SettingsPickerRow(
                 label    = "A / B Swap",
                 sublabel = state.layoutPrefs.confirmBackLayout.displayLabel(),
-                value    = if (state.layoutPrefs.confirmBackLayout == ConfirmBackLayout.STANDARD) {
-                    "Off"
-                } else {
-                    "On"
+                options  = ConfirmBackLayout.entries.map {
+                    SettingsPickerOption(
+                        label = if (it == ConfirmBackLayout.STANDARD) "Off" else "On",
+                        help  = it.displayLabel(),
+                    )
                 },
-                onClick  = { viewModel.cycleConfirmBackLayout() },
+                selectedIndex = ConfirmBackLayout.entries.indexOf(state.layoutPrefs.confirmBackLayout),
+                onPick   = { viewModel.setConfirmBackLayout(ConfirmBackLayout.entries[it]) },
             )
 
             SettingsGroup("X / Y Swap")
@@ -68,15 +72,17 @@ fun ControllerSettingsScreen(
                 modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),
             )
 
-            SettingsValueRow(
+            SettingsPickerRow(
                 label    = "X / Y Swap",
                 sublabel = state.layoutPrefs.xyLayout.displayLabel(),
-                value    = if (state.layoutPrefs.xyLayout == XYLayout.STANDARD) {
-                    "Off"
-                } else {
-                    "On"
+                options  = XYLayout.entries.map {
+                    SettingsPickerOption(
+                        label = if (it == XYLayout.STANDARD) "Off" else "On",
+                        help  = it.displayLabel(),
+                    )
                 },
-                onClick  = { viewModel.cycleXYLayout() },
+                selectedIndex = XYLayout.entries.indexOf(state.layoutPrefs.xyLayout),
+                onPick   = { viewModel.setXYLayout(XYLayout.entries[it]) },
             )
 
             SettingsGroup("Controller Type")
@@ -87,11 +93,12 @@ fun ControllerSettingsScreen(
                 modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),
             )
 
-            SettingsValueRow(
+            SettingsPickerRow(
                 label    = "Type",
                 sublabel = "Affects the help bar at the bottom of the launcher",
-                value    = state.layoutPrefs.displayType.displayLabel(),
-                onClick  = { viewModel.cycleDisplayType() },
+                options  = ControllerDisplayType.entries.map { SettingsPickerOption(it.displayLabel()) },
+                selectedIndex = ControllerDisplayType.entries.indexOf(state.layoutPrefs.displayType),
+                onPick   = { viewModel.setDisplayType(ControllerDisplayType.entries[it]) },
             )
 
             SettingsGroup("Scroll Speed")
@@ -103,11 +110,12 @@ fun ControllerSettingsScreen(
                 modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),
             )
 
-            SettingsValueRow(
+            SettingsPickerRow(
                 label    = "Scroll Speed",
                 sublabel = "Applies to held D-pad and stick navigation",
-                value    = state.layoutPrefs.scrollSpeed.displayLabel(),
-                onClick  = { viewModel.cycleScrollSpeed() },
+                options  = ScrollSpeed.entries.map { SettingsPickerOption(it.displayLabel()) },
+                selectedIndex = ScrollSpeed.entries.indexOf(state.layoutPrefs.scrollSpeed),
+                onPick   = { viewModel.setScrollSpeed(ScrollSpeed.entries[it]) },
             )
 
             SettingsGroup("Navigation")

@@ -190,7 +190,6 @@ data class DisplaySettingsUiState(
     /** The layout saved for this screen size is the PSP preset, so Biblically Accurate PSP XMB greys out. */
     val pspLayoutApplied: Boolean = false,
 ) {
-    val waveStyleLabel: String get() = WAVE_STYLE_LABELS[waveStyle] ?: waveStyle.name
 }
 
 /** Row summary for a UI-media slot with no user assignment. */
@@ -337,19 +336,19 @@ class DisplaySettingsViewModel @Inject constructor(
         if (slot.kind == UiMediaKind.VIDEO) UiMediaLimits.VIDEO_MIME.toTypedArray()
         else UiMediaLimits.AUDIO_MIME.toTypedArray()
 
-    fun cycleWaveStyle() {
-        val styles = WaveStyle.values()
-        val next = styles[(styles.indexOf(uiState.value.waveStyle) + 1) % styles.size]
-        save { it[KEY_WAVE_STYLE] = next.name }
-    }
+    fun setWaveStyle(style: WaveStyle) = save { it[KEY_WAVE_STYLE] = style.name }
 
-    /** Cycles None → Offset Shadow → Contour (Dark/Light/Auto) → None, persisting the enum name. */
-    fun cycleIconLegibility() {
-        // entries, not the deprecated values() cycleWaveStyle still uses.
-        val styles = IconLegibilityStyle.entries
-        val next = styles[(styles.indexOf(uiState.value.iconLegibility) + 1) % styles.size]
-        save { it[KEY_ICON_LEGIBILITY] = next.name }
-    }
+    // The three label maps below are private to this file, so the picker rows cannot build their
+    // own option lists from them. These expose value-and-label pairs in enum order, which is the
+    // order the picker shows and the order its indices mean.
+    val waveStyleOptions: List<Pair<WaveStyle, String>> =
+        WaveStyle.entries.map { it to (WAVE_STYLE_LABELS[it] ?: it.name) }
+    val touchNavButtonOptions: List<Pair<TouchNavButtonMode, String>> =
+        TouchNavButtonMode.entries.map { it to (TOUCH_NAV_BUTTON_LABELS[it] ?: it.name) }
+    val touchSensitivityOptions: List<Pair<TouchSensitivity, String>> =
+        TouchSensitivity.entries.map { it to (TOUCH_SENSITIVITY_LABELS[it] ?: it.name) }
+
+    fun setIconLegibility(style: IconLegibilityStyle) = save { it[KEY_ICON_LEGIBILITY] = style.name }
 
     fun setSolidUnfocusedIcons(v: Boolean) = save { it[KEY_SOLID_UNFOCUSED_ICONS] = v }
 
@@ -386,11 +385,7 @@ class DisplaySettingsViewModel @Inject constructor(
         }
     }
 
-    fun cycleTextLegibility() {
-        val styles = TextLegibilityStyle.entries
-        val next = styles[(styles.indexOf(uiState.value.textLegibility) + 1) % styles.size]
-        save { it[KEY_TEXT_LEGIBILITY] = next.name }
-    }
+    fun setTextLegibility(style: TextLegibilityStyle) = save { it[KEY_TEXT_LEGIBILITY] = style.name }
 
     /** Transient dismiss — the notice comes back on the next pick that needs it. */
     fun dismissTextContrastNotice() {
@@ -470,23 +465,11 @@ class DisplaySettingsViewModel @Inject constructor(
         it[KEY_CONTEXT_MENU_HINT_DELAY_SECONDS] = v.coerceIn(1f, 5f)
     }
 
-    fun cycleTouchNavButtonMode() {
-        val modes = TouchNavButtonMode.entries
-        val next = modes[(modes.indexOf(uiState.value.touchNavButtonMode) + 1) % modes.size]
-        save { it[KEY_TOUCH_NAV_BUTTON] = next.name }
-    }
+    fun setTouchNavButtonMode(mode: TouchNavButtonMode) = save { it[KEY_TOUCH_NAV_BUTTON] = mode.name }
 
-    fun touchNavButtonLabel(): String =
-        TOUCH_NAV_BUTTON_LABELS[uiState.value.touchNavButtonMode] ?: uiState.value.touchNavButtonMode.name
 
-    fun cycleTouchSensitivity() {
-        val levels = TouchSensitivity.entries
-        val next = levels[(levels.indexOf(uiState.value.touchSensitivity) + 1) % levels.size]
-        save { it[KEY_TOUCH_SENSITIVITY] = next.name }
-    }
+    fun setTouchSensitivity(level: TouchSensitivity) = save { it[KEY_TOUCH_SENSITIVITY] = level.name }
 
-    fun touchSensitivityLabel(): String =
-        TOUCH_SENSITIVITY_LABELS[uiState.value.touchSensitivity] ?: uiState.value.touchSensitivity.name
 
     // ── Wallpaper ─────────────────────────────────────────────────────────────
 

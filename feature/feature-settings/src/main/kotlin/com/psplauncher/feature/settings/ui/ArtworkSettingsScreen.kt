@@ -1,5 +1,7 @@
 package com.psplauncher.feature.settings.ui
 
+import com.psplauncher.core.domain.model.VideoSnapPlacement
+import com.psplauncher.core.domain.model.IconDisplayMode
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -215,11 +217,12 @@ fun ArtworkSettingsScreen(
             if (section == null || section == ArtworkSection.ARTWORK) {
                 SettingsGroup("Art Preferences")
 
-                SettingsValueRow(
+                SettingsPickerRow(
                     label    = "Game Icon Display",
                     sublabel = "Default for every console — override per console or per game from their Options menus",
-                    value    = state.iconDisplayMode.label,
-                    onClick  = { viewModel.cycleIconDisplayMode() },
+                    options  = IconDisplayMode.entries.map { SettingsPickerOption(it.label) },
+                    selectedIndex = IconDisplayMode.entries.indexOf(state.iconDisplayMode),
+                    onPick   = { viewModel.setIconDisplayMode(IconDisplayMode.entries[it]) },
                 )
 
                 SettingsToggleRow(
@@ -236,11 +239,21 @@ fun ArtworkSettingsScreen(
                     onToggle = { viewModel.setAnimatedIcons(it) },
                 )
 
-                SettingsValueRow(
+                SettingsPickerRow(
                     label    = "Video Snap Placement",
-                    sublabel = "In the icon tile, or full-screen behind the crossbar. The tile needs Custom Icon mode; the background plays in any mode",
-                    value    = state.snapPlacement.label,
-                    onClick  = { viewModel.cycleSnapPlacement() },
+                    sublabel = "Where a game's video snap plays once you rest on it",
+                    options  = listOf(
+                        SettingsPickerOption(
+                            VideoSnapPlacement.ICON.label,
+                            "Inside the 144x80 tile over the static icon. Needs Custom Icon mode.",
+                        ),
+                        SettingsPickerOption(
+                            VideoSnapPlacement.BACKGROUND.label,
+                            "Full-screen behind the crossbar. Plays in any icon mode.",
+                        ),
+                    ),
+                    selectedIndex = VideoSnapPlacement.entries.indexOf(state.snapPlacement),
+                    onPick   = { viewModel.setSnapPlacement(VideoSnapPlacement.entries[it]) },
                     enabled  = state.animatedIcons,
                 )
 

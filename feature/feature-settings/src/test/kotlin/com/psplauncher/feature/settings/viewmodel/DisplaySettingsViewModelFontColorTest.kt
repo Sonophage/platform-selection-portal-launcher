@@ -147,21 +147,19 @@ class DisplaySettingsViewModelFontColorTest {
             vm.uiState.first().textLegibility == TextLegibilityStyle.DEFAULT
         }
 
-        vm.cycleTextLegibility()
-        eventually("cycle works after a stale value") {
+        vm.setTextLegibility(TextLegibilityStyle.entries.first { it != TextLegibilityStyle.DEFAULT })
+        eventually("a pick works after a stale value") {
             vm.uiState.first().textLegibility != TextLegibilityStyle.DEFAULT
         }
     }
 
     @Test
-    fun `cycling legibility persists the enum name`() = uiTest {
-        val expected = TextLegibilityStyle.entries
-        val start = expected.indexOf(TextLegibilityStyle.DEFAULT)
+    fun `choosing a legibility style persists its enum name`() = uiTest {
+        val chosen = TextLegibilityStyle.entries.first { it != TextLegibilityStyle.DEFAULT }
 
-        vm.cycleTextLegibility()
-        eventually("next style persisted") {
-            context.pfpDataStore.data.first()[KEY_LEGIBILITY] ==
-                expected[(start + 1) % expected.size].name
+        vm.setTextLegibility(chosen)
+        eventually("chosen style persisted") {
+            context.pfpDataStore.data.first()[KEY_LEGIBILITY] == chosen.name
         }
     }
 

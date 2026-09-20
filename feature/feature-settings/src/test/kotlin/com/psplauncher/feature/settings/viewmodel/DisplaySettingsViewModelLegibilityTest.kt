@@ -66,28 +66,31 @@ class DisplaySettingsViewModelLegibilityTest {
     }
 
     @Test
-    fun `cycle advances through every style and persists the enum name`() = runTest(dispatcher) {
+    fun `every style persists its enum name and comes back`() = runTest(dispatcher) {
+        // Was written against cycling, which walked the list for you. The picker sets a chosen
+        // value instead, so each style is now set directly -- which tests the same round trip
+        // and no longer depends on the enum's order meaning anything.
         val expected = IconLegibilityStyle.entries
         val seen = mutableListOf<IconLegibilityStyle>()
 
-        repeat(expected.size) { index ->
-            eventually("style $index visible") {
+        expected.forEach { style ->
+            vm.setIconLegibility(style)
+            eventually("$style persisted") {
+                context.pfpDataStore.data.first()[KEY_ICON_LEGIBILITY] == style.name
+            }
+            eventually("$style visible") {
                 // The DataStore-backed state must have settled to the persisted value before we
                 // sample it — the initial StateFlow value precedes the first emission.
-                vm.uiState.first().iconLegibility == expected[index]
+                vm.uiState.first().iconLegibility == style
             }
             seen += vm.uiState.first().iconLegibility
-            vm.cycleIconLegibility()
-            eventually("style ${index + 1} persisted") {
-                context.pfpDataStore.data.first()[KEY_ICON_LEGIBILITY] == expected[(index + 1) % expected.size].name
-            }
         }
 
         assertEquals(expected, seen)
     }
 
     @Test
-    fun `an unknown persisted value surfaces as NONE and still cycles`() = runTest(dispatcher) {
+    fun `an unknown persisted value surfaces as NONE and still takes a new pick`() = runTest(dispatcher) {
         context.pfpDataStore.edit {
             it[KEY_ICON_LEGIBILITY] = "CONTOUR_MEDIUM" // a style that no longer exists
         }
@@ -96,10 +99,10 @@ class DisplaySettingsViewModelLegibilityTest {
             vm.uiState.first().iconLegibility == IconLegibilityStyle.NONE
         }
 
-        // The pipeline genuinely works with the stale key present: cycling lands on the first
-        // entry after NONE, proving the read neither crashed nor wedged the state flow.
-        vm.cycleIconLegibility()
-        eventually("cycle works after stale value") {
+        // The pipeline genuinely works with the stale key present: a pick lands, proving the
+        // read neither crashed nor wedged the state flow.
+        vm.setIconLegibility(IconLegibilityStyle.OFFSET_SHADOW)
+        eventually("a pick works after a stale value") {
             vm.uiState.first().iconLegibility == IconLegibilityStyle.OFFSET_SHADOW
         }
     }

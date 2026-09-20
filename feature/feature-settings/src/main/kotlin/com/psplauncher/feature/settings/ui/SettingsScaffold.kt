@@ -262,6 +262,26 @@ val SETTINGS_COLUMN_MAX_WIDTH = 560.dp
  */
 val LocalSettingsHelp = compositionLocalOf { mutableStateOf<String?>(null) }
 
+/** One choice offered by a [SettingsPickerRow]. */
+data class SettingsPickerOption(val label: String, val help: String? = null)
+
+/**
+ * An open picker. Null when none is.
+ *
+ * The scaffold owns this, not the row that opened it, for the same reason it owns slider adjust
+ * mode: while a picker is up it must take EVERY controller action before navigation sees any of
+ * them, and the only thing in the tree that can do that is the scaffold's action handler.
+ */
+internal class SettingsPickerRequest(
+    val title: String,
+    val options: List<SettingsPickerOption>,
+    val selectedIndex: Int,
+    val onPick: (Int) -> Unit,
+)
+
+internal val LocalSettingsPicker =
+    compositionLocalOf { mutableStateOf<SettingsPickerRequest?>(null) }
+
 /** Two lines at [SETTINGS_HELP_TEXT_SP], reserved whether or not there is anything to say. */
 private val SETTINGS_HELP_BAND_HEIGHT = 44.dp
 private const val SETTINGS_HELP_TEXT_SP = 13
@@ -398,6 +418,10 @@ fun SettingsScaffold(
     // The focused row's explanation. Owned here because the band that shows it is chrome, a
     // sibling of the scrolling body, and cannot read anything the body composed.
     val helpText = remember { mutableStateOf<String?>(null) }
+    // The open picker and the cursor inside it. Cursor lives beside the request rather than in it
+    // so re-opening the same setting always starts on its current value.
+    val pickerState = remember { mutableStateOf<SettingsPickerRequest?>(null) }
+    val pickerCursor = remember { mutableIntStateOf(0) }
     // Root-space centre of the visible content viewport. Touch scrolling hides the cursor;
     // the next controller action reanchors focus to the closest visible node instead of resuming
     // the previously focused (possibly off-screen) row.
@@ -589,6 +613,12 @@ fun SettingsScaffold(
         }
     }
 
+    // A picker opens ON its current value, not at the top: the first thing you should see is
+    // where you already are, and for a setting you are not changing, BACK then costs nothing.
+    LaunchedEffect(pickerState.value) {
+        pickerState.value?.let { pickerCursor.intValue = it.selectedIndex.coerceAtLeast(0) }
+    }
+
     LaunchedEffect(pendingAction) {
         if (pendingAction == null) return@LaunchedEffect
         // Every controller action is a source transition, including actions intercepted by a
@@ -629,6 +659,31 @@ fun SettingsScaffold(
             onConsumed()
             return@LaunchedEffect
         }
+        // ── Picker panel ────────────────────────────────────────────────────
+        // Fully modal: while one is open every action belongs to it, including BACK, which closes
+        // the picker rather than the screen. Listed ABOVE slider adjust because a picker cannot
+        // be opened from inside a slider, but a slider row can sit under an open picker.
+        val openPicker = pickerState.value
+        if (openPicker != null) {
+            val count = openPicker.options.size
+            when (pendingAction) {
+                // Wrapping, like every PSP list: the options are few and a wall at each end
+                // costs more presses than it saves.
+                GamepadAction.NAVIGATE_UP ->
+                    pickerCursor.intValue = (pickerCursor.intValue - 1 + count) % count
+                GamepadAction.NAVIGATE_DOWN ->
+                    pickerCursor.intValue = (pickerCursor.intValue + 1) % count
+                GamepadAction.SELECT -> {
+                    openPicker.onPick(pickerCursor.intValue)
+                    pickerState.value = null
+                }
+                GamepadAction.BACK -> pickerState.value = null
+                else -> Unit
+            }
+            onConsumed()
+            return@LaunchedEffect
+        }
+
         // ── Slider adjust mode ──────────────────────────────────────────────
         // A focused slider node (SettingsSliderRow) captures input after SELECT: LEFT/RIGHT step
         // its value (the gamepad layer supplies auto-repeat for held buttons); SELECT or BACK
@@ -733,6 +788,7 @@ fun SettingsScaffold(
             notifyTouchInput()
         },
         LocalSettingsHelp provides helpText,
+        LocalSettingsPicker provides pickerState,
         LocalSettingsFocusRegistry provides focusRegistry,
         // First clickable row to compose wins the initial-focus slot.
         LocalSettingsRegisterFirstFocusable provides { fr ->
@@ -1011,6 +1067,111 @@ fun SettingsScaffold(
                     } else {
                         SettingsHelperFooter(helperFooterItems)
                     }
+                }
+            }
+
+            // The picker, over the whole screen. Last child of the root Box so it paints above
+            // the list, the header and the footer; it draws no focusable node of its own because
+            // the scaffold's action handler already owns every action while it is open, and a
+            // second focus target would fight the list's cursor underneath.
+            pickerState.value?.let { picker ->
+                SettingsPickerPanel(picker = picker, cursor = pickerCursor.intValue)
+            }
+        }
+    }
+}
+
+/**
+ * The open picker, in the settings list's own language rather than a dialog's: no card, no
+ * buttons, left-anchored in the same column as the rows it came from, options selected by the
+ * same bloom and the same growth. The chosen value is ticked, and the focused option explains
+ * itself at the foot exactly as a row does.
+ */
+@Composable
+private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
+    val bloom = LocalPFPColors.current.waveColor
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            // 0.88, and it took the device to learn why. At 0.55 the list underneath read
+            // straight through the panel -- row labels crossing option labels, and the screen's
+            // own help band showing beneath the picker's, so two different explanations were on
+            // screen at once. The settings scrim is already translucent, so a picker scrim has
+            // to cover a LIST, not a wallpaper.
+            .background(Color.Black.copy(alpha = 0.88f)),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(start = 48.dp, end = 48.dp)
+                .widthIn(max = SETTINGS_COLUMN_MAX_WIDTH),
+        ) {
+            Text(
+                text = picker.title.uppercase(),
+                color = SettingsSubtext,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.4.sp,
+                style = TextStyle(shadow = SettingsTextShadow),
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+            picker.options.forEachIndexed { index, option ->
+                val focused = index == cursor
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .drawBehind {
+                            if (focused) {
+                                drawRect(
+                                    Brush.horizontalGradient(
+                                        0f to bloom.copy(alpha = 0.62f),
+                                        0.5f to bloom.copy(alpha = 0.14f),
+                                        1f to Color.Transparent,
+                                    )
+                                )
+                            }
+                        }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // A tick, not a highlight, marks what is CURRENTLY set. Selection and
+                    // "in use" are different facts and the panel has to show both at once: you
+                    // are standing on one option while another is the saved one.
+                    Text(
+                        text = if (index == picker.selectedIndex) "\u2713" else " ",
+                        color = if (focused) Color.White else SettingsText,
+                        fontSize = 16.sp,
+                        style = TextStyle(shadow = SettingsTextShadow),
+                        modifier = Modifier.padding(end = 16.dp),
+                    )
+                    Text(
+                        text = option.label,
+                        color = if (focused) Color.White else SettingsText,
+                        fontSize = if (focused) XmbLayoutSpec.DEFAULT.itemTextSelectedSp.sp
+                                   else XmbLayoutSpec.DEFAULT.itemTextSp.sp,
+                        fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
+                        style = TextStyle(shadow = SettingsTextShadow),
+                    )
+                }
+            }
+            // Fixed, for the same reason the list's help band is: a description that changed
+            // height would move the options under the cursor as the cursor moved.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(SETTINGS_HELP_BAND_HEIGHT)
+                    .padding(top = 10.dp),
+            ) {
+                picker.options.getOrNull(cursor)?.help?.takeIf { it.isNotBlank() }?.let { help ->
+                    Text(
+                        text = help,
+                        color = SettingsSubtext,
+                        fontSize = SETTINGS_HELP_TEXT_SP.sp,
+                        lineHeight = (SETTINGS_HELP_TEXT_SP + 4).sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = TextStyle(shadow = SettingsTextShadow),
+                    )
                 }
             }
         }
@@ -1349,6 +1510,47 @@ fun SettingsValueRow(
         onFocusChangedExternal = onFocusChangedExternal,
         onClick = onClick,
         enabled = enabled,
+    )
+}
+
+/**
+ * A setting with a fixed set of values, chosen from a panel.
+ *
+ * Reads exactly like [SettingsValueRow] -- label left, current value right -- and SELECT opens
+ * the full list instead of stepping blindly to the next one. That is the difference worth the
+ * extra press: cycling only ever showed you where you had just landed, never where you could go,
+ * so finding a particular value meant pressing A until it came round again.
+ *
+ * Two-value settings go through here too. A tick list for two options is one press more than a
+ * cycle, and it is still the right trade: one rule for every multi-value setting beats a rule
+ * that changes at some arbitrary option count, and the panel is where the options explain
+ * themselves.
+ */
+@Composable
+fun SettingsPickerRow(
+    label: String,
+    options: List<SettingsPickerOption>,
+    selectedIndex: Int,
+    onPick: (Int) -> Unit,
+    sublabel: String? = null,
+    focusKey: String? = null,
+    enabled: Boolean = true,
+) {
+    val picker = LocalSettingsPicker.current
+    SettingsRow(
+        label = label,
+        sublabel = sublabel,
+        value = options.getOrNull(selectedIndex)?.label ?: "",
+        focusKey = focusKey,
+        enabled = enabled,
+        onClick = {
+            picker.value = SettingsPickerRequest(
+                title = label,
+                options = options,
+                selectedIndex = selectedIndex,
+                onPick = onPick,
+            )
+        },
     )
 }
 

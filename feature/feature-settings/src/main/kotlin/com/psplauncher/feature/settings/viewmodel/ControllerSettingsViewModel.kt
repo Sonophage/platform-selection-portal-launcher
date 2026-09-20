@@ -33,45 +33,24 @@ class ControllerSettingsViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ControllerSettingsUiState())
 
-    fun cycleConfirmBackLayout() {
-        val next = when (uiState.value.layoutPrefs.confirmBackLayout) {
-            ConfirmBackLayout.STANDARD -> ConfirmBackLayout.REVERSED
-            ConfirmBackLayout.REVERSED -> ConfirmBackLayout.STANDARD
-        }
-        viewModelScope.launch { layoutRepository.setConfirmBackLayout(next) }
+    fun setConfirmBackLayout(layout: ConfirmBackLayout) {
+        viewModelScope.launch { layoutRepository.setConfirmBackLayout(layout) }
     }
 
-    fun cycleXYLayout() {
-        val next = when (uiState.value.layoutPrefs.xyLayout) {
-            XYLayout.STANDARD -> XYLayout.SWAPPED
-            XYLayout.SWAPPED  -> XYLayout.STANDARD
-        }
-        viewModelScope.launch { layoutRepository.setXYLayout(next) }
+    fun setXYLayout(layout: XYLayout) {
+        viewModelScope.launch { layoutRepository.setXYLayout(layout) }
     }
 
-    fun cycleScrollSpeed() {
-        val next = when (uiState.value.layoutPrefs.scrollSpeed) {
-            ScrollSpeed.RELAXED  -> ScrollSpeed.STANDARD
-            ScrollSpeed.STANDARD -> ScrollSpeed.FAST
-            ScrollSpeed.FAST     -> ScrollSpeed.RELAXED
-        }
-        viewModelScope.launch { layoutRepository.setScrollSpeed(next) }
+    fun setScrollSpeed(speed: ScrollSpeed) {
+        viewModelScope.launch { layoutRepository.setScrollSpeed(speed) }
     }
 
     fun setLeftBacksOut(enabled: Boolean) {
         viewModelScope.launch { layoutRepository.setLeftBacksOut(enabled) }
     }
 
-    fun cycleDisplayType() {
-        val types = listOf(
-            ControllerDisplayType.XBOX,
-            ControllerDisplayType.NINTENDO,
-            ControllerDisplayType.PLAYSTATION,
-        )
-        val current = uiState.value.layoutPrefs.displayType
-        val currentIndex = types.indexOf(current).takeIf { it >= 0 } ?: 0
-        val next = types[(currentIndex + 1) % types.size]
-        viewModelScope.launch { layoutRepository.setDisplayType(next) }
+    fun setDisplayType(type: ControllerDisplayType) {
+        viewModelScope.launch { layoutRepository.setDisplayType(type) }
     }
 
     fun resetToDefaults() {

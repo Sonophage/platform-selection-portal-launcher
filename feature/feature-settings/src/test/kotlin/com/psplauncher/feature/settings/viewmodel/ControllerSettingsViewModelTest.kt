@@ -68,87 +68,57 @@ class ControllerSettingsViewModelTest {
     }
 
     @Test
-    fun `cycleConfirmBackLayout switches standard to reversed`() = runTest(testDispatcher) {
+    fun `setConfirmBackLayout persists the chosen layout`() = runTest(testDispatcher) {
         viewModel = buildActive()
         advanceUntilIdle()
-        viewModel.cycleConfirmBackLayout()
+
+        viewModel.setConfirmBackLayout(ConfirmBackLayout.REVERSED)
         advanceUntilIdle()
 
         coVerify { layoutRepository.setConfirmBackLayout(ConfirmBackLayout.REVERSED) }
     }
 
     @Test
-    fun `cycleConfirmBackLayout switches reversed to standard`() = runTest(testDispatcher) {
+    fun `setConfirmBackLayout persists a value that is already current`() = runTest(testDispatcher) {
+        // Picking the ticked option is a normal thing to do in a picker, and it must reach the
+        // repository like any other pick rather than being quietly dropped as a no-op: these
+        // setters no longer read the current value at all, and this is what pins that.
         coEvery { layoutRepository.prefs } returns flowOf(
             ControllerLayoutPrefs(confirmBackLayout = ConfirmBackLayout.REVERSED)
         )
         viewModel = buildActive()
         advanceUntilIdle()
 
-        viewModel.cycleConfirmBackLayout()
+        viewModel.setConfirmBackLayout(ConfirmBackLayout.REVERSED)
         advanceUntilIdle()
 
-        coVerify { layoutRepository.setConfirmBackLayout(ConfirmBackLayout.STANDARD) }
+        coVerify { layoutRepository.setConfirmBackLayout(ConfirmBackLayout.REVERSED) }
     }
 
     @Test
-    fun `cycleXYLayout switches standard to swapped`() = runTest(testDispatcher) {
+    fun `setXYLayout persists the chosen layout`() = runTest(testDispatcher) {
         viewModel = buildActive()
         advanceUntilIdle()
-        viewModel.cycleXYLayout()
+
+        viewModel.setXYLayout(XYLayout.SWAPPED)
         advanceUntilIdle()
 
         coVerify { layoutRepository.setXYLayout(XYLayout.SWAPPED) }
     }
 
     @Test
-    fun `cycleXYLayout switches swapped to standard`() = runTest(testDispatcher) {
-        coEvery { layoutRepository.prefs } returns flowOf(
-            ControllerLayoutPrefs(xyLayout = XYLayout.SWAPPED)
-        )
+    fun `every controller type can be chosen directly`() = runTest(testDispatcher) {
+        // The picker indexes ControllerDisplayType.entries, so the list it offers and the values
+        // it can set are the same list. Cycling used to define that order; the enum defines it
+        // now, and every entry has to be reachable or a picker row would offer a dead option.
         viewModel = buildActive()
         advanceUntilIdle()
 
-        viewModel.cycleXYLayout()
-        advanceUntilIdle()
-
-        coVerify { layoutRepository.setXYLayout(XYLayout.STANDARD) }
-    }
-
-    @Test
-    fun `cycleDisplayType advances through the three branded types`() = runTest(testDispatcher) {
-        val types = listOf(
-            ControllerDisplayType.XBOX,
-            ControllerDisplayType.NINTENDO,
-            ControllerDisplayType.PLAYSTATION,
-        )
-
-        types.forEachIndexed { index, type ->
-            coEvery { layoutRepository.prefs } returns flowOf(
-                ControllerLayoutPrefs(displayType = type)
-            )
-            viewModel = buildActive()
+        ControllerDisplayType.entries.forEach { type ->
+            viewModel.setDisplayType(type)
             advanceUntilIdle()
-
-            viewModel.cycleDisplayType()
-            advanceUntilIdle()
-
-            coVerify { layoutRepository.setDisplayType(types[(index + 1) % types.size]) }
+            coVerify { layoutRepository.setDisplayType(type) }
         }
-    }
-
-    @Test
-    fun `cycleDisplayType treats generic as xbox for next branded option`() = runTest(testDispatcher) {
-        coEvery { layoutRepository.prefs } returns flowOf(
-            ControllerLayoutPrefs(displayType = ControllerDisplayType.XBOX)
-        )
-        viewModel = buildActive()
-        advanceUntilIdle()
-
-        viewModel.cycleDisplayType()
-        advanceUntilIdle()
-
-        coVerify { layoutRepository.setDisplayType(ControllerDisplayType.NINTENDO) }
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.psplauncher.feature.settings.ui
 
+import com.psplauncher.core.domain.model.TextLegibilityStyle
+import com.psplauncher.core.domain.model.IconLegibilityStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -286,26 +288,29 @@ fun DisplaySettingsScreen(
                 // KEY_WAVE_STYLE, so a user who set Static for the wave gets a still poster the
                 // moment they pick a video).
                 if (state.customWallpaperPath == null) {
-                    SettingsValueRow(
+                    SettingsPickerRow(
                         label    = "Wave Style",
-                        value    = state.waveStyleLabel,
-                        onClick  = { viewModel.cycleWaveStyle() },
+                        options  = viewModel.waveStyleOptions.map { SettingsPickerOption(it.second) },
+                        selectedIndex = viewModel.waveStyleOptions.indexOfFirst { it.first == state.waveStyle },
+                        onPick   = { viewModel.setWaveStyle(viewModel.waveStyleOptions[it].first) },
                     )
                 } else if (state.motionWallpaperPath != null) {
-                    SettingsValueRow(
+                    SettingsPickerRow(
                         label    = "Background Motion",
-                        value    = state.waveStyleLabel,
-                        onClick  = { viewModel.cycleWaveStyle() },
+                        options  = viewModel.waveStyleOptions.map { SettingsPickerOption(it.second) },
+                        selectedIndex = viewModel.waveStyleOptions.indexOfFirst { it.first == state.waveStyle },
+                        onPick   = { viewModel.setWaveStyle(viewModel.waveStyleOptions[it].first) },
                     )
                 }
 
                 // Icon legibility is an appearance choice, NOT gated on a wallpaper being set —
                 // it matters most over a wallpaper, but still applies over the wave.
-                SettingsValueRow(
+                SettingsPickerRow(
                     label    = "Icon Legibility",
                     sublabel = "How XMB icons separate from the background",
-                    value    = state.iconLegibility.label,
-                    onClick  = { viewModel.cycleIconLegibility() },
+                    options  = IconLegibilityStyle.entries.map { SettingsPickerOption(it.label) },
+                    selectedIndex = IconLegibilityStyle.entries.indexOf(state.iconLegibility),
+                    onPick   = { viewModel.setIconLegibility(IconLegibilityStyle.entries[it]) },
                 )
 
                 SettingsToggleRow(
@@ -359,11 +364,12 @@ fun DisplaySettingsScreen(
                     )
                 }
 
-                SettingsValueRow(
+                SettingsPickerRow(
                     label    = "Text Legibility",
                     sublabel = "How text separates from what is behind it",
-                    value    = state.textLegibility.label,
-                    onClick  = { viewModel.cycleTextLegibility() },
+                    options  = TextLegibilityStyle.entries.map { SettingsPickerOption(it.label) },
+                    selectedIndex = TextLegibilityStyle.entries.indexOf(state.textLegibility),
+                    onPick   = { viewModel.setTextLegibility(TextLegibilityStyle.entries[it]) },
                 )
 
             }
@@ -489,18 +495,22 @@ fun DisplaySettingsScreen(
             if (section == null || section == DisplaySection.INPUT) {
                 SettingsGroup("Interface")
 
-                SettingsValueRow(
+                SettingsPickerRow(
                     label    = "Touch Navigation Button",
                     sublabel = "On-screen App Drawer / Back button",
-                    value    = viewModel.touchNavButtonLabel(),
-                    onClick  = { viewModel.cycleTouchNavButtonMode() },
+                    options  = viewModel.touchNavButtonOptions.map { SettingsPickerOption(it.second) },
+                    selectedIndex = viewModel.touchNavButtonOptions
+                        .indexOfFirst { it.first == state.touchNavButtonMode },
+                    onPick   = { viewModel.setTouchNavButtonMode(viewModel.touchNavButtonOptions[it].first) },
                 )
 
-                SettingsValueRow(
+                SettingsPickerRow(
                     label    = "Touch Sensitivity",
                     sublabel = "How far a swipe travels per XMB step",
-                    value    = viewModel.touchSensitivityLabel(),
-                    onClick  = { viewModel.cycleTouchSensitivity() },
+                    options  = viewModel.touchSensitivityOptions.map { SettingsPickerOption(it.second) },
+                    selectedIndex = viewModel.touchSensitivityOptions
+                        .indexOfFirst { it.first == state.touchSensitivity },
+                    onPick   = { viewModel.setTouchSensitivity(viewModel.touchSensitivityOptions[it].first) },
                 )
 
                 SettingsToggleRow(
