@@ -33,6 +33,14 @@ class BackupKeyCoverageTest {
     }
 
     @Test
+    fun `the XMB's own display switches are backed up`() {
+        // Both halves of the crossbar's look: the focused row's info line, and whether its
+        // artwork and colour take over the shell at all. A cosmetic choice the user made, with
+        // no file behind it, so it restores cleanly onto any device.
+        assertCovered("pref_xmb_game_metadata", "pref_xmb_item_backdrop")
+    }
+
+    @Test
     fun `icon and text appearance settings are backed up`() {
         assertCovered(
             "display_icon_legibility",

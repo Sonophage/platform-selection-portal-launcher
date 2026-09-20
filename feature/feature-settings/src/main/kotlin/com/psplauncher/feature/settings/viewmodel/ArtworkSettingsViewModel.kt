@@ -68,6 +68,7 @@ data class ArtworkSettingsUiState(
         com.psplauncher.core.domain.model.VideoSnapPlacement.DEFAULT,
     // The focused game's scraped one-liner under its logo on the XMB.
     val gameMetadata: Boolean = true,
+    val itemBackdrop: Boolean = true,
     // How long the cursor must rest on a game before its video snap plays (Video Snap Delay,
     // under the Animated Icons toggle). Seconds, clamped 1..5; default 1.5 matches the PSP.
     val icon1LingerDelaySeconds: Float = 1.5f,
@@ -116,6 +117,11 @@ class ArtworkSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iconDisplayPreferences.snapPlacementFlow.collect { placement ->
                 _extra.update { it.copy(snapPlacement = placement) }
+            }
+        }
+        viewModelScope.launch {
+            iconDisplayPreferences.itemBackdropFlow.collect { on ->
+                _extra.update { it.copy(itemBackdrop = on) }
             }
         }
         viewModelScope.launch {
@@ -478,6 +484,12 @@ class ArtworkSettingsViewModel @Inject constructor(
     /** Where an approved video snap plays: the icon tile, or behind the crossbar. */
     fun setSnapPlacement(placement: com.psplauncher.core.domain.model.VideoSnapPlacement) {
         viewModelScope.launch { iconDisplayPreferences.setSnapPlacement(placement) }
+    }
+
+    /** The focused row's artwork behind the shell, and its colour on the wave. */
+    fun setItemBackdrop(enabled: Boolean) {
+        _extra.update { it.copy(itemBackdrop = enabled) }
+        viewModelScope.launch { iconDisplayPreferences.setItemBackdrop(enabled) }
     }
 
     fun setGameMetadata(enabled: Boolean) {

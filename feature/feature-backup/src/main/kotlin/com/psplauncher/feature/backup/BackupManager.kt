@@ -613,6 +613,8 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("display_text_shadow"),
             booleanPreferencesKey("pref_animated_icons"),
             booleanPreferencesKey("pref_xmb_game_metadata"),
+        // "Backdrop & Tint" — whether the focused row's art and colour take over the shell.
+        booleanPreferencesKey("pref_xmb_item_backdrop"),
             // Launch behaviour
             booleanPreferencesKey("pref_direct_game_launch"),
             // Artwork behaviour

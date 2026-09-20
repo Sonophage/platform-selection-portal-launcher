@@ -233,6 +233,14 @@ fun ArtworkSettingsScreen(
                 )
 
                 SettingsToggleRow(
+                    label    = "Backdrop & Tint",
+                    sublabel = "The focused item's artwork fills the background and its colour " +
+                        "tints the wave. Off keeps your theme's own colour and wallpaper.",
+                    checked  = state.itemBackdrop,
+                    onToggle = { viewModel.setItemBackdrop(it) },
+                )
+
+                SettingsToggleRow(
                     label    = "Game Info Line",
                     sublabel = "Show the focused game's year, genre, developer and players under its logo",
                     checked  = state.gameMetadata,

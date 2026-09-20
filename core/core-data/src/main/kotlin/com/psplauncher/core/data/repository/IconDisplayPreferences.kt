@@ -65,6 +65,19 @@ class IconDisplayPreferences @Inject constructor(
     suspend fun setGameMetadata(enabled: Boolean) =
         context.pfpDataStore.edit { it[KEY_GAME_METADATA] = enabled }
 
+    // Whether the focused row's own artwork fills the shell's background and its colour retints
+    // the wave. On by default, because that is what it did before this switch existed.
+    //
+    // It needs a switch because it is the one thing in the launcher that argues with the XMB's
+    // own visual thesis: the system has ONE calm colour, taken from the month, and the content
+    // sits quietly on it. A background and a palette that change on every cursor step is the
+    // PS4/PS5 idea, and some people will want the crossbar to hold still.
+    val itemBackdropFlow: Flow<Boolean> = context.pfpDataStore.data
+        .map { it[KEY_ITEM_BACKDROP] ?: true }
+
+    suspend fun setItemBackdrop(enabled: Boolean) =
+        context.pfpDataStore.edit { it[KEY_ITEM_BACKDROP] = enabled }
+
     // How long the cursor must rest on a game (ICON0 tile) before its ICON1 video snap plays.
     // Seconds, clamped to 1..5; the 1.5 s default keeps the PSP's rest-then-animate cadence.
     val lingerDelaySecondsFlow: Flow<Float> = context.pfpDataStore.data
@@ -82,6 +95,8 @@ class IconDisplayPreferences @Inject constructor(
         private val KEY_SNAP_PLACEMENT = stringPreferencesKey("pref_video_snap_placement")
         private val KEY_GAME_METADATA =
             androidx.datastore.preferences.core.booleanPreferencesKey("pref_xmb_game_metadata")
+        private val KEY_ITEM_BACKDROP =
+            androidx.datastore.preferences.core.booleanPreferencesKey("pref_xmb_item_backdrop")
 
         // "platformId=MODE" per line. Pure and internal-free so the encoding is unit-testable;
         // anything unparseable is dropped rather than failing the whole read, so one bad entry

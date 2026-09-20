@@ -379,7 +379,11 @@ fun XMBShell(
     // colour on before the next one starts pulling it away.
     val themeWave = uiState.themeColors.waveColor
     val themeAccent = uiState.themeColors.accentColor
-    val itemColor = uiState.focusedItemAccentArgb?.let { Color(it.toInt()) }
+    // One switch gates BOTH halves. Gating only the picture would leave the whole palette still
+    // following the cursor, which is the half the XMB argues with most.
+    val itemColor = uiState.focusedItemAccentArgb
+        ?.takeIf { uiState.itemBackdropEnabled }
+        ?.let { Color(it.toInt()) }
     val xmbWave by androidx.compose.animation.animateColorAsState(
         targetValue = itemColor ?: themeWave,
         animationSpec = tween(durationMillis = 420),
@@ -525,7 +529,7 @@ fun XMBShell(
             // the first candidate that actually DECODED, which is the same image its colour came
             // from, so the backdrop and the tint over it can never be of two different pictures.
             val selectedItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-            val selectedBg = uiState.focusedItemBackdrop
+            val selectedBg = uiState.focusedItemBackdrop?.takeIf { uiState.itemBackdropEnabled }
             // PS3 placement: the approved snap plays full-bleed here instead of in the tile,
             // over the still art and UNDER the legibility scrim, so the crossbar keeps the same
             // contrast it has over a still background. Same FocusedGameVideo, same gates, same

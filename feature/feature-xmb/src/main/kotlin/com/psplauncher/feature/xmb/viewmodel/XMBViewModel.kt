@@ -680,6 +680,11 @@ data class XMBUiState(
     // Whether the focused game's scraped one-liner is drawn under its logo.
     val gameMetadataVisible: Boolean = true,
     /**
+     * "Backdrop & Tint" (Artwork settings). When false the shell keeps the theme's own wallpaper
+     * and colour whatever the cursor is on, which is the XMB's own idea of how a system looks.
+     */
+    val itemBackdropEnabled: Boolean = true,
+    /**
      * The focused row's own colour, read out of its artwork. Null on a row with no art of its
      * own, on art with no dominant hue, and for the moment before it has been read -- in all
      * three the XMB keeps the user's theme, which is what it looked like before this existed.
@@ -7741,6 +7746,11 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch {
             iconDisplayPreferences.gameMetadataFlow.collect { visible ->
                 _uiState.update { it.copy(gameMetadataVisible = visible) }
+            }
+        }
+        viewModelScope.launch {
+            iconDisplayPreferences.itemBackdropFlow.collect { on ->
+                _uiState.update { it.copy(itemBackdropEnabled = on) }
             }
         }
         viewModelScope.launch {
