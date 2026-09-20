@@ -18,6 +18,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -262,6 +267,11 @@ val SETTINGS_COLUMN_MAX_WIDTH = 560.dp
  */
 val LocalSettingsHelp = compositionLocalOf { mutableStateOf<String?>(null) }
 
+// The focused row's plate: a neutral lift, no hue. See SettingsRow for why it is colourless.
+private val SETTINGS_ROW_SHAPE = RoundedCornerShape(10.dp)
+private val SETTINGS_ROW_SELECTED_FILL = Color.White.copy(alpha = 0.10f)
+private val SETTINGS_ROW_SELECTED_EDGE = Color.White.copy(alpha = 0.22f)
+
 /** One choice offered by a [SettingsPickerRow]. */
 data class SettingsPickerOption(val label: String, val help: String? = null)
 
@@ -277,6 +287,8 @@ internal class SettingsPickerRequest(
     val options: List<SettingsPickerOption>,
     val selectedIndex: Int,
     val onPick: (Int) -> Unit,
+    /** Root-space Y of the row that opened it, so the list appears where the value was. */
+    val anchorY: Float,
 )
 
 internal val LocalSettingsPicker =
@@ -1082,101 +1094,91 @@ fun SettingsScaffold(
 }
 
 /**
- * The open picker, in the settings list's own language rather than a dialog's: no card, no
- * buttons, left-anchored in the same column as the rows it came from, options selected by the
- * same bloom and the same growth. The chosen value is ticked, and the focused option explains
- * itself at the foot exactly as a row does.
+ * The open picker: a list that opens ON the row it belongs to, the way a PS5 setting's options
+ * do, rather than a panel in the middle of the screen.
+ *
+ * Anchoring is the whole point. A centred panel made you look away from the row you were
+ * changing and then hunt for it again afterwards; this one appears over the value it is
+ * replacing, so the thing being chosen never moves.
  */
 @Composable
 private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
-    val bloom = LocalPFPColors.current.waveColor
-    Box(
+    val density = LocalDensity.current
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            // 0.88, and it took the device to learn why. At 0.55 the list underneath read
-            // straight through the panel -- row labels crossing option labels, and the screen's
-            // own help band showing beneath the picker's, so two different explanations were on
-            // screen at once. The settings scrim is already translucent, so a picker scrim has
-            // to cover a LIST, not a wallpaper.
-            .background(Color.Black.copy(alpha = 0.88f)),
-        contentAlignment = Alignment.CenterStart,
+            // Light, because the point of anchoring is that the row you came from stays visible.
+            // Contrast alone has to say which layer is on top, and the opaque list below does it.
+            .background(Color.Black.copy(alpha = 0.45f)),
     ) {
+        val panelHeight = PICKER_ROW_HEIGHT * picker.options.size + PICKER_PADDING * 2
+        val anchorDp = with(density) { picker.anchorY.toDp() }
+        // Clamped, so a row near the bottom opens upward rather than off the screen and a row
+        // near the top is not pushed under the header.
+        val top = anchorDp.coerceIn(
+            PICKER_EDGE_MARGIN,
+            (maxHeight - panelHeight - PICKER_EDGE_MARGIN).coerceAtLeast(PICKER_EDGE_MARGIN),
+        )
         Column(
             modifier = Modifier
-                .padding(start = 48.dp, end = 48.dp)
-                .widthIn(max = SETTINGS_COLUMN_MAX_WIDTH),
+                .padding(start = 48.dp)
+                .offset(y = top)
+                .widthIn(min = 260.dp, max = SETTINGS_COLUMN_MAX_WIDTH)
+                .clip(SETTINGS_ROW_SHAPE)
+                // Opaque: this list sits ON the settings list, so the rows underneath must not
+                // read through the options the way they did through the full-screen panel.
+                .background(Color(0xF21A1A22), SETTINGS_ROW_SHAPE)
+                .border(1.dp, SETTINGS_ROW_SELECTED_EDGE, SETTINGS_ROW_SHAPE)
+                .padding(PICKER_PADDING),
         ) {
-            Text(
-                text = picker.title.uppercase(),
-                color = SettingsSubtext,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.4.sp,
-                style = TextStyle(shadow = SettingsTextShadow),
-                modifier = Modifier.padding(bottom = 10.dp),
-            )
             picker.options.forEachIndexed { index, option ->
                 val focused = index == cursor
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .drawBehind {
+                        .height(PICKER_ROW_HEIGHT)
+                        .clip(SETTINGS_ROW_SHAPE)
+                        .background(
+                            if (focused) SETTINGS_ROW_SELECTED_FILL else Color.Transparent,
+                            SETTINGS_ROW_SHAPE,
+                        )
+                        .then(
                             if (focused) {
-                                drawRect(
-                                    Brush.horizontalGradient(
-                                        0f to bloom.copy(alpha = 0.62f),
-                                        0.5f to bloom.copy(alpha = 0.14f),
-                                        1f to Color.Transparent,
-                                    )
-                                )
+                                Modifier.border(1.dp, SETTINGS_ROW_SELECTED_EDGE, SETTINGS_ROW_SHAPE)
+                            } else {
+                                Modifier
                             }
-                        }
-                        .padding(vertical = 10.dp),
+                        )
+                        .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // A tick, not a highlight, marks what is CURRENTLY set. Selection and
-                    // "in use" are different facts and the panel has to show both at once: you
-                    // are standing on one option while another is the saved one.
+                    // The tick marks what is CURRENTLY set; the plate marks where the cursor is.
+                    // Two different facts, both on screen at once, because you stand on one
+                    // option while another is the saved one.
                     Text(
                         text = if (index == picker.selectedIndex) "\u2713" else " ",
-                        color = if (focused) Color.White else SettingsText,
-                        fontSize = 16.sp,
-                        style = TextStyle(shadow = SettingsTextShadow),
-                        modifier = Modifier.padding(end = 16.dp),
+                        color = SettingsText,
+                        fontSize = 15.sp,
+                        modifier = Modifier.padding(end = 12.dp),
                     )
                     Text(
                         text = option.label,
                         color = if (focused) Color.White else SettingsText,
-                        fontSize = if (focused) XmbLayoutSpec.DEFAULT.itemTextSelectedSp.sp
-                                   else XmbLayoutSpec.DEFAULT.itemTextSp.sp,
+                        fontSize = 15.sp,
                         fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
-                        style = TextStyle(shadow = SettingsTextShadow),
-                    )
-                }
-            }
-            // Fixed, for the same reason the list's help band is: a description that changed
-            // height would move the options under the cursor as the cursor moved.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(SETTINGS_HELP_BAND_HEIGHT)
-                    .padding(top = 10.dp),
-            ) {
-                picker.options.getOrNull(cursor)?.help?.takeIf { it.isNotBlank() }?.let { help ->
-                    Text(
-                        text = help,
-                        color = SettingsSubtext,
-                        fontSize = SETTINGS_HELP_TEXT_SP.sp,
-                        lineHeight = (SETTINGS_HELP_TEXT_SP + 4).sp,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        style = TextStyle(shadow = SettingsTextShadow),
                     )
                 }
             }
         }
     }
 }
+
+private val PICKER_ROW_HEIGHT = 42.dp
+private val PICKER_PADDING = 8.dp
+private val PICKER_EDGE_MARGIN = 24.dp
+
 
 // ── Reusable row components ───────────────────────────────────────────────────
 // (Controller-row registration helpers live in ControllerRowRegistration.kt — shared with the
@@ -1248,11 +1250,6 @@ fun SettingsRow(
     enabled: Boolean = true,
 ) {
     val click = onClick?.takeIf { enabled }
-    // waveColor, NOT SettingsAccent. The accent in this app's palettes is a hardcoded white
-    // (XmbPalette.accentColor), so an accent bloom was a white wash that flattened the row it was
-    // meant to lift. The wave colour is the theme's actual hue, which is what a PS3 settings
-    // cursor glows.
-    val bloom = LocalPFPColors.current.waveColor
     val help = LocalSettingsHelp.current
     val actionFocusCount = remember { mutableIntStateOf(0) }
     val anyActionFocused = actionFocusCount.intValue > 0
@@ -1319,29 +1316,30 @@ fun SettingsRow(
                     Timber.d("Settings focus: row=\"$label\" clickable=${click != null}")
                 }
             }
-            // Selection is the row growing and thickening PLUS a soft bloom from the left.
+            // Selection is a PLATE: a soft rounded fill with a hairline edge behind the whole
+            // row. This is the PS5 settings list, which is the reference asked for -- its focused
+            // row is a lifted rounded rectangle, not a coloured wash.
             //
-            // The bloom is not the flat highlight bar this screen used to paint and which was
-            // removed for being un-XMB. It is the PS3 settings list's own treatment: a gradient
-            // that is strongest at the left margin and gone by the middle of the row, so nothing
-            // is boxed and no edge is drawn. The same idiom the detail context menus already use,
-            // mirrored, because those menus hang off the right edge and this list off the left.
-            .drawBehind {
-                if (rowSelected) {
-                    drawRect(
-                        Brush.horizontalGradient(
-                            0f to bloom.copy(alpha = 0.62f),
-                            0.5f to bloom.copy(alpha = 0.14f),
-                            1f to Color.Transparent,
-                        )
-                    )
-                }
-            }
+            // It replaced a left-edge bloom in the PS3 idiom. Both are console-correct; they come
+            // from different consoles, and this is the one whose screenshots are the brief.
+            //
+            // The plate is COLOURLESS on purpose. A themed one turned every focused row into a
+            // bar of the wallpaper's hue, which is the habit this screen has been unlearning.
+            .padding(horizontal = 40.dp)
+            .clip(SETTINGS_ROW_SHAPE)
+            .background(
+                color = if (rowSelected) SETTINGS_ROW_SELECTED_FILL else Color.Transparent,
+                shape = SETTINGS_ROW_SHAPE,
+            )
+            .then(
+                if (rowSelected) Modifier.border(1.dp, SETTINGS_ROW_SELECTED_EDGE, SETTINGS_ROW_SHAPE)
+                else Modifier
+            )
             .focusable()
             // 18dp was set when every row carried a second line of helper text and needed the
             // air. With the helper moved to the foot of the screen the rows are one line, and at
-            // 18dp a screen held three of them. A PS3 settings list is denser than that.
-            .padding(horizontal = 48.dp, vertical = 12.dp),
+            // 18dp a screen held three of them. A console settings list is denser than that.
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -1537,21 +1535,27 @@ fun SettingsPickerRow(
     enabled: Boolean = true,
 ) {
     val picker = LocalSettingsPicker.current
-    SettingsRow(
-        label = label,
-        sublabel = sublabel,
-        value = options.getOrNull(selectedIndex)?.label ?: "",
-        focusKey = focusKey,
-        enabled = enabled,
-        onClick = {
-            picker.value = SettingsPickerRequest(
-                title = label,
-                options = options,
-                selectedIndex = selectedIndex,
-                onPick = onPick,
-            )
-        },
-    )
+    // Where this row sits on screen, so its option list can open ON it. Re-read on every layout
+    // pass, because the list scrolls under the cursor between one open and the next.
+    var anchorY by remember { mutableStateOf(0f) }
+    Box(modifier = Modifier.onGloballyPositioned { anchorY = it.localToRoot(Offset.Zero).y }) {
+        SettingsRow(
+            label = label,
+            sublabel = sublabel,
+            value = options.getOrNull(selectedIndex)?.label ?: "",
+            focusKey = focusKey,
+            enabled = enabled,
+            onClick = {
+                picker.value = SettingsPickerRequest(
+                    title = label,
+                    options = options,
+                    selectedIndex = selectedIndex,
+                    onPick = onPick,
+                    anchorY = anchorY,
+                )
+            },
+        )
+    }
 }
 
 // Confirm-to-edit text field for controller navigation. Navigating onto the field only
