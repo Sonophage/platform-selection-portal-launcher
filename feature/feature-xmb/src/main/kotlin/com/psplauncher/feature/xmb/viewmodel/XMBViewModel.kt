@@ -1270,6 +1270,21 @@ data class XMBItem(
     val backdropArt: List<String>
         get() = listOfNotNull(artworkUri, heroUri, coverUri, boxArtUri, iconUri)
             .filter { it.isNotBlank() && it != XMBViewModel.MEMORY_CARD_ASSET_URI }
+
+    /**
+     * A clear logo will actually be drawn for this row.
+     *
+     * ONE predicate, read by both halves of a pair that used to disagree. The row hid its title
+     * whenever a logo existed, on the premise that the logo IS the identity; the shell only drew
+     * the logo when there was also background art. A game with a logo and no art therefore got
+     * neither -- a tile with nothing naming it, and nothing logged.
+     *
+     * Gated on [backdropArt] rather than on `artworkUri` alone because that column is not what
+     * decides the backdrop any more: the shell shows the first art candidate that actually
+     * decodes, so the logo has to ask the same question.
+     */
+    val hasVisibleLogo: Boolean
+        get() = !logoUri.isNullOrBlank() && backdropArt.isNotEmpty()
 }
 
 /**

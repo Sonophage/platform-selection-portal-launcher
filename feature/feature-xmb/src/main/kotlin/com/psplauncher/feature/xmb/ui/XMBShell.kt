@@ -612,7 +612,7 @@ fun XMBShell(
             // over the hover background, a beat AFTER the background lands (the PSP's
             // icon → PIC1 → PIC0 stagger). Fades out instantly with any focus move.
             val selectedLogo = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.takeIf { it.artworkUri != null }?.logoUri
+                ?.takeIf { it.hasVisibleLogo }?.logoUri
             var pic0Visible by remember(selectedLogo) { mutableStateOf(false) }
             androidx.compose.runtime.LaunchedEffect(selectedLogo) {
                 if (selectedLogo != null) {
@@ -849,6 +849,7 @@ fun XMBShell(
                                 solidUnfocusedIcons = uiState.solidUnfocusedIcons,
                                 textShadow = uiState.textShadow,
                                 iconAnimatingAllowed = iconAnimatingAllowed,
+                                focusedLogoVisible = pic0Alpha > 0f,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

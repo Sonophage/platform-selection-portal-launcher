@@ -490,6 +490,12 @@ fun XMBItemList(
     // When false, rows render icon-only (no title/subtitle label). The drill flyout's memory-card
     // column uses this so the drilled console reads as a bare icon + ◀, tight against the games.
     showLabels: Boolean = true,
+    // Whether the focused row's clear-logo overlay is currently on screen. The selected row hides
+    // its own title only while that logo is actually visible -- never before it fades in, and
+    // never for a game whose logo will not be drawn at all. Without this the identity of a
+    // logo-bearing game was absent for the first 650ms and, on a game with no background art,
+    // forever.
+    focusedLogoVisible: Boolean = false,
     // When true, the selected row gets a ◀ drill cursor pinned directly to its right.
     drillCursorOnSelected: Boolean = false,
     // How far the dissolving previous item rises above the bar, in row heights (theme layout spec).
@@ -532,6 +538,7 @@ fun XMBItemList(
                 val last = minOf(items.size, sel + rowsBelow)
                 for (i in sel until last) {
                     XmbVerticalListRow(
+                        focusedLogoVisible = focusedLogoVisible,
                         item = items[i],
                         isSelected = i == selectedIndex,
                         // The real PSP XMB labels EVERY first-level item (selected bright, the
@@ -610,6 +617,9 @@ private fun XmbVerticalListRow(
     solidUnfocusedIcons: Boolean = false,
     // "Text Shadow" (Display ▸ Appearance): drop shadow behind row helper text (subtitle).
     textShadow: Boolean = true,
+    // The focused row's clear-logo overlay is on screen, so this row may hide its own title.
+    // False means the title shows: a row is never allowed to be nameless.
+    focusedLogoVisible: Boolean = false,
     // Whether THIS row may animate its GIF icon — true only for the focused row, so exactly
     // one decoder runs at a time (decision 3). Provided per-row around the icon.
     iconAnimatingAllowed: Boolean = false,
@@ -691,11 +701,11 @@ private fun XmbVerticalListRow(
             }
 
             // Game entities are icon-first: NO text on any game row except the ACTIVE row of
-            // a logo-less game, where title + emulator show immediately — there is no logo
-            // overlay to wait for, so the old PIC0-timeline fade only made the identity late.
-            // Games with a logo never show text — the logo overlay IS the identity. Non-game
-            // rows keep their labels as always. A textOnly row (e.g. Untracked) always labels.
-            val showGameText = item.textOnly || !item.isRealGame || (isSelected && item.logoUri == null)
+            // The logo overlay IS the identity, so a game hides its title while that logo is on
+            // screen -- and only then. Before the overlay fades in, and for a game whose logo
+            // will not be drawn, the title shows: a row must never be nameless. Non-game rows
+            // keep their labels as always, and a textOnly row (e.g. Untracked) always labels.
+            val showGameText = item.textOnly || !item.isRealGame || (isSelected && !focusedLogoVisible)
             if (showText && showGameText) {
                 // start padding pushes the label clear of the wallpaper's vertical cross bar, so the
                 // text doesn't butt against the black band (a small gap, PSP-style).

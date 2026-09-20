@@ -64,6 +64,40 @@ class XmbBackdropArtTest {
         assertEquals(listOf("content://library-art"), library.backdropArt)
     }
 
+    // ── The logo / label pair ──────────────────────────────────────────────────
+    //
+    // Two conditions that must agree, where only one was guarded. The row hid its title whenever a
+    // logo existed; the shell only drew the logo when there was background art too. A game with a
+    // logo and no art got neither, and nothing logged. Both sites read hasVisibleLogo now.
+
+    @Test
+    fun `a logo with no artwork behind it is not a visible logo`() {
+        // The exact hole: this row used to be nameless. No label, because it has a logo; no logo,
+        // because there is nothing to draw it over.
+        val orphanLogo = XMBItem(id = "g1", title = "Crash", logoUri = "content://logo", isRealGame = true)
+        assertTrue(orphanLogo.backdropArt.isEmpty())
+        assertTrue("a row with no art must keep its title", !orphanLogo.hasVisibleLogo)
+    }
+
+    @Test
+    fun `a logo with any readable art behind it is a visible logo`() {
+        // Any candidate, not artworkUri specifically: the shell shows the first one that decodes,
+        // so the logo has to ask the same question or the two disagree again.
+        listOf(
+            XMBItem(id = "a", title = "x", logoUri = "content://l", artworkUri = "content://bg"),
+            XMBItem(id = "b", title = "x", logoUri = "content://l", heroUri = "content://hero"),
+            XMBItem(id = "c", title = "x", logoUri = "content://l", boxArtUri = "content://box"),
+        ).forEach { assertTrue("${it.id} should draw its logo", it.hasVisibleLogo) }
+    }
+
+    @Test
+    fun `no logo is never a visible logo, however much art there is`() {
+        val noLogo = XMBItem(id = "g2", title = "Crash", artworkUri = "content://bg", isRealGame = true)
+        assertTrue(!noLogo.hasVisibleLogo)
+        // A blank string is not a logo either — a scraper that wrote "" must not blank the title.
+        assertTrue(!XMBItem(id = "g3", title = "x", logoUri = "  ", artworkUri = "content://bg").hasVisibleLogo)
+    }
+
     @Test
     fun `a row with no art at all colours nothing`() {
         // Settings rows, text-only rows and unscraped games: the shell keeps the user's theme,
