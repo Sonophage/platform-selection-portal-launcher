@@ -120,6 +120,9 @@ data class XMBContextMenu(
     val categoryContext: String? = null,
     // Set on the category-picker submenu: "move" or "add"
     val pendingAppAction: String? = null,
+    // Set on the media columns' collapsed Add submenu. Its items carry the SAME ids the Add rows
+    // used to, so activating one re-enters the ordinary row-select path rather than repeating it.
+    val isAddMenu: Boolean = false,
     // Set on the "Add to Collection" submenu — the game being added.
     val collectionGameId: Long? = null,
     // Set on a collection row's own options menu (rename / delete / open).
@@ -374,41 +377,10 @@ sealed interface MusicNav {
 // as Music/Video/Photo); selecting an L2 row inside it opens the existing settings screen
 // overlay. L2 row ids ARE screen route ids — SettingsNavHost resolves them, so legacy direct
 // callers keep working during migration.
-/**
- * The crossbar's Settings sections. A thin XMB-side view of core-domain's
- * [com.psplauncher.core.domain.model.SettingsSectionId] -- the id, title and subtitle all come
- * from there, so the column and the settings screens' rail cannot describe the tree differently.
- */
-enum class SettingsSection(val catalogId: com.psplauncher.core.domain.model.SettingsSectionId) {
-    LIBRARY(com.psplauncher.core.domain.model.SettingsSectionId.LIBRARY),
-    EMULATORS(com.psplauncher.core.domain.model.SettingsSectionId.EMULATORS),
-    APPEARANCE(com.psplauncher.core.domain.model.SettingsSectionId.APPEARANCE),
-    INTERFACE(com.psplauncher.core.domain.model.SettingsSectionId.INTERFACE),
-    MEDIA(com.psplauncher.core.domain.model.SettingsSectionId.MEDIA),
-    SYSTEM(com.psplauncher.core.domain.model.SettingsSectionId.SYSTEM);
-
-    val id: String get() = catalogId.id
-    val title: String get() = catalogId.title
-    val subtitle: String get() = catalogId.subtitle
-}
-
-fun settingsSectionForId(id: String): SettingsSection? =
-    SettingsSection.entries.firstOrNull { it.id == id }
 
 // The L2 rows of a section. Ids must be unique inside the list (list keys + cursor restore) and
 // distinct from every section id (the select handler routes section ids to the flyout and
 // everything else to activeSettingsScreen — see SettingsHierarchyTest).
-/**
- * The L2 rows of a section, built from the shared catalog in core-domain.
- *
- * It used to spell the tree out here, which made it the only copy -- right up until the settings
- * screens needed the same tree to draw their section rail, and a second copy in another module
- * would have been a list and its mirror with nothing keeping them level.
- */
-fun settingsSectionItems(section: SettingsSection): List<XMBItem> =
-    com.psplauncher.core.domain.model.settingsEntriesIn(section.catalogId)
-        .map { XMBItem(id = it.id, title = it.title, subtitle = it.subtitle) }
-
 // ── Fullscreen music browser (Settings-style, searchable) ───────────────────────
 // Opened from the "Music" and "Playlist" root items as a fullscreen overlay (not the inline XMB
 // list). Rows reuse XMBItem so the same row visuals/actions apply: tracks play, playlists drill in,
@@ -466,7 +438,6 @@ data class MusicTrackPickerState(
  * lets the ladder's precedence be pinned by a plain state test, with no ViewModel to build.
  */
 enum class DrillOutStep {
-    SETTINGS_SECTION,
     MUSIC,
     /** A video Library backs out to the Libraries list before leaving Video. */
     VIDEO_LIBRARY,
@@ -618,7 +589,6 @@ data class XMBUiState(
     // The drilled-into Settings L1 section — non-null while its two-pane flyout shows the L2 rows,
     // null at the flat section root. Deliberately NOT part of hasBlockingOverlay: the flyout is
     // XMB foreground, so input keeps driving the item list exactly like every other drill.
-    val settingsSectionNav: SettingsSection? = null,
     // Settings ▸ Controller ▸ Left Backs Out. Mirrored from ControllerLayoutRepository so both the
     // XMB's own LEFT and the Settings overlay's read one value. Default true matches the pref's.
     val leftBacksOut: Boolean = true,
@@ -800,7 +770,6 @@ data class XMBUiState(
     // before leaving the section, so each press climbs exactly one level.
     val drillOutStep: DrillOutStep?
         get() = when {
-            settingsSectionNav != null -> DrillOutStep.SETTINGS_SECTION
             musicNav != MusicNav.Root -> DrillOutStep.MUSIC
             videoNav is VideoNav.Library -> DrillOutStep.VIDEO_LIBRARY
             videoNav is VideoNav.Playlist -> DrillOutStep.VIDEO_PLAYLIST
@@ -2008,9 +1977,7 @@ class XMBViewModel @Inject constructor(
                     // Always reset the cursor against the newly selected list so nested Settings
                     // cannot retain an out-of-range index from the parent list.
                     _uiState.update { state ->
-                        val items = state.settingsSectionNav
-                            ?.let(::settingsSectionItems)
-                            ?: SETTINGS_ROOT_ITEMS
+                        val items = SETTINGS_ROOT_ITEMS
                         state.copy(
                             currentItems = items,
                             selectedItemIndex = state.selectedItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)),
@@ -2366,10 +2333,21 @@ class XMBViewModel @Inject constructor(
                     type     = XMBItemType.MEMORY_CARD,
                 )
             )
-            // Getting-started prompt: opens Settings → Music. Drops away once a root has been
-            // scanned (even if it found no tracks), since the root is then managed in Settings.
-            if (!hasScannedFolder) add(addMusicFolderItem())
         }
+    }
+
+    /**
+     * Every "Add ..." this category offers right now, in the order they belong in.
+     *
+     * One function rather than rows scattered through the builders, because the same list has to
+     * answer two questions: what the column ends with, and what the Add submenu contains. Two
+     * copies would drift the moment one gained an entry.
+     */
+    private fun musicAddActions(): List<XMBItem> = buildList {
+        // Getting-started prompt: opens Settings → Music. Drops away once a root has been scanned
+        // (even if it found no tracks), since the root is then managed in Settings.
+        if (_uiState.value.musicFolders.none { it.lastScannedAt != null }) add(addMusicFolderItem())
+        add(addMusicAppsItem())
     }
 
     /**
@@ -2378,7 +2356,52 @@ class XMBViewModel @Inject constructor(
      * The apps used to live one level down behind a "Music Apps" row. Media first, then the tools
      * for it, is the order a user scans in, and it costs one press fewer to reach Spotify.
      */
-    private suspend fun musicRootItems(): List<XMBItem> = musicRootSections() + musicAppItems()
+    private suspend fun musicRootItems(): List<XMBItem> =
+        musicRootSections() + musicAppItems() + collapseAddRows(musicAddActions())
+
+    /**
+     * A column ends in ONE Add row.
+     *
+     * A media column can offer two of them at once -- point the library at a folder, and pick
+     * apps to show -- and two adjacent rows both starting with "Add" is a menu pretending to be a
+     * list. With more than one, they collapse into a single "Add" row that opens the rest as a
+     * submenu, which is one more press only for the case that was ambiguous anyway. With one,
+     * that row is shown as itself: wrapping a single choice in a menu would be pure ceremony.
+     */
+    private fun collapseAddRows(rows: List<XMBItem>): List<XMBItem> = when {
+        rows.size <= 1 -> rows
+        else -> listOf(
+            XMBItem(
+                id       = ADD_MENU_ITEM_ID,
+                title    = "Add",
+                subtitle = rows.joinToString("  ·  ") { it.title.removePrefix("Add ") },
+                type     = XMBItemType.ADD_ACTION,
+            )
+        )
+    }
+
+    /** The Add submenu's entries for whichever column the cursor is in, or empty elsewhere. */
+    private fun currentAddActions(): List<XMBItem> = when (currentCategory()?.id) {
+        BuiltInCategory.MUSIC   -> musicAddActions()
+        BuiltInCategory.VIDEO   -> videoAddActions()
+        BuiltInCategory.PHOTO   -> photoAddActions()
+        BuiltInCategory.LIBRARY -> booksAddActions()
+        else -> emptyList()
+    }
+
+    private fun openAddMenu() {
+        val actions = currentAddActions()
+        if (actions.isEmpty()) return
+        _uiState.update { state ->
+            state.copy(
+                activeContextMenu = XMBContextMenu(
+                    title = "Add",
+                    items = actions.map { XMBContextMenuItem(it.id, it.title) },
+                    isAddMenu = true,
+                )
+            )
+        }
+    }
 
     private fun addMusicFolderItem(): XMBItem = XMBItem(
         id       = ADD_MUSIC_FOLDER_ITEM_ID,
@@ -2411,14 +2434,15 @@ class XMBViewModel @Inject constructor(
     private suspend fun musicAppItems(): List<XMBItem> {
         val apps = appCategoryRepository.appsForCategory(MUSIC_APPS_CATEGORY_ID)
             .notHiddenAt(HideLocationType.CATEGORY, MUSIC_APPS_CATEGORY_ID)
-        val appItems = apps.map { it.toXmbItem(gameRepository.getAppEntry(it.packageName)) }
-        return appItems + XMBItem(
-            id       = ADD_MUSIC_APPS_ITEM_ID,
-            title    = "Add Music Apps",
-            subtitle = "Pick installed apps to show here",
-            type     = XMBItemType.ADD_ACTION,
-        )
+        return apps.map { it.toXmbItem(gameRepository.getAppEntry(it.packageName)) }
     }
+
+    private fun addMusicAppsItem(): XMBItem = XMBItem(
+        id       = ADD_MUSIC_APPS_ITEM_ID,
+        title    = "Add Music Apps",
+        subtitle = "Pick installed apps to show here",
+        type     = XMBItemType.ADD_ACTION,
+    )
 
     private fun addTracksItem(): XMBItem = XMBItem(
         id       = ADD_TRACKS_ITEM_ID,
@@ -2610,14 +2634,18 @@ class XMBViewModel @Inject constructor(
                     type     = XMBItemType.MEMORY_CARD,
                 )
             )
-            // Getting-started prompt: opens Settings → Video. Drops away once a root has been
-            // scanned (even if it found no videos), since the root is then managed in Settings.
-            if (!hasScannedLibrary) add(addVideosItem())
         }
     }
 
+    /** Every "Add ..." the Video column offers (see [musicAddActions]). */
+    private fun videoAddActions(): List<XMBItem> = buildList {
+        if (_uiState.value.videoLibraries.none { it.lastScannedAt != null }) add(addVideosItem())
+        add(addVideoAppsItem())
+    }
+
     /** The whole Video root: its sections, then the installed video apps, then Add Video Apps. */
-    private suspend fun videoRootItems(): List<XMBItem> = videoRootSections() + videoAppItems()
+    private suspend fun videoRootItems(): List<XMBItem> =
+        videoRootSections() + videoAppItems() + collapseAddRows(videoAddActions())
 
     private fun addVideosItem(): XMBItem = XMBItem(
         id       = ADD_VIDEOS_ITEM_ID,
@@ -2675,14 +2703,15 @@ class XMBViewModel @Inject constructor(
     private suspend fun videoAppItems(): List<XMBItem> {
         val apps = appCategoryRepository.appsForCategory(VIDEO_APPS_CATEGORY_ID)
             .notHiddenAt(HideLocationType.CATEGORY, VIDEO_APPS_CATEGORY_ID)
-        val appItems = apps.map { it.toXmbItem(gameRepository.getAppEntry(it.packageName)) }
-        return appItems + XMBItem(
-            id       = ADD_VIDEO_APPS_ITEM_ID,
-            title    = "Add Video Apps",
-            subtitle = "Pick installed apps to show here",
-            type     = XMBItemType.ADD_ACTION,
-        )
+        return apps.map { it.toXmbItem(gameRepository.getAppEntry(it.packageName)) }
     }
+
+    private fun addVideoAppsItem(): XMBItem = XMBItem(
+        id       = ADD_VIDEO_APPS_ITEM_ID,
+        title    = "Add Video Apps",
+        subtitle = "Pick installed apps to show here",
+        type     = XMBItemType.ADD_ACTION,
+    )
 
     private fun List<com.psplauncher.core.domain.model.Video>.toVideoItems(): List<XMBItem> =
         map { video ->
@@ -2756,6 +2785,7 @@ class XMBViewModel @Inject constructor(
 
     // Handles A/Cross on any Video row. Returns true when [item] is a Video row it owns.
     private fun handleVideoSelection(item: XMBItem): Boolean = when {
+        item.id == ADD_MENU_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openAddMenu(); true }
         item.type == XMBItemType.EMPTY -> true
         item.id == ALL_VIDEOS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openVideoView(VideoNav.AllVideos); true }
         item.id == VIDEO_COLLECTIONS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openVideoView(VideoNav.Collections); true }
@@ -2815,7 +2845,7 @@ class XMBViewModel @Inject constructor(
             catId == BuiltInCategory.VIDEO -> "video_${videoNavKey(s.videoNav)}"
             catId == BuiltInCategory.PHOTO -> "photo_${photoNavKey(s.photoNav)}"
             catId == BuiltInCategory.LIBRARY -> "books_${booksNavKey(s.booksNav)}"
-            catId == BuiltInCategory.SETTINGS -> "settings_${s.settingsSectionNav?.id ?: "root"}"
+            catId == BuiltInCategory.SETTINGS -> "settings_root"
             s.selectedCollectionId != null -> "col_${s.selectedCollectionId}"
             s.selectedPlatformId != null   -> "plat_${s.selectedPlatformId}"
             else                           -> "root"
@@ -3095,18 +3125,23 @@ class XMBViewModel @Inject constructor(
                     type     = XMBItemType.MEMORY_CARD,
                 )
             )
-            // Getting-started prompt, gone once a shelf has been scanned even if it found nothing.
-            if (!hasScannedShelf) {
-                add(
-                    XMBItem(
-                        id       = ADD_BOOK_FOLDER_ITEM_ID,
-                        title    = "Add Book Folder",
-                        subtitle = "Point the Library at a folder of EPUBs",
-                        type     = XMBItemType.ADD_ACTION,
-                    )
-                )
-            }
         }
+    }
+
+    /** Every "Add ..." the Library column offers (see [musicAddActions]). */
+    private fun booksAddActions(): List<XMBItem> = buildList {
+        // Getting-started prompt, gone once a shelf has been scanned even if it found nothing.
+        if (_uiState.value.bookLibraries.none { it.lastScannedAt != null }) {
+            add(
+                XMBItem(
+                    id       = ADD_BOOK_FOLDER_ITEM_ID,
+                    title    = "Add Book Folder",
+                    subtitle = "Point the Library at a folder of EPUBs",
+                    type     = XMBItemType.ADD_ACTION,
+                )
+            )
+        }
+        add(addBookAppsItem())
     }
 
     /**
@@ -3115,19 +3150,21 @@ class XMBViewModel @Inject constructor(
      * The pinned default reader above stays what it is -- the app a book opens IN. These rows are
      * for launching a reader on its own, and match what Music, Video and Photo already do.
      */
-    private suspend fun booksRootItems(): List<XMBItem> = booksRootSections() + bookAppItems()
+    private suspend fun booksRootItems(): List<XMBItem> =
+        booksRootSections() + bookAppItems() + collapseAddRows(booksAddActions())
 
     private suspend fun bookAppItems(): List<XMBItem> {
         val apps = appCategoryRepository.appsForCategory(LIBRARY_APPS_CATEGORY_ID)
             .notHiddenAt(HideLocationType.CATEGORY, LIBRARY_APPS_CATEGORY_ID)
-        val appItems = apps.map { it.toXmbItem(gameRepository.getAppEntry(it.packageName)) }
-        return appItems + XMBItem(
-            id       = ADD_LIBRARY_APPS_ITEM_ID,
-            title    = "Add Book Apps",
-            subtitle = "Pick installed apps to show here",
-            type     = XMBItemType.ADD_ACTION,
-        )
+        return apps.map { it.toXmbItem(gameRepository.getAppEntry(it.packageName)) }
     }
+
+    private fun addBookAppsItem(): XMBItem = XMBItem(
+        id       = ADD_LIBRARY_APPS_ITEM_ID,
+        title    = "Add Book Apps",
+        subtitle = "Pick installed apps to show here",
+        type     = XMBItemType.ADD_ACTION,
+    )
 
     private fun bookItems(books: List<com.psplauncher.core.domain.model.Book>): List<XMBItem> =
         books.map { book ->
@@ -3183,6 +3220,7 @@ class XMBViewModel @Inject constructor(
 
     /** Returns true when [item] was a Library row and has been handled. */
     private fun handleBooksSelection(item: XMBItem): Boolean = when {
+        item.id == ADD_MENU_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openAddMenu(); true }
         item.id == OPEN_READER_ITEM_ID -> {
             menuSound.play(MenuSound.LAUNCH)
             val reader = _uiState.value.defaultReader
@@ -3321,14 +3359,18 @@ class XMBViewModel @Inject constructor(
                     type     = XMBItemType.MEMORY_CARD,
                 )
             )
-            // Getting-started prompt: opens Settings → Photo. Drops away once a root has been
-            // scanned (even if it found no photos), since the root is then managed in Settings.
-            if (!hasScannedLibrary) add(addPhotoLibraryItem())
         }
     }
 
+    /** Every "Add ..." the Photo column offers (see [musicAddActions]). */
+    private fun photoAddActions(): List<XMBItem> = buildList {
+        if (_uiState.value.photoLibraries.none { it.lastScannedAt != null }) add(addPhotoLibraryItem())
+        add(addPhotoAppsItem())
+    }
+
     /** The whole Photo root: its sections, then the installed photo apps, then Add Photo Apps. */
-    private suspend fun photoRootItems(): List<XMBItem> = photoRootSections() + photoAppItems()
+    private suspend fun photoRootItems(): List<XMBItem> =
+        photoRootSections() + photoAppItems() + collapseAddRows(photoAddActions())
 
     private fun addPhotoLibraryItem(): XMBItem = XMBItem(
         id       = ADD_PHOTO_LIBRARY_ITEM_ID,
@@ -3342,14 +3384,15 @@ class XMBViewModel @Inject constructor(
     private suspend fun photoAppItems(): List<XMBItem> {
         val apps = appCategoryRepository.appsForCategory(PHOTO_APPS_CATEGORY_ID)
             .notHiddenAt(HideLocationType.CATEGORY, PHOTO_APPS_CATEGORY_ID)
-        val appItems = apps.map { it.toXmbItem(gameRepository.getAppEntry(it.packageName)) }
-        return appItems + XMBItem(
-            id       = ADD_PHOTO_APPS_ITEM_ID,
-            title    = "Add Photo Apps",
-            subtitle = "Pick installed apps to show here",
-            type     = XMBItemType.ADD_ACTION,
-        )
+        return apps.map { it.toXmbItem(gameRepository.getAppEntry(it.packageName)) }
     }
+
+    private fun addPhotoAppsItem(): XMBItem = XMBItem(
+        id       = ADD_PHOTO_APPS_ITEM_ID,
+        title    = "Add Photo Apps",
+        subtitle = "Pick installed apps to show here",
+        type     = XMBItemType.ADD_ACTION,
+    )
 
     // One folder card per Album, drillable into its photos. The root folder is managed in
     // Settings → Photo, so there is no add row here.
@@ -3411,6 +3454,7 @@ class XMBViewModel @Inject constructor(
 
     // Handles A/Cross on any Photo row. Returns true when [item] is a Photo row it owns.
     private fun handlePhotoSelection(item: XMBItem): Boolean = when {
+        item.id == ADD_MENU_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openAddMenu(); true }
         item.id == ALL_PHOTOS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openPhotoView(PhotoNav.AllPhotos); true }
         item.id == PHOTO_ALBUMS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openPhotoView(PhotoNav.Albums); true }
         item.id == CAMERA_ITEM_ID -> { menuSound.play(MenuSound.LAUNCH); launchCamera(); true }
@@ -3735,6 +3779,7 @@ class XMBViewModel @Inject constructor(
     // Handles A/Cross on any Music row. Returns true when [item] is a Music row it owns. Empty-state
     // rows are consumed silently; everything else plays its own select/launch sound.
     private fun handleMusicSelection(item: XMBItem): Boolean = when {
+        item.id == ADD_MENU_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openAddMenu(); true }
         item.type == XMBItemType.EMPTY -> true   // not selectable
         item.id == NOW_PLAYING_ITEM_ID -> {
             menuSound.play(MenuSound.SELECT)
@@ -4160,9 +4205,6 @@ class XMBViewModel @Inject constructor(
     // a playlist / All Music). Null = top level, normal single-column list.
     private fun computeDrillTitle(): String? {
         val s = _uiState.value
-        // Settings L1 flyout: the section name parents the L2 rows, like every other drill-in.
-        val settingsTitle = s.settingsSectionNav?.title
-        if (settingsTitle != null) return settingsTitle
         // Music sub-navigation is a drill-in too — a non-null title makes it show the two-pane flyout.
         val musicTitle = when (val nav = s.musicNav) {
             MusicNav.AllMusic    -> "Music"
@@ -4236,17 +4278,6 @@ class XMBViewModel @Inject constructor(
     // single parent so the flyout still shows one icon.
     private fun computeDrillSiblings(category: Category?): Pair<List<XMBItem>, Int> {
         val s = _uiState.value
-        // Settings L1 flyout: the left column is the six section rows, drilled-into one centred.
-        if (s.settingsSectionNav != null) {
-            // Android Settings is a real sibling of the section cards. Keep it in the left
-            // column so Library (and every other L1 section) always has a visible parent icon
-            // above the category bar, matching the established Music flyout geometry.
-            val sibs = listOf(
-                XMBItem(id = ANDROID_SETTINGS_ITEM_ID, title = "Android Settings", subtitle = "Opens device settings"),
-            ) + SettingsSection.entries.map { XMBItem(id = it.id, title = it.title, subtitle = it.subtitle) }
-            val idx = sibs.indexOfFirst { it.id == s.settingsSectionNav.id }.coerceAtLeast(0)
-            return sibs to idx
-        }
         // Music sub-navigation: the left column is the Music root's sections (Playlist / Music Apps /
         // Music), with the drilled-into one centred on the arrow.
         if (s.musicNav != MusicNav.Root) {
@@ -5442,6 +5473,17 @@ class XMBViewModel @Inject constructor(
             return
         }
 
+        // ── The media columns' collapsed Add submenu ──────────────────────────────
+        // The entries are the Add rows themselves, so the handling is the row's own: find it by
+        // id and send it through the same per-category selection the column would have used. No
+        // second copy of "what Add Video Apps does" exists to fall out of step.
+        if (menu.isAddMenu) {
+            val row = currentAddActions().firstOrNull { it.id == itemId }
+            closeContextMenu()
+            if (row != null) dispatchCategorySelection(row)
+            return
+        }
+
         // ── Collection picker submenu — handled before closing so toggles stay in place ──
         if (menu.collectionGameId != null) {
             val gameId = menu.collectionGameId
@@ -6448,7 +6490,7 @@ class XMBViewModel @Inject constructor(
         // activeAppDrawerFilter is cleared as an invariant: landing on a category always shows the
         // plain XMB (the drawer can't normally be open here, but this keeps the contextual button
         // state correct no matter which path selected the category).
-        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = restore, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, settingsSectionNav = null, activeAppDrawerFilter = null) }
+        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = restore, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, activeAppDrawerFilter = null) }
         tintWaveForCategory(category)
         loadItemsForCategory(category)
     }
@@ -6552,6 +6594,22 @@ class XMBViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Hands [item] to the media column that owns it, and reports whether anyone took it.
+     *
+     * Extracted because the Add submenu activates the very same rows: a row selected from the
+     * submenu must do exactly what it does when pressed in the column, and the only way to
+     * guarantee that is for there to be one dispatcher.
+     */
+    private fun dispatchCategorySelection(item: XMBItem): Boolean =
+        when (currentCategory()?.id) {
+            BuiltInCategory.MUSIC   -> handleMusicSelection(item)
+            BuiltInCategory.VIDEO   -> handleVideoSelection(item)
+            BuiltInCategory.PHOTO   -> handlePhotoSelection(item)
+            BuiltInCategory.LIBRARY -> handleBooksSelection(item)
+            else -> false
+        }
+
     private fun markControllerInput() {
         lastInteractionMs = SystemClock.elapsedRealtime()
         _uiState.update {
@@ -6581,7 +6639,6 @@ class XMBViewModel @Inject constructor(
      */
     private fun backOutOfDrill(s: XMBUiState): Boolean {
         when (s.drillOutStep) {
-            DrillOutStep.SETTINGS_SECTION -> closeSettingsSection()
             DrillOutStep.MUSIC -> closeMusicView()
             // Two-level video paths back out through their own list first.
             DrillOutStep.VIDEO_LIBRARY -> openVideoView(VideoNav.Libraries)
@@ -6621,18 +6678,9 @@ class XMBViewModel @Inject constructor(
         val category = _uiState.value.categories.getOrNull(_uiState.value.selectedCategoryIndex)
         val item     = _uiState.value.currentItems.getOrNull(index)
 
-        // Music rows are handled together (static items, the All Music card, playlists, tracks,
-        // and the various add/setup rows), each owning its sound and returning early.
-        if (category?.id == BuiltInCategory.MUSIC && item != null && handleMusicSelection(item)) return
-
-        // Video rows (static items, library cards, video files, app rows) are handled together.
-        if (category?.id == BuiltInCategory.VIDEO && item != null && handleVideoSelection(item)) return
-
-        // Photo rows (the All Photos card, Camera, Add Photo Library, Album cards, photo files).
-        if (category?.id == BuiltInCategory.PHOTO && item != null && handlePhotoSelection(item)) return
-
-        // Library rows (the reader, shelves, a shelf, a book).
-        if (category?.id == BuiltInCategory.LIBRARY && item != null && handleBooksSelection(item)) return
+        // The media columns handle their own rows (static items, the memory card, playlists,
+        // tracks, app rows, add/setup rows), each owning its sound and returning early.
+        if (item != null && dispatchCategorySelection(item)) return
 
         // Sound: launch for items that boot something immediately; select for opening a folder,
         // detail, picker, or settings; silent for non-selectable placeholder rows.
@@ -6768,18 +6816,20 @@ class XMBViewModel @Inject constructor(
                     )
                 }.onFailure { Timber.w(it, "Could not open device settings") }
             }
+            OPEN_SETTINGS_ITEM_ID -> {
+                // Lands on the catalog's first screen, which is also the first row of the rail,
+                // so the tree is on screen and the cursor is at the top of it.
+                val first = com.psplauncher.core.domain.model.SETTINGS_CATALOG.first().id
+                Timber.d("Opening settings: $first")
+                _uiState.update { it.copy(activeSettingsScreen = first) }
+            }
             else -> when (category?.id) {
                 BuiltInCategory.SETTINGS -> {
-                    val id = item?.id
-                    if (id != null) {
-                        val section = settingsSectionForId(id)
-                        if (section != null) {
-                            Timber.d("Opening settings section flyout: ${section.title}")
-                            openSettingsSection(section)
-                        } else {
-                            Timber.d("Opening settings screen: $id")
-                            _uiState.update { it.copy(activeSettingsScreen = id) }
-                        }
+                    // Any other id on this column is a direct screen route (deep links from
+                    // elsewhere reuse these rows).
+                    item?.id?.let { id ->
+                        Timber.d("Opening settings screen: $id")
+                        _uiState.update { it.copy(activeSettingsScreen = id) }
                     }
                 }
                 BuiltInCategory.ANDROID -> {
@@ -7101,19 +7151,8 @@ class XMBViewModel @Inject constructor(
     // ── Settings hierarchy (L1 section flyouts) ───────────────────────────────
     // Drilling into a section reuses the shared drill path (computeDrillTitle / computeDrillSiblings
     // → XmbDrillFlyout) with cursor memory, exactly like Music/Video/Photo. Back from an L2
-    // screen simply closes the overlay: settingsSectionNav survives underneath, so the owning
     // flyout is revealed — there is no extra stack to unwind.
 
-    private fun openSettingsSection(section: SettingsSection) {
-        // Rebuild immediately: the settings section changes the visible item list and drill
-        // metadata. Waiting for a category reload can leave the old selection/index in place,
-        // which may activate an invalid row and crash on nested Settings screens.
-        navigateRememberingCursor { it.copy(settingsSectionNav = section) }
-    }
-
-    private fun closeSettingsSection() {
-        navigateRememberingCursor { it.copy(settingsSectionNav = null) }
-    }
 
     // ── Settings overlay ──────────────────────────────────────────────────────
 
@@ -8282,6 +8321,7 @@ class XMBViewModel @Inject constructor(
         // How far back Last Played reaches. A "what was I doing" shelf, not an archive: past
         // twenty rows nobody is recognising a game by having played it recently.
         private const val RECENTLY_PLAYED_LIMIT = 20
+        internal const val ADD_MENU_ITEM_ID = "add_menu"
         // Reader apps are stored under the Library category's own id, the same convention the
         // other media categories use for their app rows.
         private const val LIBRARY_APPS_CATEGORY_ID = BuiltInCategory.LIBRARY
@@ -8319,13 +8359,32 @@ class XMBViewModel @Inject constructor(
         // First item opens the device's own Settings app (not a PFP screen).
         internal const val ANDROID_SETTINGS_ITEM_ID = "settings_android_system"
 
-        // Settings root: the Android system-settings leaf plus the six nested L1 sections
-        // (settingsSectionItems supplies each section's L2 rows). Section rows drill into the
-        // two-pane flyout; any other id opens its screen overlay directly. `internal` so the
-        // hierarchy unit tests can assert the exact root order.
+        // Opens the settings screens. One row, not a tree.
+        internal const val OPEN_SETTINGS_ITEM_ID = "settings_open"
+
+        /**
+         * The Settings column: open the settings, or open Android's.
+         *
+         * It used to be the six sections, each drilling into its own screens: three presses to
+         * reach Library Manager. The screens have carried the whole tree in their own rail since
+         * the rail was added, so the column was a second way to walk a tree that is already on
+         * screen once you arrive. One press now, and the rail does the walking.
+         *
+         * Android Settings stays a row of its own. It is not one of PSPLauncher's screens, it is
+         * not in SETTINGS_CATALOG, and the rail is built from that catalog -- so folding it in
+         * would mean inventing a rail entry that routes nowhere. It is a different destination
+         * and it reads as one.
+         *
+         * `internal` so the hierarchy unit tests can assert the exact root order.
+         */
         internal val SETTINGS_ROOT_ITEMS = listOf(
+            XMBItem(
+                id = OPEN_SETTINGS_ITEM_ID,
+                title = "Settings",
+                subtitle = "Library, emulators, appearance, media & system",
+            ),
             XMBItem(id = ANDROID_SETTINGS_ITEM_ID, title = "Android Settings", subtitle = "Opens device settings"),
-        ) + SettingsSection.entries.map { XMBItem(id = it.id, title = it.title, subtitle = it.subtitle) }
+        )
     }
 
     private fun canonicalXmbCategories(categories: List<Category>): List<Category> =

@@ -25,28 +25,32 @@ class SettingsHierarchyTest {
 
     // ── Crossbar root ────────────────────────────────────────────────────────
 
-    @Test fun `the crossbar column is Android Settings followed by the six sections`() {
-        // The sections are back on the crossbar. Settings is the one column where the XMB has to
-        // carry its own weight: everywhere else the crossbar is a shell around content, and it
-        // reads as an XMB regardless. Here, drilling a section IS the interface. The section rail
-        // inside the screens stays as well, for moving sideways once you are deep.
+    @Test fun `the crossbar column is two rows, open settings and open Android's`() {
+        // The column used to be the six sections, each drilling into its own screens: three
+        // presses to reach Library Manager. The screens have carried the whole tree in their own
+        // rail since the rail was added, so the column was a second way to walk a tree that is
+        // already on screen once you arrive.
+        //
+        // There is no "and the column agrees with the rail" test any more, and that is the point
+        // of the change: there is only one owner of the tree left to disagree with.
         assertEquals(
-            listOf("settings_android_system") + SettingsSectionId.entries.map { it.id },
+            listOf(XMBViewModel.OPEN_SETTINGS_ITEM_ID, "settings_android_system"),
             XMBViewModel.SETTINGS_ROOT_ITEMS.map { it.id },
         )
     }
 
-    @Test fun `each crossbar section drills into exactly the screens the rail expands`() {
-        // The two navigations must agree about what a section contains, or drilling "Library" on
-        // the crossbar and opening Library in the rail would offer different screens.
-        SettingsSectionId.entries.forEach { section ->
-            val drilled = settingsSectionItems(SettingsSection.entries.first { it.catalogId == section })
-                .map { it.id }
-            val railed = settingsRailRows(settingsEntriesIn(section).first().id)
-                .filterNot { it.isSection }
-                .map { it.id }
-            assertEquals("${section.id} differs between the column and the rail", drilled, railed)
-        }
+    @Test fun `the settings row opens a screen that exists and is first in the rail`() {
+        // The row hands activeSettingsScreen the catalog's first entry. Two things have to hold
+        // or the one press that now reaches settings goes nowhere: the id must resolve to a
+        // route, and it must be the rail's first screen, so arriving puts the cursor at the top
+        // of the tree rather than halfway down it.
+        val opensId = com.psplauncher.core.domain.model.SETTINGS_CATALOG.first().id
+        assertTrue("The settings row opens $opensId, which has no route", opensId in SETTINGS_SCREEN_ROUTES)
+        assertEquals(
+            "The settings row must land on the rail's first screen",
+            opensId,
+            settingsRailRows(opensId).first { !it.isSection }.id,
+        )
     }
 
     @Test fun `every crossbar row carries a title and a subtitle`() {

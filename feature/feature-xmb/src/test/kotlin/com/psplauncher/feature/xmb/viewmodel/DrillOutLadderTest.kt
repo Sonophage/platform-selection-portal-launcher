@@ -26,7 +26,6 @@ class DrillOutLadderTest {
     @Test fun `isInSubItem is exactly 'there is a rung to climb'`() {
         // One representative of each rung — the invariant that used to be two hand-written lists.
         val drilled = listOf(
-            root.copy(settingsSectionNav = SettingsSection.entries.first()),
             root.copy(musicNav = MusicNav.AllMusic),
             root.copy(videoNav = VideoNav.Library("lib", "Movies")),
             root.copy(videoNav = VideoNav.Playlist(1L, "Mix")),
@@ -68,12 +67,12 @@ class DrillOutLadderTest {
         assertEquals(DrillOutStep.PHOTO, root.copy(photoNav = PhotoNav.Albums).drillOutStep)
     }
 
-    @Test fun `a settings flyout outranks anything else left open behind it`() {
-        val state = root.copy(
-            settingsSectionNav = SettingsSection.entries.first(),
-            selectedPlatformId = "psp",
-        )
-        assertEquals(DrillOutStep.SETTINGS_SECTION, state.drillOutStep)
+    // The Settings rung is gone: the column is one row that opens the settings screens, so there
+    // is no section flyout left to climb out of. Music is now the highest rung, and this still
+    // asserts what the removed test did -- that the ladder is ordered, not "whatever is set".
+    @Test fun `a media sub-view outranks a games folder left open behind it`() {
+        val state = root.copy(musicNav = MusicNav.AllMusic, selectedPlatformId = "psp")
+        assertEquals(DrillOutStep.MUSIC, state.drillOutStep)
     }
 
     @Test fun `a games folder and a collection share the last rung`() {
