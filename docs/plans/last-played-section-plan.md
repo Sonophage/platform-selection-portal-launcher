@@ -28,8 +28,8 @@ asked for — "the art of the last played game like the hover when looking throu
 needs **no work at all**: `focusedItemBackdrop` and `focusedItemAccentArgb` already fire for any
 focused row that has art, in any category, since `f716af25`.
 
-The one genuinely absent piece: `RECENTLY_PLAYED` is **not** in `BUILT_IN_CATEGORIES`, so the
-category has never appeared on the bar.
+The one genuinely absent piece was that `RECENTLY_PLAYED` was **not** in `BUILT_IN_CATEGORIES`,
+so the category had never appeared on the bar. It is there now, at position 10.
 
 ## Architecture
 
@@ -96,9 +96,8 @@ Game may well be the better home; that is a reorder in Category Manager, not a c
 
 # Task 4 — tests ✅
 
-- [x] **4.1** No mapping was added, so this leans on the SQL as planned.
-- [ ] ~~4.1~~ The ordering rule as a pure function if any mapping is added; otherwise lean on
-      `observeRecentlyPlayed`'s `ORDER BY last_played_at DESC`, which is SQL and already correct.
+- [x] **4.1** No mapping was added, so the ordering leans on `observeRecentlyPlayed`'s
+      `ORDER BY last_played_at DESC` as planned, and the DAO test below covers it directly.
 - [x] **4.2** A DAO test: three games with known `last_played_at`, assert the order and the limit.
       `GameDao` has no coverage of this query today.
 - [x] **4.3** Falsify by reversing the `ORDER BY`.
