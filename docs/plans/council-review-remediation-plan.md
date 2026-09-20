@@ -1,6 +1,6 @@
 # Council review remediation
 
-**Status:** Batches 0, 1, 3 and 5 landed · **Branch:** `main` · **Written:** 2026-09-20
+**Status:** Everything that does not need the device is done · **Branch:** `main` · **Written:** 2026-09-20
 
 ## Landed so far
 
@@ -29,8 +29,25 @@ Fourteen commits, each with its own falsification. Suite: **2149 tests, 0 failur
 goes is a pixel decision on a 462 dp screen and every candidate position collides with something;
 it is five minutes with the device and a guess without it.
 
-**Still open:** 2.1–2.3 (XMB motion — all want the device), 4.1 (the `AlertDialog` question — needs
-the device), 6.2 (migrations 34→35, 35→36), 7.1 (the Books extraction), `RomScanner.scan()`.
+### Landed after the first pass
+
+| Task | Commit |
+|---|---|
+| Stick sensitivity + touch fling (asked for directly, not from the council) | `624f4b2c` |
+| 3.4 One list of built-in categories; 3.5 music clock hours | `cfff75ac` |
+| 3.3 Preflight checks the handle the launch uses | `139f9282` |
+| 6.1 Backup TABLE drift guard | `2de1c7ef` |
+| 6.2 Migrations 34→35 and 35→36 | `d6369bc1` |
+| 6.3 `RomScanner.scan()` deleted (196 lines) | this commit |
+
+**Still open, and all of it needs the device:** 2.1–2.3 (XMB motion — cursor glide, the 650 ms
+logo stagger, the category-change slide axis), 2.4 (`drillTitle` placement), 4.1 (whether
+`AlertDialog` is controller-deaf).
+
+**Still open, not device-bound:** 7.1 (the Books extraction from `XMBViewModel`), foreground
+`CoroutineWorker`s so a long scrape can finish, batching `LibraryScanner`'s per-row upserts, an
+index on `disc_set_key`, and the `ArtworkNaming` version bump that task 1.5's `@Ignore`d test is
+waiting on.
 
 **Written:** 2026-09-20
 
