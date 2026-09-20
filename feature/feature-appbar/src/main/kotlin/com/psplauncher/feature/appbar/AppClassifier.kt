@@ -76,6 +76,23 @@ class AppClassifier @Inject constructor() {
                 "com.duckduckgo.mobile.android", "com.sec.android.app.sbrowser",
                 "com.UCMobile.intl", "com.kiwibrowser.browser", "org.torproject.torbrowser",
                 "mark.via", "com.android.browser",
+                // ── Remote play ──────────────────────────────────────────────────────────
+                // Streaming clients belong in Network, not Game: they need a connection before
+                // they need a controller, and they run nothing on this device. A PSP owner looks
+                // under Network for "things that talk to something else".
+                //
+                // Verified installed on the test tablet: com.limelight (which by prefix also
+                // covers com.limelight.noir) and com.boosteroid.streaming. The rest are taken
+                // from each app's published id and have NOT been seen on a device here -- a wrong
+                // prefix classifies nothing and fails silently, so they are listed one per line
+                // with the app named, and AppClassifierTest pins each one.
+                "com.limelight",                    // Moonlight (and Moonlight Noir)
+                "com.boosteroid.streaming",         // Boosteroid
+                "com.metallic.chiaki",              // Chiaki (PS4/PS5 remote play)
+                "com.valvesoftware.steamlink",      // Steam Link
+                "com.nvidia.geforcenow",            // GeForce NOW
+                "com.microsoft.xcloud",             // Xbox Cloud Gaming
+                "com.parsecgaming.parsec",          // Parsec
             ),
             AppCategoryIds.APP_STORE to listOf(
                 "com.android.vending",                 // Google Play Store

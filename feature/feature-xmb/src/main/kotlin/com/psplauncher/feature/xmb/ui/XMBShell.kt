@@ -1135,6 +1135,8 @@ fun XMBShell(
                     onTextChange = onNamePromptTextChanged,
                     onConfirm = onConfirmCollectionName,
                     onCancel = onCancelCollectionName,
+                    placeholder = dialog.placeholder,
+                    confirmLabel = dialog.confirmLabel,
                 )
             }
 
@@ -1349,14 +1351,17 @@ private fun CollectionNameDialog(
     onTextChange: (String) -> Unit,
     onConfirm: (String) -> Unit,
     onCancel: () -> Unit,
+    placeholder: String = "e.g. RPGs, Currently Playing",
+    confirmLabel: String = "Save",
 ) {
     PfpTextPromptOverlay(
         title = title,
         value = text,
-        placeholder = "e.g. RPGs, Currently Playing",
+        placeholder = placeholder,
         onValueChange = onTextChange,
         onConfirm = { onConfirm(text) },
         onCancel = onCancel,
+        confirmLabel = confirmLabel,
     )
 }
 

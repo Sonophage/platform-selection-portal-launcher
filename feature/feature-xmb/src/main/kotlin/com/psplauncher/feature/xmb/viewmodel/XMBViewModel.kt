@@ -176,6 +176,13 @@ data class CollectionNameDialogState(
     val editTitleGameId: Long? = null,
     // When set, confirming saves this game's note (blank clears it).
     val editNoteGameId: Long? = null,
+    // When set, confirming hands the text to Quick Search rather than making a collection.
+    val quickSearch: Boolean = false,
+    // The prompt's own hint and commit label. Defaulted to the collection wording, because that
+    // is what this dialog started as and still mostly is; a repurposed prompt that kept saying
+    // "e.g. RPGs, Currently Playing" under a Quick Search title would be lying on screen.
+    val placeholder: String = "e.g. RPGs, Currently Playing",
+    val confirmLabel: String = "Save",
 )
 
 // A simple read-only message dialog (e.g. "View File Location"). Dismissed with A/B or tap.
@@ -2228,9 +2235,14 @@ class XMBViewModel @Inject constructor(
                             }
                         val combined = collectionItems + appItems
                         val items = if (combined.isEmpty()) listOf(emptyCategoryItem(category)) else combined
+                        // Quick Search leads the Network column: a launcher with no browser of
+                        // its own still has to be able to look something up, and a search box is
+                        // the shortest route to a browser on a device where opening one and
+                        // reaching its address bar is four presses.
+                        val lead = if (category.id == NETWORK_CATEGORY_ID) listOf(quickSearchItem()) else emptyList()
                         // "Add Apps" is offered on every app section so the same picker serves
                         // Video, Music, Network, App Store and custom categories alike.
-                        _uiState.update { it.copy(currentItems = items + addAppsItem()) }
+                        _uiState.update { it.copy(currentItems = lead + items + addAppsItem()) }
                     }
                 }
             }
@@ -2254,6 +2266,13 @@ class XMBViewModel @Inject constructor(
         artworkUri   = artwork?.let { it.artworkUri ?: it.heroUri },
         heroUri      = artwork?.heroUri,
         accentColor  = artwork?.let { platformCache[it.platformId]?.accentColor },
+    )
+
+    private fun quickSearchItem(): XMBItem = XMBItem(
+        id       = QUICK_SEARCH_ITEM_ID,
+        title    = "Quick Search",
+        subtitle = "Search the web, or type an address",
+        type     = XMBItemType.ADD_ACTION,
     )
 
     private fun addAppsItem(): XMBItem = XMBItem(
@@ -5942,6 +5961,7 @@ class XMBViewModel @Inject constructor(
     fun onConfirmCollectionName(name: String) {
         val dialog = _uiState.value.collectionNameDialog ?: return
         _uiState.update { it.copy(collectionNameDialog = null) }
+        if (dialog.quickSearch) { runQuickSearch(name); return }
         // Game Edit Title / Edit Note targets: blank input clears the override/note.
         if (dialog.editTitleGameId != null) {
             viewModelScope.launch {
@@ -5972,6 +5992,40 @@ class XMBViewModel @Inject constructor(
             // reactive collection stream.
             if (categoryShowsCollections(currentCategory())) {
                 loadItemsForCategory(currentCategory())
+            }
+        }
+    }
+
+    /**
+     * Hands what was typed to whichever app the user has chosen for the job.
+     *
+     * PSPLauncher never picks the browser. ACTION_WEB_SEARCH and ACTION_VIEW both go to Android's
+     * own default, which is why there is no browser preference anywhere in this app.
+     */
+    private fun runQuickSearch(text: String) {
+        val intent = when (val action = quickSearchActionFor(text)) {
+            is QuickSearchAction.None -> return
+            is QuickSearchAction.Open ->
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(action.url))
+            is QuickSearchAction.Search ->
+                android.content.Intent(android.content.Intent.ACTION_WEB_SEARCH)
+                    .putExtra(android.app.SearchManager.QUERY, action.query)
+        }.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        menuSound.play(MenuSound.LAUNCH)
+        try {
+            context.startActivity(intent)
+        } catch (e: android.content.ActivityNotFoundException) {
+            // A device with no browser at all. Say so rather than throwing on the launcher's own
+            // scope, which would take the whole XMB down for a failed search.
+            Timber.w(e, "No app can handle Quick Search")
+            _uiState.update {
+                it.copy(
+                    infoDialog = InfoDialogState(
+                        title = "Nothing to search with",
+                        message = "No app on this device can open a web search. Install a browser, " +
+                            "then try again.",
+                    )
+                )
             }
         }
     }
@@ -6732,6 +6786,17 @@ class XMBViewModel @Inject constructor(
             }
             MISSING_ITEM_ID -> {
                 openMissingFolder()
+                return
+            }
+            QUICK_SEARCH_ITEM_ID -> {
+                _uiState.update {
+                    it.copy(collectionNameDialog = CollectionNameDialogState(
+                        title = "Quick Search",
+                        quickSearch = true,
+                        placeholder = "Search the web, or type an address",
+                        confirmLabel = "Search",
+                    ))
+                }
                 return
             }
             ADD_APPS_ITEM_ID -> {
@@ -8322,6 +8387,8 @@ class XMBViewModel @Inject constructor(
         // twenty rows nobody is recognising a game by having played it recently.
         private const val RECENTLY_PLAYED_LIMIT = 20
         internal const val ADD_MENU_ITEM_ID = "add_menu"
+        internal const val QUICK_SEARCH_ITEM_ID = "quick_search"
+        private const val NETWORK_CATEGORY_ID = "network"
         // Reader apps are stored under the Library category's own id, the same convention the
         // other media categories use for their app rows.
         private const val LIBRARY_APPS_CATEGORY_ID = BuiltInCategory.LIBRARY
