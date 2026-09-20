@@ -397,79 +397,6 @@ private fun consoleIconKeyFor(item: XMBItem): String? = when (item.type) {
     else                    -> null   // collections / unknown fall back to sysicon_default
 }
 
-// A vertical list whose [selectedIndex] row is pinned to a fixed line; rows scroll under it. When
-// [anchorTopY] is unspecified the row centres vertically; otherwise the row's TOP is pinned at
-// [anchorTopY] (used by the drill flyout to seat the active row just below the caticon, exactly like
-// the main XMB, with earlier rows scrolling up past it). Each row is exactly [rowHeight] tall.
-@Composable
-private fun CenterLockedColumn(
-    count: Int,
-    selectedIndex: Int,
-    rowHeight: Dp,
-    modifier: Modifier = Modifier,
-    anchorTopY: Dp = Dp.Unspecified,
-    row: @Composable (index: Int) -> Unit,
-) {
-    BoxWithConstraints(modifier = modifier.clipToBounds()) {
-        val density = LocalDensity.current
-        val centered = anchorTopY.isUnspecified
-        // Where the active row's TOP sits, and the padding that lets the first/last rows reach it.
-        val topPad = (if (centered) (maxHeight - rowHeight) / 2 else anchorTopY).coerceAtLeast(0.dp)
-        val bottomPad = (if (centered) (maxHeight - rowHeight) / 2 else maxHeight - anchorTopY - rowHeight)
-            .coerceAtLeast(0.dp)
-        val anchorPx = with(density) { topPad.toPx() }
-        val listState = rememberLazyListState()
-        // Uptime of the previous selection change — lets the glide duration follow the input
-        // cadence: rapid held-repeat steps get a tween that finishes before the next step lands,
-        // while isolated presses keep the full-length PSP glide.
-        val lastStepUptime = remember { longArrayOf(0L) }
-
-        LaunchedEffect(selectedIndex, count, anchorPx) {
-            if (count == 0) return@LaunchedEffect
-            val now = android.os.SystemClock.uptimeMillis()
-            val sinceLastStep = now - lastStepUptime[0]
-            lastStepUptime[0] = now
-            val idx = selectedIndex.coerceIn(0, count - 1)
-            // If the target is off-screen (e.g. a big jump or first composition), get it measured
-            // and roughly in view instantly so the visible glide covers only the final short delta —
-            // this avoids a long, laggy sweep across many rows.
-            if (listState.layoutInfo.visibleItemsInfo.none { it.index == idx }) {
-                listState.scrollToItem(idx, scrollOffset = -anchorPx.toInt())
-            }
-            val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == idx }
-                ?: return@LaunchedEffect
-            // Glide by the exact remaining delta so the row's top settles precisely on the line.
-            // A single ease-in-out tween reads as one smooth motion with no spring overshoot/bounce.
-            // Duration tracks the step cadence (clamped) so held-repeat scrolling stays 1:1 with
-            // input instead of every step interrupting a half-finished 240 ms glide.
-            val delta = item.offset - anchorPx
-            if (delta != 0f) {
-                val duration = sinceLastStep.coerceIn(70L, 240L).toInt()
-                listState.animateScrollBy(
-                    delta,
-                    animationSpec = tween(durationMillis = duration, easing = FastOutSlowInEasing),
-                )
-            }
-        }
-
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(top = topPad, bottom = bottomPad),
-            userScrollEnabled = false,   // selection-driven; taps still work, drag can't fight the lock
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            items(count) { index ->
-                // Centre the ROW_HEIGHT content within the taller (row + gap) cell so the card's
-                // midline lands exactly on the shared centre line — same line as the sibling & arrow.
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(rowHeight),
-                    contentAlignment = Alignment.Center,
-                ) { row(index) }
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun XMBItemList(
@@ -478,9 +405,6 @@ fun XMBItemList(
     onItemSelected: (Int) -> Unit,
     onItemLongPress: (Int) -> Unit,
     iconStyle: GameIconStyle = GameIconStyle.PSP_RECTANGLE,
-    // Increments when the list must snap to the top regardless of cursor position (e.g. a sort
-    // cycle). Necessary because keyed reorders otherwise keep the viewport anchored to the old item.
-    scrollToTopToken: Int = 0,
     // Y of the category bar's TOP edge, measured from the top of this list.
     barTopY: Dp = 40.dp,
     // Y of the category bar's BOTTOM edge — where the selected item is seated, directly under the

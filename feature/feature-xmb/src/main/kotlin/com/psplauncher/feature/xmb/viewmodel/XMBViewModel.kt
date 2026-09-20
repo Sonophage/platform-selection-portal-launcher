@@ -540,9 +540,13 @@ data class XMBUiState(
     // drilled into, which sits centred on the arrow. Empty when not drilled in.
     val drillSiblings: List<XMBItem> = emptyList(),
     val drillSiblingIndex: Int = 0,
-    // Bumped whenever the list should snap back to the top regardless of cursor position — e.g. a
-    // sort cycle. The item list scrolls to item 0 each time this changes (keyed reorders otherwise
-    // keep the viewport anchored to the old top item).
+    // Bumped on a sort cycle, alongside selectedItemIndex = 0.
+    //
+    // It no longer reaches XMBItemList: that list is absolute-offset layout rather than a scroll
+    // container, so it has nothing to scroll, and the parameter it used to be passed to was never
+    // read. The comment here claimed otherwise for as long as that was true. What actually returns
+    // the crossbar to the top is the `selectedItemIndex = 0` written with it. The token is still
+    // live for the music browser, which IS a LazyColumn (see MusicBrowserScreen).
     val scrollToTopToken: Int = 0,
 
     // ── Input source (drives the on-screen touch-navigation button) ────────

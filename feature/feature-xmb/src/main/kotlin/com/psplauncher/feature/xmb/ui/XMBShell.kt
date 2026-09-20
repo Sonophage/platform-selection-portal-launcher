@@ -846,7 +846,6 @@ fun XMBShell(
                                 onItemSelected = onItemTap,
                                 onItemLongPress = onItemLongPress,
                                 iconStyle = uiState.iconStyle,
-                                scrollToTopToken = uiState.scrollToTopToken,
                                 barTopY = barTop,
                                 belowTopY = anchorTop,
                                 previousRiseRows = layoutSpec.previousItemRiseRows,
