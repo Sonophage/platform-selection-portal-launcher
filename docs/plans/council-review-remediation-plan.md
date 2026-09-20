@@ -251,10 +251,14 @@ scanner and **no disc suffix** from the slug: disc 2's box art silently overwrit
 `NORMALIZATION_VERSION = 1` is documented as unchangeable once shipped, so a fix needs a version
 bump plus a re-slug of existing folders. **This is cheaper today than it will ever be again.**
 
-- [ ] Write a test asserting the two title forms produce **distinct** slugs
-- [ ] Run it — confirm it fails (RED), and leave it failing with `@Ignore` plus a comment pointing here
-- [ ] Do **not** edit the regex in this batch — the version bump is its own conversation
-- [ ] Record the decision in this plan when it is made
+- [x] Written as `ArtworkNamingDiscTagTest`. **Running it corrected the finding**: of the three
+      forms the review expected to collide, only ONE does.
+      - `[Disc 2]` **collides** — `TAG_GROUPS` strips bracket groups and `DISC_TAG` never sees
+        brackets, so the number is dropped. @Ignore'd, pinned, waiting on the version bump.
+      - `- Disc 2` is safe **by accident** — nothing strips an ungrouped tag, so it survives into
+        the base as `-disc-2`. Now asserted, because a later tidy-up of `TAG_GROUPS` would break it.
+      - `(Disc 2 of 3)` is safe — `[^)]*` swallows the "of 3".
+- [ ] The version bump and re-slug pass — still a decision, not a patch
 
 **Verify batch 1:** `./gradlew test --rerun-tasks` · commit each task separately.
 
