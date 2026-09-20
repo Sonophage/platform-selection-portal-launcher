@@ -72,4 +72,38 @@ class GameUpsertCascadeTest {
         assertEquals(0, playSessionDao.getAll().size)
         assertEquals(0, collectionDao.getGameIdsInCollection(collectionId).size)
     }
+
+    /**
+     * ...and the mirror of that fact: the write PcShortcutImporter actually uses.
+     *
+     * Pin reconcile runs at every app start, and it used to attach a launcher handle to a matched
+     * row with the same REPLACE upsert asserted above -- so pressing "Add to home" inside a wrapper
+     * deleted that game's playtime and its collection membership. `attachLauncherHandle` writes the
+     * three columns in place instead.
+     *
+     * This test is the guard; the one above is the reason it exists. If someone ever swaps this
+     * call back to `upsert` because it is shorter, this goes red and the one above stays green.
+     */
+    @Test
+    fun `attaching a launcher handle keeps the game's play sessions and collections`() = runTest {
+        val gameId = gameDao.upsert(game("Portal 2"))
+        playSessionDao.insert(PlaySessionEntity(gameId = gameId, platformId = "windows", launchedAt = 1L))
+        val collectionId = collectionDao.insert(CollectionEntity(name = "Favorites"))
+        collectionDao.addGame(CollectionGameEntity(collectionId, gameId))
+
+        gameDao.attachLauncherHandle(
+            id = gameId,
+            packageName = "com.winlator",
+            shortcutId = "shortcut-42",
+            launchIntentUri = null,
+        )
+
+        assertEquals(1, playSessionDao.getAll().size)
+        assertEquals(1, collectionDao.getGameIdsInCollection(collectionId).size)
+
+        // And it actually wrote the handle, rather than being a no-op that trivially preserves them.
+        val after = gameDao.getById(gameId)!!
+        assertEquals("com.winlator", after.packageName)
+        assertEquals("shortcut-42", after.launchShortcutId)
+    }
 }

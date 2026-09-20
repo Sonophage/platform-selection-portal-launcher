@@ -145,7 +145,14 @@ class PcShortcutImporter @Inject constructor(
             ?: titleMatch(label)?.let { match ->
                 // The shortcut is the launch handle the folder-imported row was missing.
                 if (match.shortcutId == null && match.launchIntentUri == null) {
-                    gameRepository.upsert(match.copy(packageName = hostPackage, shortcutId = shortcutId))
+                    // A targeted column write, never upsert: REPLACE would cascade-delete this
+                    // row's play sessions and collection membership (GameUpsertCascadeTest).
+                    gameRepository.attachLauncherHandle(
+                        id = match.id,
+                        packageName = hostPackage,
+                        shortcutId = shortcutId,
+                        launchIntentUri = match.launchIntentUri,
+                    )
                 }
                 match
             }
@@ -176,7 +183,13 @@ class PcShortcutImporter @Inject constructor(
         val existing = gameRepository.getByIntentUri(intentUri)
             ?: titleMatch(label)?.let { match ->
                 if (match.shortcutId == null && match.launchIntentUri == null) {
-                    gameRepository.upsert(match.copy(packageName = hostPackage, launchIntentUri = intentUri))
+                    // Same reasoning as the pinned-shortcut path above.
+                    gameRepository.attachLauncherHandle(
+                        id = match.id,
+                        packageName = hostPackage,
+                        shortcutId = match.shortcutId,
+                        launchIntentUri = intentUri,
+                    )
                 }
                 match
             }

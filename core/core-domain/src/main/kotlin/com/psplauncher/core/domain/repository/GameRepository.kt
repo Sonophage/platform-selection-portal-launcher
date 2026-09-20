@@ -67,6 +67,19 @@ interface GameRepository {
     suspend fun updateStorefrontIdentity(id: Long, storefront: String?, storefrontGameId: String?)
 
     /**
+     * Attaches a launcher handle (package / pinned shortcut / captured intent) to an existing game.
+     *
+     * A targeted write rather than an upsert, so the row's play sessions and collection membership
+     * survive -- see [GameDao.attachLauncherHandle].
+     */
+    suspend fun attachLauncherHandle(
+        id: Long,
+        packageName: String?,
+        shortcutId: String?,
+        launchIntentUri: String?,
+    )
+
+    /**
      * Records (or, with a null [providerGameId], forgets) the confirmed match for ONE provider.
      *
      * Exactly one of `ss_id` / `tgdb_id` / `igdb_id` / `steam_grid_db_id` is written and the other

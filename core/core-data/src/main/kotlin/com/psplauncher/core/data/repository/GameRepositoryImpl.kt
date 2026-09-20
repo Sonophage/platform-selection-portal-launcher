@@ -146,6 +146,13 @@ class GameRepositoryImpl @Inject constructor(
     override suspend fun updateStorefrontIdentity(id: Long, storefront: String?, storefrontGameId: String?) =
         gameDao.updateStorefrontIdentity(id, storefront, storefrontGameId)
 
+    override suspend fun attachLauncherHandle(
+        id: Long,
+        packageName: String?,
+        shortcutId: String?,
+        launchIntentUri: String?,
+    ) = gameDao.attachLauncherHandle(id, packageName, shortcutId, launchIntentUri)
+
     override suspend fun updateProviderMatch(id: Long, provider: String, providerGameId: Long?) =
         gameDao.updateProviderMatch(id, provider, providerGameId)
 

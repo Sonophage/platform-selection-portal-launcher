@@ -379,6 +379,32 @@ interface GameDao {
     )
     suspend fun updateStorefrontIdentity(id: Long, storefront: String?, storefrontGameId: String?)
 
+    /**
+     * Attaches a launcher handle to an existing row, one column pair at a time.
+     *
+     * Emphatically NOT [upsert]. That is `@Insert(onConflict = REPLACE)`, which SQLite performs as
+     * DELETE-then-INSERT, so every `ON DELETE CASCADE` child of this row goes with it --
+     * `play_sessions` and `collection_games` both do. `GameUpsertCascadeTest` proves exactly that,
+     * on a windows fixture, and `PcGameScanner.applyFill` already writes column-at-a-time for the
+     * same reason. Pin reconcile runs at every app start, so a row merge here was silently
+     * deleting a game's playtime and its collection membership.
+     */
+    @Query(
+        """
+        UPDATE games SET
+            package_name = :packageName,
+            launch_shortcut_id = :shortcutId,
+            launch_intent_uri = :launchIntentUri
+        WHERE id = :id
+    """
+    )
+    suspend fun attachLauncherHandle(
+        id: Long,
+        packageName: String?,
+        shortcutId: String?,
+        launchIntentUri: String?,
+    )
+
     // ── Confirmed provider match (C16 task 2.3) ──────────────────────────────
     // Sets EXACTLY ONE provider id and leaves the other three untouched, so a match confirmed on
     // SteamGridDB can never be read back as an IGDB id. Unlike updateMetadata this is not

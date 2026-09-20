@@ -86,16 +86,25 @@ class PcShortcutImporterTest {
         val folderGame = windowsGame(9L, "MARVEL Cosmic Invasion")
         coEvery { gameRepository.getLauncherShortcut("com.ludashi.aibench", "MARVELCosmicInvasion") } returns null
         coEvery { gameRepository.getByPlatform("windows") } returns listOf(folderGame)
-        val updated = slot<Game>()
-        coEvery { gameRepository.upsert(capture(updated)) } returns 9L
+        val handleId = slot<Long>()
+        val handlePkg = slot<String>()
+        val handleShortcut = slot<String>()
+        coEvery {
+            gameRepository.attachLauncherHandle(capture(handleId), capture(handlePkg), capture(handleShortcut), any())
+        } returns Unit
 
         val result = importer().importPinnedShortcut("com.ludashi.aibench", "MARVELCosmicInvasion", "MARVELCosmicInvasion")
 
         assertEquals(9L, result.gameId)
         assertFalse(result.added)
-        assertEquals(9L, updated.captured.id)
-        assertEquals("MARVELCosmicInvasion", updated.captured.shortcutId)
-        assertEquals("com.ludashi.aibench", updated.captured.packageName)
+        assertEquals(9L, handleId.captured)
+        assertEquals("MARVELCosmicInvasion", handleShortcut.captured)
+        assertEquals("com.ludashi.aibench", handlePkg.captured)
+        // NEVER upsert onto an existing row. GameDao.upsert is @Insert(onConflict = REPLACE),
+        // which SQLite runs as DELETE-then-INSERT, so this game's play sessions and collection
+        // membership would go with it -- proven by GameUpsertCascadeTest. Pin reconcile runs at
+        // every app start, so this ran on every launch.
+        coVerify(exactly = 0) { gameRepository.upsert(any()) }
         // The Ludashi shortcut id carries no appid — no STEAM identity may be invented.
         coVerify(exactly = 0) { gameRepository.updateStorefrontIdentity(any(), any(), any()) }
     }
