@@ -16,7 +16,7 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 
 > This document is the **user manual**. It walks you from install to daily use, feature by
 > feature. Building the project from source is covered last, in
-> **[For Developers](#for-developers)**. For a deep architectural tour of the codebase, see
+> **[For Developers](#7-for-developers)**. For a deep architectural tour of the codebase, see
 > **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ---
@@ -88,12 +88,10 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
    - [4.15 Interface sounds & boot videos](#415-interface-sounds--boot-videos)
    - [4.16 Adjusting the layout for your screen](#416-adjusting-the-layout-for-your-screen)
    - [4.17 Backup & restore](#417-backup--restore)
-   - [4.18 Shiba Coins (achievements)](#418-shiba-coins-achievements)
-   - [4.19 Tracking local (Steam-emulated) PC games](#419-tracking-local-steam-emulated-pc-games)
-   - [4.20 Settings reference](#420-settings-reference)
+   - [4.18 Settings reference](#418-settings-reference)
 5. [Permissions & privacy](#5-permissions--privacy)
 6. [Troubleshooting](#6-troubleshooting)
-7. [For Developers](#for-developers)
+7. [For Developers](#7-for-developers)
    - [7.1 Tech stack](#71-tech-stack)
    - [7.2 Prerequisites](#72-prerequisites)
    - [7.3 Get the code & open it in Android Studio](#73-get-the-code--open-it-in-android-studio)
@@ -149,7 +147,7 @@ PFP is distributed as a **side-loaded APK** (it is not on the Google Play Store)
    manager the first time — approve it.
 3. Tap **Install**.
 
-> Building the APK yourself instead? See [For Developers](#for-developers).
+> Building the APK yourself instead? See [For Developers](#7-for-developers).
 
 ### 2.3 Set PFP as your home screen (Optional)
 
@@ -183,9 +181,8 @@ On a fresh install PFP opens a guided **setup wizard**:
 4. **Artwork** — the artwork library folder, with an embedded import offer.
 5. **Online Services** — connect SteamGridDB and IGDB, plus the ScreenScraper *user*
    account (each optional; IGDB and ScreenScraper credentials are tested live).
-6. **Achievement Services** — RetroAchievements and Steam accounts.
-7. **Vita Data Folder** & **RetroArch** — offered only when those apps are installed.
-8. **Finish.**
+6. **Vita Data Folder** & **RetroArch** — offered only when those apps are installed.
+7. **Finish.**
 
 Every step can be skipped and everything it configures is the same setting you can reach
 later in Settings — the wizard is just a shortcut. You can re-run it any time from
@@ -630,113 +627,13 @@ pick, and restores from one. Because on-device cloud backup is disabled for priv
 move your setup to a new device or recover after a reinstall. Restoring re-links your ROM/media
 folders via *Library ▸ Root Access*.
 
-### 4.18 Shiba Coins (achievements)
-
-**Shiba Coins** turn achievements into a coin economy across your whole library. Enable it
-under **Settings ▸ Shiba Coins** and connect one or more providers:
-
-| Provider | What it tracks | You supply |
-|---|---|---|
-| **RetroAchievements** | Retro console games with RA sets | RA username + Web API key |
-| **Steam** | Games on your own Steam account | SteamID64 (or vanity name) + Steam Web API key |
-| **Local Steam** | Steam-emulated PC games run through Wine emulators | Steam Web API key (see [4.19](#419-tracking-local-steam-emulated-pc-games)) |
-
-Each achievement earns a **bronze, silver, gold or platinum** coin by rarity; coins feed an
-account-wide wallet with **levels and ranks** shown on the **Player Card**.
-
-- **Player Card** — on the XMB and at the top of Settings ▸ Shiba Coins. Its menu holds
-  **Sync All Coins**, which refreshes every tracked game in one pass. Confirm on the card
-  opens the fullscreen **Player Status** view: level, rank and XP, Recent Achievements,
-  your coin wallet, and your Rarest Achievement Unlocked — a recent unlock from a library
-  game jumps straight to that game's coins screen.
-- **Per-game coins screen** — from a game's Shiba Coins strip on Game Detail. Lists every
-  achievement with its coin tier and unlock state; **X** cycles sorting, **Y** cycles the
-  earned/unearned filter.
-- **Auto-Match** — if a game is not linked yet, the coins screen offers one button that
-  asks whether your copy is a legitimate Steam one: *Yes* matches it against Steam
-  (embedded appid, SteamGridDB, title variants); *No* scans your windows game folders for
-  Steam-emu data and links it as Local Steam. When nothing links, the screen tells you
-  exactly what to fix.
-- **Shiba Library** — a hub with an **All Tracked** view (filter by provider with **Y**,
-  sort by Title / Progress / Console with **X**) and an **Untracked** view of games you
-  could still link. Android games are excluded — they can never have achievements.
-
-### 4.19 Tracking local (Steam-emulated) PC games
-
-PFP can track achievements for Windows games run through Wine emulators (GameHub, Winlator,
-GameNative and friends) whose bundled Steam emulator (GSE / Goldberg) records unlocks in local
-files. Tracking is display-only: PFP reads what the game already wrote, joins it with the Steam
-schema, and shows the result in Shiba Coins — run *Sync All Coins* from the Player Card to load
-every tracked game.
-
-> **Warning Note — back up your save files first.** This is opt-in behind
-> *Settings ▸ Shiba Coins ▸ Track Local Steam Games (Emulated)*, and enabling it shows the
-> same reminder. Turning it on lets a sync bring each emulator game up to the current setup:
-> it rewrites the game's `steam_settings` config and replaces its `steam_api` DLL so unlocks
-> can be recorded. A game you set up and played *before* this feature could lose access to its
-> existing save data once the emulator starts reading from the new save location. Open your
-> Windows emulator, back up the save files for those games, and only then enable the toggle and
-> run *Sync All*.
->
-> **Use your own Steam Web API key at your own risk.** This feature reads achievement data with
-> the Steam Web API key you supply. Steam tracking is entirely optional — you do not have to
-> enable it, and should only do so if you accept the risks that come with using your own key.
-
-For a game folder to be tracked it must live under your windows library and carry the Steam-emu
-config; achievement progress is read from the emu's own save redirect, or from a `saves` folder
-you keep in the game directory:
-
-```
-<ROM Root>/windows/
-├── import/                          ← exported launch files (.steam / .desktop / …)
-└── <Game>/
-    ├── steam_settings/
-    │   └── steam_appid.txt          ← REQUIRED: marks the game and names its Steam appid
-    ├── saves/
-    │   └── [<appid>/]achievements.json   ← unlock progress (either level works)
-    └── ...game files
-```
-
-To make the emulator RECORD unlocks into that folder (instead of its app-private global
-location, which PFP cannot read), set the GSE save redirect once per game — create or edit
-`steam_settings/configs.user.ini` and add:
-
-```ini
-[user::saves]
-local_save_path=./saves
-```
-
-The path is relative to the folder holding the steam_api `.dll`/`.so`; with it set the emu
-ignores its global save folder entirely (fully portable) and writes
-`saves/<appid>/achievements.json` after each play session.
-
-Notes:
-
-- `steam_settings/steam_appid.txt` may sit a few folders deep (Unity games keep it under
-  `<Game>_Data/Plugins/x86_64/`); PFP finds it automatically.
-- PFP follows whatever `local_save_path` the game already uses first (e.g. `./GSE Saves`) —
-  the `saves/` folder is the fallback convention for hand-arranged files.
-- A game is tracked only once its save location exists (the redirect's target folder, or the
-  `saves/` folder). Before any unlocks it tracks at 0%; a game with `steam_settings` but no
-  save location at all stays untracked.
-- Reading the schema needs your Steam Web API key (*Settings ▸ Shiba Coins*).
-- Tracking is off until you enable *Track Local Steam Games (Emulated)* (see the Warning Note
-  above); with it off, no discovery, generation, DLL swap, or syncing runs.
-- A game folder with `steam_settings` but no `achievements.json` can't record unlocks —
-  the emulator needs that schema file. When a PC scan finds one missing, PFP offers to bring
-  the game up to the current emulator setup (per game: No / Yes / Yes to All for that scan):
-  it writes the schema and stat files from the Steam Web API, sets the save redirect, and
-  installs the bundled emulator over the game's original `steam_api` DLL (backed up alongside
-  it). This is the step the Warning Note's backup protects against.
-
-### 4.20 Settings reference
+### 4.18 Settings reference
 
 | Section | What it covers |
 |---|---|
 | **Library** | ROM roots, Library Manager (consoles, Auto-Detect, scan-all passes), Import PC Games, Root Access |
 | **Emulators** | Detected emulators, Custom Emulator Wizard |
 | **Artwork** | API keys, scrape all/missing, Game Icon Display, Artwork Folder & Import |
-| **Shiba Coins** | Player Card, enable toggle, RetroAchievements / Steam accounts, Track Local Steam Games (Emulated) |
 | **Themes** | Color scheme, icon color (presets + Custom HSV), wallpaper, New Theme from Photo, PSP import, My Themes |
 | **Display** | Wave style, wallpaper, boot sequence, Adjust XMB Layout, Animated Icons |
 | **Music / Video / Photo** | Root folder, rescan, default player, thumbnail cache |
@@ -753,8 +650,7 @@ Notes:
 
 PFP is a **local-first** launcher: your data stays on your device. There is no analytics, no
 telemetry, and no account. PFP reaches the network only for the things you connect:
-artwork/metadata scraping (SteamGridDB, ScreenScraper, TheGamesDB, IGDB) and achievement
-data (RetroAchievements, Steam). Everything is HTTPS.
+artwork/metadata scraping (SteamGridDB, ScreenScraper, TheGamesDB, IGDB). Everything is HTTPS.
 
 **What PFP stores, and how**
 - **On-device only.** Your library, settings and artwork live in app storage. **Backup is disabled**
@@ -796,7 +692,7 @@ to send.
 
 ---
 
-# For Developers
+## 7. For Developers
 
 > This section is for building PFP from source. It assumes familiarity with Android development.
 
@@ -928,7 +824,6 @@ feature/
   feature-library/        ROM scanner, rescan triggers, disc-image resolver, platform map
   feature-launcher/       Emulator detection, the launch-resolution ladder, LaunchDispatcher
   feature-artwork/        Scraper clients, portable artwork library, ES-DE import/export
-  feature-achievements/   Shiba Coins: RA / Steam / Local Steam providers, wallet, sync
   feature-themes/         Theme loader/repository, built-in themes
   feature-settings/       Settings screens + ViewModels
   feature-appbar/         App drawer, app→category classification, filters
@@ -1018,33 +913,6 @@ replaced by the original set. You can replace any of the seven with your own aud
 Fetched at the user's request from third-party providers and remaining the property of their owners:
 - **SteamGridDB** — community artwork (grids, heroes, logos, icons)
 - **IGDB** and **TheGamesDB** — optional metadata / artwork sources
-
-### Achievement data (Shiba Coins)
-- **RetroAchievements** — community-made achievement sets and unlock data for retro games,
-  fetched via the official RetroAchievements Web API and the official
-  [api-kotlin](https://github.com/RetroAchievements/api-kotlin) client. Achievement sets are
-  the work of the RetroAchievements community. https://retroachievements.org
-- **Steam** — achievement schemas and unlock data are fetched from the **Steam Web API**
-  using the user's own API key. **Powered by Steam.** Steam and the Steam logo are
-  trademarks and/or registered trademarks of **Valve Corporation**. PSPLauncher is
-  not affiliated with or endorsed by Valve. https://steampowered.com
-
-### Goldberg Steam Emulator (gbe_fork)
-Local achievement tracking for Steam-emulated PC games ([4.19](#419-tracking-local-steam-emulated-pc-games))
-bundles the **Goldberg Steam Emulator** — specifically **gbe_fork**, the community fork
-maintained by **Detanup01** and contributors, building on the original **Goldberg Emulator**
-by **Mr. Goldberg**.
-
-- Project: [gbe_fork](https://github.com/Detanup01/gbe_fork) · Original:
-  [Goldberg Emulator](https://gitlab.com/Mr_Goldberg/goldberg_emulator)
-- License: **GNU Lesser General Public License v3.0 (LGPL-3.0)** —
-  [full text](https://www.gnu.org/licenses/lgpl-3.0.html)
-- What PFP ships: an **unmodified** build of the emulator's `steam_api64.dll`, bundled as an
-  app asset and installed into a game folder only when you opt in and confirm (see the
-  Warning Note in [4.19](#419-tracking-local-steam-emulated-pc-games)). The original DLL is
-  always backed up alongside, so the emulator build can be freely replaced with your own —
-  as the LGPL requires. The complete corresponding source code is available from the
-  project links above.
 
 If you are a rights holder and would like attribution changed or an asset removed, please open an
 issue and it will be addressed promptly.

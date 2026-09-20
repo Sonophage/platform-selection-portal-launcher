@@ -51,11 +51,11 @@ app  ──▶ feature:*  ──▶ core:core-ui ──▶ core:core-data ──
 | `feature:feature-library` | ROM scanning into the Memory Card library, plus the rescan triggers |
 | `feature:feature-launcher` | Emulator detection, the launch-resolution ladder, and the launch dispatcher |
 | `feature:feature-artwork` | Metadata/artwork scrapers (ScreenScraper/TGDB/IGDB/SteamGridDB), the `ArtworkStore` storage seam, the portable artwork library (`portable/` — user-owned SAF folder, manifest, per-entry metadata) and the ES-DE artwork importer (`importer/`) |
-| `feature:feature-achievements` | Shiba Coins: RetroAchievements / Steam / Local Steam (GSE/Goldberg) providers, coin mapping, wallet + standings, sync, emu-kit generation |
 | `feature:feature-themes` | Theme loader/repository, built-in themes, `.pfptheme` / PSP `.ptf` install paths |
 | `feature:feature-settings` | All settings screens, the first-run setup wizard, PC game import |
 | `feature:feature-appbar` | App drawer, app→category classification, filtering |
 | `feature:feature-backup` | Backup & restore (`.pfpbackup`) |
+| `baselineprofile` | Records the startup baseline profile with the Macrobenchmark runner. Run deliberately (`./gradlew :app:generateReleaseBaselineProfile`), never as part of an ordinary build |
 
 ## Data layer (`core:core-data`)
 

@@ -1,3 +1,7 @@
+> **Superseded.** The achievements feature this plans was removed from the app in full;
+> see `docs/plans/remove-achievements-plan.md`. Kept as a record of what was built and
+> why, not as current intent. Nothing here describes code that still exists.
+
 # Play Field Portal — Per-Game Achievements Page: Implementation Plan
 
 Mockup: [Per-Game Achievements Mockup](https://claude.ai/artifact/FF3A6hSQaJmYdP3s9NF46U)

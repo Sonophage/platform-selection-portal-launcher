@@ -1,3 +1,7 @@
+> **Superseded.** The achievements feature this plans was removed from the app in full;
+> see `docs/plans/remove-achievements-plan.md`. Kept as a record of what was built and
+> why, not as current intent. Nothing here describes code that still exists.
+
 # PlayFieldPortal — Player Status Redesign Implementation Plan
 
 **Status:** Implementation plan  

@@ -208,8 +208,50 @@ unzip -p app/build/outputs/apk/release/*.apk assets/dexopt/baseline.prof | wc -c
 
 ## Standing facts worth re-checking rather than trusting
 
-- Release APK is **10.56 MB** (was 19.46 MB). `ls -la app/build/outputs/apk/release/*.apk`
-- Suite is **2225 tests, 10 skipped, 0 failures**. `./gradlew test testDebugUnitTest --continue`
-- The 10 skips are `GoldenPtfTest` and ROM-hash tests whose fixtures live in `~/Downloads` and are
+- Release APK size. `ls -la app/build/outputs/apk/release/*.apk`
+- Suite size and result. **Use `--rerun-tasks`:**
+
+  ```bash
+  ./gradlew test testDebugUnitTest --continue --rerun-tasks
+  ```
+
+  Without it Gradle reports a module's LAST result whenever that module's inputs have not
+  changed, so a test that has gone red in a module you are not editing keeps printing green.
+  That is not hypothetical: `DisplaySettingsViewModelLegibilityTest` was red on clean runs for
+  days while every ordinary build called the suite green.
+- Counting: the XML is the truth, and `<skipped/>` is not a failure.
+
+  ```bash
+  python3 - <<'PY'
+  import glob, xml.etree.ElementTree as ET
+  t = f = s = 0
+  for p in glob.glob('**/build/test-results/**/*.xml', recursive=True):
+      try: r = ET.parse(p).getroot()
+      except Exception: continue
+      t += int(r.get('tests', 0))
+      f += int(r.get('failures', 0)) + int(r.get('errors', 0))
+      s += int(r.get('skipped', 0))
+  print(f"tests {t}  failures/errors {f}  skipped {s}")
+  PY
+  ```
+- The skips are `GoldenPtfTest` and ROM-hash tests whose fixtures live in `~/Downloads` and are
   not present. They have always skipped; they are not passing.
-- `main` is **20 commits ahead of `origin/main`** and nothing has been pushed.
+
+### Known failing, and not from the work around it
+
+`DisplaySettingsViewModelLegibilityTest > text shadow defaults on, toggles off, and persists`
+fails on a clean re-run of its module and passes on an incremental build. Verified failing at
+`3b0827cb`, before the settings and detail work that surrounds it.
+
+The product wiring is correct: `setTextShadow` writes `display_text_shadow` and the state reads
+that same key, in the same combine that carries `iconLegibility`, which does surface. The write
+lands -- the test's "persisted off" check passes -- and only the ViewModel's `uiState` never
+follows. Four attempts did not fix it: preparing DataStore before `Dispatchers.setMain` (which
+did fix a different clean-run failure in the same class), holding one collector open for the
+test, starting that collector before the first read, and settling the state before writing.
+
+Re-check it rather than trusting this paragraph:
+
+```bash
+./gradlew :feature:feature-settings:testDebugUnitTest --rerun-tasks
+```
