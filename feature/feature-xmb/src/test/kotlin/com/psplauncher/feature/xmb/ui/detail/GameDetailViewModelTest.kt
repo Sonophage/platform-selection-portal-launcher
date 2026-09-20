@@ -1616,4 +1616,81 @@ class GameDetailViewModelTest {
 
         assertEquals(0, viewModel.uiState.value.emulatorPickerIndex)
     }
+
+    // ── The remove confirmation ───────────────────────────────────────────────
+    //
+    // It was a Material3 AlertDialog, which renders into its own platform Window: while it held
+    // focus, MainActivity.dispatchKeyEvent never ran, so the gamepad pipeline never saw a press.
+    // Verified on device -- BUTTON_A, BUTTON_B and the D-pad all did nothing and touch was the
+    // only way out, while the footer promised "A Enter / B Back". The ViewModel also intercepted
+    // confirmRemove before the engine, which made the CONFIRM_REMOVE / CONFIRM_CANCEL nodes dead
+    // code AND wired Confirm straight to the destructive choice.
+
+    @Test
+    fun `the remove prompt opens on Cancel, not on Remove`() = runTest {
+        loadedAndLaidOut()
+        viewModel.activateAction(DetailAction.REMOVE)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.confirmRemove)
+        // A destructive prompt must never open with the cursor on the destructive choice.
+        assertEquals(GameDetailKeys.CONFIRM_CANCEL, viewModel.uiState.value.navFocusKey)
+    }
+
+    @Test
+    fun `the prompt is navigable, so Remove has to be chosen deliberately`() = runTest {
+        loadedAndLaidOut()
+        viewModel.activateAction(DetailAction.REMOVE)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // DOWN reaches Remove. The two are top-level sibling nodes, and top-level siblings move
+        // on the vertical axis in this engine -- a node's `children` are the LEFT/RIGHT axis. The
+        // overlay is drawn as a stacked pair for exactly that reason. Under the old intercept
+        // every direction was swallowed, so no axis worked at all.
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        assertEquals(GameDetailKeys.CONFIRM_REMOVE, viewModel.uiState.value.navFocusKey)
+
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_UP)
+        assertEquals(GameDetailKeys.CONFIRM_CANCEL, viewModel.uiState.value.navFocusKey)
+    }
+
+    @Test
+    fun `Confirm on the freshly opened prompt cancels rather than removing`() = runTest {
+        loadedAndLaidOut()
+        viewModel.activateAction(DetailAction.REMOVE)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.confirmRemove)
+        coVerify(exactly = 0) { gameRepository.delete(any()) }
+    }
+
+    @Test
+    fun `Confirm on Remove does remove`() = runTest {
+        loadedAndLaidOut()
+        viewModel.activateAction(DetailAction.REMOVE)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { gameRepository.delete(1L) }
+    }
+
+    @Test
+    fun `Back closes the prompt without removing`() = runTest {
+        loadedAndLaidOut()
+        viewModel.activateAction(DetailAction.REMOVE)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.handleGamepadAction(GamepadAction.BACK)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.confirmRemove)
+        assertFalse(viewModel.uiState.value.closed)
+        coVerify(exactly = 0) { gameRepository.delete(any()) }
+    }
 }

@@ -89,6 +89,7 @@ import com.psplauncher.core.ui.detail.PfpDetailField
 import com.psplauncher.core.ui.detail.PfpDetailFieldBand
 import com.psplauncher.core.ui.detail.PfpDetailHelperFooter
 import com.psplauncher.core.ui.detail.PfpDetailArtBackdrop
+import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpDetailMediaTile
 import com.psplauncher.core.ui.detail.PfpDetailProgressRow
@@ -686,12 +687,22 @@ private fun GameDetailOverlays(
         }
 
         if (state.confirmRemove) {
-            AlertDialog(
-                onDismissRequest = viewModel::cancelRemove,
-                title = { Text("Remove ${game.title}?") },
-                text = { Text("Removes this game from your library. ROM/app files are not deleted.") },
-                confirmButton = { TextButton(onClick = viewModel::confirmRemoveGame) { Text("Remove") } },
-                dismissButton = { TextButton(onClick = viewModel::cancelRemove) { Text("Cancel") } },
+            // In-window, not an AlertDialog. Verified on device: with an AlertDialog open the
+            // controller could neither confirm nor cancel -- it renders into its own platform
+            // Window, so MainActivity.dispatchKeyEvent (and with it the whole gamepad pipeline)
+            // is never called. The footer went on promising "A Enter / B Back" underneath it.
+            //
+            // Drawn here, the engine's own CONFIRM_REMOVE / CONFIRM_CANCEL nodes drive it, which
+            // is what they were built for before the intercept in the ViewModel made them dead.
+            PfpConfirmOverlay(
+                title = "Remove ${game.displayTitle}?",
+                message = "Removes this game from your library. ROM and app files are not deleted.",
+                confirmLabel = "Remove",
+                cancelLabel = "Cancel",
+                destructiveFocused = state.navFocusKey == GameDetailKeys.CONFIRM_REMOVE,
+                cancelFocused = state.navFocusKey == GameDetailKeys.CONFIRM_CANCEL,
+                onConfirm = { viewModel.onNodeTapped(GameDetailKeys.CONFIRM_REMOVE) },
+                onCancel = { viewModel.onNodeTapped(GameDetailKeys.CONFIRM_CANCEL) },
             )
         }
     }

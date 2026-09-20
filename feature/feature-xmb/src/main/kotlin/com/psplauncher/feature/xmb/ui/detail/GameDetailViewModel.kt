@@ -578,9 +578,13 @@ class GameDetailViewModel @Inject constructor(
                     }
                 }
             }
+            // THIS ORDER IS THE PROMPT, the same rule the options menu follows: these are
+            // top-level sibling nodes, so the cursor moves between them vertically, and the
+            // overlay draws them stacked in this order. Cancel first -- safe choice on top, and
+            // where the cursor starts.
             GameDetailKeys.MODAL_CONFIRM_REMOVE -> listOf(
+                NavigationNode(GameDetailKeys.CONFIRM_CANCEL, onSelect = { cancelRemove() }),
                 NavigationNode(GameDetailKeys.CONFIRM_REMOVE, onSelect = { confirmRemoveGame() }),
-                NavigationNode(GameDetailKeys.CONFIRM_CANCEL, onSelect = { _uiState.update { it.copy(confirmRemove = false) } }),
             )
             // Viewers, text editors and the full-screen Artwork Studio own their own input.
             else -> emptyList()
@@ -599,7 +603,10 @@ class GameDetailViewModel @Inject constructor(
         GameDetailKeys.MODAL_COLLECTION_PICKER -> collectionKeyAt(s, s.collectionPicker.selectedIndex)
         // The metadata overlay opens on Apply: the default policy is the non-destructive one.
         GameDetailKeys.MODAL_METADATA -> GameDetailKeys.METADATA_APPLY
-        GameDetailKeys.MODAL_CONFIRM_REMOVE -> GameDetailKeys.CONFIRM_REMOVE
+        // Cancel, never Remove. The metadata overlay two lines up opens on its non-destructive
+        // default for the same reason; this one said the opposite while the intercept above made
+        // it moot. Now that the engine really drives this modal, the default is load-bearing.
+        GameDetailKeys.MODAL_CONFIRM_REMOVE -> GameDetailKeys.CONFIRM_CANCEL
         else -> null
     }
 
@@ -636,6 +643,11 @@ class GameDetailViewModel @Inject constructor(
             s.collectionPicker.visible -> closeCollectionPicker()
             s.showOptions -> closeOptions()
             s.showDetailsMenu -> closeDetailsMenu()
+            // Back on the remove prompt cancels it. This branch is NEW: the prompt used to be
+            // intercepted before the engine and answered BACK itself, so removing that intercept
+            // left Back falling through to close() -- which shut the whole page instead of the
+            // prompt. Caught by `Back closes the prompt without removing`.
+            s.confirmRemove -> cancelRemove()
             else -> close()
         }
     }
@@ -869,15 +881,6 @@ class GameDetailViewModel @Inject constructor(
         }
         if (s.manualViewerUri != null) {
             handleManualViewerInput(action)
-            finishInput()
-            return
-        }
-        if (s.confirmRemove) {
-            when (action) {
-                GamepadAction.SELECT -> confirmRemoveGame()
-                GamepadAction.BACK   -> _uiState.update { it.copy(confirmRemove = false) }
-                else -> Unit
-            }
             finishInput()
             return
         }
