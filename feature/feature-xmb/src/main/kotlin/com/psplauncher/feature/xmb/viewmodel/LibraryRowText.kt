@@ -1,5 +1,6 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.common.format.formatByteSize
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,7 +73,7 @@ internal fun bookRowSubtitle(author: String?, series: String?, seriesIndex: Doub
 internal fun photoRowSubtitle(dateMs: Long?, resolution: String?, sizeBytes: Long?): String? = join(
     dateMs?.takeIf { it > 0 }?.let(::formatDate),
     resolution.clean(),
-    sizeBytes?.takeIf { it > 0 }?.let(::formatBytes),
+    sizeBytes?.takeIf { it > 0 }?.let(::formatByteSize),
 )
 
 // ── Shared formatters ─────────────────────────────────────────────────────────
@@ -120,9 +121,3 @@ internal fun relativeDate(epochMillis: Long, now: Long = System.currentTimeMilli
  * with its own idea of the unit to round to; they are untouched and worth collapsing into this one
  * the next time either is edited.
  */
-internal fun formatBytes(bytes: Long): String = when {
-    bytes <= 0L         -> "—"
-    bytes < 1024        -> "$bytes B"
-    bytes < 1024 * 1024 -> "%.1f KB".format(Locale.US, bytes / 1024.0)
-    else                -> "%.1f MB".format(Locale.US, bytes / (1024.0 * 1024))
-}

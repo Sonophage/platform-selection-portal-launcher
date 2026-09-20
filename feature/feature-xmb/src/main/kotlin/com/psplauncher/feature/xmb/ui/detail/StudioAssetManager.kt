@@ -35,9 +35,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.ui.components.XmbHeaderPill
 import com.psplauncher.feature.artwork.store.StudioArtworkSlot
-import com.psplauncher.feature.xmb.viewmodel.formatBytes
 
 /**
  * The stored-assets manager (task 5.4): the active multi-asset slot's assets in order, with the
@@ -211,7 +211,7 @@ private fun StudioAssetRow(
             Text(
                 listOfNotNull(
                     asset.provider.takeIf { position == 0 },
-                    formatBytes(asset.sizeBytes).takeIf { asset.sizeBytes > 0 },
+                    formatByteSize(asset.sizeBytes).takeIf { asset.sizeBytes > 0 },
                 ).joinToString(" · ").ifEmpty { "—" },
                 color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp,
                 maxLines = 1,

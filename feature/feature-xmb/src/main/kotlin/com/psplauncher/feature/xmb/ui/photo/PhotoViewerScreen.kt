@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.Photo
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
@@ -359,7 +360,7 @@ private fun InfoDialog(photo: Photo, onDismiss: () -> Unit) {
         photo.resolutionLabel?.let { InfoRow("Resolution", it) }
         photo.dateTaken?.let { InfoRow("Taken", fmtDate(it)) }
         photo.lastModified?.let { InfoRow("Modified", fmtDate(it)) }
-        photo.sizeBytes?.let { InfoRow("Size", fmtSize(it)) }
+        photo.sizeBytes?.let { InfoRow("Size", formatByteSize(it)) }
         photo.mimeType?.let { InfoRow("Type", it) }
         photo.relativePath?.let { InfoRow("Location", it) }
         InfoRow("File", photo.displayName)
@@ -386,7 +387,3 @@ private fun InfoRow(label: String, value: String) {
 private fun fmtDate(ms: Long): String =
     SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(ms))
 
-private fun fmtSize(bytes: Long): String {
-    val mb = bytes / (1024.0 * 1024.0)
-    return if (mb >= 1.0) "%.1f MB".format(mb) else "%.0f KB".format(bytes / 1024.0)
-}

@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.common.logging.LogRedaction
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.ControllerPrompt
@@ -89,7 +90,6 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.artwork.store.ArtworkKind
-import com.psplauncher.feature.xmb.viewmodel.formatBytes
 
 // The gap between grid tiles. Must equal StudioGridCapacity's GAP_DP, or the tiles drawn here stop
 // matching the capacity the ViewModel paged for.
@@ -1305,7 +1305,7 @@ internal fun ArtworkStudioContent(
                         StudioInfoRow("Source", info.source)
                         StudioInfoRow("Pinned", if (info.userAssigned) "Yes (locked)" else "No")
                         StudioInfoRow("Dimensions", if (info.width != null && info.height != null) "${info.width} × ${info.height}" else "—")
-                        StudioInfoRow("Size", formatBytes(info.sizeBytes))
+                        StudioInfoRow("Size", formatByteSize(info.sizeBytes))
                         StudioInfoRow("Cropped", if (info.cropRect != null) "Yes" else "No")
                         StudioInfoRow("Previous version", if (info.hasPrevious) "Available" else "—")
                         StudioInfoRow("Path", info.relativePath ?: "—")

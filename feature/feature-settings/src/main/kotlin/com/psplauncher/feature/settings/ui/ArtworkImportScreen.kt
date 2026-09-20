@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.feature.settings.viewmodel.ArtworkImportUiState
 import com.psplauncher.feature.settings.viewmodel.ArtworkImportViewModel
 import java.util.Locale
@@ -139,7 +140,7 @@ fun ArtworkImportScreen(
                     } else {
                         SettingsRow(
                             label    = "Move Into Folder",
-                            sublabel = "${state.internalFiles} artwork files (${formatBytes(state.internalBytes)}) " +
+                            sublabel = "${state.internalFiles} artwork files (${formatByteSize(state.internalBytes)}) " +
                                 "were saved before this folder was linked and live in app storage. " +
                                 "Moving them makes them portable and frees app space. Locked and " +
                                 "hand-picked artwork already in the folder is never overwritten.",
@@ -172,7 +173,7 @@ fun ArtworkImportScreen(
                 plan.countsByKind().entries.sortedBy { it.key }.forEach { (kind, count) ->
                     SettingsValueRow(label = "   ${kindLabel(kind)}", value = count.toString())
                 }
-                SettingsValueRow(label = "Estimated Size",    value = formatBytes(plan.totalBytes))
+                SettingsValueRow(label = "Estimated Size",    value = formatByteSize(plan.totalBytes))
                 SettingsValueRow(
                     label    = "Game Details Found",
                     sublabel = if (plan.metadataUpdates.isEmpty())
@@ -312,9 +313,3 @@ private fun kindLabel(kind: String): String = when (kind) {
     else -> kind.lowercase(Locale.ROOT).replaceFirstChar { it.uppercase(Locale.ROOT) }
 }
 
-private fun formatBytes(bytes: Long): String = when {
-    bytes >= 1L shl 30 -> String.format(Locale.US, "%.1f GB", bytes / (1L shl 30).toDouble())
-    bytes >= 1L shl 20 -> String.format(Locale.US, "%.1f MB", bytes / (1L shl 20).toDouble())
-    bytes >= 1L shl 10 -> String.format(Locale.US, "%.0f KB", bytes / (1L shl 10).toDouble())
-    else -> "$bytes B"
-}

@@ -103,8 +103,13 @@ class LibraryRowTextTest {
 
     @Test
     fun `a zero size is omitted rather than drawn as a dash`() {
-        // formatBytes answers "—" for nothing, which is right in a labelled info row and wrong
-        // inside a joined line, where it reads as a fact that exists and is unknown.
+        // The row drops a zero size before formatting rather than printing it. formatByteSize
+        // answers "0 B", which is correct for a labelled info row and wrong inside a joined
+        // line, where it reads as a fact that exists and happens to be zero.
+        //
+        // This used to say the formatter answered "—". It did, in a branch nothing could reach:
+        // this caller guards zero itself, and it was the only caller. The dash went with the
+        // four-way merge into core-common.
         assertEquals("4032×3024", photoRowSubtitle(null, "4032×3024", 0L))
     }
 

@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.Video
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
@@ -444,7 +445,7 @@ private fun InfoDialog(video: Video, onDismiss: () -> Unit) {
         video.resolutionLabel?.let { InfoRow("Resolution", it) }
         video.codec?.let { InfoRow("Format", it) }
         video.mimeType?.let { InfoRow("Type", it) }
-        video.sizeBytes?.let { InfoRow("Size", fmtSize(it)) }
+        video.sizeBytes?.let { InfoRow("Size", formatByteSize(it)) }
         video.relativePath?.let { InfoRow("Location", it) }
         InfoRow("File", video.displayName)
         Spacer(Modifier.height(18.dp))
@@ -500,7 +501,3 @@ private fun fmtTime(ms: Long): String {
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
 
-private fun fmtSize(bytes: Long): String {
-    val mb = bytes / (1024.0 * 1024.0)
-    return if (mb >= 1024) "%.1f GB".format(mb / 1024) else "%.0f MB".format(mb)
-}
