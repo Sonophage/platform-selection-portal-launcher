@@ -1,6 +1,38 @@
 # Council review remediation
 
-**Status:** Not started · **Branch:** none yet · **Written:** 2026-09-20
+**Status:** Batches 0, 1, 3 and 5 landed · **Branch:** `main` · **Written:** 2026-09-20
+
+## Landed so far
+
+Fourteen commits, each with its own falsification. Suite: **2149 tests, 0 failures, 8 skipped**
+(7 dormant `GoldenPtfTest` + the 1 `@Ignore`d disc-tag pin).
+
+| Task | Commit |
+|---|---|
+| 0.1 Play sessions are recorded | `90fe587f` |
+| 0.2 A row always says what it is | `c1367d8b` |
+| 0.3 Backdrop & Tint switch | `e5bb5416` |
+| 0.4 Clock honours the device (in `3a1d87e4`) | `3a1d87e4` |
+| 1.1 Photo viewer cannot lock | `f523c96a` |
+| 1.2 Shortcut pin keeps playtime + collections | `e3f9bf36` |
+| 1.3 Migration registration is enumerated | `1f3eee34` |
+| 1.4 Save as Theme has a BACK branch; the sink logs | `9054468c` |
+| 1.5 Disc-tag pinned (**and corrected** — see below) | `d866076f` |
+| 2.5 Settings sections back on the crossbar | `2f571457` |
+| 3.1/3.2/3.7 RetroArch copy, override clear, drawer search | `0cc992d8` |
+| 5.x @Immutable, key(), flowOn, COLLATE NOCASE | `3a1d87e4` |
+| 6.1 Backup drift guard, derived | `4c70f44a` |
+| 6.3 Dead glide + dead parameter | `c72e381b` |
+| 6.4 Two tests that could not fail | `ceffbfba` |
+
+**Deliberately left for the device session:** task 2.4 (render `drillTitle`). Where that label
+goes is a pixel decision on a 462 dp screen and every candidate position collides with something;
+it is five minutes with the device and a guess without it.
+
+**Still open:** 2.1–2.3 (XMB motion — all want the device), 4.1 (the `AlertDialog` question — needs
+the device), 6.2 (migrations 34→35, 35→36), 7.1 (the Books extraction), `RomScanner.scan()`.
+
+**Written:** 2026-09-20
 
 ## Goal
 
