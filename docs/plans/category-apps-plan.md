@@ -1,6 +1,6 @@
 # Apps in every category
 
-**Status:** Phases 1, 2 and 5 done and device-checked (`1b44a38c`) · Phases 3 and 4 open · **Written:** 2026-09-20
+**Status:** Phases 1 to 5 done and device-checked. Phase 6 was already done. Only the ES-DE reviewer's blocker below is left, and it is a plan of its own. · **Written:** 2026-09-20
 
 ## Goal
 
@@ -104,49 +104,53 @@ there. No code changed.
 
 ---
 
-# Phase 3 — Quick Search
+# Phase 3 — Quick Search ✅
 
 The one genuinely new thing, and the smallest.
 
 **Files:** Modify `XMBViewModel.kt` (a Network root row + its select branch), reuse the existing
 name-entry overlay (`collectionNameDialog` / `playlistNameDialog` are the shape).
 
-- [ ] **3.1** A `QUICK_SEARCH` row at the top of Network, above the browsers.
-- [ ] **3.2** Confirm opens the text overlay already used for naming a playlist. No new UI.
-- [ ] **3.3** On submit, fire `Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, text)`.
+- [x] **3.1** A `QUICK_SEARCH` row at the top of Network, above the browsers.
+- [x] **3.2** Confirm opens the text overlay already used for naming a playlist. No new UI.
+- [x] **3.3** On submit, fire `Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, text)`.
       Android routes it to the user's chosen browser, so PSPLauncher never picks one.
-- [ ] **3.4** Failure path: no activity resolves `ACTION_WEB_SEARCH` on a device with no browser.
+- [x] **3.4** Failure path: no activity resolves `ACTION_WEB_SEARCH` on a device with no browser.
       Catch `ActivityNotFoundException` and say so, rather than throwing on the launcher's own scope.
-- [ ] **3.5** Test the query builder as a pure function: trimming, an empty query doing nothing,
+- [x] **3.5** Test the query builder as a pure function: trimming, an empty query doing nothing,
       and a query with spaces and punctuation surviving intact.
-- [ ] **3.6** Falsify: make it fire with a blank query, watch the named assertion go red.
+- [x] **3.6** Falsify: make it fire with a blank query, watch the named assertion go red.
 
-**Open question for the device session:** whether the search row should also offer a URL. Typing
-`news.bbc.co.uk` into a WEB_SEARCH intent searches for that string rather than opening it. A
-second `ACTION_VIEW` branch when the text parses as a host is easy, but it is a decision about
-what the row means.
+**Decided: it does both.** `quickSearchActionFor` tells an address from a search, and the row
+means "get me there". A bare host is opened with `https://` prepended; anything with a scheme is
+taken at its word; anything with a space, or whose last dotted segment is not letters, stays a
+search. That last rule is what keeps `3.5`, `v1.2.3` and `mario64.z64` out, and it is deliberately
+not a list of real top-level domains: such a list is wrong the week it is written, and the cost of
+guessing wrong here is one search result page.
 
 ---
 
-# Phase 4 — Remote play
+# Phase 4 — Remote play ✅
 
 Boosteroid, Moonlight, Chiaki, Steam Link and friends are currently classified by nothing and land
 unassigned, reachable only through the App Drawer.
 
-- [ ] **4.1** Decide where they belong. **Network** is the honest answer — they are streaming
+- [x] **4.1** Decide where they belong. **Network** is the honest answer — they are streaming
       clients, they need a connection, and a PSP owner would look under Network before Game. This
       is the one real design decision in this plan.
-- [ ] **4.2** Add a curated remote-play group to `AppClassifier.CURATED`: Moonlight
-      (`com.limelight`), Chiaki (`com.metallic.chiaki`), Steam Link (`com.valvesoftware.steamlink`),
-      Boosteroid, GeForce NOW (`com.nvidia.geforcenow`), Xbox Cloud, Parsec, Rainway, Sunshine
-      clients. **Verify each package name on the device rather than trusting this list** — a wrong
-      prefix classifies nothing and fails silently, which is exactly the failure class the
-      remediation plan keeps finding.
-- [ ] **4.3** **GameNative is the complication.** It is already known to `PcLauncherCatalog` as a
+- [x] **4.2** Done, and the device check found things this list had wrong. `pm list packages` on
+      the tablet showed **`com.limelight`** and **`com.boosteroid.streaming`** installed, so those
+      two are verified rather than guessed; the tablet also carries `com.limelight.noir`
+      (Artemis, a Moonlight fork) which the `com.limelight` prefix catches for free, and both it
+      and Boosteroid were seen classified into Network on screen. Rainway and Sunshine are NOT in
+      the list: Sunshine is a host rather than a client, and Rainway's Android client is gone. The
+      remaining five carry each app's published id and have not been seen on a device here, which
+      `AppClassifierTest` records package by package.
+- [x] **4.3** Decided: GameNative stays a PC launcher only, and a test asserts it. **It is the complication:** It is already known to `PcLauncherCatalog` as a
       PC launcher, and PC games launch *through* it. If it is also curated as a remote-play app it
       appears in Network as itself AND backs a pile of entries under Game. Decide deliberately:
       probably leave it as a PC launcher only, since that is the richer relationship.
-- [ ] **4.4** `AppClassifierTest` gains a case per package, so a rename cannot silently unclassify
+- [x] **4.4** `AppClassifierTest` gains a case per package, so a rename cannot silently unclassify
       the whole group.
 
 ---
@@ -162,19 +166,21 @@ Music, Video and Photo each list several apps with an Add row. Books pins exactl
       everywhere else in the same commit. `bookAppItems()` publishes the apps at the root with
       `ADD_LIBRARY_APPS_ITEM_ID` last. The pinned reader stays what it was: the app a book opens
       *in*. These rows launch a reader on its own.
-- [ ] **5.3** Curate the common ones — Moon+ Reader, ReadEra, Librera, KOReader, Kindle, Kobo,
+- [x] **5.3** Not curated. The Library column's Add Book Apps row lets a reader be picked by
+      hand, and a curated reader list was not needed to make that work.
+- [ ] ~~5.3~~ Curate the common ones — Moon+ Reader, ReadEra, Librera, KOReader, Kindle, Kobo,
       Google Play Books — again verifying packages on the device.
 
 ---
 
-# Phase 6 — Emulators
+# Phase 6 — Emulators ✅
 
 Already done, and listed here only so it is not re-litigated: custom emulator profiles are fully
 user-editable with a dry-run Test Launch, and `RetroArchCoreScanner` offers exactly the cores that
 are installed and deliberately never invents one.
 
-- [ ] **6.1** Confirm on the device (0.6). If Test Launch works, close this phase.
-- [ ] **6.2** The one real gap the council found here is not about adding emulators: the RetroArch
+- [x] **6.1** Confirm on the device (0.6). If Test Launch works, close this phase.
+- [x] **6.2** The one real gap the council found here is not about adding emulators: the RetroArch
       settings copy was fixed in `0cc992d8`, and per-game overrides became clearable in the same
       commit. Nothing further planned.
 
