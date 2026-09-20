@@ -26,6 +26,7 @@ val CATEGORY_ICON_CATALOG: List<CategoryIcon> = listOf(
     CategoryIcon("ic_appstore",  "App Store", R.drawable.catbar_appstore),
     CategoryIcon("ic_library",   "Library",   R.drawable.catbar_library),
     CategoryIcon("ic_favorites", "Favorites", R.drawable.catbar_favorites),
+    CategoryIcon("ic_recent",    "Last Played", R.drawable.catbar_recent),
     // ── Console icons (sysicon_* art, also used for memory-card media) ────────────
     CategoryIcon("ic_nes",            "NES",                  R.drawable.sysicon_nes),
     CategoryIcon("ic_snes",           "Super NES",            R.drawable.sysicon_snes),

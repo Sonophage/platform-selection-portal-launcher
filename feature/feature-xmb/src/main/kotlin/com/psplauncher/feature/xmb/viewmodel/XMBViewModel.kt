@@ -1983,6 +1983,23 @@ class XMBViewModel @Inject constructor(
                         keepCursor = true
                     }
                 }
+                BuiltInCategory.RECENTLY_PLAYED -> {
+                    // Deliberately NOT gameSorted. Recency is the whole point of this list, and a
+                    // user sort would destroy it; activeSortModes declines to offer one because
+                    // the category is not a gaming category (see BUILT_IN_CATEGORIES).
+                    //
+                    // Hidden games follow ALL_GAMES: hiding a game from All Games is how a user
+                    // says "I do not want to see this", and honouring it everywhere except the one
+                    // shelf that resurfaces whatever they last opened would be a poor joke.
+                    var keepCursor = keepCursorOnRow
+                    gameRepository.observeRecentlyPlayed(RECENTLY_PLAYED_LIMIT).collect { games ->
+                        val visible = games.notHiddenAt(HideLocationType.ALL_GAMES)
+                        val items = if (visible.isEmpty()) listOf(emptyRecentlyPlayedItem())
+                                    else visible.toXmbItems()
+                        publishGameItems(items, keepCursor)
+                        keepCursor = true
+                    }
+                }
                 BuiltInCategory.ANDROID -> {
                     _uiState.update { it.copy(currentItems = ANDROID_ITEMS) }
                 }
@@ -4338,6 +4355,21 @@ class XMBViewModel @Inject constructor(
         val cycle = activeSortContext() ?: return null
         return "Sort: ${_uiState.value.sortModeFor(cycle).label}"
     }
+
+    /**
+     * Last Played with nothing in it.
+     *
+     * Its own message rather than "No games assigned", because nothing can be assigned here and a
+     * user told to assign something would go looking for a control that does not exist. An
+     * established install starts empty too: last_played_at was never written before 90fe587f, so
+     * the shelf fills up as games are played rather than arriving full.
+     */
+    private fun emptyRecentlyPlayedItem(): XMBItem = XMBItem(
+        id       = EMPTY_CATEGORY_ITEM_ID,
+        title    = "Nothing played yet",
+        subtitle = "Games you play show up here, most recent first",
+        type     = XMBItemType.EMPTY,
+    )
 
     private fun emptyCategoryItem(category: Category): XMBItem {
         val (message, subtitle) = if (category.isGamingCategory) {
@@ -8247,6 +8279,9 @@ class XMBViewModel @Inject constructor(
         private const val ALL_BOOKS_ITEM_ID = "all_books"
         private const val ADD_BOOK_FOLDER_ITEM_ID = "add_book_folder"
         private const val ADD_LIBRARY_APPS_ITEM_ID = "add_library_apps"
+        // How far back Last Played reaches. A "what was I doing" shelf, not an archive: past
+        // twenty rows nobody is recognising a game by having played it recently.
+        private const val RECENTLY_PLAYED_LIMIT = 20
         // Reader apps are stored under the Library category's own id, the same convention the
         // other media categories use for their app rows.
         private const val LIBRARY_APPS_CATEGORY_ID = BuiltInCategory.LIBRARY

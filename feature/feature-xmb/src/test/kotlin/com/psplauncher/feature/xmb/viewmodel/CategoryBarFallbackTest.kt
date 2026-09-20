@@ -80,13 +80,29 @@ class CategoryBarFallbackTest {
     }
 
     @Test
-    fun `Library is appended rather than inserted`() {
-        // Its position is deliberately past the others so a database seeded by an older build
-        // gains it without colliding with the positions its existing rows already hold.
-        val library = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.LIBRARY }
-        assertTrue(
-            "Library at ${library.position} would collide with an established row",
-            BUILT_IN_CATEGORIES.filter { it.id != BuiltInCategory.LIBRARY }.all { it.position < library.position },
-        )
+    fun `a late built-in is appended rather than inserted`() {
+        // Every built-in added after the original seven takes a position past all of them, so a
+        // database seeded by an older build gains it without colliding with the positions its
+        // existing rows already hold. Library was the first to do this; Last Played followed.
+        //
+        // The rule is per-arrival, not "Library is last": asserting Library held the highest
+        // position is what this test used to do, and it went red the moment a second late
+        // built-in was appended correctly.
+        val original = BUILT_IN_CATEGORIES.filter {
+            it.id != BuiltInCategory.LIBRARY && it.id != BuiltInCategory.RECENTLY_PLAYED
+        }
+        val highestOriginal = original.maxOf { it.position }
+        for (id in listOf(BuiltInCategory.LIBRARY, BuiltInCategory.RECENTLY_PLAYED)) {
+            val late = BUILT_IN_CATEGORIES.first { it.id == id }
+            assertTrue(
+                "${late.name} at ${late.position} would collide with an established row",
+                late.position > highestOriginal,
+            )
+        }
+
+        // And no two built-ins share a position at all, which is the failure the rule above is
+        // there to prevent. A duplicate would make the bar's order depend on list order alone.
+        val positions = BUILT_IN_CATEGORIES.map { it.position }
+        assertEquals("two built-ins share a position", positions.size, positions.toSet().size)
     }
 }

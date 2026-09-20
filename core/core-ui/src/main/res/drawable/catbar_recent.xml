@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Category-bar glyph for Last Played. Drawn rather than borrowed, for the same reason
+  catbar_library.xml was: every other catbar_* drawable already means something, and reusing one
+  would put two identical icons on the bar. A clock, because the section's whole meaning is "what
+  I was doing recently". Flat white at the same weight as its neighbours, so PortalIcon's tint and
+  the legibility matte behave here as everywhere else.
+
+  The ring is one path with two subpaths wound in opposite directions: the outer circle fills, the
+  inner one cuts the hole back out under the default non-zero fill rule.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2.8 A9.2,9.2 0 1,1 11.99,2.8 Z M12,5.1 A6.9,6.9 0 1,0 12.01,5.1 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.2,6.6 H12.8 V12.8 H11.2 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.2,11.2 H16.6 V12.8 H11.2 Z" />
+</vector>

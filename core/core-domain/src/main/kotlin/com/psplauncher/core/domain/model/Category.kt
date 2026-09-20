@@ -91,4 +91,10 @@ val BUILT_IN_CATEGORIES: List<Category> = listOf(
     Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 5),
     Category(id = "app_store",              name = "App Store", iconKey = "ic_appstore", type = CategoryType.BUILT_IN, position = 6),
     Category(id = BuiltInCategory.LIBRARY,  name = "Library",   iconKey = "ic_library",  type = CategoryType.BUILT_IN, position = 9),
+    // isGamingCategory stays FALSE even though every row here is a game. The flag means
+    // "games can be assigned to this category": it puts an Add Games row on the column and
+    // gives the column a sort cycle (see activeSortModes). This section is derived from
+    // last_played_at, nothing can be assigned to it, and its order IS its meaning, so both
+    // would be wrong. Position 10, appended past Library, for the same reason Library was.
+    Category(id = BuiltInCategory.RECENTLY_PLAYED, name = "Last Played", iconKey = "ic_recent", type = CategoryType.BUILT_IN, position = 10),
 )

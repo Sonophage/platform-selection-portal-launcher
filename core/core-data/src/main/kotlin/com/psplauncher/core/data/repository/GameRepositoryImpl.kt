@@ -38,6 +38,9 @@ class GameRepositoryImpl @Inject constructor(
     override fun observeFavorites(): Flow<List<Game>> =
         gameDao.observeFavorites().map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
+    override fun observeRecentlyPlayed(limit: Int): Flow<List<Game>> =
+        gameDao.observeRecentlyPlayed(limit).map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
+
     override fun observeByPlatform(platformId: String): Flow<List<Game>> =
         gameDao.observeByPlatform(platformId).map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 

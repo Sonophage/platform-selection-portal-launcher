@@ -30,6 +30,14 @@ interface GameRepository {
     fun observePlatformGames(platformId: String): Flow<List<Game>>
     // One-shot snapshot of a platform's games — for import-time dedupe checks.
     suspend fun getByPlatform(platformId: String): List<Game>
+    /**
+     * The games most recently played, newest first, capped at [limit].
+     *
+     * Drives the Last Played section. A game that has never been played has a null last_played_at
+     * and is excluded by the query, which is what keeps a fresh library's section empty instead of
+     * full of games in arbitrary id order.
+     */
+    fun observeRecentlyPlayed(limit: Int): Flow<List<Game>>
     fun observeRecentPlatforms(limit: Int): Flow<List<RecentPlatform>>
     suspend fun getById(id: Long): Game?
     /** All rows in one multi-disc set, ordered with its projected primary first. */
