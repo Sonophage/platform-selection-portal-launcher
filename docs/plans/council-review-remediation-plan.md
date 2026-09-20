@@ -54,6 +54,105 @@ artwork folders. New features of any kind.
 
 ---
 
+# Batch 0 — what the two user stand-ins found
+
+Two more reviewers, briefed as **people** rather than engineers: an XMB fan who owned a PSP-1000
+and a PS3, and an ES-DE user with ~3,000 ROMs across 40 systems. Both were forbidden from claiming
+a feature was missing without grepping for it first and saying what they searched for. Both
+withdrew claims after checking.
+
+They arrived at the same finding from opposite directions, and it is now the highest-value item in
+this plan.
+
+## Task 0.1 — Call `recordPlaySession` ✅
+
+**Files:** Modify `feature/feature-launcher/.../LaunchDispatcher.kt`
+
+`recordPlaySession` has **two references in the entire tree**: its own interface declaration and
+its own implementation. **Zero callers.** `addPlayTime` is called only from inside it. So
+`games.last_played_at` and `games.total_play_time_millis` are never written by the launch path.
+
+Everything downstream is built and waiting: the `play_sessions` table, the indexes, the
+`RECENT_PLAYED` sort mode, `observeRecentlyPlayed` (also callerless), and Game Detail's "Last
+played" and "Play time" rows, which are `?.let` / `if (> 0)` guarded and therefore never render.
+
+The ES-DE stand-in: *"My most-used view — Last Played — has no equivalent here, and the one that's
+labelled that way does nothing."* It is the smallest fix in this plan and it buys the most.
+
+- [ ] Call it from the launch path, after `startActivity` succeeds (same condition `AutoCoreMemory` uses)
+- [ ] Test: a successful launch writes a session and stamps `last_played_at`
+- [ ] Falsify: remove the call, watch the named assertion go red
+
+## Task 0.2 — The focused row must always say what it is ✅
+
+Both stand-ins hit this independently. The XMB fan: *"scroll through twenty games and you read
+nothing."* The ES-DE fan: *"I cannot navigate 3,000 games with a D-pad and no search."* Same
+root — see Task 2.1. Its priority moves up to here.
+
+## Task 0.3 — A switch for the per-item backdrop and wave tint ✅
+
+**No setting exists.** Searched `focusedItemBackdrop`, `focusedItemAccent`, `withWaveTint`,
+`backdropArt` across `feature-settings` and `core-data`: zero hits. Artwork settings can disable
+hero art, clear logos, the metadata line and video snaps — not this.
+
+The XMB fan's argument, which is a real one: *"The XMB's whole visual thesis is that the system has
+one calm colour and the content sits quietly on it. The colour comes from the month, not the
+cursor."* They were explicit that they do **not** want it removed — one switch under Display.
+
+This shipped in `f716af25` and was widened to every library without an off switch. That was a
+mistake in the shipping, not in the feature.
+
+- [ ] One boolean under Display, default on (it is the current behaviour)
+- [ ] It must gate both the backdrop and the wave/accent retint, not one of them
+- [ ] Rides backup, and is covered by the derived key test from Task 6.1
+
+## Task 0.4 — The clock must honour the device's 24-hour setting ✅
+
+`XmbStatusStrip.kt:335` is `SimpleDateFormat("h:mm a")` and `:338` is `"MM/dd/yyyy"`.
+`Locale.getDefault()` is passed but the **pattern is fixed**, so a device set to 24-hour is
+ignored. Searched `is24Hour`, `getTimeFormat`, `HH:mm`: only log formatters and an EXIF parser.
+
+- [ ] Use `android.text.format.DateFormat.getTimeFormat(context)` / `getDateFormat(context)`
+
+## Deliberately not doing, with reasons
+
+- **Default the controller glyphs to PlayStation.** The reviewer assumed a PlayStation interface
+  wants PlayStation glyphs. The Pocket FIT Elite has physically Xbox-labelled ABXY buttons, and the
+  glyphs should match the buttons under the thumb, not the art on screen. `XBOX` stays.
+- **Default `directLaunch` to true.** The reviewer is right that X on a game in an XMB starts the
+  game. But this is a large behaviour change to a daily driver and it is the owner's taste call,
+  not a defect. The setting already exists.
+- **Photo slideshow · music shuffle/repeat · artist/album grouping.** Real gaps, genuinely wanted
+  (the XMB fan would miss the slideshow "a lot" and shuffle "daily"), but they are *features*, not
+  remediation. They belong in their own plan.
+
+## Logged from the ES-DE lens
+
+- **No text search over the library, and no jump-to-letter** ✅ — the whole controller vocabulary is
+  eleven `GamepadAction`s and none of them is search. At 147 games this is fine; it is why that
+  reviewer will not make this a daily driver. **The single change that would flip their verdict.**
+- **Three sort keys, zero filters** for games; genre, year, rating and players are scraped into the
+  schema and unreachable.
+- **`dos`, `ports`, `scummvm`** are recognised folder names in `PlatformFolderHintResolver` and are
+  **not** in `PlatformSeeder` ✅, so `RomRootDiscoveryScanner` does `catalog[id] ?: continue` and
+  skips those folders without counting or reporting them.
+- **`<favorite>` does not import** from `gamelist.xml` — the parser reads seven tags.
+- **"Re-Scrape All"** clears first and has no checkpoint, so on a large library it can never finish.
+- **`RomHasher` is CRC-32 only**, capped at 256 MB, so every PS2/GC/Wii image matches on
+  filename+size.
+- **"Saves"** in the options menu resolves to "Save management isn't available yet" — a menu entry
+  that exists to say no.
+
+## What both told us to leave alone
+
+`GameBootSequence.kt` — *"not one line"*. The wave shader. The half-clipped rising previous row.
+The `.ptf` parser. `assets/SFX/active/README.md` and its cross-correlation admission test. The
+four-rung emulator ladder that reports which rung won. The Missing bucket. Disc-set region reading.
+The backup admission whitelist.
+
+
+---
+
 # Batch 1 — data loss and lockouts
 
 Four small guards. Each one closes a way the launcher can currently hurt the user without
@@ -215,6 +314,25 @@ the column flows under it.
 - [ ] Device check first: does the snap actually read wrong at 147 games?
 - [ ] If so: make `sel` a float via `animateFloatAsState`; `XmbGameColumn` already places by absolute offset
 - [ ] Delete `CenterLockedColumn` either way
+
+## Task 2.5 — Put the Settings sections back on the crossbar, keep the rail ✅
+
+The XMB fan's single first-thing-to-fix. `849dbfb5` replaced the Settings column's six section rows
+with one row that opens a page carrying a sidebar, and the comment at `SettingsScaffold.kt:1096`
+says *"This is the PS5 layout"*.
+
+Their argument: *"Settings is the one column where the XMB has to carry its own weight — everywhere
+else the crossbar is a shell around content. In Settings the crossbar IS the product. The moment it
+hands off to a page with a sidebar, the app has admitted the XMB was a skin."*
+
+**Resolution: the merge, not a revert.** Keep `SETTINGS_CATALOG` and `settingsRailRows` — both are
+good and the section split is right. Restore the six section rows to the crossbar column so X drills
+like every other column, and keep the rail on the page for moving sideways once deep. Own commit,
+so it can be reverted alone.
+
+- [ ] Restore the section rows to `SETTINGS_ROOT_ITEMS` and the drill path
+- [ ] Leave the rail exactly as it is
+- [ ] Update `SettingsHierarchyTest` and `ARCHITECTURE.md` to match
 
 ## Task 2.4 — Nothing on screen names the folder you are in ✅
 
