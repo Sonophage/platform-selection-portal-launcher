@@ -33,6 +33,10 @@ class BackupKeyDriftTest {
         "debug_seeded_v1" to "seed marker",
         "themes_seeded_v1" to "seed marker",
         "library_consolidated_v22" to "migration marker",
+        // A one-shot that fixes WHERE Last Played sits on the bar. A restore brings the old
+        // positions with it, so the fresh install has to be allowed to run the fix again;
+        // carrying the flag would leave the restored bar with Last Played wherever it was.
+        "last_played_placed_v1" to "one-shot position fix that a restore must be able to re-run",
         "data_prep_version" to "migration marker",
         // Points at an extracted directory that is not bundled, so a restored stamp would send
         // observers at files that are not there.

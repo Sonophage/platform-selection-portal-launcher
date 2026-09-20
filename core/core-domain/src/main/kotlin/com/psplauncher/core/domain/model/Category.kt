@@ -78,23 +78,28 @@ object BuiltInCategory {
  * apart once before. The merge rule was guarded. The two lists it merged were not. There is one
  * list now, so there is nothing left to guard.
  *
- * Order here is the bar's order. Library carries position 9 deliberately: appending it rather
- * than inserting it means a database seeded by an older build gains it without colliding with
- * the positions its existing rows already hold. The user can reorder it in Category Manager.
+ * Order here is the bar's order, and it applies to a FRESH install only: an established database
+ * keeps the positions it already holds, because reconciliation deliberately leaves position alone
+ * (it is user-editable). Library carries position 9 rather than 8 for that reason -- appending it
+ * meant an older database gained it without colliding. Last Played is the exception: it is placed
+ * here, and moved on established databases by a one-shot in CategoryRepositoryImpl, because it
+ * was on the bar for a matter of hours before it was given its home.
  */
 val BUILT_IN_CATEGORIES: List<Category> = listOf(
     Category(id = BuiltInCategory.SETTINGS, name = "Settings",  iconKey = "ic_settings", type = CategoryType.BUILT_IN, position = 0),
     Category(id = "photos",                 name = "Photo",     iconKey = "ic_photos",   type = CategoryType.BUILT_IN, position = 1),
     Category(id = "music",                  name = "Music",     iconKey = "ic_music",    type = CategoryType.BUILT_IN, position = 2),
     Category(id = "videos",                 name = "Video",     iconKey = "ic_videos",   type = CategoryType.BUILT_IN, position = 3),
-    Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 4, isGamingCategory = true),
-    Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 5),
-    Category(id = "app_store",              name = "App Store", iconKey = "ic_appstore", type = CategoryType.BUILT_IN, position = 6),
+    // Immediately left of Game: "what I was doing" is the thing you reach for first, and the
+    // shortest path to it is one step off the column you already live in.
+    //
+    // isGamingCategory stays FALSE even though every row here is a game. The flag means "games
+    // can be assigned to this category": it puts an Add Games row on the column and gives the
+    // column a sort cycle (see activeSortModes). This section is derived from last_played_at,
+    // nothing can be assigned to it, and its order IS its meaning, so both would be wrong.
+    Category(id = BuiltInCategory.RECENTLY_PLAYED, name = "Last Played", iconKey = "ic_recent", type = CategoryType.BUILT_IN, position = 4),
+    Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 5, isGamingCategory = true),
+    Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 6),
+    Category(id = "app_store",              name = "App Store", iconKey = "ic_appstore", type = CategoryType.BUILT_IN, position = 7),
     Category(id = BuiltInCategory.LIBRARY,  name = "Library",   iconKey = "ic_library",  type = CategoryType.BUILT_IN, position = 9),
-    // isGamingCategory stays FALSE even though every row here is a game. The flag means
-    // "games can be assigned to this category": it puts an Add Games row on the column and
-    // gives the column a sort cycle (see activeSortModes). This section is derived from
-    // last_played_at, nothing can be assigned to it, and its order IS its meaning, so both
-    // would be wrong. Position 10, appended past Library, for the same reason Library was.
-    Category(id = BuiltInCategory.RECENTLY_PLAYED, name = "Last Played", iconKey = "ic_recent", type = CategoryType.BUILT_IN, position = 10),
 )

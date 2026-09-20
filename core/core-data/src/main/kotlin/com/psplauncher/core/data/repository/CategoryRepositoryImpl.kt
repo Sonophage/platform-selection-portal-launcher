@@ -136,6 +136,33 @@ class CategoryRepositoryImpl @Inject constructor(
         return removed
     }
 
+    /**
+     * Puts Last Played immediately left of Game on a database that already has it elsewhere.
+     *
+     * Reconciliation deliberately never touches a category's position, because position is
+     * user-editable and stomping it would undo a reorder on every launch. This is the one
+     * exception, and it is a ONE-SHOT: the caller guards it with a DataStore flag so it runs
+     * once per install and a later reorder is permanent.
+     *
+     * It shifts, rather than assigning a fixed number, so it preserves whatever order the user
+     * already has: everything at or past Game moves up one, and Last Played takes Game's old
+     * slot. Returns false when there is nothing to do.
+     */
+    suspend fun placeLastPlayedBeforeGames(): Boolean {
+        val recent = categoryDao.getById(BuiltInCategory.RECENTLY_PLAYED) ?: return false
+        val games = categoryDao.getById(BuiltInCategory.GAMES) ?: return false
+        if (recent.position < games.position) return false
+        val target = games.position
+        // Descending, so no two rows hold the same position even momentarily.
+        categoryDao.getAll()
+            .filter { it.position >= target && it.id != BuiltInCategory.RECENTLY_PLAYED }
+            .sortedByDescending { it.position }
+            .forEach { categoryDao.updatePosition(it.id, it.position + 1) }
+        categoryDao.updatePosition(recent.id, target)
+        Timber.i("Last Played moved to position $target, left of Game")
+        return true
+    }
+
     suspend fun reconcileBuiltInCategories() {
         // Before seeding the live built-ins: an install from an older build, or one that has just
         // restored an older backup, can still be carrying a retired column.

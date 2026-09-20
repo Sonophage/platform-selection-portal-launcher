@@ -15,6 +15,10 @@ import javax.inject.Singleton
 
 private val KEY_DB_SEEDED     = booleanPreferencesKey("db_seeded_v1")
 private val KEY_THEMES_SEEDED = booleanPreferencesKey("themes_seeded_v1")
+// One-shot: Last Played shipped appended to the end of the bar and was given its home left of
+// Game hours later. Flag-guarded rather than condition-guarded so a user who afterwards moves
+// it somewhere else keeps that choice.
+private val KEY_LAST_PLAYED_PLACED = booleanPreferencesKey("last_played_placed_v1")
 
 /** Built-in theme seeded separately from the main DB seed so it can be added to existing installs. */
 private val BUILTIN_CLASSIC_BLUE = ThemeEntity(
@@ -57,6 +61,7 @@ class DatabaseInitializer @Inject constructor(
         // Runs every launch (not gated by DB_SEEDED): corrects system-defined flags on
         // built-in categories so definition changes reach databases seeded by older builds.
         categoryRepository.reconcileBuiltInCategories()
+        placeLastPlayed()
         seedThemes()
         // One-shot v22 follow-up (flag-guarded): the Windows-card consolidation steps that
         // need app logic — spoof-package label checks, duplicate merge, card creation.
@@ -77,6 +82,13 @@ class DatabaseInitializer @Inject constructor(
 
         context.pfpDataStore.edit { it[KEY_DB_SEEDED] = true }
         Timber.i("Database seed complete")
+    }
+
+    private suspend fun placeLastPlayed() {
+        val prefs = context.pfpDataStore.data.first()
+        if (prefs[KEY_LAST_PLAYED_PLACED] == true) return
+        categoryRepository.placeLastPlayedBeforeGames()
+        context.pfpDataStore.edit { it[KEY_LAST_PLAYED_PLACED] = true }
     }
 
     private suspend fun seedThemes() {

@@ -80,28 +80,40 @@ class CategoryBarFallbackTest {
     }
 
     @Test
-    fun `a late built-in is appended rather than inserted`() {
-        // Every built-in added after the original seven takes a position past all of them, so a
-        // database seeded by an older build gains it without colliding with the positions its
-        // existing rows already hold. Library was the first to do this; Last Played followed.
+    fun `Library is appended rather than inserted`() {
+        // Library takes a position past every original built-in, so a database seeded by an older
+        // build gains it without colliding with the positions its existing rows already hold.
         //
-        // The rule is per-arrival, not "Library is last": asserting Library held the highest
-        // position is what this test used to do, and it went red the moment a second late
-        // built-in was appended correctly.
-        val original = BUILT_IN_CATEGORIES.filter {
+        // Last Played is deliberately NOT held to this rule: it is placed left of Game, and an
+        // established database is corrected by the one-shot in CategoryRepositoryImpl rather than
+        // by where the constant puts it. See the test below.
+        val library = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.LIBRARY }
+        val others = BUILT_IN_CATEGORIES.filter {
             it.id != BuiltInCategory.LIBRARY && it.id != BuiltInCategory.RECENTLY_PLAYED
         }
-        val highestOriginal = original.maxOf { it.position }
-        for (id in listOf(BuiltInCategory.LIBRARY, BuiltInCategory.RECENTLY_PLAYED)) {
-            val late = BUILT_IN_CATEGORIES.first { it.id == id }
-            assertTrue(
-                "${late.name} at ${late.position} would collide with an established row",
-                late.position > highestOriginal,
-            )
-        }
+        assertTrue(
+            "Library at ${library.position} would collide with an established row",
+            others.all { it.position < library.position },
+        )
+    }
 
-        // And no two built-ins share a position at all, which is the failure the rule above is
-        // there to prevent. A duplicate would make the bar's order depend on list order alone.
+    @Test
+    fun `Last Played sits immediately left of Game`() {
+        // "What I was doing" is one step off the column you already live in. Immediately left,
+        // not merely somewhere left: a gap would let a future built-in land between them.
+        val recent = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.RECENTLY_PLAYED }
+        val games = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.GAMES }
+        assertEquals(
+            "Last Played must be the row immediately left of Game",
+            games.position - 1,
+            recent.position,
+        )
+    }
+
+    @Test
+    fun `no two built-ins share a position`() {
+        // The failure the rules above exist to prevent. A duplicate would make the bar's order
+        // depend on list order alone, which nothing else in the app promises to preserve.
         val positions = BUILT_IN_CATEGORIES.map { it.position }
         assertEquals("two built-ins share a position", positions.size, positions.toSet().size)
     }
