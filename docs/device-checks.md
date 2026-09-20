@@ -170,39 +170,52 @@ adb -s $D shell "run-as $P ls -la cache/book_covers | head -3"
 Expect roughly 80 titles and authors, 77 covers, 36 series. Cover files should be materially larger
 than before the change.
 
-## 8. Backup and restore
+## 8. Backup and restore — RUN, 2026-09-19
 
-```
-Settings, System, Backup, Create Backup
-Settings, System, Backup, Restore
-```
+Round trip done on hardware. Backup wrote 26 JSON entries plus the wallpapers to
+`/storage/6DBF-B253/PSPLauncher-Backups/`, and its counts matched the live database exactly:
+147 games, 43 platforms, 9 categories, 0 collections, 80 books, 1 book library, 130 artwork
+links and 0 dead ones. Restoring that file left every one of those tables identical, favourites
+included, and the app restarted clean.
 
-Book libraries and the reader choice come back; folder grants need re-linking, which the Backup
-screen already says. Nothing achievement-shaped returns (check 3).
+Two things it turned up. The manifest recorded `appVersionCode 0 / appVersionName "unknown"` on
+every backup ever written, because the worker took them from input data and its one caller passed
+none (fixed: the worker reads its own PackageManager entry). And the **Saved Backups** list on
+that screen is labels only -- restoring goes through *Restore from File* and its document picker,
+not by confirming a row in the list.
 
-## 9. Generate the baseline profile
+To re-run it: snapshot the database before and after and compare the counts per table.
+**Pull the `-wal` with the database** or you are comparing stale snapshots.
 
-The generator module is wired but **no profile for this app's own code has ever been recorded** —
-the shipped one carries only AndroidX and Compose library profiles.
+## 9. Baseline profile — RUN, 2026-09-19
 
-```bash
-./gradlew :app:generateReleaseBaselineProfile
-```
-
-Needs a rooted emulator or a userdebug device; a locked retail device cannot record one. It writes
-`app/src/main/baseline-prof.txt`, **which must be committed**. Confirm it holds this app's classes:
-
-```bash
-grep -c "com/psplauncher" app/src/main/baseline-prof.txt
-```
-
-Zero means it recorded nothing useful. After committing, rebuild release and check the profile grew
-beyond the library-only one:
+Generated and committed. **Not on the handheld:** it reports `ro.build.type=user` and
+`ro.debuggable=0`, and the Macrobenchmark rule needs root or a userdebug build. It ran on the
+`orca-pixel9` AVD (`google_apis`, API 37, `adb root` available):
 
 ```bash
-./gradlew :app:assembleRelease
-unzip -p app/build/outputs/apk/release/*.apk assets/dexopt/baseline.prof | wc -c   # was 16941
+~/Android/Sdk/emulator/emulator -avd orca-pixel9 -no-window -no-audio -no-boot-anim \
+    -gpu swiftshader_indirect &
+adb -s emulator-5554 root
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:generateReleaseBaselineProfile
 ```
+
+It lands in `app/src/release/generated/baselineProfiles/baseline-prof.txt`, **not** the
+`app/src/main/baseline-prof.txt` this document used to name, and it must be committed.
+
+23,098 rules, 4,832 of them this app's own classes -- the shipped profile had none of its own
+code before this. Prove the APK actually consumes it rather than trusting the count, by building
+without it:
+
+```bash
+mv app/src/release/generated /tmp/holdout && ./gradlew :app:assembleRelease
+unzip -p app/build/outputs/apk/release/*.apk assets/dexopt/baseline.prof | wc -c   # 16418
+mv /tmp/holdout app/src/release/generated && ./gradlew :app:assembleRelease
+unzip -p app/build/outputs/apk/release/*.apk assets/dexopt/baseline.prof | wc -c   # 18359
+```
+
+The compiled `.prof` is far smaller than the text it came from: it stores method references as
+dex indices, not names, so a ~2.4 MB rule list becomes about 2 KB of added profile.
 
 ---
 
