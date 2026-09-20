@@ -512,9 +512,7 @@ open class BackupManager @Inject constructor(
 
     private val BACKED_UP_STRING_KEYS = listOf(
         // Display
-        stringPreferencesKey("display_wave_mode"),
         stringPreferencesKey("display_wave_style"),
-        stringPreferencesKey("display_icon_style"),
         // The retired GameBoot three-way mode key. GameBoot is a boolean again
         // (display_gameboot_enabled, in the boolean list below), but this stays here so an
         // archive written during the mode era restores and migrates through GameBootPreferences'
@@ -539,6 +537,11 @@ open class BackupManager @Inject constructor(
         // Theme cascade values. The applied theme's NAME and layout are plain data; the theme's
         // extracted icon files are not bundled, so theme_icons_stamp is deliberately absent —
         // restoring it would point observers at a directory that isn't there.
+        // Service account identifiers. Not credentials — the API keys are sealed separately by
+        // the Keystore — but they are things the user typed, and retyping them on a new device
+        // is exactly the kind of small re-setup a backup exists to avoid.
+        stringPreferencesKey("ra_username"),
+        stringPreferencesKey("steam_id64"),
         stringPreferencesKey("theme_applied_name"),
         stringPreferencesKey("theme_layout_spec"),
             // Controller
@@ -556,7 +559,6 @@ open class BackupManager @Inject constructor(
             stringPreferencesKey("video_default_player"),
             stringPreferencesKey("books_default_reader"),
             // Library
-            stringPreferencesKey("library_root_path"),
             // SAF ROM root grants (newline-joined list; singular key kept for older backups).
             // Inert without a live OS grant, so re-linked under Library ▸ ROM Root Access after a
             // restore — carrying them lets that section pre-point the picker at each exact folder.
@@ -599,7 +601,6 @@ open class BackupManager @Inject constructor(
 
         private val BACKED_UP_BOOLEAN_KEYS = listOf(
             // Display
-            booleanPreferencesKey("display_auto_reduce"),
             booleanPreferencesKey("display_show_boot"),
             booleanPreferencesKey("display_boot_on_resume"),
             booleanPreferencesKey("display_thermal_aware"),
@@ -615,6 +616,8 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("pref_xmb_game_metadata"),
         // "Backdrop & Tint" — whether the focused row's art and colour take over the shell.
         booleanPreferencesKey("pref_xmb_item_backdrop"),
+        // Artwork Studio's crop preview toggle — a plain preference with no file behind it.
+        booleanPreferencesKey("artwork_crop_preview_enabled"),
             // Launch behaviour
             booleanPreferencesKey("pref_direct_game_launch"),
             // Artwork behaviour
