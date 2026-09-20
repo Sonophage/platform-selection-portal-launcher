@@ -59,3 +59,36 @@ object BuiltInCategory {
      */
     val RETIRED_IDS = setOf("social", "achievements")
 }
+
+/**
+ * The built-in categories, defined ONCE.
+ *
+ * There were two copies: `CategoryRepositoryImpl.BUILT_IN_CATEGORIES`, which called itself the
+ * single source of truth and is used for first-launch seeding and per-launch reconciliation, and
+ * `XMBViewModel.FALLBACK_CATEGORIES`, a byte-for-byte copy of the first seven rows used as the
+ * crossbar's cold-start list. They drifted: Library was added to one and not the other.
+ *
+ * That was not only a cold-start cosmetic difference. `canonicalXmbCategories` derives its set of
+ * built-in ids from the crossbar's copy, so a category missing from it fell through to the
+ * custom-category path and lost the canonical icon every built-in is guaranteed; and
+ * `observeCategoryBar` falls back to that copy on an empty read, where the missing section
+ * vanished from the bar entirely.
+ *
+ * The sting is that `canonicalXmbCategories` exists BECAUSE the bar and the repository drifted
+ * apart once before. The merge rule was guarded. The two lists it merged were not. There is one
+ * list now, so there is nothing left to guard.
+ *
+ * Order here is the bar's order. Library carries position 9 deliberately: appending it rather
+ * than inserting it means a database seeded by an older build gains it without colliding with
+ * the positions its existing rows already hold. The user can reorder it in Category Manager.
+ */
+val BUILT_IN_CATEGORIES: List<Category> = listOf(
+    Category(id = BuiltInCategory.SETTINGS, name = "Settings",  iconKey = "ic_settings", type = CategoryType.BUILT_IN, position = 0),
+    Category(id = "photos",                 name = "Photo",     iconKey = "ic_photos",   type = CategoryType.BUILT_IN, position = 1),
+    Category(id = "music",                  name = "Music",     iconKey = "ic_music",    type = CategoryType.BUILT_IN, position = 2),
+    Category(id = "videos",                 name = "Video",     iconKey = "ic_videos",   type = CategoryType.BUILT_IN, position = 3),
+    Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 4, isGamingCategory = true),
+    Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 5),
+    Category(id = "app_store",              name = "App Store", iconKey = "ic_appstore", type = CategoryType.BUILT_IN, position = 6),
+    Category(id = BuiltInCategory.LIBRARY,  name = "Library",   iconKey = "ic_library",  type = CategoryType.BUILT_IN, position = 9),
+)

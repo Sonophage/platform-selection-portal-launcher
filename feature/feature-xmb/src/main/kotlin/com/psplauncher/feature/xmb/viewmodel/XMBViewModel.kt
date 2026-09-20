@@ -8218,17 +8218,18 @@ class XMBViewModel @Inject constructor(
         // Sentinel in XMBContextMenu.musicTrackId marking the in-app player's own options menu.
         private const val MUSIC_PLAYER_MENU_MARKER = "__music_player__"
 
-        // Used only if the categories table hasn't been seeded yet (first frame on first run).
-        // The main XMB always presents these seven categories in this order.
-        val FALLBACK_CATEGORIES = listOf(
-            Category(id = BuiltInCategory.SETTINGS, name = "Settings",  iconKey = "ic_settings", type = CategoryType.BUILT_IN, position = 0),
-            Category(id = "photos",                 name = "Photo",     iconKey = "ic_photos",   type = CategoryType.BUILT_IN, position = 1),
-            Category(id = "music",                  name = "Music",     iconKey = "ic_music",    type = CategoryType.BUILT_IN, position = 2),
-            Category(id = "videos",                 name = "Video",     iconKey = "ic_videos",   type = CategoryType.BUILT_IN, position = 3),
-            Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 4, isGamingCategory = true),
-            Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 5),
-            Category(id = "app_store",              name = "App Store", iconKey = "ic_appstore", type = CategoryType.BUILT_IN, position = 6),
-        )
+        /**
+         * The crossbar's cold-start list. NOT a second copy any more.
+         *
+         * It used to be a byte-for-byte duplicate of the repository's built-in table, and the
+         * two drifted: Library was added there and not here. That was not just a cold-start
+         * difference -- canonicalXmbCategories derives its built-in ids from THIS list, so a
+         * category missing from it fell through to the custom path and lost the canonical icon,
+         * and observeCategoryBar falls back to it on an empty read, where the section vanished
+         * from the bar outright. There is one list now, in core-domain.
+         */
+        val FALLBACK_CATEGORIES: List<Category> =
+            com.psplauncher.core.domain.model.BUILT_IN_CATEGORIES
 
         private val ANDROID_ITEMS = listOf(
             XMBItem(id = "drawer_all",       title = "All Apps",      subtitle = "Browse every installed app"),

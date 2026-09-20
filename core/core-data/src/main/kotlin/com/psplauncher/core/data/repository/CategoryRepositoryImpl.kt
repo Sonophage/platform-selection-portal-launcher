@@ -4,6 +4,7 @@ import com.psplauncher.core.data.database.dao.CategoryDao
 import com.psplauncher.core.data.database.entity.CategoryItemEntity
 import com.psplauncher.core.data.database.entity.toDomain
 import com.psplauncher.core.data.database.entity.toEntity
+import com.psplauncher.core.domain.model.BUILT_IN_CATEGORIES
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.CategoryType
@@ -149,23 +150,6 @@ class CategoryRepositoryImpl @Inject constructor(
     }
 
     companion object {
-        // Canonical built-in category definitions — single source of truth for both
-        // first-launch seeding and per-launch flag reconciliation.
-        private val BUILT_IN_CATEGORIES = listOf(
-            Category(BuiltInCategory.SETTINGS, "Settings",  "ic_settings", type = CategoryType.BUILT_IN, position = 0),
-            Category("photos",                 "Photo",     "ic_photos",   type = CategoryType.BUILT_IN, position = 1),
-            Category("music",                  "Music",     "ic_music",    type = CategoryType.BUILT_IN, position = 2),
-            Category("videos",                 "Video",     "ic_videos",   type = CategoryType.BUILT_IN, position = 3),
-            Category(BuiltInCategory.GAMES,    "Game",      "ic_games",    type = CategoryType.BUILT_IN, position = 4, isGamingCategory = true),
-            Category("network",                "Network",   "ic_network",  type = CategoryType.BUILT_IN, position = 5),
-            Category("app_store",              "App Store", "ic_appstore", type = CategoryType.BUILT_IN, position = 6),
-            // Appended after App Store so it slots in without colliding with existing rows' positions
-            // on databases seeded by older builds; the user can reorder it next to Games.
-            // Appended last so an established database gains it without colliding with the
-            // positions its existing rows already hold.
-            Category(BuiltInCategory.LIBRARY,  "Library",   "ic_library",  type = CategoryType.BUILT_IN, position = 9),
-        )
-
         // Built-in categories the user may hide/reorder but never delete.
         val PROTECTED_BUILTINS = setOf(
             BuiltInCategory.FAVORITES,

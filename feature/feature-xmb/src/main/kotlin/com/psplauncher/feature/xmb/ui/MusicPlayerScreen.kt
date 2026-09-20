@@ -43,6 +43,7 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.ControllerPromptBar
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.feature.xmb.music.MusicPlaybackState
+import com.psplauncher.feature.xmb.viewmodel.formatDuration
 
 private val Backdrop   = Color(0xF20A0A12)
 private val Primary    = Color.White
@@ -132,8 +133,8 @@ fun MusicPlayerScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatTime(state.positionMs), color = Secondary, fontSize = 11.sp)
-                Text(formatTime(duration), color = Secondary, fontSize = 11.sp)
+                Text(formatDuration(state.positionMs.toLong()), color = Secondary, fontSize = 11.sp)
+                Text(formatDuration(duration.toLong()), color = Secondary, fontSize = 11.sp)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -188,10 +189,6 @@ private fun TransportButton(icon: ImageVector, desc: String, size: androidx.comp
     }
 }
 
-private fun formatTime(ms: Int): String {
-    if (ms <= 0) return "0:00"
-    val totalSec = ms / 1000
-    val m = totalSec / 60
-    val s = totalSec % 60
-    return "%d:%02d".format(m, s)
-}
+// Deleted: a local formatTime with no hour branch, so a 72-minute track read "72:14" and an
+// audiobook chapter read "184:07". LibraryRowText.formatDuration already handles hours and is
+// what every library row uses, so the player now agrees with the list it was launched from.
