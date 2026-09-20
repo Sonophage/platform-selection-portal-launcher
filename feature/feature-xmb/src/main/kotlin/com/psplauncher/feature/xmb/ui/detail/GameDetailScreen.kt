@@ -102,6 +102,7 @@ import com.psplauncher.feature.xmb.ui.DetailContextMenu
 import com.psplauncher.feature.xmb.ui.DetailMenuRow
 import com.psplauncher.feature.xmb.ui.collection.CollectionPickerPanel
 import com.psplauncher.feature.xmb.viewmodel.gameMetadataLine
+import com.psplauncher.feature.xmb.viewmodel.relativeDate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -802,7 +803,7 @@ private fun GameInformationBand(
             PfpDetailField(label = "Genre", value = it)
         }
         game.lastPlayedAt?.let {
-            PfpDetailField(label = "Last played", value = relativeDays(it))
+            PfpDetailField(label = "Last played", value = relativeDate(it))
         }
         if (game.totalPlayTimeMillis > 0) {
             PfpDetailField(label = "Play time", value = formatPlayTime(game.totalPlayTimeMillis))
@@ -986,14 +987,7 @@ private fun formatPlayTime(millis: Long): String {
     }
 }
 
-private fun relativeDays(epochMillis: Long): String {
-    val days = ((System.currentTimeMillis() - epochMillis) / 86_400_000L).coerceAtLeast(0)
-    return when (days) {
-        0L   -> "Today"
-        1L   -> "Yesterday"
-        else -> "$days days ago"
-    }
-}
+
 
 private val OptionsPanelMaxHeight: Dp = 440.dp
 private val OptionsRowScrollStep: Dp = 58.dp

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.ui.components.XmbHeaderPill
 import com.psplauncher.feature.artwork.store.StudioArtworkSlot
+import com.psplauncher.feature.xmb.viewmodel.formatBytes
 
 /**
  * The stored-assets manager (task 5.4): the active multi-asset slot's assets in order, with the

@@ -89,6 +89,7 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.artwork.store.ArtworkKind
+import com.psplauncher.feature.xmb.viewmodel.formatBytes
 
 // The gap between grid tiles. Must equal StudioGridCapacity's GAP_DP, or the tiles drawn here stop
 // matching the capacity the ViewModel paged for.
@@ -1460,13 +1461,6 @@ private fun StudioInfoRow(label: String, value: String) {
         Text(label, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, modifier = Modifier.width(130.dp))
         Text(value, color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
-}
-
-internal fun formatBytes(bytes: Long): String = when {
-    bytes <= 0L        -> "—"
-    bytes < 1024       -> "$bytes B"
-    bytes < 1024 * 1024 -> "%.1f KB".format(java.util.Locale.US, bytes / 1024.0)
-    else               -> "%.1f MB".format(java.util.Locale.US, bytes / (1024.0 * 1024))
 }
 
 /**

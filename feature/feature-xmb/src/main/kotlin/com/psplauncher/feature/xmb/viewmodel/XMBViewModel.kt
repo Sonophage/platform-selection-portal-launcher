@@ -2331,7 +2331,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id            = "mt_${track.id}",
                 title         = track.displayTitle,
-                subtitle      = track.artist?.takeIf { it.isNotBlank() },
+                subtitle      = musicRowSubtitle(track.artist, track.album, track.durationMs),
                 type          = XMBItemType.MUSIC_TRACK,
                 mediaUri      = track.uri,
                 mimeType      = track.mimeType,
@@ -2593,7 +2593,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "vid_${video.id}",
                 title    = video.displayTitle,
-                subtitle = video.durationMs?.let { formatDuration(it) },
+                subtitle = videoRowSubtitle(video.durationMs, video.lastWatchedAt),
                 type     = XMBItemType.VIDEO_FILE,
                 mediaUri = video.uri,
                 mimeType = video.mimeType,
@@ -2657,13 +2657,6 @@ class XMBViewModel @Inject constructor(
         subtitle = "Add videos from a video's ⚙ Options menu",
         type     = XMBItemType.EMPTY,
     )
-
-    private fun formatDuration(ms: Long): String {
-        if (ms <= 0) return ""
-        val totalSec = ms / 1000
-        val h = totalSec / 3600; val m = (totalSec % 3600) / 60; val s = totalSec % 60
-        return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
-    }
 
     // Handles A/Cross on any Video row. Returns true when [item] is a Video row it owns.
     private fun handleVideoSelection(item: XMBItem): Boolean = when {
@@ -3026,7 +3019,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "book_${book.id}",
                 title    = book.displayTitle,
-                subtitle = bookSubtitle(book),
+                subtitle = bookRowSubtitle(book.author, book.seriesName, book.seriesIndex),
                 coverUri = book.coverUri,
                 // Same image in both slots on purpose: coverUri draws the list tile, artworkUri is
                 // the shell's hover-background slot. XMBShell already crossfades artworkUri behind
@@ -3036,24 +3029,6 @@ class XMBViewModel @Inject constructor(
                 type     = XMBItemType.LIBRARY_BOOK,
             )
         }
-
-    /**
-     * What sits under a book's title: where it falls in its series, and who wrote it.
-     *
-     * The series is shown whatever the sort mode, not only when sorting by series. A list sorted
-     * by title is exactly where "book 3 of something" is the fact the user is missing.
-     */
-    private fun bookSubtitle(book: com.psplauncher.core.domain.model.Book): String? {
-        val series = book.seriesName?.let { name ->
-            // A whole number is written without its decimal: "Dune #2", not "Dune #2.0". A .5
-            // keeps it, because that IS the information (a novella between two books).
-            val index = book.seriesIndex?.let { i ->
-                if (i == Math.floor(i)) "#${i.toInt()}" else "#$i"
-            }
-            listOfNotNull(name, index).joinToString(" ")
-        }
-        return listOfNotNull(series, book.author).joinToString(" · ").takeIf { it.isNotBlank() }
-    }
 
     private fun emptyBooksItem(): XMBItem = XMBItem(
         id       = "books_empty",
@@ -3285,21 +3260,13 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "pho_${photo.id}",
                 title    = photo.displayName,
-                subtitle = photoSubtitle(photo),
+                subtitle = photoRowSubtitle(photo.displayDateMs, photo.resolutionLabel, photo.sizeBytes),
                 type     = XMBItemType.PHOTO_FILE,
                 mediaUri = photo.uri,
                 mimeType = photo.mimeType,
                 coverUri = photo.thumbnailUri,
             )
         }
-
-    // "4032×3024  ·  Jul 14, 2026" — whichever parts are known; null when neither is.
-    private fun photoSubtitle(photo: com.psplauncher.core.domain.model.Photo): String? {
-        val date = photo.displayDateMs?.let {
-            java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault()).format(java.util.Date(it))
-        }
-        return listOfNotNull(photo.resolutionLabel, date).joinToString("  ·  ").ifEmpty { null }
-    }
 
     private fun setPhotoItems(
         photos: List<com.psplauncher.core.domain.model.Photo>,
