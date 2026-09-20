@@ -118,6 +118,30 @@ class EmulatorIntentResolver @Inject constructor(
             if (game.launchToken.isNullOrBlank()) {
                 error("No launch ID recorded for ${game.title}. Re-scan its library.")
             }
+        } else if (launchesByRawPath(profile)) {
+            // The profile will hand over a raw path, so THAT is what has to be checked — not the
+            // content URI, however healthy it is.
+            //
+            // This branch used to be unreachable for every SAF-scanned game, because such a game
+            // carries BOTH handles and the romUri branch below came first. So preflight opened a
+            // URI the emulator would never receive, said "yes, I can read this", and then handed
+            // RetroArch a path derived by string arithmetic from the document id. If that
+            // derivation was wrong — an odd document id, a volume mounted elsewhere — the result
+            // was RetroArch's black screen with preflight's blessing, which is the exact failure
+            // class the rest of this file exists to eliminate.
+            val romPath = game.romPath
+                ?: error(
+                    "${profile.name} launches games by file path and PSPLauncher has no path " +
+                        "for ${game.title}. Re-scan its library, or pick another emulator."
+                )
+            val file = File(romPath)
+            if (!file.exists()) error("ROM file not found: $romPath")
+            if (!file.canRead()) {
+                error(
+                    "PSPLauncher can see ${game.title} but cannot read it at $romPath. " +
+                        "${profile.name} needs direct file access to this folder."
+                )
+            }
         } else if (!game.romUri.isNullOrBlank()) {
             // A SAF game launches from its granted content:// URI — PFP holds no raw path to stat,
             // so just require the URI is present/parseable, then probe whether the grant still
@@ -157,6 +181,17 @@ class EmulatorIntentResolver @Inject constructor(
 
     // True when the profile boots by launch token (the {title_id} template appears in a string or
     // array extra) rather than by ROM file — e.g. Vita3K's AppStartParameters.
+    /**
+     * The profile hands the emulator a RAW FILESYSTEM PATH rather than a content URI.
+     *
+     * RetroArch is the headline case: `EmulatorDetector` generates its profiles with a single
+     * `"ROM" to "{rom_path}"` extra and no `attachRomData`, so whatever `romUri` says, what
+     * actually reaches RetroArch is a string built by path arithmetic from the SAF document id.
+     */
+    private fun launchesByRawPath(profile: EmulatorProfile): Boolean =
+        profile.intentArrayExtras.values.flatten().any { it.contains(LaunchTemplate.ROM_PATH) } ||
+            profile.intentExtras.values.any { it.contains(LaunchTemplate.ROM_PATH) }
+
     private fun launchesByToken(profile: EmulatorProfile): Boolean =
         profile.intentArrayExtras.values.flatten().any { it.contains(LaunchTemplate.TITLE_ID) } ||
             profile.intentExtras.values.any { it.contains(LaunchTemplate.TITLE_ID) }
