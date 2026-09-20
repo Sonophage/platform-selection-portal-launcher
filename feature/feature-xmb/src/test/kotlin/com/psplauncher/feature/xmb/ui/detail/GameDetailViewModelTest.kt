@@ -1544,4 +1544,76 @@ class GameDetailViewModelTest {
         // Touch hides the controller cursor without losing the logical node.
         assertFalse(viewModel.uiState.value.cursorVisible)
     }
+
+    // ── Emulator override ─────────────────────────────────────────────────────
+    //
+    // The picker could SET a per-game override and never clear one. That pins a game to
+    // PER_GAME_OVERRIDE, the top rung of the resolver ladder, so fixing the console's default
+    // later never reaches it. The XMB's context menu always had the escape hatch
+    // (`choice.takeIf { it != "default" }`); this page did not.
+
+    private fun installPsxProfile() = com.psplauncher.core.domain.model.EmulatorProfile(
+        id = "duckstation",
+        name = "DuckStation",
+        packageName = "com.github.stenzek.duckstation",
+        intentType = com.psplauncher.core.domain.model.IntentType.ACTION_VIEW,
+        supportedPlatformIds = listOf("psx"),
+    ).also { every { profileRepository.getInstalledProfiles() } returns listOf(it) }
+
+    @Test
+    fun `the emulator picker leads with a row that clears the override`() = runTest {
+        installPsxProfile()
+        loadedAndLaidOut()
+
+        viewModel.requestChangeEmulator()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val options = viewModel.uiState.value.emulatorPickerOptions
+        assertEquals(DEFAULT_EMULATOR_SENTINEL, options.first().id)
+        assertEquals("Use system default", options.first().name)
+        // ...and the real emulators are still there behind it.
+        assertTrue(options.any { it.id == "duckstation" })
+    }
+
+    @Test
+    fun `choosing that row writes null, not a profile id`() = runTest {
+        installPsxProfile()
+        loadedAndLaidOut()
+        viewModel.requestChangeEmulator()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.confirmEmulatorPick(DEFAULT_EMULATOR_SENTINEL)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // null is what clears it. Writing the sentinel as a package name would pin the game to an
+        // emulator called "default" that does not exist.
+        coVerify { gameRepository.setPreferredEmulator(1L, null) }
+        coVerify(exactly = 0) { gameRepository.setPreferredEmulator(1L, DEFAULT_EMULATOR_SENTINEL) }
+    }
+
+    @Test
+    fun `choosing a real emulator still sets the override`() = runTest {
+        installPsxProfile()
+        loadedAndLaidOut()
+        viewModel.requestChangeEmulator()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.confirmEmulatorPick("duckstation")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { gameRepository.setPreferredEmulator(1L, "duckstation") }
+    }
+
+    @Test
+    fun `with no override the cursor starts on the clear row, which is the truth`() = runTest {
+        // fakeGame carries no emulatorPackage, so "system default" IS the current state and the
+        // highlight must say so rather than pointing at an emulator that was never chosen.
+        installPsxProfile()
+        loadedAndLaidOut()
+
+        viewModel.requestChangeEmulator()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.emulatorPickerIndex)
+    }
 }

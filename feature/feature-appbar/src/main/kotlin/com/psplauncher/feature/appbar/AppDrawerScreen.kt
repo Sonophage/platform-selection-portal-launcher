@@ -93,12 +93,22 @@ fun AppDrawerScreen(
 
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null) {
-            val overlayOpen = state.menuApp != null || state.confirmUninstall != null
+            // searchActive counts as an overlay. It is a local `remember` rather than ViewModel
+            // state, which is why it was missing here: BACK while searching fell through to the
+            // plain-grid branch and closed the WHOLE drawer, losing your place in the grid. The
+            // only controller way to close search was a second X/Square, which is not advertised.
+            val overlayOpen = state.menuApp != null || state.confirmUninstall != null || searchActive
             when {
                 // An inner drawer overlay (options menu / uninstall confirm) is up: BACK goes to
                 // the drawer ViewModel, which pops that overlay. XMBViewModel forwards every
                 // action — including BACK — to the drawer, so BACK here NEVER closes the drawer
                 // itself while an overlay is open.
+                // Search is drawer-local, so it is answered here rather than in the ViewModel.
+                searchActive && pendingGamepadAction == GamepadAction.BACK -> {
+                    searchActive = false
+                    viewModel.setSearchQuery("")
+                    keyboard?.hide()
+                }
                 overlayOpen -> viewModel.handleGamepadAction(pendingGamepadAction)
                 // BACK on the plain grid closes the drawer (its only controller escape).
                 pendingGamepadAction == GamepadAction.BACK -> onBack()

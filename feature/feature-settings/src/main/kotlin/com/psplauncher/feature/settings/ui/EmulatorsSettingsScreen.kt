@@ -194,7 +194,7 @@ fun EmulatorsSettingsScreen(
                     state.retroArchLinked ->
                         "Linked, but access was lost (e.g. after reinstall). Re-link RetroArch to detect cores again."
                     else ->
-                        "Not linked. PFP can't see which RetroArch cores are installed, so it offers them all — launching one that isn't installed shows a black screen. Link RetroArch to detect installed cores."
+                        "Not linked — no RetroArch cores are offered at all, so any console without a standalone emulator has nothing to launch with. Link RetroArch so its installed cores become selectable."
                 }
             )
 
@@ -222,7 +222,7 @@ fun EmulatorsSettingsScreen(
                 )
                 SettingsRow(
                     label    = "Unlink RetroArch",
-                    sublabel = "Go back to offering all cores unverified",
+                    sublabel = "Its cores stop being offered until you link it again",
                     onClick  = { viewModel.unlinkRetroArch() },
                 )
             }

@@ -23,6 +23,7 @@ import com.psplauncher.feature.artwork.match.MetadataField
 import com.psplauncher.feature.artwork.match.MetadataFieldRow
 import com.psplauncher.feature.artwork.match.MetadataPreset
 import com.psplauncher.core.domain.model.EmulatorProfile
+import com.psplauncher.core.domain.model.IntentType
 import com.psplauncher.feature.artwork.store.ArtworkKind
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.psplauncher.core.data.datastore.pfpDataStore
@@ -312,6 +313,12 @@ private const val PLAY_SECTION = "Play"
 private const val FILE_SECTION = "File"
 
 private const val WINDOWS_PLATFORM_ID = "windows"
+
+/**
+ * The picker id that means "no per-game override". Same string the XMB context menu writes
+ * through `choice.takeIf { it != "default" }`, so both paths clear an override identically.
+ */
+internal const val DEFAULT_EMULATOR_SENTINEL = "default"
 private const val ANDROID_PLATFORM_ID = "android"
 
 // Key prefixes the node graph hands back through [GameDetailNav.onActivate]. Kept next to the keys
@@ -1364,6 +1371,25 @@ class GameDetailViewModel @Inject constructor(
 
     // ── Emulator picker ───────────────────────────────────────────────────
 
+    /**
+     * The picker's "Use system default" row, as a synthetic profile so it rides the same list,
+     * the same node keys and the same confirm path as a real one.
+     *
+     * Its id is the sentinel the XMB's context menu already uses, and [confirmEmulatorPick] turns
+     * it into a null write. Without this row the picker could only ever SET an override: try a
+     * different core from this page, find it does not help, and that game is pinned to
+     * PER_GAME_OVERRIDE -- the top rung of the resolver ladder -- for good. Fixing the console's
+     * default later would not reach it, and the only way back was the XMB's own context menu,
+     * which nobody connects to the screen where the change was made.
+     */
+    private fun systemDefaultOption(platformId: String) = EmulatorProfile(
+        id = DEFAULT_EMULATOR_SENTINEL,
+        name = "Use system default",
+        packageName = "",
+        intentType = IntentType.ACTION_VIEW,
+        supportedPlatformIds = listOf(platformId),
+    )
+
     private fun openEmulatorPicker() {
         val game = _uiState.value.game ?: return
         val options = profileRepository.getInstalledProfiles()
@@ -1373,15 +1399,17 @@ class GameDetailViewModel @Inject constructor(
             showActionMessage("No emulators installed for ${game.platformId.uppercase()}")
             return
         }
+        // The clear-the-override row leads the list, so it is always reachable with one UP.
+        val rows = listOf(systemDefaultOption(game.platformId)) + options
         val stored = game.emulatorPackage
         val currentIndex = if (stored != null) {
-            options.indexOfFirst { it.id == stored || it.packageName == stored }.coerceAtLeast(0)
-        } else 0
+            rows.indexOfFirst { it.id == stored || it.packageName == stored }.coerceAtLeast(0)
+        } else 0   // no override: the cursor starts on "Use system default", which is the truth
         _uiState.update {
             it.copy(
                 showOptions           = false,
                 showEmulatorPicker    = true,
-                emulatorPickerOptions = options,
+                emulatorPickerOptions = rows,
                 emulatorPickerIndex   = currentIndex,
             )
         }
@@ -1406,7 +1434,8 @@ class GameDetailViewModel @Inject constructor(
     fun confirmEmulatorPick(profileId: String) {
         val game = _uiState.value.game ?: return
         viewModelScope.launch {
-            gameRepository.setPreferredEmulator(game.id, profileId)
+            // null CLEARS the override, exactly as the XMB's context menu has always done.
+            gameRepository.setPreferredEmulator(game.id, profileId.takeIf { it != DEFAULT_EMULATOR_SENTINEL })
             val updated = gameRepository.getById(game.id)
             val profile = profileRepository.getInstalledProfiles().firstOrNull { it.id == profileId }
             // Re-resolve from the fresh override so the emulator line shows the new winner + core
@@ -1419,7 +1448,11 @@ class GameDetailViewModel @Inject constructor(
                     game               = updated ?: it.game,
                     resolvedLaunch     = resolved,
                     showEmulatorPicker = false,
-                    actionMessage      = profile?.let { p -> "Emulator set to ${p.name}" },
+                    actionMessage      = if (profileId == DEFAULT_EMULATOR_SENTINEL) {
+                        "Using the system default emulator"
+                    } else {
+                        profile?.let { p -> "Emulator set to ${p.name}" }
+                    },
                 )
             }
         }
