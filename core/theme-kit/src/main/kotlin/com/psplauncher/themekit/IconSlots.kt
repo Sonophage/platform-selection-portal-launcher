@@ -83,6 +83,7 @@ object IconSlots {
         item("item_library_book", "Book"),
         item("item_library_series", "Book series"),
         item("item_camera", "Camera"),
+        item("item_search", "Search"),
         item("item_music_track", "Music track"),
         item("item_playlist", "Playlist"),
 

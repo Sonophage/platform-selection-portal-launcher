@@ -30,6 +30,8 @@ enum class GamepadAction {
     OPEN_CONTEXT_MENU,
     /** Cycle the sort order of the current list. */
     CHANGE_SORT,
+    /** Open the library search overlay, searching everything. */
+    OPEN_SEARCH,
     PREV_CATEGORY,
     NEXT_CATEGORY,
     HOME,

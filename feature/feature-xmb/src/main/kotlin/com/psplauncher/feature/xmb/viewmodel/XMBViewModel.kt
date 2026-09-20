@@ -411,6 +411,26 @@ data class MusicBrowserState(
     val scrollToTopToken: Int = 0,
 )
 
+/**
+ * The library search overlay.
+ *
+ * [rows] is what is on screen: already matched, already labelled, ready to render. The raw
+ * libraries are NOT held here -- they are read once when the overlay opens and kept in a field,
+ * because a search that re-queried the database on every keystroke would make typing feel like
+ * the device was thinking about it.
+ */
+data class SearchState(
+    val scope: SearchScope,
+    val query: String = "",
+    val rows: List<XMBItem> = emptyList(),
+    val selectedIndex: Int = 0,
+    // Bumped to snap the list back to the top when the query changes.
+    val scrollToTopToken: Int = 0,
+    // True once the libraries have been read. Until then the overlay says so rather than
+    // claiming an empty library.
+    val loaded: Boolean = false,
+)
+
 // Drives the "New / Rename Playlist" text dialog. When [forTrackId] is set, the freshly created
 // playlist immediately receives that track.
 data class PlaylistNameDialogState(
@@ -661,6 +681,7 @@ data class XMBUiState(
 
     // ── Fullscreen searchable music browser (Music / Playlist) ─────────────
     val musicBrowser: MusicBrowserState? = null,
+    val search: SearchState? = null,
 
     // ── Simple read-only info dialog (e.g. file location) ──────────────────
     val infoDialog: InfoDialogState? = null,
@@ -841,6 +862,7 @@ data class XMBUiState(
             playlistNameDialog != null ||
             musicTrackPicker != null ||
             musicBrowser != null ||
+            search != null ||
             musicPlayerVisible ||
             infoDialog != null ||
             launchRecovery != null ||
@@ -876,6 +898,8 @@ enum class XMBItemType {
     LIBRARY_SERIES,
     PHOTO_FILE,
     CAMERA,
+    // The Search row a library column leads with, and Network's Quick Search.
+    SEARCH,
     // "Add …" / "Create …" rows (add library/folder/apps/tracks, create playlist) — plus glyph.
     ADD_ACTION,
     EMPTY,
@@ -2268,11 +2292,25 @@ class XMBViewModel @Inject constructor(
         accentColor  = artwork?.let { platformCache[it.platformId]?.accentColor },
     )
 
+    /**
+     * The Search row a library column leads with.
+     *
+     * Scoped, so searching from inside Video looks only at video. The Music column has no such
+     * row: its own "Music" and "Playlist" rows already open a searchable browser, and a second
+     * way to do the same thing on the same column is worse than none.
+     */
+    private fun librarySearchItem(scope: SearchScope): XMBItem = XMBItem(
+        id       = SEARCH_ITEM_ID,
+        title    = scope.label,
+        subtitle = scope.hint,
+        type     = XMBItemType.SEARCH,
+    )
+
     private fun quickSearchItem(): XMBItem = XMBItem(
         id       = QUICK_SEARCH_ITEM_ID,
         title    = "Quick Search",
         subtitle = "Search the web, or type an address",
-        type     = XMBItemType.ADD_ACTION,
+        type     = XMBItemType.SEARCH,
     )
 
     private fun addAppsItem(): XMBItem = XMBItem(
@@ -2664,7 +2702,8 @@ class XMBViewModel @Inject constructor(
 
     /** The whole Video root: its sections, then the installed video apps, then Add Video Apps. */
     private suspend fun videoRootItems(): List<XMBItem> =
-        videoRootSections() + videoAppItems() + collapseAddRows(videoAddActions())
+        listOf(librarySearchItem(SearchScope.VIDEOS)) +
+            videoRootSections() + videoAppItems() + collapseAddRows(videoAddActions())
 
     private fun addVideosItem(): XMBItem = XMBItem(
         id       = ADD_VIDEOS_ITEM_ID,
@@ -2804,6 +2843,7 @@ class XMBViewModel @Inject constructor(
 
     // Handles A/Cross on any Video row. Returns true when [item] is a Video row it owns.
     private fun handleVideoSelection(item: XMBItem): Boolean = when {
+        item.id == SEARCH_ITEM_ID -> { openSearch(SearchScope.VIDEOS); true }
         item.id == ADD_MENU_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openAddMenu(); true }
         item.type == XMBItemType.EMPTY -> true
         item.id == ALL_VIDEOS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openVideoView(VideoNav.AllVideos); true }
@@ -3170,7 +3210,8 @@ class XMBViewModel @Inject constructor(
      * for launching a reader on its own, and match what Music, Video and Photo already do.
      */
     private suspend fun booksRootItems(): List<XMBItem> =
-        booksRootSections() + bookAppItems() + collapseAddRows(booksAddActions())
+        listOf(librarySearchItem(SearchScope.BOOKS)) +
+            booksRootSections() + bookAppItems() + collapseAddRows(booksAddActions())
 
     private suspend fun bookAppItems(): List<XMBItem> {
         val apps = appCategoryRepository.appsForCategory(LIBRARY_APPS_CATEGORY_ID)
@@ -3239,6 +3280,7 @@ class XMBViewModel @Inject constructor(
 
     /** Returns true when [item] was a Library row and has been handled. */
     private fun handleBooksSelection(item: XMBItem): Boolean = when {
+        item.id == SEARCH_ITEM_ID -> { openSearch(SearchScope.BOOKS); true }
         item.id == ADD_MENU_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openAddMenu(); true }
         item.id == OPEN_READER_ITEM_ID -> {
             menuSound.play(MenuSound.LAUNCH)
@@ -3389,7 +3431,8 @@ class XMBViewModel @Inject constructor(
 
     /** The whole Photo root: its sections, then the installed photo apps, then Add Photo Apps. */
     private suspend fun photoRootItems(): List<XMBItem> =
-        photoRootSections() + photoAppItems() + collapseAddRows(photoAddActions())
+        listOf(librarySearchItem(SearchScope.PHOTOS)) +
+            photoRootSections() + photoAppItems() + collapseAddRows(photoAddActions())
 
     private fun addPhotoLibraryItem(): XMBItem = XMBItem(
         id       = ADD_PHOTO_LIBRARY_ITEM_ID,
@@ -3473,6 +3516,7 @@ class XMBViewModel @Inject constructor(
 
     // Handles A/Cross on any Photo row. Returns true when [item] is a Photo row it owns.
     private fun handlePhotoSelection(item: XMBItem): Boolean = when {
+        item.id == SEARCH_ITEM_ID -> { openSearch(SearchScope.PHOTOS); true }
         item.id == ADD_MENU_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openAddMenu(); true }
         item.id == ALL_PHOTOS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openPhotoView(PhotoNav.AllPhotos); true }
         item.id == PHOTO_ALBUMS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openPhotoView(PhotoNav.Albums); true }
@@ -3696,6 +3740,221 @@ class XMBViewModel @Inject constructor(
         )) }
         if (state.view is MusicBrowserView.Playlists) rebuildBrowserPlaylistRows() else rebuildBrowserTrackRows()
     }
+
+    // ── Library search ──────────────────────────────────────────────────────────
+    //
+    // One overlay, two ways in: a Search row at the top of a library scopes it to that library,
+    // and the Select button searches everything. Scope is the only difference.
+    //
+    // The libraries are read ONCE, when the overlay opens, and kept here. Re-querying on every
+    // keystroke would put a database round trip between a key press and the letter appearing,
+    // which on a handheld reads as the device struggling.
+    private var searchGames: List<com.psplauncher.core.domain.model.Game> = emptyList()
+    private var searchVideos: List<com.psplauncher.core.domain.model.Video> = emptyList()
+    private var searchPhotos: List<com.psplauncher.core.domain.model.Photo> = emptyList()
+    private var searchBooks: List<com.psplauncher.core.domain.model.Book> = emptyList()
+    private var searchTracks: List<com.psplauncher.core.domain.model.MusicTrack> = emptyList()
+
+    fun openSearch(scope: SearchScope) {
+        menuSound.play(MenuSound.SELECT)
+        _uiState.update { it.copy(search = SearchState(scope = scope)) }
+        viewModelScope.launch {
+            // Only what the scope can actually match. A scoped search never pays for libraries it
+            // will not look in, which on a large game library is the difference that matters.
+            val wantsGames = scope == SearchScope.ALL || scope == SearchScope.GAMES
+            val wantsVideos = scope == SearchScope.ALL || scope == SearchScope.VIDEOS
+            val wantsPhotos = scope == SearchScope.ALL || scope == SearchScope.PHOTOS
+            val wantsBooks = scope == SearchScope.ALL || scope == SearchScope.BOOKS
+            searchGames = if (wantsGames) gameRepository.observeAllGames().first() else emptyList()
+            searchVideos = if (wantsVideos) videoRepository.observeAllVideos().first() else emptyList()
+            searchPhotos = if (wantsPhotos) photoRepository.observeAllPhotos().first() else emptyList()
+            searchBooks = if (wantsBooks) bookRepository.observeAllBooks().first() else emptyList()
+            // Music rides along on the global search only: the Music column already opens a
+            // searchable browser of its own, so it has no Search row and no scope of its own.
+            searchTracks = if (scope == SearchScope.ALL) musicRepository.observeAllTracks().first() else emptyList()
+            _uiState.update { it.copy(search = it.search?.copy(loaded = true)) }
+            rebuildSearchRows()
+        }
+    }
+
+    fun onSearchQueryChange(query: String) {
+        markTouchInput()
+        val state = _uiState.value.search ?: return
+        _uiState.update { it.copy(search = it.search?.copy(
+            query = query,
+            selectedIndex = 0,
+            scrollToTopToken = state.scrollToTopToken + 1,
+        )) }
+        rebuildSearchRows()
+    }
+
+    fun closeSearch() {
+        menuSound.play(MenuSound.BACK)
+        // Drop the snapshots with the overlay. Holding a whole library alive behind a closed
+        // screen is the kind of thing that only shows up as a memory graph six months later.
+        searchGames = emptyList(); searchVideos = emptyList(); searchPhotos = emptyList()
+        searchBooks = emptyList(); searchTracks = emptyList()
+        _uiState.update { it.copy(search = null) }
+    }
+
+    private fun rebuildSearchRows() {
+        val state = _uiState.value.search ?: return
+        val q = state.query
+        val rows = buildList {
+            searchGames.filter { matchesSearch(q, it.title, it.developer, it.publisher) }
+                .take(SEARCH_RESULTS_PER_LIBRARY)
+                .forEach { add(it.toSearchRow()) }
+            searchVideos.filter { matchesSearch(q, it.displayTitle, it.displayName) }
+                .take(SEARCH_RESULTS_PER_LIBRARY)
+                .forEach { add(it.toSearchRow()) }
+            searchPhotos.filter { matchesSearch(q, it.displayName, it.relativePath) }
+                .take(SEARCH_RESULTS_PER_LIBRARY)
+                .forEach { add(it.toSearchRow()) }
+            searchBooks.filter { matchesSearch(q, it.displayTitle, it.author, it.seriesName) }
+                .take(SEARCH_RESULTS_PER_LIBRARY)
+                .forEach { add(it.toSearchRow()) }
+            searchTracks.filter { matchesSearch(q, it.displayTitle, it.artist, it.album) }
+                .take(SEARCH_RESULTS_PER_LIBRARY)
+                .forEach { add(it.toSearchRow()) }
+        }
+        val display = when {
+            rows.isNotEmpty() -> rows
+            else -> when (searchEmptyState(state.loaded, q)) {
+                SearchEmptyState.LOADING -> searchNoticeItem("Reading your libraries", "One moment.")
+                SearchEmptyState.PROMPT -> searchNoticeItem("Type to search", state.scope.hint)
+                SearchEmptyState.NO_MATCHES -> searchNoticeItem("No matches", "Nothing here matches that.")
+            }.let(::listOf)
+        }
+        _uiState.update { it.copy(search = it.search?.copy(
+            rows = display,
+            selectedIndex = state.selectedIndex.coerceIn(0, (display.size - 1).coerceAtLeast(0)),
+        )) }
+    }
+
+    private fun searchNoticeItem(title: String, subtitle: String): XMBItem =
+        XMBItem(id = EMPTY_CATEGORY_ITEM_ID, title = title, subtitle = subtitle, type = XMBItemType.EMPTY)
+
+    private fun moveSearch(delta: Int) {
+        val state = _uiState.value.search ?: return
+        if (state.rows.isEmpty()) return
+        val next = (state.selectedIndex + delta).coerceIn(0, state.rows.lastIndex)
+        if (next == state.selectedIndex) return
+        menuSound.play(MenuSound.SCROLL)
+        _uiState.update { it.copy(search = it.search?.copy(selectedIndex = next)) }
+    }
+
+    /**
+     * Opens whatever the highlighted result is, in the place it lives.
+     *
+     * The crossbar is moved to the owning column first, so backing out of the thing you opened
+     * leaves you where it came from rather than wherever you happened to be standing when you
+     * started searching.
+     */
+    fun onSearchActivatedAt(index: Int) {
+        val state = _uiState.value.search ?: return
+        val row = state.rows.getOrNull(index) ?: return
+        if (row.type == XMBItemType.EMPTY) return
+        _uiState.update { it.copy(search = it.search?.copy(selectedIndex = index)) }
+        val categoryId = searchRowCategory(row) ?: return
+        closeSearch()
+        selectCategoryById(categoryId)
+        when (row.type) {
+            XMBItemType.VIDEO_FILE -> _uiState.update { it.copy(activeVideoId = row.id.removePrefix("vid_")) }
+            XMBItemType.PHOTO_FILE -> openSearchedPhoto(row)
+            XMBItemType.LIBRARY_BOOK -> openBook(row.id.removePrefix("book_"))
+            XMBItemType.MUSIC_TRACK -> openSearchedTrack(row)
+            else -> row.gameId?.let { id -> _uiState.update { s -> s.copy(activeGameId = id, activeGameAutoLaunch = false) } }
+        }
+    }
+
+    /** The column a result belongs to, which is where the cursor is put before opening it. */
+    private fun searchRowCategory(row: XMBItem): String? = when (row.type) {
+        XMBItemType.VIDEO_FILE -> BuiltInCategory.VIDEO
+        XMBItemType.PHOTO_FILE -> BuiltInCategory.PHOTO
+        XMBItemType.LIBRARY_BOOK -> BuiltInCategory.LIBRARY
+        XMBItemType.MUSIC_TRACK -> BuiltInCategory.MUSIC
+        else -> if (row.gameId != null) BuiltInCategory.GAMES else null
+    }
+
+    private fun selectCategoryById(categoryId: String) {
+        val index = _uiState.value.categories.indexOfFirst { it.id == categoryId }
+        if (index >= 0) onCategorySelected(index)
+    }
+
+    /**
+     * A photo is opened inside its album, not on its own.
+     *
+     * openPhotoViewer reads the album from photoNav, so the cursor is put in that album first --
+     * which also means backing out of the viewer lands in the album the photo lives in rather
+     * than at the Photo root.
+     */
+    private fun openSearchedPhoto(row: XMBItem) {
+        val photoId = row.id.removePrefix("pho_")
+        val libraryId = searchPhotos.firstOrNull { it.id == photoId }?.libraryId ?: return
+        val name = _uiState.value.photoLibraries.firstOrNull { it.id == libraryId }?.displayName.orEmpty()
+        _uiState.update { it.copy(photoNav = PhotoNav.Library(libraryId, name)) }
+        openPhotoViewer(photoId)
+    }
+
+    private fun openSearchedTrack(row: XMBItem) {
+        val trackId = row.id.removePrefix("mt_")
+        val track = searchTracks.firstOrNull { it.id == trackId } ?: return
+        musicPlayer.setQueue(listOf(track), 0)
+        _uiState.update { it.copy(musicPlayerVisible = true) }
+    }
+
+    // ── Result rows ─────────────────────────────────────────────────────────────
+    // Each carries the id shape its own opener already parses ("vid_", "pho_", "book_", "mt_"),
+    // so nothing here invents a second way to identify an entry. The subtitle names the library,
+    // because in a global search "Spirited Away" could be a film or a book and the row is the
+    // only thing that can say which.
+
+    private fun com.psplauncher.core.domain.model.Game.toSearchRow(): XMBItem = XMBItem(
+        id = "search_game_$id",
+        title = title,
+        subtitle = listOfNotNull("Game", platformCache[platformId]?.name).joinToString("  ·  "),
+        coverUri = artworkUri,
+        gameId = id,
+        platformId = platformId,
+        type = XMBItemType.STANDARD,
+    )
+
+    private fun com.psplauncher.core.domain.model.Video.toSearchRow(): XMBItem = XMBItem(
+        id = "vid_$id",
+        title = displayTitle,
+        subtitle = listOfNotNull("Video", videoRowSubtitle(durationMs, lastWatchedAt)).joinToString("  ·  "),
+        coverUri = effectiveThumbnailUri,
+        mediaUri = uri,
+        mimeType = mimeType,
+        type = XMBItemType.VIDEO_FILE,
+    )
+
+    private fun com.psplauncher.core.domain.model.Photo.toSearchRow(): XMBItem = XMBItem(
+        id = "pho_$id",
+        title = displayName,
+        subtitle = listOfNotNull("Photo", relativePath).joinToString("  ·  "),
+        coverUri = thumbnailUri ?: uri,
+        mediaUri = uri,
+        type = XMBItemType.PHOTO_FILE,
+    )
+
+    private fun com.psplauncher.core.domain.model.Book.toSearchRow(): XMBItem = XMBItem(
+        id = "book_$id",
+        title = displayTitle,
+        subtitle = listOfNotNull("Book", bookRowSubtitle(author, seriesName, seriesIndex)).joinToString("  ·  "),
+        coverUri = coverUri,
+        type = XMBItemType.LIBRARY_BOOK,
+    )
+
+    private fun com.psplauncher.core.domain.model.MusicTrack.toSearchRow(): XMBItem = XMBItem(
+        id = "mt_$id",
+        title = displayTitle,
+        subtitle = listOfNotNull("Music", musicRowSubtitle(artist, album, durationMs)).joinToString("  ·  "),
+        coverUri = artUri,
+        mediaUri = uri,
+        mimeType = mimeType,
+        type = XMBItemType.MUSIC_TRACK,
+    )
 
     private fun moveMusicBrowser(delta: Int) {
         val b = _uiState.value.musicBrowser ?: return
@@ -4476,7 +4735,9 @@ class XMBViewModel @Inject constructor(
                 type     = XMBItemType.MISSING,
             )
         } else null
-        val header = listOfNotNull(allGamesItem, favoritesItem, missingItem)
+        // Search leads the Games root, above All Games. On a 147-game library it is the row you
+        // want first, and the ES-DE reviewer's blocker was that there was no way to reach it.
+        val header = listOfNotNull(librarySearchItem(SearchScope.GAMES), allGamesItem, favoritesItem, missingItem)
 
         // User collections sit just under All Games / Favorites — like Favorites but user-defined.
         // Only collections assigned to this (the Main Game) category appear here; categoryId
@@ -4918,6 +5179,21 @@ class XMBViewModel @Inject constructor(
             return
         }
 
+        // ── Library search captures input. Beside the music browser and for the same reason:
+        //    a fullscreen list with its own cursor, so nothing underneath may move. OPEN_SEARCH
+        //    is absent on purpose -- pressing the search button again while searching should do
+        //    nothing rather than restart the search you are halfway through typing. ────────────
+        if (state.search != null) {
+            when (action) {
+                GamepadAction.NAVIGATE_UP   -> moveSearch(-1)
+                GamepadAction.NAVIGATE_DOWN -> moveSearch(+1)
+                GamepadAction.SELECT        -> onSearchActivatedAt(state.search.selectedIndex)
+                GamepadAction.BACK          -> closeSearch()
+                else -> Unit
+            }
+            return
+        }
+
         // ── Fullscreen music browser captures input. Below the context-menu / player / dialog
         //    branches above, so a menu (Y) or the player opened from it wins. ─────────────────
         if (state.musicBrowser != null) {
@@ -5115,6 +5391,9 @@ class XMBViewModel @Inject constructor(
             // Cycle the sort order of the current list (PSP-style). Whichever face button
             // the user's X/Y layout assigns to sort dispatches this.
             GamepadAction.CHANGE_SORT -> cycleSort()
+            // Searches everything, from anywhere on the home screen. The per-library Search rows
+            // are the same overlay with a narrower scope.
+            GamepadAction.OPEN_SEARCH -> openSearch(SearchScope.ALL)
             GamepadAction.OPEN_CONTEXT_MENU,
             GamepadAction.CHANGE_SORT,
             GamepadAction.PREV_CATEGORY,
@@ -6799,6 +7078,12 @@ class XMBViewModel @Inject constructor(
                 }
                 return
             }
+            SEARCH_ITEM_ID -> {
+                // The Games root's own Search row. The media columns answer this in their own
+                // selection handlers, which run before this one.
+                openSearch(SearchScope.GAMES)
+                return
+            }
             ADD_APPS_ITEM_ID -> {
                 category?.id?.let { openAppPicker(AppPickerTarget.CategoryShortcuts(it), "Add Apps") }
                 return
@@ -8388,6 +8673,10 @@ class XMBViewModel @Inject constructor(
         private const val RECENTLY_PLAYED_LIMIT = 20
         internal const val ADD_MENU_ITEM_ID = "add_menu"
         internal const val QUICK_SEARCH_ITEM_ID = "quick_search"
+        internal const val SEARCH_ITEM_ID = "library_search"
+        // Per library, not overall. A global search that returned two hundred games and nothing
+        // else would bury the one book you were looking for.
+        private const val SEARCH_RESULTS_PER_LIBRARY = 40
         private const val NETWORK_CATEGORY_ID = "network"
         // Reader apps are stored under the Library category's own id, the same convention the
         // other media categories use for their app rows.

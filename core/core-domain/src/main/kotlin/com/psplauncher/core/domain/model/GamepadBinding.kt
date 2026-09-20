@@ -58,8 +58,10 @@ val DEFAULT_BINDINGS = listOf(
     GamepadBinding(KeyEvent.KEYCODE_BUTTON_L1,     GamepadAction.PREV_CATEGORY),
     GamepadBinding(KeyEvent.KEYCODE_BUTTON_R1,     GamepadAction.NEXT_CATEGORY),
     GamepadBinding(KeyEvent.KEYCODE_BUTTON_START,  GamepadAction.HOME),
-    // The task tray was removed; Select keeps its repurposed sort role.
-    GamepadBinding(KeyEvent.KEYCODE_BUTTON_SELECT, GamepadAction.CHANGE_SORT),
+    // Select opens search. It used to be a second button for sort, which X already does -- a
+    // leftover from the removed task tray rather than a choice. Search is what the other button
+    // on a handheld has always been for, and a face button could not be spared for it.
+    GamepadBinding(KeyEvent.KEYCODE_BUTTON_SELECT, GamepadAction.OPEN_SEARCH),
     GamepadBinding(KeyEvent.KEYCODE_ENTER,         GamepadAction.SELECT),
     GamepadBinding(KeyEvent.KEYCODE_BACK,          GamepadAction.BACK),
     GamepadBinding(KeyEvent.KEYCODE_DPAD_CENTER,   GamepadAction.SELECT),
@@ -119,6 +121,7 @@ fun GamepadAction.displayLabel(): String = when (this) {
     GamepadAction.BACK              -> "Back / Close"
     GamepadAction.OPEN_CONTEXT_MENU -> "Options / Context Menu"
     GamepadAction.CHANGE_SORT       -> "Change Sort Order"
+    GamepadAction.OPEN_SEARCH       -> "Search Your Libraries"
     GamepadAction.PREV_CATEGORY     -> "Previous Tab (App Drawer)"
     GamepadAction.NEXT_CATEGORY     -> "Next Tab (App Drawer)"
     GamepadAction.HOME              -> "Start (Confirm in pickers)"

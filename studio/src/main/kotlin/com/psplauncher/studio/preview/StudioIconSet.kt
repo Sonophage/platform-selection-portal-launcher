@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCode2
@@ -94,6 +95,7 @@ object StudioIconSet {
         "item_library_book" to Icons.Filled.Book,
         "item_library_series" to Icons.Filled.Bookmarks,
         "item_camera" to Icons.Filled.PhotoCamera,
+        "item_search" to Icons.Filled.Search,
         "item_music_track" to Icons.Filled.MusicNote,
         "item_playlist" to Icons.Filled.QueueMusic,
     )

@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.QueueMusic
@@ -317,6 +318,7 @@ private fun SiblingIcon(item: XMBItem, selected: Boolean, solidUnfocusedIcons: B
         XMBItemType.VIDEO_COLLECTIONS -> Icons.Filled.Bookmarks
         XMBItemType.PHOTO_FOLDER    -> Icons.Filled.Folder
         XMBItemType.PHOTO_ALBUMS    -> Icons.Filled.PhotoLibrary
+        XMBItemType.SEARCH          -> Icons.Filled.Search
         // The video "Playlists" section row (PLAYLIST type with no playlistId) uses a playlist glyph.
         XMBItemType.PLAYLIST        -> Icons.Filled.QueueMusic
         else                        -> null
@@ -379,6 +381,7 @@ internal fun itemSlotKeyFor(type: XMBItemType): String? = when (type) {
     XMBItemType.LIBRARY_BOOK -> "item_library_book"
     XMBItemType.LIBRARY_SERIES -> "item_library_series"
     XMBItemType.CAMERA -> "item_camera"
+    XMBItemType.SEARCH -> "item_search"
     XMBItemType.MUSIC_TRACK -> "item_music_track"
     XMBItemType.PLAYLIST -> "item_playlist"
     else -> null
@@ -922,6 +925,13 @@ private fun XmbItemLeadingIcon(
         item.type == XMBItemType.CAMERA -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
                 ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.PhotoCamera, null, iconTint, Modifier.size(48.dp))
+            }
+        }
+        // A Search row: a magnifier rather than the "+" every other action row wears, because
+        // it does not add anything.
+        item.type == XMBItemType.SEARCH -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Search, null, iconTint, Modifier.size(44.dp))
             }
         }
         // "Add …" / "Create …" rows across Photo / Music / Video sections.

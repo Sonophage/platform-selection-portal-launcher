@@ -2914,7 +2914,9 @@ class ArtworkStudioViewModel @Inject constructor(
                 StudioZone.GRID    -> if (s.selectsMultiple) toggleSelection(s.gridIndex) else openCandidate(s.gridIndex)
             }
             // X / Square focuses the search field, from any level.
-            GamepadAction.CHANGE_SORT -> openSearch()
+            // Both buttons open this screen's own image search. Select is the library-search
+            // button everywhere else, so it means "search" here too rather than nothing.
+            GamepadAction.CHANGE_SORT, GamepadAction.OPEN_SEARCH -> openSearch()
             // START applies the active tab's changes, as it confirms in the other pickers (task 5.2).
             // SteamGridDB's mature filter, which it used to toggle, is in the Triangle menu.
             GamepadAction.HOME -> applyChanges()

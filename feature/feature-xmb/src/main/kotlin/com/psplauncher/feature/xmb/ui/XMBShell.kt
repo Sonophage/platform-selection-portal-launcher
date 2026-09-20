@@ -236,6 +236,10 @@ fun XMBShellContainer(
         onMusicTrackPickerActivatedAt = viewModel::onMusicTrackPickerActivatedAt,
         onMusicTrackPickerConfirm = viewModel::onMusicTrackPickerConfirm,
         onMusicTrackPickerDismiss = viewModel::closeMusicTrackPicker,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onSearchActivatedAt = viewModel::onSearchActivatedAt,
+        onSearchBack = viewModel::closeSearch,
+        onOpenSearch = { viewModel.openSearch(com.psplauncher.feature.xmb.viewmodel.SearchScope.ALL) },
         onMusicBrowserQueryChange = viewModel::onMusicBrowserQueryChange,
         onMusicBrowserActivatedAt = viewModel::onMusicBrowserActivatedAt,
         onMusicBrowserLongPressAt = viewModel::onMusicBrowserLongPressAt,
@@ -349,6 +353,10 @@ fun XMBShell(
     onCancelCollectionName: () -> Unit = {},
     onConfirmPlaylistName: (String) -> Unit = {},
     onCancelPlaylistName: () -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
+    onSearchActivatedAt: (Int) -> Unit = {},
+    onSearchBack: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
     onMusicBrowserQueryChange: (String) -> Unit = {},
     onMusicBrowserActivatedAt: (Int) -> Unit = {},
     onMusicBrowserLongPressAt: (Int) -> Unit = {},
@@ -609,6 +617,7 @@ fun XMBShell(
             // use a translucent backdrop, so the XMB would otherwise show through them.
             if (uiState.activeAppDrawerFilter == null &&
                 uiState.musicBrowser == null &&
+                uiState.search == null &&
                 uiState.activeSettingsScreen == null &&
                 uiState.activeGameId == null &&
                 uiState.activeVideoId == null &&
@@ -903,10 +912,17 @@ fun XMBShell(
                 exit = fadeOut(tween(220)),
                 modifier = Modifier.align(Alignment.BottomEnd),
             ) {
-                AppDrawerButton(
-                    onClick = onOpenAppDrawer,
+                // Search sits beside the drawer rather than replacing it: both are things you
+                // reach for with a thumb, and on a controller the same two are BACK at the root
+                // and the Select button. They share the visibility rule for that reason.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(bottom = 24.dp, end = 20.dp),
-                )
+                ) {
+                    SearchTouchButton(onClick = onOpenSearch)
+                    Spacer(Modifier.width(12.dp))
+                    AppDrawerButton(onClick = onOpenAppDrawer)
+                }
             }
 
             // Idle hint pill: [ X Sort   Y Options ], with the controller-style glyphs, fading
@@ -1009,6 +1025,18 @@ fun XMBShell(
                     // Drawer touches are reported to the shared input-source tracker so a finger
                     // tap/browse suppresses that hint exactly like touch on the XMB does.
                     onTouchInteraction = onTouchInput,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            // Library search — above the music browser, because a track opened from a search
+            // raises the player and this must not be sitting on top of it afterwards.
+            uiState.search?.let { search ->
+                SearchScreen(
+                    state = search,
+                    onQueryChange = onSearchQueryChange,
+                    onActivateAt = onSearchActivatedAt,
+                    onBack = onSearchBack,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -1363,6 +1391,46 @@ private fun CollectionNameDialog(
         onCancel = onCancel,
         confirmLabel = confirmLabel,
     )
+}
+
+/**
+ * Bottom-corner touch button that opens library search — a magnifier drawn on a Canvas, for the
+ * same reason the drawer's grid is: no icon-library dependency, and a drawn glyph does not change
+ * shape with whichever font the device falls back to.
+ *
+ * Controller users press Select instead, which is why this appears only when touch is the last
+ * input source (or the user has forced the touch affordances on).
+ */
+@Composable
+private fun SearchTouchButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    XmbTouchButton(onClick = onClick, modifier = modifier) {
+        Canvas(modifier = Modifier.size(26.dp)) {
+            val stroke = size.minDimension * 0.10f
+            val radius = size.minDimension * 0.30f
+            val centre = androidx.compose.ui.geometry.Offset(size.width * 0.42f, size.height * 0.42f)
+            drawCircle(
+                color = androidx.compose.ui.graphics.Color.White,
+                radius = radius,
+                center = centre,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
+            )
+            // The handle, running out of the glass at 45 degrees.
+            val from = androidx.compose.ui.geometry.Offset(
+                centre.x + radius * 0.72f,
+                centre.y + radius * 0.72f,
+            )
+            drawLine(
+                color = androidx.compose.ui.graphics.Color.White,
+                start = from,
+                end = androidx.compose.ui.geometry.Offset(size.width * 0.88f, size.height * 0.88f),
+                strokeWidth = stroke,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+        }
+    }
 }
 
 /** Bottom-corner touch button that opens the app drawer — a 2×2 grid glyph drawn on a Canvas
