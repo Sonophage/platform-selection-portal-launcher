@@ -644,6 +644,7 @@ class ArtworkStudioViewModel @Inject constructor(
     private val routingStore: com.psplauncher.feature.artwork.store.RoutingArtworkStore,
     private val ssMediaCatalog: com.psplauncher.feature.artwork.api.SsMediaCatalog,
     private val steamGridDb: SteamGridDbApi,
+    private val screenScraper: com.psplauncher.feature.artwork.api.ScreenScraperApi,
     private val sgdbKeyProvider: SgdbApiKeyProvider,
     private val theGamesDb: com.psplauncher.feature.artwork.TheGamesDbApi,
     private val igdbApi: com.psplauncher.feature.artwork.api.IgdbApi,
@@ -1289,9 +1290,19 @@ class ArtworkStudioViewModel @Inject constructor(
 
     // ── Provider availability ─────────────────────────────────────────────────
 
-    /** Re-reads which keyed providers can be asked. Cheap DataStore reads — safe on every open. */
+    /**
+     * Re-reads which keyed providers can be asked. Cheap DataStore reads — safe on every open.
+     *
+     * SCREENSCRAPER was missing from this set while being the DEFAULT source, and the effect was
+     * not a missing badge: SsMediaCatalog returns null the moment isEnabled() is false, ssResults
+     * turns that null into an empty list, and the grid then told the user "ScreenScraper has
+     * nothing of this type for this game" about a request that was never sent. Four sources need
+     * credentials and only three were checked -- see StudioSourceAvailabilityTest, which now
+     * pins the pair.
+     */
     private suspend fun refreshProviderAvailability() {
         val unavailable = buildSet {
+            if (!screenScraper.isEnabled()) add(StudioSource.SCREENSCRAPER)
             if (sgdbKeyProvider.getKey().isNullOrBlank()) add(StudioSource.STEAMGRIDDB)
             if (!theGamesDb.hasApiKey()) add(StudioSource.THEGAMESDB)
             if (!igdbApi.hasCredentials()) add(StudioSource.IGDB)

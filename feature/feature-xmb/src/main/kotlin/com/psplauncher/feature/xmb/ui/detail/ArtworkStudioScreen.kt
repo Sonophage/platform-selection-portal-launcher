@@ -682,6 +682,12 @@ internal fun ArtworkStudioContent(
                             state.results.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(
                                     when {
+                                        // "Nothing found" is a claim about an answer. A source
+                                        // with no credentials never sent the question, and saying
+                                        // it found nothing was the app inventing a result.
+                                        activeSource != null &&
+                                            activeSource in state.unavailableSources ->
+                                            "${activeSource.label} needs an account or key. Add one under Settings, Artwork, Scraping Sources."
                                         activeSource != StudioSource.SCREENSCRAPER -> "No results"
                                         // ScreenScraper art is fetched per game, so with no match there
                                         // was nothing to ask for, which is not the same as having none.

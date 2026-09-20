@@ -117,9 +117,17 @@ class ArtworkStudioViewModelTest {
             every { enabledFlow } returns kotlinx.coroutines.flow.flowOf(true)
         }
 
+    // Enabled by default: these tests are about what the studio ASKS, and a source the studio
+    // has decided it cannot ask is a source that asks nothing.
+    private val screenScraperApi =
+        mockk<com.psplauncher.feature.artwork.api.ScreenScraperApi>(relaxed = true) {
+            coEvery { isEnabled() } returns true
+        }
+
     private fun viewModel() = ArtworkStudioViewModel(
         context, gameRepository, artworkStore, routingStore, ssMediaCatalog,
-        steamGridDb, sgdbKeyProvider, theGamesDb, igdbApi, videoSnapTranscoder, matchEvidence,
+        steamGridDb, screenScraperApi, sgdbKeyProvider, theGamesDb, igdbApi,
+        videoSnapTranscoder, matchEvidence,
         cropPreviewPreferences,
         // Nothing kept between opens: these tests count what each open asks.
         com.psplauncher.feature.artwork.match.TitleSearchStore.None,
