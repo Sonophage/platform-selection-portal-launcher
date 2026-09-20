@@ -128,7 +128,11 @@ class PhotoViewerViewModel @Inject constructor(
     fun handleGamepadAction(action: GamepadAction) {
         val s = _uiState.value
         when {
-            s.applyingWallpaper -> Unit   // brief; swallow input so a double-tap can't re-apply
+            // Swallow input so a double-tap can't re-apply -- but never BACK. The point of this
+            // branch is to stop a SECOND apply, and closing the viewer was never what it was
+            // guarding against. Letting BACK through means that even if the flag were somehow
+            // left set, the user is not trapped in a screen whose buttons are all disabled.
+            s.applyingWallpaper -> if (action == GamepadAction.BACK) _uiState.update { it.copy(closed = true) } else Unit
             s.wallpaperPreviewVisible -> when (action) {
                 GamepadAction.SELECT -> applyWallpaper()
                 GamepadAction.BACK   -> _uiState.update { it.copy(wallpaperPreviewVisible = false) }
@@ -250,7 +254,17 @@ class PhotoViewerViewModel @Inject constructor(
         val photo = _uiState.value.photo ?: return
         val rotation = _uiState.value.rotationDegrees
         _uiState.update { it.copy(applyingWallpaper = true) }
+        // try/finally, and the finally is load-bearing.
+        //
+        // handleGamepadAction swallows EVERY action while this flag is set, including BACK, and
+        // both on-screen buttons are disabled by it. Three things below can throw and none of them
+        // is wrapped: the luminance survey decodes a bitmap (OOM on a large photo), edit{} can
+        // raise IOException, and the orphan sweep can raise SecurityException. Any of them used to
+        // leave the flag true for good -- pad input swallowed, buttons dead, no BackHandler
+        // anywhere in the app and system Back deliberately neutered, so the only way out was
+        // killing the launcher.
         viewModelScope.launch {
+            try {
             val imported = withContext(Dispatchers.IO) { importWallpaper(photo, rotation) }
             if (imported == null) {
                 _uiState.update {
@@ -280,6 +294,14 @@ class PhotoViewerViewModel @Inject constructor(
             }
             _uiState.update {
                 it.copy(applyingWallpaper = false, wallpaperPreviewVisible = false, actionMessage = "Wallpaper applied")
+            }
+            } catch (e: Exception) {
+                Timber.w(e, "Applying a wallpaper from the photo viewer failed")
+                _uiState.update { it.copy(actionMessage = "Could not set wallpaper — ${e.message ?: "unknown error"}") }
+            } finally {
+                // Unconditionally. Every success path above already cleared it; this is for the
+                // paths that threw, and for cancellation.
+                _uiState.update { it.copy(applyingWallpaper = false) }
             }
         }
     }
