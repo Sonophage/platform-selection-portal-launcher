@@ -4811,6 +4811,15 @@ class XMBViewModel @Inject constructor(
                 _uiState.update { it.copy(pendingDrawerAction = action) }
                 return
             }
+            state.saveThemeNameDialog != null -> {
+                // "Save as Theme..." is a touch-only button inside the icon editor, and the
+                // dialog it opens had NO branch here at all -- five references in the whole file,
+                // none of them a gamepad path. It is in hasBlockingOverlay, so every press fell
+                // through to the silent return below and the controller went dead until the user
+                // touched Cancel. BACK closes it; the dialog's own text field owns the rest.
+                if (action == GamepadAction.BACK) dismissSaveThemeNameDialog()
+                return
+            }
             state.customIconSession != null -> {
                 // The icon editor owns the pad: LEFT/RIGHT (and UP/DOWN, mirrored) step the
                 // slot cursor through the group's list — the strip is horizontal, so left and
@@ -4835,7 +4844,15 @@ class XMBViewModel @Inject constructor(
         // Defensive net: the main XMB navigation below must NEVER run while any overlay,
         // menu, or modal dialog is on screen. Each case above returns for its own handling;
         // this guards against a future overlay being added without its own branch.
-        if (state.hasBlockingOverlay) return
+        //
+        // It LOGS now. It was written to catch exactly that mistake and then caught one in
+        // production silently for as long as the Save-as-Theme dialog existed -- the controller
+        // simply stopped responding and nothing said why. A dropped press here is always a bug
+        // in this function, so it should arrive in a log rather than in the user's hands.
+        if (state.hasBlockingOverlay) {
+            Timber.w("Gamepad action $action dropped: a blocking overlay has no branch in this dispatcher")
+            return
+        }
 
         when (action) {
             // Item cursor moves through the shared moveItemCursor() so touch swipes and the D-pad
@@ -7218,7 +7235,10 @@ class XMBViewModel @Inject constructor(
     }
 
     fun closeCustomIcons() {
-        _uiState.update { it.copy(customIconSession = null) }
+        // The Save-as-Theme dialog is opened from INSIDE this editor, so it cannot outlive it.
+        // It used to: closeCustomIcons cleared only the session, leaving a blocking dialog up
+        // with nothing above it in the dispatcher.
+        _uiState.update { it.copy(customIconSession = null, saveThemeNameDialog = null) }
     }
 
     // Every cursor move drops [CustomIconSession.message]: it always describes what just
