@@ -88,3 +88,55 @@ fun settingsEntryFor(screenId: String): SettingsEntry? =
 
 /** The section a screen sits in, or null when it is not one of the catalog's screens. */
 fun settingsSectionFor(screenId: String): SettingsSectionId? = settingsEntryFor(screenId)?.section
+
+// ── The section rail ──────────────────────────────────────────────────────────
+
+/**
+ * One row of the section rail drawn down the left of every settings screen.
+ *
+ * [id] identifies the row and [opens] is what confirming it opens, and they are NOT the same thing
+ * for a section: a section row opens its first screen, and if the two ids were one string the rail
+ * would have two rows claiming the same identity and would highlight both.
+ */
+data class SettingsRailRow(
+    val id: String,
+    val opens: String,
+    val title: String,
+    /** A section heading you can confirm, as opposed to one of its screens. */
+    val isSection: Boolean,
+)
+
+/**
+ * The rail for the screen you are on: every section, with the one you are inside expanded to show
+ * its screens.
+ *
+ * The crossbar used to be where you chose a section, and the rail only listed the screens of the
+ * one you had already chosen. With the crossbar down to a single Settings row, the rail is the
+ * only place the tree exists, so it has to carry both levels: the six sections, always, and the
+ * open section's screens under it.
+ *
+ * Empty for a route outside the catalog. The setup wizard's first-run variant and Library
+ * Manager's deep links are reached from elsewhere and have no siblings to move between; a rail
+ * there would offer a way out of a screen that is meant to be finished.
+ */
+fun settingsRailRows(screenId: String?): List<SettingsRailRow> {
+    val open = screenId?.let(::settingsSectionFor) ?: return emptyList()
+    return buildList {
+        SettingsSectionId.entries.forEach { section ->
+            val screens = settingsEntriesIn(section)
+            add(
+                SettingsRailRow(
+                    id = section.id,
+                    opens = screens.first().id,
+                    title = section.title,
+                    isSection = true,
+                ),
+            )
+            if (section == open) {
+                screens.forEach {
+                    add(SettingsRailRow(id = it.id, opens = it.id, title = it.title, isSection = false))
+                }
+            }
+        }
+    }
+}

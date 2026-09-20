@@ -26,7 +26,6 @@ class DrillOutLadderTest {
     @Test fun `isInSubItem is exactly 'there is a rung to climb'`() {
         // One representative of each rung — the invariant that used to be two hand-written lists.
         val drilled = listOf(
-            root.copy(settingsSectionNav = SettingsSection.entries.first()),
             root.copy(musicNav = MusicNav.AllMusic),
             root.copy(videoNav = VideoNav.Library("lib", "Movies")),
             root.copy(videoNav = VideoNav.Playlist(1L, "Mix")),
@@ -66,14 +65,6 @@ class DrillOutLadderTest {
             root.copy(photoNav = PhotoNav.Library("alb", "Trip")).drillOutStep,
         )
         assertEquals(DrillOutStep.PHOTO, root.copy(photoNav = PhotoNav.Albums).drillOutStep)
-    }
-
-    @Test fun `a settings flyout outranks anything else left open behind it`() {
-        val state = root.copy(
-            settingsSectionNav = SettingsSection.entries.first(),
-            selectedPlatformId = "psp",
-        )
-        assertEquals(DrillOutStep.SETTINGS_SECTION, state.drillOutStep)
     }
 
     @Test fun `a games folder and a collection share the last rung`() {

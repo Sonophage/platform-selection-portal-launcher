@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -445,16 +449,15 @@ fun SettingsScaffold(
     val helpText = remember { mutableStateOf<String?>(null) }
     // The open picker and the cursor inside it. Cursor lives beside the request rather than in it
     // so re-opening the same setting always starts on its current value.
-    // The section rail: the screens beside this one, and whether the cursor is in it.
+    // The section rail: every section, the open one expanded to its screens, and whether the
+    // cursor is in it.
     //
     // Only for a screen that IS one of the catalog's screens. A deep link or the wizard has no
     // siblings to show, and an empty rail would be a column of nothing holding the content in.
     val screenId = LocalSettingsScreenId.current
     val openScreen = LocalSettingsOpenScreen.current
     val railEntries = remember(screenId) {
-        screenId?.let { com.psplauncher.core.domain.model.settingsSectionFor(it) }
-            ?.let { com.psplauncher.core.domain.model.settingsEntriesIn(it) }
-            .orEmpty()
+        com.psplauncher.core.domain.model.settingsRailRows(screenId)
     }
     val railFocused = remember { mutableStateOf(false) }
     val railCursor = remember(screenId) {
@@ -714,8 +717,9 @@ fun SettingsScaffold(
                 GamepadAction.SELECT -> {
                     val target = railEntries.getOrNull(railCursor.intValue)
                     // Confirming the screen you are already on just puts the cursor back in it,
-                    // rather than reloading the page you can see.
-                    if (target != null && target.id != screenId) openScreen(target.id) 
+                    // rather than reloading the page you can see. A section row opens its first
+                    // screen, which is also what expands that section in the rail.
+                    if (target != null && target.opens != screenId) openScreen(target.opens)
                     else railFocused.value = false
                 }
                 GamepadAction.BACK -> onBack()
@@ -1088,11 +1092,10 @@ fun SettingsScaffold(
                     // wider than the screen and this is a no-op, so narrow devices keep the full
                     // width they need.
                     Row(Modifier.fillMaxSize()) {
-                        // The section rail: the other screens of this section, always on screen,
-                        // the one you are on bright and the rest dimmed. This is the PS5 layout,
-                        // and the reason it earns its width is that settings are a tree you move
-                        // AROUND in -- before it, changing two things in one section meant
-                        // backing out to the crossbar and drilling in again for each.
+                        // The section rail: all six sections, with the one you are inside
+                        // expanded to its screens. This is the PS5 layout, and the reason it
+                        // earns its width is that the crossbar is down to a single Settings row
+                        // now, so the rail is the only place the whole tree exists.
                         if (railEntries.isNotEmpty()) {
                             SettingsSectionRail(
                                 entries = railEntries,
@@ -1100,9 +1103,9 @@ fun SettingsScaffold(
                                 cursorIndex = railCursor.intValue.takeIf {
                                     railFocused.value && cursorVisible.value
                                 },
-                                onPick = { entry ->
+                                onPick = { row ->
                                     notifyTouchInput()
-                                    if (entry.id != screenId) openScreen(entry.id)
+                                    if (row.opens != screenId) openScreen(row.opens)
                                 },
                             )
                         }
@@ -1274,19 +1277,27 @@ private val PICKER_EDGE_MARGIN = 24.dp
  */
 @Composable
 private fun SettingsSectionRail(
-    entries: List<com.psplauncher.core.domain.model.SettingsEntry>,
+    entries: List<com.psplauncher.core.domain.model.SettingsRailRow>,
     currentId: String?,
     cursorIndex: Int?,
-    onPick: (com.psplauncher.core.domain.model.SettingsEntry) -> Unit,
+    onPick: (com.psplauncher.core.domain.model.SettingsRailRow) -> Unit,
 ) {
-    Column(
+    // A list, not a Column: two levels of a six-section tree is up to twelve rows, which is
+    // taller than the rail on a handheld in landscape. The cursor scrolls it.
+    val listState = rememberLazyListState()
+    LaunchedEffect(cursorIndex) {
+        cursorIndex?.let { listState.animateScrollToItem(it.coerceIn(0, (entries.size - 1).coerceAtLeast(0))) }
+    }
+    LazyColumn(
+        state = listState,
         modifier = Modifier
             .width(SETTINGS_RAIL_WIDTH)
+            .fillMaxHeight()
             .padding(start = 40.dp, end = 12.dp, top = 6.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        entries.forEachIndexed { index, entry ->
-            val isCurrent = entry.id == currentId
+        itemsIndexed(entries, key = { _, row -> row.id }) { index, row ->
+            val isCurrent = row.id == currentId
             val isCursor = index == cursorIndex
             Row(
                 modifier = Modifier
@@ -1303,18 +1314,29 @@ private fun SettingsSectionRail(
                             Modifier
                         }
                     )
-                    .clickable { onPick(entry) }
-                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                    .clickable { onPick(row) }
+                    // A section's screens are indented under it. Indentation is the only thing
+                    // that says which section a screen belongs to once all six are listed.
+                    .padding(
+                        start = if (row.isSection) 10.dp else 22.dp,
+                        end = 10.dp,
+                        top = 7.dp,
+                        bottom = 7.dp,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = entry.title,
+                    text = row.title,
                     // The page you are on stays bright whether or not the cursor is in the rail:
                     // it is answering "where am I", not "what am I pointing at". The cursor plate
                     // answers the second question, and the two are allowed to be on different rows.
                     color = if (isCurrent) SettingsText else SettingsSubtext,
-                    fontSize = 14.sp,
-                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                    fontSize = if (row.isSection) 14.sp else 13.sp,
+                    fontWeight = when {
+                        isCurrent -> FontWeight.SemiBold
+                        row.isSection -> FontWeight.Medium
+                        else -> FontWeight.Normal
+                    },
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = TextStyle(shadow = SettingsTextShadow),

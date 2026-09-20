@@ -368,46 +368,15 @@ sealed interface MusicNav {
 // this stays a sealed interface so the drill/back plumbing keeps a stable type.
 
 
-// ── Settings hierarchy ────────────────────────────────────────────────────────
-// The Settings category root shows the Android system-settings leaf plus these six nested L1
-// sections. Selecting a section drills into the shared two-pane flyout (same interaction model
-// as Music/Video/Photo); selecting an L2 row inside it opens the existing settings screen
-// overlay. L2 row ids ARE screen route ids — SettingsNavHost resolves them, so legacy direct
-// callers keep working during migration.
-/**
- * The crossbar's Settings sections. A thin XMB-side view of core-domain's
- * [com.psplauncher.core.domain.model.SettingsSectionId] -- the id, title and subtitle all come
- * from there, so the column and the settings screens' rail cannot describe the tree differently.
- */
-enum class SettingsSection(val catalogId: com.psplauncher.core.domain.model.SettingsSectionId) {
-    LIBRARY(com.psplauncher.core.domain.model.SettingsSectionId.LIBRARY),
-    EMULATORS(com.psplauncher.core.domain.model.SettingsSectionId.EMULATORS),
-    APPEARANCE(com.psplauncher.core.domain.model.SettingsSectionId.APPEARANCE),
-    INTERFACE(com.psplauncher.core.domain.model.SettingsSectionId.INTERFACE),
-    MEDIA(com.psplauncher.core.domain.model.SettingsSectionId.MEDIA),
-    SYSTEM(com.psplauncher.core.domain.model.SettingsSectionId.SYSTEM);
-
-    val id: String get() = catalogId.id
-    val title: String get() = catalogId.title
-    val subtitle: String get() = catalogId.subtitle
-}
-
-fun settingsSectionForId(id: String): SettingsSection? =
-    SettingsSection.entries.firstOrNull { it.id == id }
-
-// The L2 rows of a section. Ids must be unique inside the list (list keys + cursor restore) and
-// distinct from every section id (the select handler routes section ids to the flyout and
-// everything else to activeSettingsScreen — see SettingsHierarchyTest).
-/**
- * The L2 rows of a section, built from the shared catalog in core-domain.
- *
- * It used to spell the tree out here, which made it the only copy -- right up until the settings
- * screens needed the same tree to draw their section rail, and a second copy in another module
- * would have been a list and its mirror with nothing keeping them level.
- */
-fun settingsSectionItems(section: SettingsSection): List<XMBItem> =
-    com.psplauncher.core.domain.model.settingsEntriesIn(section.catalogId)
-        .map { XMBItem(id = it.id, title = it.title, subtitle = it.subtitle) }
+// ── Settings ───────────────────────────────────────────────────────
+// The Settings category is two rows: one that opens the settings screens and one that opens
+// Android's own. It used to be the Android row plus six section rows, each of which drilled into
+// a two-pane flyout listing that section's screens.
+//
+// The flyout is gone because the settings screens grew their own section rail, which lists the
+// same six sections AND the current one's screens down the left of every page. Keeping the
+// crossbar version would have meant two ways to reach the same screen, one of which put the tree
+// on the home screen and the other inside it.
 
 // ── Fullscreen music browser (Settings-style, searchable) ───────────────────────
 // Opened from the "Music" and "Playlist" root items as a fullscreen overlay (not the inline XMB
@@ -464,7 +433,6 @@ data class MusicTrackPickerState(
  * lets the ladder's precedence be pinned by a plain state test, with no ViewModel to build.
  */
 enum class DrillOutStep {
-    SETTINGS_SECTION,
     MUSIC,
     /** A video Library backs out to the Libraries list before leaving Video. */
     VIDEO_LIBRARY,
@@ -602,7 +570,6 @@ data class XMBUiState(
     // The drilled-into Settings L1 section — non-null while its two-pane flyout shows the L2 rows,
     // null at the flat section root. Deliberately NOT part of hasBlockingOverlay: the flyout is
     // XMB foreground, so input keeps driving the item list exactly like every other drill.
-    val settingsSectionNav: SettingsSection? = null,
     // Settings ▸ Controller ▸ Left Backs Out. Mirrored from ControllerLayoutRepository so both the
     // XMB's own LEFT and the Settings overlay's read one value. Default true matches the pref's.
     val leftBacksOut: Boolean = true,
@@ -776,7 +743,6 @@ data class XMBUiState(
     // before leaving the section, so each press climbs exactly one level.
     val drillOutStep: DrillOutStep?
         get() = when {
-            settingsSectionNav != null -> DrillOutStep.SETTINGS_SECTION
             musicNav != MusicNav.Root -> DrillOutStep.MUSIC
             videoNav is VideoNav.Library -> DrillOutStep.VIDEO_LIBRARY
             videoNav is VideoNav.Playlist -> DrillOutStep.VIDEO_PLAYLIST
@@ -1918,16 +1884,13 @@ class XMBViewModel @Inject constructor(
                     _uiState.update { it.copy(currentItems = ANDROID_ITEMS) }
                 }
                 BuiltInCategory.SETTINGS -> {
-                    // Root rows while no section is open; the drilled-into section's L2 rows otherwise.
-                    // Always reset the cursor against the newly selected list so nested Settings
-                    // cannot retain an out-of-range index from the parent list.
+                    // One flat list. Still clamped rather than reset: the cursor is restored from
+                    // this category's own memory and must not survive as an out-of-range index.
                     _uiState.update { state ->
-                        val items = state.settingsSectionNav
-                            ?.let(::settingsSectionItems)
-                            ?: SETTINGS_ROOT_ITEMS
                         state.copy(
-                            currentItems = items,
-                            selectedItemIndex = state.selectedItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)),
+                            currentItems = SETTINGS_ROOT_ITEMS,
+                            selectedItemIndex = state.selectedItemIndex
+                                .coerceIn(0, (SETTINGS_ROOT_ITEMS.size - 1).coerceAtLeast(0)),
                         )
                     }
                 }
@@ -2748,7 +2711,6 @@ class XMBViewModel @Inject constructor(
             catId == BuiltInCategory.VIDEO -> "video_${videoNavKey(s.videoNav)}"
             catId == BuiltInCategory.PHOTO -> "photo_${photoNavKey(s.photoNav)}"
             catId == BuiltInCategory.LIBRARY -> "books_${booksNavKey(s.booksNav)}"
-            catId == BuiltInCategory.SETTINGS -> "settings_${s.settingsSectionNav?.id ?: "root"}"
             s.selectedCollectionId != null -> "col_${s.selectedCollectionId}"
             s.selectedPlatformId != null   -> "plat_${s.selectedPlatformId}"
             else                           -> "root"
@@ -4098,9 +4060,6 @@ class XMBViewModel @Inject constructor(
     // a playlist / All Music). Null = top level, normal single-column list.
     private fun computeDrillTitle(): String? {
         val s = _uiState.value
-        // Settings L1 flyout: the section name parents the L2 rows, like every other drill-in.
-        val settingsTitle = s.settingsSectionNav?.title
-        if (settingsTitle != null) return settingsTitle
         // Music sub-navigation is a drill-in too — a non-null title makes it show the two-pane flyout.
         val musicTitle = when (val nav = s.musicNav) {
             MusicNav.MusicApps   -> "Music Apps"
@@ -4177,17 +4136,6 @@ class XMBViewModel @Inject constructor(
     // single parent so the flyout still shows one icon.
     private fun computeDrillSiblings(category: Category?): Pair<List<XMBItem>, Int> {
         val s = _uiState.value
-        // Settings L1 flyout: the left column is the six section rows, drilled-into one centred.
-        if (s.settingsSectionNav != null) {
-            // Android Settings is a real sibling of the section cards. Keep it in the left
-            // column so Library (and every other L1 section) always has a visible parent icon
-            // above the category bar, matching the established Music flyout geometry.
-            val sibs = listOf(
-                XMBItem(id = ANDROID_SETTINGS_ITEM_ID, title = "Android Settings", subtitle = "Opens device settings"),
-            ) + SettingsSection.entries.map { XMBItem(id = it.id, title = it.title, subtitle = it.subtitle) }
-            val idx = sibs.indexOfFirst { it.id == s.settingsSectionNav.id }.coerceAtLeast(0)
-            return sibs to idx
-        }
         // Music sub-navigation: the left column is the Music root's sections (Playlist / Music Apps /
         // Music), with the drilled-into one centred on the arrow.
         if (s.musicNav != MusicNav.Root) {
@@ -6336,7 +6284,7 @@ class XMBViewModel @Inject constructor(
         // activeAppDrawerFilter is cleared as an invariant: landing on a category always shows the
         // plain XMB (the drawer can't normally be open here, but this keeps the contextual button
         // state correct no matter which path selected the category).
-        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = restore, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, settingsSectionNav = null, activeAppDrawerFilter = null) }
+        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = restore, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, activeAppDrawerFilter = null) }
         tintWaveForCategory(category)
         loadItemsForCategory(category)
     }
@@ -6469,7 +6417,6 @@ class XMBViewModel @Inject constructor(
      */
     private fun backOutOfDrill(s: XMBUiState): Boolean {
         when (s.drillOutStep) {
-            DrillOutStep.SETTINGS_SECTION -> closeSettingsSection()
             DrillOutStep.MUSIC -> closeMusicView()
             // Two-level video paths back out through their own list first.
             DrillOutStep.VIDEO_LIBRARY -> openVideoView(VideoNav.Libraries)
@@ -6658,16 +6605,11 @@ class XMBViewModel @Inject constructor(
             }
             else -> when (category?.id) {
                 BuiltInCategory.SETTINGS -> {
-                    val id = item?.id
-                    if (id != null) {
-                        val section = settingsSectionForId(id)
-                        if (section != null) {
-                            Timber.d("Opening settings section flyout: ${section.title}")
-                            openSettingsSection(section)
-                        } else {
-                            Timber.d("Opening settings screen: $id")
-                            _uiState.update { it.copy(activeSettingsScreen = id) }
-                        }
+                    // Every row here is a screen id now, including the single Settings row, which
+                    // carries the id of the screen the section rail opens on.
+                    item?.id?.let { id ->
+                        Timber.d("Opening settings screen: $id")
+                        _uiState.update { it.copy(activeSettingsScreen = id) }
                     }
                 }
                 BuiltInCategory.ANDROID -> {
@@ -6984,23 +6926,6 @@ class XMBViewModel @Inject constructor(
 
     fun consumeAppDetailAction() {
         _uiState.update { it.copy(pendingAppDetailAction = null) }
-    }
-
-    // ── Settings hierarchy (L1 section flyouts) ───────────────────────────────
-    // Drilling into a section reuses the shared drill path (computeDrillTitle / computeDrillSiblings
-    // → XmbDrillFlyout) with cursor memory, exactly like Music/Video/Photo. Back from an L2
-    // screen simply closes the overlay: settingsSectionNav survives underneath, so the owning
-    // flyout is revealed — there is no extra stack to unwind.
-
-    private fun openSettingsSection(section: SettingsSection) {
-        // Rebuild immediately: the settings section changes the visible item list and drill
-        // metadata. Waiting for a category reload can leave the old selection/index in place,
-        // which may activate an invalid row and crash on nested Settings screens.
-        navigateRememberingCursor { it.copy(settingsSectionNav = section) }
-    }
-
-    private fun closeSettingsSection() {
-        navigateRememberingCursor { it.copy(settingsSectionNav = null) }
     }
 
     // ── Settings overlay ──────────────────────────────────────────────────────
@@ -8187,13 +8112,25 @@ class XMBViewModel @Inject constructor(
         // First item opens the device's own Settings app (not a PFP screen).
         internal const val ANDROID_SETTINGS_ITEM_ID = "settings_android_system"
 
-        // Settings root: the Android system-settings leaf plus the six nested L1 sections
-        // (settingsSectionItems supplies each section's L2 rows). Section rows drill into the
-        // two-pane flyout; any other id opens its screen overlay directly. `internal` so the
-        // hierarchy unit tests can assert the exact root order.
+        /**
+         * The id the single Settings row opens on: the first screen of the first section.
+         *
+         * Taken from the catalog rather than written out, so reordering the catalog moves this
+         * with it. The rail on that screen is what reaches everything else.
+         */
+        internal val SETTINGS_ENTRY_SCREEN_ID: String =
+            com.psplauncher.core.domain.model.SETTINGS_CATALOG.first().id
+
+        // Settings root: one row into the settings screens, one into Android's own. `internal` so
+        // the hierarchy unit tests can assert the exact root order.
         internal val SETTINGS_ROOT_ITEMS = listOf(
+            XMBItem(
+                id = SETTINGS_ENTRY_SCREEN_ID,
+                title = "Settings",
+                subtitle = "Library, emulators, appearance, interface, media & system",
+            ),
             XMBItem(id = ANDROID_SETTINGS_ITEM_ID, title = "Android Settings", subtitle = "Opens device settings"),
-        ) + SettingsSection.entries.map { XMBItem(id = it.id, title = it.title, subtitle = it.subtitle) }
+        )
     }
 
     private fun canonicalXmbCategories(categories: List<Category>): List<Category> =
