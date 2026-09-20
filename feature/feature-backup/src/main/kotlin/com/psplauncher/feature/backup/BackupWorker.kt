@@ -1,6 +1,7 @@
 package com.psplauncher.feature.backup
 
 import android.content.Context
+import android.os.Build
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -17,9 +18,21 @@ class BackupWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val now = System.currentTimeMillis()
-        // Version info passed in by the caller (app module owns BuildConfig)
-        val versionCode = inputData.getInt(KEY_INPUT_VERSION_CODE, 0)
-        val versionName = inputData.getString(KEY_INPUT_VERSION_NAME) ?: "unknown"
+        // The worker reads its own version rather than being told it.
+        //
+        // It used to take both from inputData, and the one caller that enqueues it passed none,
+        // so every backup this app has ever written records appVersionCode 0 and appVersionName
+        // "unknown" -- the two fields whose whole job is to say which version wrote the file.
+        // Nothing failed, because a default is a perfectly good Int. Reading it here means a
+        // caller cannot forget, which is the only fix that stays fixed.
+        val pkg = runCatching {
+            applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0)
+        }.getOrNull()
+        val versionCode = pkg?.let {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode.toInt()
+            else @Suppress("DEPRECATION") it.versionCode
+        } ?: 0
+        val versionName = pkg?.versionName ?: "unknown"
         return when (
             val result = backupManager.createBackup(
                 appVersionCode = versionCode,
@@ -38,8 +51,6 @@ class BackupWorker @AssistedInject constructor(
 
     companion object {
         const val TAG                    = "pfp_backup"
-        const val KEY_INPUT_VERSION_CODE = "version_code"
-        const val KEY_INPUT_VERSION_NAME = "version_name"
         const val KEY_OUTPUT_PATH        = "output_path"
         const val KEY_ERROR              = "error"
     }
