@@ -683,20 +683,22 @@ data class XMBUiState(
     // Whether the focused game's scraped one-liner is drawn under its logo.
     val gameMetadataVisible: Boolean = true,
     /**
-     * The focused game's own colour, read out of its artwork. Null on a non-game row, on art
-     * with no dominant hue, and for the moment before it has been read -- in all three the XMB
-     * keeps the user's theme, which is what it looked like before this existed.
+     * The focused row's own colour, read out of its artwork. Null on a row with no art of its
+     * own, on art with no dominant hue, and for the moment before it has been read -- in all
+     * three the XMB keeps the user's theme, which is what it looked like before this existed.
+     *
+     * Every category feeds this, not only Games: see [XMBItem.backdropArt].
      */
-    val focusedGameAccentArgb: Long? = null,
+    val focusedItemAccentArgb: Long? = null,
     /**
-     * The image behind the focused game: the first of its art candidates that actually decodes.
+     * The image behind the focused row: the first of its art candidates that actually decodes.
      *
      * NOT simply artworkUri, which is what this used to read. 125 of the 147 games on the real
      * library name an internal artwork path that no longer exists, so reading the named slot
      * showed the wallpaper for all of them and the per-game backdrop only ever appeared for the
      * five with a content:// one.
      */
-    val focusedGameBackdrop: String? = null,
+    val focusedItemBackdrop: String? = null,
     val librarySetupComplete: Boolean = false,
     val themeColors: PFPColors = DefaultPFPColors,
     // Custom icon slots of the applied theme (theme slot key → CustomIcon); empty = the
@@ -1254,7 +1256,24 @@ data class XMBItem(
     // Prestige Bones earned (player-card summary row only); renders "• N [bone glyph]" after the
     // title when greater than zero.
     val type: XMBItemType = XMBItemType.STANDARD,
-)
+) {
+    /**
+     * The art this row's shell colour and backdrop are read from, best first, or empty when the
+     * row has no art of its own.
+     *
+     * One list for every category on purpose. Games had this treatment and the other libraries
+     * did not, which meant the shell took a photograph's colour on the Games row and dropped
+     * back to the flat theme the moment you moved to Music or Photo. Whether a row can colour
+     * the shell is now a question about the row, not about which category it came from.
+     *
+     * [MEMORY_CARD_ASSET_URI] is excluded deliberately: it is the bundled folder icon that every
+     * category's navigation rows share, so reading a colour from it would tint the whole shell
+     * the same grey on every folder, everywhere, which reads as the theme having broken.
+     */
+    val backdropArt: List<String>
+        get() = listOfNotNull(artworkUri, heroUri, coverUri, boxArtUri, iconUri)
+            .filter { it.isNotBlank() && it != XMBViewModel.MEMORY_CARD_ASSET_URI }
+}
 
 /**
  * The tile art [GameIcon] should draw for [item] under the given global mode.
@@ -1409,7 +1428,7 @@ class XMBViewModel @Inject constructor(
         observeContextMenuHintIdle()
         observeIconDisplayMode()
         observeFocusedGameVideo()
-        observeFocusedGameAccent()
+        observeFocusedItemAccent()
         observeBackgroundSettings()
         observeTouchNavButtonMode()
         observeWallpaper()
@@ -7765,36 +7784,41 @@ class XMBViewModel @Inject constructor(
      * overlay, or mode change clears it immediately (collectLatest cancels the pending linger).
      */
     /**
-     * The focused game's colour, following the cursor.
+     * The focused row's colour, following the cursor.
+     *
+     * Every category, not just Games: an album cover, a video thumbnail, a photo and a book
+     * jacket all colour the shell and back it exactly the way a game's key art does. Which rows
+     * qualify is [XMBItem.backdropArt]'s answer, so there is one rule rather than one per
+     * library.
      *
      * Debounced, and that is the whole difference from the detail page's version of this: there
-     * a page opens on ONE game, here the cursor can cross forty of them in a second, and decoding
-     * every one of those would be forty bitmaps nobody ever sees. The wait is deliberately
-     * shorter than the video snap's -- a colour settling in is cheap and reads as the screen
-     * catching up, where a video starting is an event.
+     * a page opens on ONE entry, here the cursor can cross forty of them in a second, and
+     * decoding every one of those would be forty bitmaps nobody ever sees. The wait is
+     * deliberately shorter than the video snap's -- a colour settling in is cheap and reads as
+     * the screen catching up, where a video starting is an event.
      */
-    private fun observeFocusedGameAccent() {
+    private fun observeFocusedItemAccent() {
         viewModelScope.launch {
             _uiState
-                .map { s -> s.currentItems.getOrNull(s.selectedItemIndex)?.takeIf { it.isRealGame } }
-                .distinctUntilChanged { a, b -> a?.gameId == b?.gameId }
+                .map { s -> s.currentItems.getOrNull(s.selectedItemIndex)?.takeIf { it.backdropArt.isNotEmpty() } }
+                // By row id, not game id: every non-game row has a null game id, so comparing
+                // those would report a whole music library as one unchanging item.
+                .distinctUntilChanged { a, b -> a?.id == b?.id }
                 .collectLatest { item ->
                     if (item == null) {
                         _uiState.update {
-                            it.copy(focusedGameAccentArgb = null, focusedGameBackdrop = null)
+                            it.copy(focusedItemAccentArgb = null, focusedItemBackdrop = null)
                         }
                         return@collectLatest
                     }
                     kotlinx.coroutines.delay(ACCENT_SETTLE_MS)
-                    val art = artworkAccent.resolve(
-                        item.artworkUri, item.heroUri, item.boxArtUri, item.iconUri,
-                    )
+                    val art = artworkAccent.resolve(*item.backdropArt.toTypedArray())
                     // collectLatest cancels this on any cursor move, so reaching here means the
-                    // cursor is still on the game this was read for.
+                    // cursor is still on the row this was read for.
                     _uiState.update {
                         it.copy(
-                            focusedGameAccentArgb = art?.accent,
-                            focusedGameBackdrop = art?.uri,
+                            focusedItemAccentArgb = art?.accent,
+                            focusedItemBackdrop = art?.uri,
                         )
                     }
                 }
@@ -8085,7 +8109,9 @@ class XMBViewModel @Inject constructor(
         private const val PHOTO_APPS_CATEGORY_ID = "photos"
         // Generic memory-card art for the "Music" (All Music) item — the physical-media default
         // PNG, loaded from assets via Coil (same convention as PhysicalMediaIcon).
-        private const val MEMORY_CARD_ASSET_URI =
+        // `internal` because XMBItem.backdropArt has to exclude it: a row wearing the shared
+        // folder icon must not colour the shell.
+        internal const val MEMORY_CARD_ASSET_URI =
             "file:///android_asset/systems/physical-media/_default.png"
         // Sentinel in XMBContextMenu.musicTrackId marking the in-app player's own options menu.
         private const val MUSIC_PLAYER_MENU_MARKER = "__music_player__"

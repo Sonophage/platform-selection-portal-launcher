@@ -379,16 +379,16 @@ fun XMBShell(
     // colour on before the next one starts pulling it away.
     val themeWave = uiState.themeColors.waveColor
     val themeAccent = uiState.themeColors.accentColor
-    val gameColor = uiState.focusedGameAccentArgb?.let { Color(it.toInt()) }
+    val itemColor = uiState.focusedItemAccentArgb?.let { Color(it.toInt()) }
     val xmbWave by androidx.compose.animation.animateColorAsState(
-        targetValue = gameColor ?: themeWave,
+        targetValue = itemColor ?: themeWave,
         animationSpec = tween(durationMillis = 420),
-        label = "xmbGameWave",
+        label = "xmbItemWave",
     )
     val xmbGameAccent by androidx.compose.animation.animateColorAsState(
-        targetValue = gameColor ?: themeAccent,
+        targetValue = itemColor ?: themeAccent,
         animationSpec = tween(durationMillis = 420),
-        label = "xmbGameAccent",
+        label = "xmbItemAccent",
     )
     // withWaveTint re-derives the background anchors from the wave through the same cascade the
     // theme itself was built with, so a game's colour produces the gradient that colour WOULD
@@ -514,7 +514,9 @@ fun XMBShell(
                 modifier            = Modifier.fillMaxSize(),
             )
 
-            // Per-game background art (XMB hover).
+            // Per-row background art (XMB hover). Any row with art of its own, in any
+            // category: an album cover, a video thumbnail, a photo or a book jacket backs the
+            // shell exactly the way a game's key art does.
             //
             // It read artworkUri alone -- the dedicated background slot, with heroUri reserved
             // for the Game Detail banner. That rule was right and the data was not: 125 of the
@@ -523,7 +525,7 @@ fun XMBShell(
             // the first candidate that actually DECODED, which is the same image its colour came
             // from, so the backdrop and the tint over it can never be of two different pictures.
             val selectedItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-            val selectedBg = uiState.focusedGameBackdrop
+            val selectedBg = uiState.focusedItemBackdrop
             // PS3 placement: the approved snap plays full-bleed here instead of in the tile,
             // over the still art and UNDER the legibility scrim, so the crossbar keeps the same
             // contrast it has over a still background. Same FocusedGameVideo, same gates, same
