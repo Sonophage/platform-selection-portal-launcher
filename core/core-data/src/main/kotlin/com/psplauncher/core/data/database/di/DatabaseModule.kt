@@ -67,53 +67,8 @@ object DatabaseModule {
         // database carrying it — from a migration or this callback — fails Room's post-migration
         // validation. The one-primary-per-disc-set invariant is enforced by DiscSetBuilder /
         // DiscSetReconciler at scan time instead.)
-        .addMigrations(
-            PFPDatabase.MIGRATION_1_2,
-            PFPDatabase.MIGRATION_2_3,
-            PFPDatabase.MIGRATION_3_4,
-            PFPDatabase.MIGRATION_4_5,
-            PFPDatabase.MIGRATION_5_6,
-            PFPDatabase.MIGRATION_6_7,
-            PFPDatabase.MIGRATION_7_8,
-            PFPDatabase.MIGRATION_8_9,
-            PFPDatabase.MIGRATION_9_10,
-            PFPDatabase.MIGRATION_10_11,
-            PFPDatabase.MIGRATION_11_12,
-            PFPDatabase.MIGRATION_12_13,
-            PFPDatabase.MIGRATION_13_14,
-            PFPDatabase.MIGRATION_14_15,
-            PFPDatabase.MIGRATION_15_16,
-            PFPDatabase.MIGRATION_16_17,
-            PFPDatabase.MIGRATION_17_18,
-            PFPDatabase.MIGRATION_18_19,
-            PFPDatabase.MIGRATION_19_20,
-            PFPDatabase.MIGRATION_20_21,
-            PFPDatabase.MIGRATION_21_22,
-            PFPDatabase.MIGRATION_22_23,
-            PFPDatabase.MIGRATION_23_24,
-            PFPDatabase.MIGRATION_24_25,
-            PFPDatabase.MIGRATION_25_26,
-            PFPDatabase.MIGRATION_26_27,
-            PFPDatabase.MIGRATION_27_28,
-            PFPDatabase.MIGRATION_28_29,
-            PFPDatabase.MIGRATION_29_30,
-            PFPDatabase.MIGRATION_30_31,
-            PFPDatabase.MIGRATION_31_32,
-            PFPDatabase.MIGRATION_32_33,
-            PFPDatabase.MIGRATION_33_34,
-            PFPDatabase.MIGRATION_34_35,
-            PFPDatabase.MIGRATION_35_36,
-            PFPDatabase.MIGRATION_36_37,
-            PFPDatabase.MIGRATION_37_38,
-            PFPDatabase.MIGRATION_38_39,
-            PFPDatabase.MIGRATION_39_40,
-            PFPDatabase.MIGRATION_40_41,
-            PFPDatabase.MIGRATION_41_42,
-            PFPDatabase.MIGRATION_42_43,
-            PFPDatabase.MIGRATION_43_44,
-            PFPDatabase.MIGRATION_44_45,
-            PFPDatabase.MIGRATION_45_46,
-        )
+        // One list, declared beside the migrations themselves. See PFPDatabase.ALL_MIGRATIONS.
+        .addMigrations(*PFPDatabase.ALL_MIGRATIONS)
         .build()
 
     @Provides fun provideGameDao(db: PFPDatabase): GameDao = db.gameDao()

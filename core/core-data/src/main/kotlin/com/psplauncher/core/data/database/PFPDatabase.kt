@@ -64,6 +64,14 @@ import com.psplauncher.core.data.database.entity.VideoLibraryEntity
 import com.psplauncher.core.data.database.entity.VideoPlaylistEntity
 import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
 
+/**
+ * The schema version, named once.
+ *
+ * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
+ * version bump cannot leave the test still asserting against the old number.
+ */
+const val PFP_DATABASE_VERSION = 46
+
 @Database(
     entities = [
         GameEntity::class,
@@ -97,7 +105,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
         BookLibraryEntity::class,
         BookEntity::class,
     ],
-    version = 46,
+    version = PFP_DATABASE_VERSION,
     exportSchema = true,        // schema JSON exported to /schemas/ for migration auditing
 )
 @TypeConverters(PFPTypeConverters::class)
@@ -1347,5 +1355,65 @@ abstract class PFPDatabase : RoomDatabase() {
                 db.execSQL("DROP TABLE IF EXISTS steam_no_achievements")
             }
         }
+
+        /**
+         * Every migration, in order, as ONE list.
+         *
+         * DatabaseModule used to hand-type all of these into `addMigrations(...)`, which made the
+         * registration a mirror of the declarations with nothing keeping them level. Forgetting one
+         * line there produces `IllegalStateException: A migration from N to N+1 was required but not
+         * found` on every existing user's next launch -- and, because each migration's own test
+         * invokes the object directly, the whole suite stays green. The list lives here now, beside
+         * the objects it names, and `PFPDatabaseMigrationsTest` enumerates the declarations by
+         * reflection and checks none is missing from it.
+         */
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
+            MIGRATION_10_11,
+            MIGRATION_11_12,
+            MIGRATION_12_13,
+            MIGRATION_13_14,
+            MIGRATION_14_15,
+            MIGRATION_15_16,
+            MIGRATION_16_17,
+            MIGRATION_17_18,
+            MIGRATION_18_19,
+            MIGRATION_19_20,
+            MIGRATION_20_21,
+            MIGRATION_21_22,
+            MIGRATION_22_23,
+            MIGRATION_23_24,
+            MIGRATION_24_25,
+            MIGRATION_25_26,
+            MIGRATION_26_27,
+            MIGRATION_27_28,
+            MIGRATION_28_29,
+            MIGRATION_29_30,
+            MIGRATION_30_31,
+            MIGRATION_31_32,
+            MIGRATION_32_33,
+            MIGRATION_33_34,
+            MIGRATION_34_35,
+            MIGRATION_35_36,
+            MIGRATION_36_37,
+            MIGRATION_37_38,
+            MIGRATION_38_39,
+            MIGRATION_39_40,
+            MIGRATION_40_41,
+            MIGRATION_41_42,
+            MIGRATION_42_43,
+            MIGRATION_43_44,
+            MIGRATION_44_45,
+            MIGRATION_45_46,
+        )
+
     }
 }
