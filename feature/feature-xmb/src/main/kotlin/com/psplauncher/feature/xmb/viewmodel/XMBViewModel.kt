@@ -567,9 +567,6 @@ data class XMBUiState(
 
     // ── Overlay screens ───────────────────────────────────────────────────
     val activeSettingsScreen: String? = null,
-    // The drilled-into Settings L1 section — non-null while its two-pane flyout shows the L2 rows,
-    // null at the flat section root. Deliberately NOT part of hasBlockingOverlay: the flyout is
-    // XMB foreground, so input keeps driving the item list exactly like every other drill.
     // Settings ▸ Controller ▸ Left Backs Out. Mirrored from ControllerLayoutRepository so both the
     // XMB's own LEFT and the Settings overlay's read one value. Default true matches the pref's.
     val leftBacksOut: Boolean = true,

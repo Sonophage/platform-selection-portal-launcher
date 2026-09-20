@@ -128,7 +128,7 @@ class GameDetailNav(
 
     /**
      * Rows that hand the cursor straight to a child on vertical arrival. Their container is a visual
-     * band (the quick actions, the disc row, the media strip) rather than something a user acts on,
+     * band (the action row, the disc row, the media strip) rather than something a user acts on,
      * so parking the cursor on it would cost an extra RIGHT press for no information.
      */
     private val autoEnterRows = setOf(GameDetailKeys.ACTIONS, GameDetailKeys.DISCS, GameDetailKeys.MEDIA)
@@ -143,7 +143,7 @@ class GameDetailNav(
      * Every key the cursor can actually reach, inline children included.
      *
      * Not the engine's [NavigationEngine.focusableKeys], which reports only top-level nodes: the
-     * quick actions, discs and media tiles are children (LEFT/RIGHT siblings), so a caller asking
+     * action buttons, discs and media tiles are children (LEFT/RIGHT siblings), so a caller asking
      * "can the user reach this?" needs the whole graph.
      */
     fun reachableKeys(): Set<String> = registeredNodes
@@ -214,7 +214,7 @@ class GameDetailNav(
      * Keep the cursor off the visual bands that hold no action of their own.
      *
      * A removed node recovers to its owning row first (the engine's rule), and a row is a legitimate
-     * answer for a row that is *itself* actionable — but the quick-action, disc and media bands are
+     * answer for a row that is *itself* actionable — but the action, disc and media bands are
      * not: parking there would hide the cursor on something with nothing to confirm, so it steps
      * into the band's first child instead.
      */

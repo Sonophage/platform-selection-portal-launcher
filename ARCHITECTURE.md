@@ -143,9 +143,12 @@ per-system defaults, and copyable diagnostics instead of a dead end.
   **Favorites** (shown only when something is favorited), user collections, then one row per
   enabled Memory Card. Folders are entered by setting `selectedPlatformId` (sentinels
   `__all_games__` / `__favorites__`) or `selectedCollectionId`; BACK clears them.
-- **Settings hierarchy:** two levels. L1 sections (Library, Media, Emulators, Interface, System)
-  open as nested XMB items; L2 entries route to settings screens through the
-  `SETTINGS_SCREEN_ROUTES` allowlist in `SettingsNavHost`. The structure is pinned by
+- **Settings hierarchy:** two levels, both of them inside the settings screens. The crossbar has
+  a single **Settings** row (plus **Android Settings**) that opens the first screen of the first
+  section; the section rail down the left of every settings page lists all six sections with the
+  open one expanded to its screens. The tree itself is `SETTINGS_CATALOG` in `core:core-domain`,
+  shaped for the rail by `settingsRailRows`, and every row routes through the
+  `SETTINGS_SCREEN_ROUTES` allowlist in `SettingsNavHost`. Pinned by `SettingsRailRowsTest` and
   `SettingsHierarchyTest`.
 - **Input:** a gamepad dispatcher routes D-pad/A/B/Y to the focused layer. `hasBlockingOverlay`
   guards the main XMB navigation so input never drives the bar behind a dialog or overlay. Cursor

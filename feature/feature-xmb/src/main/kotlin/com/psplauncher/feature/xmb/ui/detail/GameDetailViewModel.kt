@@ -706,8 +706,9 @@ class GameDetailViewModel @Inject constructor(
      */
     /**
      * Reads the game's colour out of its artwork, preferring the art that fills the most of the
-     * page: the hero banner, then the XMB background, then the box, then the icon. The first one
-     * that yields a hue wins; a game whose art is all greyscale keeps the user's theme.
+     * page: the hero (which is now the page's whole background), then the XMB background, then
+     * the box, then the icon. The first one that yields a hue wins; a game whose art is all
+     * greyscale keeps the user's theme.
      */
     private suspend fun resolveArtAccent(game: Game) {
         val accent = artworkAccent.of(game.heroUri, game.artworkUri, game.boxArtUri, game.iconUri)

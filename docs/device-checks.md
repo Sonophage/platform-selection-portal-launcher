@@ -140,7 +140,7 @@ print('with a storefront id:', c.execute('SELECT COUNT(*) FROM games WHERE store
 ## 6. The achievement UI is gone everywhere
 
 - Crossbar: no Shiba Coins column.
-- Game Detail: no coins row; the cursor walks Launch to quick actions to overview to information
+- Game Detail: no coins row; the cursor walks overview to Play/Details to media to information
   with no dead stop where the coins row used to be.
 - Settings: no Achievements section, and the tree still navigates.
 - Settings, Credits: no RetroAchievements, Steam or Goldberg entries.

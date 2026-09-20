@@ -309,8 +309,8 @@ private fun GameDetailContent(
     // coordinate-free and the screen owns the geometry.
     val requesterFor = remember { mutableStateMapOf<String, BringIntoViewRequester>() }
     val nodeY = remember { mutableStateMapOf<String, Float>() }
-    // The page top is not a node (the hero is deliberately not a controller-focus target), but it
-    // is a scroll target: focusing Launch or a quick action returns the page to the hero.
+    // The page top is not a node (the logo and the artwork above Overview are not focus targets),
+    // but it is a scroll target: focusing anything in TopBandKeys returns the page to it.
     val pageTopRequester = remember { BringIntoViewRequester() }
 
     // Report geometry upward whenever the layout settles. The ViewModel feeds it to the engine,

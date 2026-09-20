@@ -263,7 +263,10 @@ fun AppDetailScreen(
 
         Spacer(Modifier.height(DetailRowSpacing + 6.dp))
 
-        // Same primary-action region as Game Detail: icon tile, Launch, quick actions beneath.
+        // The hero-banner form of the detail page: icon tile, Launch, quick actions beneath.
+        // Game Detail used to share it and no longer does -- it puts the entry's artwork behind
+        // the whole page now. An app has a launcher icon and no key art, so there is nothing to
+        // put back there, which is why this page keeps the banner.
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(18.dp),
