@@ -46,11 +46,18 @@ import androidx.compose.ui.unit.sp
 // cursor belongs to the navigation engine, and a second opinion about it here is how two things
 // end up disagreeing about the same state.
 
+/** Resting tint for a confirm button that destroys something. */
+val DestructiveConfirmFill = Color(0x33FF6B6B)
+
 /**
  * A two-choice confirmation drawn inside the launcher's own window.
  *
- * [destructiveFocused] / [cancelFocused] are mutually exclusive by contract; the caller derives
- * them from one focused key, so they cannot both be true.
+ * [confirmFocused] / [cancelFocused] are mutually exclusive by contract; the caller derives them
+ * from one focused key, so they cannot both be true.
+ *
+ * [confirmFill] tints the confirm button at rest. It defaults to the destructive red because
+ * that is what most confirmations here are, and a prompt that merely offers to do something
+ * useful (finish setting up a library, say) passes null so it is not painted as a warning.
  */
 @Composable
 fun PfpConfirmOverlay(
@@ -58,11 +65,12 @@ fun PfpConfirmOverlay(
     message: String,
     confirmLabel: String,
     cancelLabel: String,
-    destructiveFocused: Boolean,
+    confirmFocused: Boolean,
     cancelFocused: Boolean,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    confirmFill: Color? = DestructiveConfirmFill,
 ) {
     Box(
         modifier = modifier
@@ -120,12 +128,12 @@ fun PfpConfirmOverlay(
                 PfpDetailLaunchButton(
                     label = confirmLabel,
                     icon = null,
-                    focused = destructiveFocused,
+                    focused = confirmFocused,
                     onClick = onConfirm,
-                    // Tinted at REST so the destructive choice is identifiable before it is
+                    // Tinted at REST so a destructive choice is identifiable before it is
                     // focused. The focused treatment stays the shared inversion: exactly one
                     // control on screen is focused and it always looks the same.
-                    fill = Color(0x33FF6B6B),
+                    fill = confirmFill ?: DetailButtonRest,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

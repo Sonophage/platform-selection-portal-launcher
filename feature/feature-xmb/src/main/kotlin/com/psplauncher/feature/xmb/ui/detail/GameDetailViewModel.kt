@@ -885,9 +885,15 @@ class GameDetailViewModel @Inject constructor(
             return
         }
         if (s.collectionPicker.showCreateDialog) {
-            // The new-collection prompt is a text field: the keyboard owns every key except Back,
-            // and Confirm belongs to the dialog's own buttons.
-            if (action == GamepadAction.BACK) cancelCreateCollection()
+            // The new-collection prompt is a text field: the keyboard owns every key except the
+            // two the XMB always means. A creates the collection with what has been typed
+            // (confirmCreateCollection reads createText, which the field already writes back),
+            // B cancels.
+            when (action) {
+                GamepadAction.SELECT -> confirmCreateCollection()
+                GamepadAction.BACK   -> cancelCreateCollection()
+                else                 -> Unit
+            }
             finishInput()
             return
         }

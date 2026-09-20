@@ -65,6 +65,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
+import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.domain.model.VideoSnapPlacement
@@ -221,6 +222,7 @@ fun XMBShellContainer(
         onXmbLayoutReset = viewModel::resetXmbLayoutAdjust,
         onXmbLayoutSave = viewModel::saveXmbLayoutAdjust,
         onXmbLayoutCancel = viewModel::cancelXmbLayoutAdjust,
+        onNamePromptTextChanged = viewModel::onNamePromptTextChanged,
         onConfirmAppRename = viewModel::onConfirmAppRename,
         onCancelAppRename = viewModel::onCancelAppRename,
         onConfirmCollectionName = viewModel::onConfirmCollectionName,
@@ -336,6 +338,7 @@ fun XMBShell(
     onXmbLayoutReset: () -> Unit = {},
     onXmbLayoutSave: () -> Unit = {},
     onXmbLayoutCancel: () -> Unit = {},
+    onNamePromptTextChanged: (String) -> Unit = {},
     onConfirmAppRename: (String) -> Unit = {},
     onCancelAppRename: () -> Unit = {},
     onConfirmCollectionName: (String) -> Unit = {},
@@ -1105,7 +1108,8 @@ fun XMBShell(
             uiState.saveThemeNameDialog?.let { dialog ->
                 CollectionNameDialog(
                     title = dialog.title,
-                    initialText = dialog.initialText,
+                    text = dialog.text,
+                    onTextChange = onNamePromptTextChanged,
                     onConfirm = onConfirmSaveAsTheme,
                     onCancel = onDismissSaveAsTheme,
                 )
@@ -1113,7 +1117,8 @@ fun XMBShell(
 
             uiState.renameAppTarget?.let {
                 AppRenameDialog(
-                    currentLabel = uiState.renameAppCurrent.orEmpty(),
+                    text = uiState.renameAppText,
+                    onTextChange = onNamePromptTextChanged,
                     onConfirm = onConfirmAppRename,
                     onCancel = onCancelAppRename,
                 )
@@ -1122,7 +1127,8 @@ fun XMBShell(
             uiState.collectionNameDialog?.let { dialog ->
                 CollectionNameDialog(
                     title = dialog.title,
-                    initialText = dialog.initialText,
+                    text = dialog.text,
+                    onTextChange = onNamePromptTextChanged,
                     onConfirm = onConfirmCollectionName,
                     onCancel = onCancelCollectionName,
                 )
@@ -1131,7 +1137,8 @@ fun XMBShell(
             uiState.playlistNameDialog?.let { dialog ->
                 CollectionNameDialog(
                     title = dialog.title,
-                    initialText = dialog.initialText,
+                    text = dialog.text,
+                    onTextChange = onNamePromptTextChanged,
                     onConfirm = onConfirmPlaylistName,
                     onCancel = onCancelPlaylistName,
                 )
@@ -1147,18 +1154,26 @@ fun XMBShell(
 
             // One-time follow-up to the pin workflow: a PC game was saved before the Windows
             // Library had a directory; offer to finish setup now (A) or later (B).
+            //
+            // That comment was a lie for as long as this was an AlertDialog: the ViewModel's A/B
+            // branch for showWindowsSetupPrompt was correct and unreachable, because a dialog's
+            // own platform Window means dispatchKeyEvent never runs. In-window, it is true again.
+            //
+            // confirmFill = null: "Set Up" offers to finish a job, it does not destroy anything,
+            // so it must not wear the destructive red. Set Up is marked focused because A does
+            // it; there is no cursor to move here, only the two fixed buttons.
             if (uiState.showWindowsSetupPrompt) {
-                AlertDialog(
-                    onDismissRequest = onWindowsSetupDismiss,
-                    title = { Text("Finish your Windows Library") },
-                    text = {
-                        Text(
-                            "A PC game was added, but the Windows Games library has no folder " +
-                                "yet. Set it up in Library Manager so game folders can be scanned.",
-                        )
-                    },
-                    confirmButton = { TextButton(onClick = onWindowsSetupConfirm) { Text("Set Up") } },
-                    dismissButton = { TextButton(onClick = onWindowsSetupDismiss) { Text("Later") } },
+                PfpConfirmOverlay(
+                    title = "Finish your Windows Library",
+                    message = "A PC game was added, but the Windows Games library has no folder " +
+                        "yet. Set it up in Library Manager so game folders can be scanned.",
+                    confirmLabel = "Set Up",
+                    cancelLabel = "Later",
+                    confirmFocused = true,
+                    cancelFocused = false,
+                    confirmFill = null,
+                    onConfirm = onWindowsSetupConfirm,
+                    onCancel = onWindowsSetupDismiss,
                 )
             }
 
@@ -1302,18 +1317,22 @@ fun XMBShell(
 // BACK branches in XMBViewModel (onCancelAppRename, onCancelCollectionName, onCancelPlaylistName)
 // were always correct and were simply unreachable. They needed no change.
 
+// Both wrappers are stateless: the text lives in XMBUiState (XMBViewModel.onNamePromptTextChanged)
+// because the gamepad path needs to read it. A press of A arrives at the ViewModel, not here, so a
+// half-typed name kept in a local remember would be invisible to the button that confirms it.
+
 @Composable
 private fun AppRenameDialog(
-    currentLabel: String,
+    text: String,
+    onTextChange: (String) -> Unit,
     onConfirm: (String) -> Unit,
     onCancel: () -> Unit,
 ) {
-    var text by remember(currentLabel) { mutableStateOf(currentLabel) }
     PfpTextPromptOverlay(
         title = "Rename Shortcut",
         value = text,
         placeholder = "Shortcut name",
-        onValueChange = { text = it },
+        onValueChange = onTextChange,
         onConfirm = { onConfirm(text) },
         onCancel = onCancel,
     )
@@ -1322,16 +1341,16 @@ private fun AppRenameDialog(
 @Composable
 private fun CollectionNameDialog(
     title: String,
-    initialText: String,
+    text: String,
+    onTextChange: (String) -> Unit,
     onConfirm: (String) -> Unit,
     onCancel: () -> Unit,
 ) {
-    var text by remember(initialText) { mutableStateOf(initialText) }
     PfpTextPromptOverlay(
         title = title,
         value = text,
         placeholder = "e.g. RPGs, Currently Playing",
-        onValueChange = { text = it },
+        onValueChange = onTextChange,
         onConfirm = { onConfirm(text) },
         onCancel = onCancel,
     )

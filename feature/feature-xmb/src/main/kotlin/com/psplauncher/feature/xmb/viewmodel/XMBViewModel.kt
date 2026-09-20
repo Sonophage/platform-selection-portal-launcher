@@ -163,6 +163,9 @@ data class XMBContextMenuItem(
 data class CollectionNameDialogState(
     val title: String,
     val initialText: String = "",
+    // What is in the field right now. Hoisted rather than kept in the composable so the gamepad
+    // path can confirm with it: A has to reach the same string the user can see.
+    val text: String = initialText,
     val forGameId: Long? = null,
     // When set, confirming renames this collection instead of creating a new one.
     val renameCollectionId: Long? = null,
@@ -437,6 +440,8 @@ data class MusicBrowserState(
 data class PlaylistNameDialogState(
     val title: String,
     val initialText: String = "",
+    // Live field contents, hoisted for the same reason as CollectionNameDialogState.text.
+    val text: String = initialText,
     val forTrackId: String? = null,
     // When set, confirming renames this playlist instead of creating a new one.
     val renamePlaylistId: Long? = null,
@@ -669,6 +674,7 @@ data class XMBUiState(
     // ── App rename dialog ─────────────────────────────────────────────────
     val renameAppTarget: String? = null,    // package name being renamed
     val renameAppCurrent: String? = null,   // current label, prefills the field
+    val renameAppText: String = "",         // live field contents, hoisted so A can confirm it
 
     // ── Create-collection text dialog ─────────────────────────────────────
     val collectionNameDialog: CollectionNameDialogState? = null,
@@ -1402,6 +1408,25 @@ data class BackgroundTaskInfo(
  * Library state (memory cards, game counts, collections, favorites) is observed reactively, so the
  * XMB re-renders as the underlying data changes.
  */
+/**
+ * Puts [text] into whichever name prompt is open (pure — unit-tested).
+ *
+ * One function rather than four intents because exactly one of these can be open at a time and the
+ * text is the same kind of thing in each.
+ *
+ * The branch ORDER is the load-bearing part, and it mirrors the order of the prompt branches in
+ * XMBViewModel.handleGamepadAction. Those branches confirm by reading the field this function
+ * writes, so if the two orders ever disagree, A confirms a string the user never typed. A prompt
+ * added to one must be added to the other.
+ */
+fun XMBUiState.withNamePromptText(text: String): XMBUiState = when {
+    renameAppTarget != null      -> copy(renameAppText = text)
+    collectionNameDialog != null -> copy(collectionNameDialog = collectionNameDialog.copy(text = text))
+    playlistNameDialog != null   -> copy(playlistNameDialog = playlistNameDialog.copy(text = text))
+    saveThemeNameDialog != null  -> copy(saveThemeNameDialog = saveThemeNameDialog.copy(text = text))
+    else -> this
+}
+
 @HiltViewModel
 class XMBViewModel @Inject constructor(
     private val gameRepository: GameRepository,
@@ -4767,18 +4792,32 @@ class XMBViewModel @Inject constructor(
             return
         }
 
-        // ── Modal text dialogs capture ALL input — text entry needs a keyboard, so
-        //    only BACK is meaningful (cancel). The XMB behind must never move. ──────
+        // ── Modal text dialogs capture ALL input — the keyboard owns everything except the
+        //    two buttons the XMB always means: A confirms what is in the field, B cancels. The
+        //    XMB behind must never move. Confirming reads the hoisted text (see
+        //    [onNamePromptTextChanged]) so A and the on-screen Save agree. ────────────────
         if (state.renameAppTarget != null) {
-            if (action == GamepadAction.BACK) onCancelAppRename()
+            when (action) {
+                GamepadAction.SELECT -> onConfirmAppRename(state.renameAppText)
+                GamepadAction.BACK   -> onCancelAppRename()
+                else                 -> Unit
+            }
             return
         }
         if (state.collectionNameDialog != null) {
-            if (action == GamepadAction.BACK) onCancelCollectionName()
+            when (action) {
+                GamepadAction.SELECT -> onConfirmCollectionName(state.collectionNameDialog.text)
+                GamepadAction.BACK   -> onCancelCollectionName()
+                else                 -> Unit
+            }
             return
         }
         if (state.playlistNameDialog != null) {
-            if (action == GamepadAction.BACK) onCancelPlaylistName()
+            when (action) {
+                GamepadAction.SELECT -> onConfirmPlaylistName(state.playlistNameDialog.text)
+                GamepadAction.BACK   -> onCancelPlaylistName()
+                else                 -> Unit
+            }
             return
         }
         // Read-only info dialog (e.g. file location) — A or B closes it.
@@ -4906,8 +4945,12 @@ class XMBViewModel @Inject constructor(
                 // dialog it opens had NO branch here at all -- five references in the whole file,
                 // none of them a gamepad path. It is in hasBlockingOverlay, so every press fell
                 // through to the silent return below and the controller went dead until the user
-                // touched Cancel. BACK closes it; the dialog's own text field owns the rest.
-                if (action == GamepadAction.BACK) dismissSaveThemeNameDialog()
+                // touched Cancel. A saves the typed name, B closes it.
+                when (action) {
+                    GamepadAction.SELECT -> confirmSaveCurrentLookAsTheme(state.saveThemeNameDialog.text)
+                    GamepadAction.BACK   -> dismissSaveThemeNameDialog()
+                    else                 -> Unit
+                }
                 return
             }
             state.customIconSession != null -> {
@@ -5698,7 +5741,9 @@ class XMBViewModel @Inject constructor(
                         persistHide(HiddenPlacement.appKey(pkg), menu.title, HideLocationType.CATEGORY, cat, categoryDisplayName(cat))
                     }
                     "hide_everywhere" -> appAction { appCategoryRepository.setHidden(pkg, true) }
-                    "rename"    -> _uiState.update { it.copy(renameAppTarget = pkg, renameAppCurrent = menu.title) }
+                    "rename"    -> _uiState.update {
+                        it.copy(renameAppTarget = pkg, renameAppCurrent = menu.title, renameAppText = menu.title)
+                    }
                 }
             }
         }
@@ -5798,6 +5843,11 @@ class XMBViewModel @Inject constructor(
             appCategoryRepository.rename(pkg, newLabel.ifBlank { null })
             _uiState.update { it.copy(renameAppTarget = null, renameAppCurrent = null) }
         }
+    }
+
+    /** Live text for whichever name prompt is open (see [withNamePromptText]). */
+    fun onNamePromptTextChanged(text: String) {
+        _uiState.update { it.withNamePromptText(text) }
     }
 
     fun onCancelAppRename() {

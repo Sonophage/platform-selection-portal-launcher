@@ -491,7 +491,13 @@ class AppDetailViewModel @Inject constructor(
 
     private fun handleCollectionPickerInput(action: GamepadAction) {
         if (_uiState.value.collectionPicker.showCreateDialog) {
-            if (action == GamepadAction.BACK) cancelCreateCollection()
+            // A creates with the typed name, B cancels — the same contract as GameDetail's copy
+            // of this prompt, which shares the panel.
+            when (action) {
+                GamepadAction.SELECT -> confirmCreateCollection()
+                GamepadAction.BACK   -> cancelCreateCollection()
+                else                 -> Unit
+            }
             return
         }
         when (action) {

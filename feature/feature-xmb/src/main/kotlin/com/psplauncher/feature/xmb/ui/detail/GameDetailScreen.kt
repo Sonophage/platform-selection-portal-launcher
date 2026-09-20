@@ -699,7 +699,7 @@ private fun GameDetailOverlays(
                 message = "Removes this game from your library. ROM and app files are not deleted.",
                 confirmLabel = "Remove",
                 cancelLabel = "Cancel",
-                destructiveFocused = state.navFocusKey == GameDetailKeys.CONFIRM_REMOVE,
+                confirmFocused = state.navFocusKey == GameDetailKeys.CONFIRM_REMOVE,
                 cancelFocused = state.navFocusKey == GameDetailKeys.CONFIRM_CANCEL,
                 onConfirm = { viewModel.onNodeTapped(GameDetailKeys.CONFIRM_REMOVE) },
                 onCancel = { viewModel.onNodeTapped(GameDetailKeys.CONFIRM_CANCEL) },
