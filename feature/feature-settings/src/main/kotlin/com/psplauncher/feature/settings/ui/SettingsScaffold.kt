@@ -848,7 +848,20 @@ fun SettingsScaffold(
     }
 
     CompositionLocalProvider(
-        LocalSettingsCursorVisible provides cursorVisible.value,
+        // `&& !railFocused` is the whole two-cursors fix.
+        //
+        // The rail draws its cursor as a filled plate with a border, and so does a content row.
+        // Nothing stopped both from being on screen at once, so stepping LEFT into the rail left
+        // the page wearing two identical cursors and no way to tell which one the D-pad moved.
+        // Verified on the device: Settings > Library Manager, LEFT once.
+        //
+        // Exactly one control on screen is focused, and it always looks the same. The content
+        // keeps its Compose focus and its scroll position -- only the drawing stands down -- so
+        // RIGHT brings the cursor back to the row it left.
+        //
+        // The help band is deliberately NOT affected: it reads cursorVisible directly, so it goes
+        // on describing the screen you are standing in while you pick a sibling out of the rail.
+        LocalSettingsCursorVisible provides (cursorVisible.value && !railFocused.value),
         // Marking focusRedirected here means ANY row gaining focus stops the bootstrap loop,
         // covering both the first-row redirect and the restore-to-key path.
         LocalSettingsFocusTracker provides { click ->

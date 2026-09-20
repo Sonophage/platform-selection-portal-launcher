@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,9 @@ class SettingsScaffoldNavigationTest {
     private fun showScreen(
         onBack: () -> Unit = {},
         leftBacksOut: Boolean = true,
+        // A real catalog screen id, which is what gives the scaffold a section rail to step into.
+        // Null (the default) means no rail, which is how every other test here wants it.
+        screenId: String? = null,
         body: @Composable () -> Unit,
     ) {
         composeRule.setContent {
@@ -75,6 +79,7 @@ class SettingsScaffoldNavigationTest {
                     LocalSettingsPendingAction provides pendingAction.value,
                     LocalSettingsActionConsumed provides { consumedPlain = true },
                     LocalSettingsLeftBacksOut provides leftBacksOut,
+                    LocalSettingsScreenId provides screenId,
                 ) {
                     SettingsScaffold(
                         title = "Settings",
@@ -102,6 +107,59 @@ class SettingsScaffoldNavigationTest {
     private fun assertFocusedRow(text: String) {
         composeRule.onNode(isFocused())
             .assert(hasText(text) or hasAnyDescendant(hasText(text)))
+    }
+
+    /**
+     * Reports what the content believes about its own cursor.
+     *
+     * LocalSettingsCursorVisible is the single flag every content row consults before drawing the
+     * focus plate, so reading it here is reading the thing under test rather than a proxy for it.
+     */
+    @Composable
+    private fun ContentCursorProbe(report: (Boolean) -> Unit) {
+        val visible = LocalSettingsCursorVisible.current
+        SideEffect { report(visible) }
+    }
+
+    @Test
+    fun `stepping into the rail stands the content cursor down`() {
+        // Measured on the tablet: Settings, Library Manager, one press of LEFT put the cursor in
+        // the rail and left BOTH the rail row and the content row wearing the same filled plate.
+        // Two identical cursors, and nothing on screen saying which one the D-pad moved.
+        var contentCursor: Boolean? = null
+        showScreen(screenId = "settings_library") {
+            SettingsRow(label = "Add ROM Root", onClick = {})
+            ContentCursorProbe { contentCursor = it }
+        }
+
+        assertEquals("the content owns the cursor when the screen opens", true, contentCursor)
+        assertFocusedRow("Add ROM Root")
+
+        press(GamepadAction.NAVIGATE_LEFT)
+        assertEquals("LEFT into the rail must stand the content cursor down", false, contentCursor)
+
+        // Coming back restores it, and to the same row -- the content never lost Compose focus,
+        // only the drawing stood down. (The help band is unaffected by design: it reads the
+        // scaffold's own cursorVisible state, not the value provided here.)
+        press(GamepadAction.NAVIGATE_RIGHT)
+        assertEquals("RIGHT must give the cursor back to the content", true, contentCursor)
+        assertFocusedRow("Add ROM Root")
+    }
+
+    @Test
+    fun `a screen with no rail keeps its cursor when LEFT backs out`() {
+        // The control. Without a rail there is nothing to hand the cursor to, so the flag must
+        // not move -- otherwise the test above would pass on any screen that merely handled LEFT.
+        var contentCursor: Boolean? = null
+        var backs = 0
+        showScreen(onBack = { backs++ }) {
+            SettingsRow(label = "Add ROM Root", onClick = {})
+            ContentCursorProbe { contentCursor = it }
+        }
+
+        press(GamepadAction.NAVIGATE_LEFT)
+        assertEquals("LEFT with no rail backs out of the screen", 1, backs)
+        assertEquals("and the content keeps its cursor", true, contentCursor)
     }
 
     @Test
