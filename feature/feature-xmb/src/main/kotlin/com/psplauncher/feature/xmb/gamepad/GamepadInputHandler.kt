@@ -7,6 +7,7 @@ import com.psplauncher.core.data.repository.RemapCoordinator
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.GamepadMappings
 import com.psplauncher.core.domain.model.ScrollSpeed
+import com.psplauncher.core.domain.model.StickSensitivity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import kotlinx.coroutines.CoroutineScope
@@ -21,9 +22,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 
-// Dead zone for analog stick — below this magnitude, input is ignored. Device-reported flat
-// (MotionRange.getFlat) can raise this floor; see stickDirection().
-private const val STICK_DEAD_ZONE = 0.5f
+// Floor for the analog stick's dead zone. The USER's StickSensitivity normally decides it; this
+// is only the lower bound, so no setting can make the stick hair-triggered. Device-reported flat
+// (MotionRange.getFlat) can raise it further; see stickDirection().
+private const val STICK_DEAD_ZONE_FLOOR = 0.35f
 
 // A stick direction engaged past activation stays engaged until deflection falls below
 // activation * STICK_RELEASE_FACTOR — hysteresis so noise around the activation edge cannot
@@ -39,9 +41,16 @@ private const val HAT_DEAD_ZONE = 0.5f
 // held direction never suppresses its own legitimate repeats.
 private const val DUPLICATE_WINDOW_MS = 80L
 
-// Stick deflection past this magnitude skips the ramp and repeats at the fast interval
-// immediately — full tilt is an explicit "scroll fast" gesture the D-pad can't make.
-private const val STICK_FULL_TILT = 0.9f
+// How much faster a full-tilt stick climbs the acceleration ramp.
+//
+// It used to SKIP the ramp: full tilt jumped straight to fastIntervalMs. Combined with the old
+// 0.90 full-tilt threshold -- trivially easy to reach on a handheld thumbstick -- that meant
+// essentially every stick push repeated at maximum speed from its very first repeat, twice as
+// fast as the D-pad's first repeat for the same intent. That is what "joystick sensitivity is too
+// high" was. Full tilt now climbs the same ramp at double rate, so it is still an explicit "go
+// faster" gesture the D-pad cannot make, and still arrives at the same top speed, without
+// teleporting there.
+private const val STICK_FULL_TILT_RAMP_FACTOR = 2
 
 // Held-navigation repeat tuning: after [initialDelayMs] the action repeats starting at
 // [baseIntervalMs], tightening linearly to [fastIntervalMs] over [rampSteps] repeats — short
@@ -72,6 +81,9 @@ class GamepadInputHandler @Inject constructor(
 
     // Held-scroll speed preference — updated from ControllerLayoutRepository by the ViewModel.
     var scrollSpeed: ScrollSpeed = ScrollSpeed.STANDARD
+
+    // How far the stick must move to register, and to count as full tilt. Same source.
+    var stickSensitivity: StickSensitivity = StickSensitivity.STANDARD
 
     // Scope for repeat jobs — set by XMBViewModel on init so repeats survive config changes
     var scope: CoroutineScope? = null
@@ -225,10 +237,8 @@ class GamepadInputHandler @Inject constructor(
                 step++
                 // Linear ramp from base to fast over rampSteps; a full-tilt stick jumps straight
                 // to the fast interval regardless of how far into the ramp the hold is.
-                val ramped =
-                    if (step >= t.rampSteps) t.fastIntervalMs
-                    else t.baseIntervalMs - (t.baseIntervalMs - t.fastIntervalMs) * step / t.rampSteps
-                delay(if (stickMagnitude >= STICK_FULL_TILT) t.fastIntervalMs else ramped)
+                val climbed = rampStepFor(step, stickMagnitude, stickSensitivity.fullTilt)
+                delay(rampedInterval(climbed, t.baseIntervalMs, t.fastIntervalMs, t.rampSteps))
             }
         }
     }
@@ -263,7 +273,7 @@ class GamepadInputHandler @Inject constructor(
      * falls below the lower release threshold.
      */
     private fun stickDirection(x: Float, y: Float, flat: Float): GamepadAction? {
-        val activation = maxOf(STICK_DEAD_ZONE, flat)
+        val activation = maxOf(stickSensitivity.deadZone, STICK_DEAD_ZONE_FLOOR, flat)
         val release = activation * STICK_RELEASE_FACTOR
 
         val strong = when {
@@ -363,3 +373,17 @@ internal fun hatDirectionNewestFirst(
         else -> yDir
     }
 }
+
+/**
+ * How far up the acceleration ramp a hold has climbed after [repeats] repeats.
+ *
+ * A full-tilt stick climbs [STICK_FULL_TILT_RAMP_FACTOR] rungs per repeat instead of one, so it
+ * reaches top speed in half the repeats -- rather than skipping the ramp outright, which is what
+ * made the stick feel twitchy. Pure so the feel can be pinned without a device.
+ */
+internal fun rampStepFor(repeats: Int, stickMagnitude: Float, fullTilt: Float): Int =
+    if (stickMagnitude >= fullTilt) repeats * STICK_FULL_TILT_RAMP_FACTOR else repeats
+
+/** The delay before the next repeat, linear from [base] down to [fast] over [rampSteps] rungs. */
+internal fun rampedInterval(step: Int, base: Long, fast: Long, rampSteps: Int): Long =
+    if (step >= rampSteps) fast else base - (base - fast) * step / rampSteps

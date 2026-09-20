@@ -41,6 +41,10 @@ class ControllerSettingsViewModel @Inject constructor(
         viewModelScope.launch { layoutRepository.setXYLayout(layout) }
     }
 
+    fun setStickSensitivity(value: com.psplauncher.core.domain.model.StickSensitivity) {
+        viewModelScope.launch { layoutRepository.setStickSensitivity(value) }
+    }
+
     fun setScrollSpeed(speed: ScrollSpeed) {
         viewModelScope.launch { layoutRepository.setScrollSpeed(speed) }
     }

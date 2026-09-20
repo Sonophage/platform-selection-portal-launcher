@@ -23,6 +23,7 @@ private val KEY_CONFIRM_BACK = stringPreferencesKey("controller_confirm_back_lay
 private val KEY_XY_LAYOUT    = stringPreferencesKey("controller_xy_layout")
 private val KEY_DISPLAY_TYPE = stringPreferencesKey("controller_display_type")
 private val KEY_SCROLL_SPEED = stringPreferencesKey("controller_scroll_speed")
+private val KEY_STICK_SENSITIVITY = stringPreferencesKey("controller_stick_sensitivity")
 private val KEY_LEFT_BACKS_OUT = booleanPreferencesKey("controller_left_backs_out")
 
 @Singleton
@@ -45,6 +46,8 @@ class ControllerLayoutRepository @Inject constructor(
             scrollSpeed = store[KEY_SCROLL_SPEED]
                 ?.let { runCatching { ScrollSpeed.valueOf(it) }.getOrNull() }
                 ?: ScrollSpeed.STANDARD,
+            stickSensitivity = com.psplauncher.core.domain.model.StickSensitivity
+                .fromName(store[KEY_STICK_SENSITIVITY]),
             // Absent key reads as the default (on) — no migration needed for existing installs.
             leftBacksOut = store[KEY_LEFT_BACKS_OUT] ?: true,
         )
@@ -92,6 +95,11 @@ class ControllerLayoutRepository @Inject constructor(
     }
 
     // ── Scroll speed ──────────────────────────────────────────────────────────
+
+    suspend fun setStickSensitivity(value: com.psplauncher.core.domain.model.StickSensitivity) {
+        context.pfpDataStore.edit { it[KEY_STICK_SENSITIVITY] = value.name }
+        Timber.i("StickSensitivity set: $value")
+    }
 
     suspend fun setScrollSpeed(speed: ScrollSpeed) {
         context.pfpDataStore.edit { it[KEY_SCROLL_SPEED] = speed.name }

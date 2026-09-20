@@ -4564,6 +4564,7 @@ class XMBViewModel @Inject constructor(
                 // Prompt glyphs are supplied ambiently by ProvideControllerPrompts at the
                 // app root, so the display type no longer needs mirroring into UI state.
                 gamepadInputHandler.scrollSpeed = prefs.scrollSpeed
+                gamepadInputHandler.stickSensitivity = prefs.stickSensitivity
                 _uiState.update { it.copy(leftBacksOut = prefs.leftBacksOut) }
             }
         }

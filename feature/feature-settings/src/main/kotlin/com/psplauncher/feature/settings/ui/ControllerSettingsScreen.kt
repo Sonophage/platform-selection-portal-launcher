@@ -17,6 +17,7 @@ import com.psplauncher.core.domain.model.ConfirmBackLayout
 import com.psplauncher.core.domain.model.ControllerDisplayType
 import com.psplauncher.core.domain.model.XYLayout
 import com.psplauncher.core.domain.model.ScrollSpeed
+import com.psplauncher.core.domain.model.StickSensitivity
 import com.psplauncher.core.domain.model.displayLabel
 import com.psplauncher.feature.settings.viewmodel.ControllerSettingsViewModel
 
@@ -101,10 +102,27 @@ fun ControllerSettingsScreen(
                 onPick   = { viewModel.setDisplayType(ControllerDisplayType.entries[it]) },
             )
 
+            SettingsGroup("Stick")
+            Text(
+                text     = "How far the stick must move before it navigates, and how far before " +
+                    "it counts as a full tilt. Lower is more deliberate.",
+                color    = SettingsSubtext,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),
+            )
+
+            SettingsPickerRow(
+                label    = "Stick Sensitivity",
+                sublabel = "Low needs a firmer push and reaches top speed later",
+                options  = StickSensitivity.entries.map { SettingsPickerOption(it.displayLabel()) },
+                selectedIndex = StickSensitivity.entries.indexOf(state.layoutPrefs.stickSensitivity),
+                onPick   = { viewModel.setStickSensitivity(StickSensitivity.entries[it]) },
+            )
+
             SettingsGroup("Scroll Speed")
             Text(
-                text     = "How fast lists scroll while a direction is held. " +
-                    "Holding longer accelerates; full stick tilt scrolls at top speed.",
+                text     = "How fast lists scroll while a direction is held. Holding longer " +
+                    "accelerates, and a full stick tilt accelerates twice as fast.",
                 color    = SettingsSubtext,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),

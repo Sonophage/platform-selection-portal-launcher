@@ -23,9 +23,23 @@ private val EDGE_COMMIT_DP = 48.dp
 // out-argue an idle finger. Like edge-Back, it is deliberately NOT scaled by TouchSensitivity: the
 // sensitivity slider tunes how far a finger travels per *step*, and a back-out has no steps.
 private val SWIPE_BACK_COMMIT_DP = 72.dp
-// Fling speed (dp/s) that earns bonus item steps on release, so a quick flick travels further than
-// the finger did. Deliberately small (max +2) — momentum, not Android free-scroll.
+// Fling speed (dp/s) at which a release earns its FIRST bonus step. Above it the bonus grows with
+// speed, so a quick flick travels further than the finger did.
 private val FLING_DP_PER_S = 420f
+
+// Ceiling on that bonus.
+//
+// It was 2, on the reasoning that this should be "momentum, not Android free-scroll". The
+// reasoning is right and the number was too small to live with: one item step is 64dp of finger
+// travel, so crossing a 147-game library meant about 74 hard flicks, or eleven full-screen slides.
+// Touch was fine for nudging and unusable for travelling. Twelve keeps the gesture discrete and
+// bounded -- it still lands on a row, never glides to a stop -- while making a hard flick worth
+// making.
+private const val FLING_MAX_STEPS = 12
+
+// How much of the speed-over-threshold ratio becomes steps. Tuned so an ordinary flick is ~2-3
+// rows and a hard one reaches the cap, rather than the cap being the only interesting value.
+private const val FLING_STEPS_PER_RATIO = 1.6f
 
 /**
  * The XMB home-screen touch gesture layer: a single axis-locked, single-pointer detector that
@@ -155,15 +169,18 @@ fun consumeWholeSteps(accumulated: Float, stepPx: Float): Int =
 
 /**
  * Extra steps granted for a fast release fling (pure — unit-tested). Up-flick (negative velocity)
- * returns positive steps (down the list). Capped at ±2 so a flick adds momentum without ever
- * becoming Android free-scroll.
+ * returns positive steps (down the list).
+ *
+ * Proportional to how far past [flingPx] the release was, and capped at [FLING_MAX_STEPS]. Still
+ * discrete and still bounded: the list lands on a row and stops, it never glides. A release below
+ * the threshold earns nothing at all, so an ordinary slow drag is unaffected.
  */
 fun flingBonusSteps(velocityPxPerS: Float, flingPx: Float): Int {
-    val magnitude = when {
-        abs(velocityPxPerS) > flingPx * 3f -> 2
-        abs(velocityPxPerS) > flingPx      -> 1
-        else                               -> 0
-    }
+    val speed = abs(velocityPxPerS)
+    if (speed <= flingPx) return 0
+    val magnitude = (speed / flingPx * FLING_STEPS_PER_RATIO)
+        .toInt()
+        .coerceIn(1, FLING_MAX_STEPS)
     return if (velocityPxPerS < 0) magnitude else -magnitude
 }
 

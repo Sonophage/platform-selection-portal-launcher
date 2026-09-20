@@ -51,15 +51,31 @@ class XmbNavGesturesTest {
         assertEquals(0, flingBonusSteps(-300f, flingPx))
     }
 
-    @Test fun `fast up-flick grants downward bonus, capped at two`() {
-        assertEquals(1, flingBonusSteps(-800f, flingPx))    // > fling
-        assertEquals(2, flingBonusSteps(-1500f, flingPx))   // > 3×fling
-        assertEquals(2, flingBonusSteps(-9999f, flingPx))   // still capped
+    @Test fun `a fling grows with speed instead of stopping at two`() {
+        // The bonus used to cap at 2, which made touch fine for nudging and unusable for
+        // travelling: one step is 64dp of finger travel, so a 147-game list was ~74 hard flicks.
+        assertEquals(3, flingBonusSteps(-800f, flingPx))
+        assertEquals(5, flingBonusSteps(-1500f, flingPx))
+        assertTrue(flingBonusSteps(-3000f, flingPx) > flingBonusSteps(-1500f, flingPx))
+    }
+
+    @Test fun `it is still bounded, so a flick can never become a free scroll`() {
+        // The list must always land on a row. Whatever the velocity tracker reports — including
+        // the absurd values a fast lift can produce — the bonus stays a small whole number.
+        assertEquals(12, flingBonusSteps(-99_999f, flingPx))
+        assertEquals(-12, flingBonusSteps(99_999f, flingPx))
+    }
+
+    @Test fun `a release just past the threshold is worth one step, not zero`() {
+        // The threshold has to be a real boundary: crossing it must do something, or the first
+        // bit of the range is dead.
+        assertEquals(1, flingBonusSteps(-(flingPx + 1f), flingPx))
+        assertEquals(-1, flingBonusSteps(flingPx + 1f, flingPx))
     }
 
     @Test fun `fast down-flick grants upward bonus`() {
-        assertEquals(-1, flingBonusSteps(800f, flingPx))
-        assertEquals(-2, flingBonusSteps(1500f, flingPx))
+        assertEquals(-3, flingBonusSteps(800f, flingPx))
+        assertEquals(-5, flingBonusSteps(1500f, flingPx))
     }
 
     // ── Swipe-back commit (drilled in) ──────────────────────────────────────────

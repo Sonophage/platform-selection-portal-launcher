@@ -546,6 +546,7 @@ open class BackupManager @Inject constructor(
         stringPreferencesKey("theme_layout_spec"),
             // Controller
             stringPreferencesKey("controller_scroll_speed"),
+            stringPreferencesKey("controller_stick_sensitivity"),
             // Controller
             stringPreferencesKey("controller_mappings_v1"),
             stringPreferencesKey("controller_confirm_back_layout"),
