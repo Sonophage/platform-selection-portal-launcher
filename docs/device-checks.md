@@ -219,7 +219,15 @@ unzip -p app/build/outputs/apk/release/*.apk assets/dexopt/baseline.prof | wc -c
   changed, so a test that has gone red in a module you are not editing keeps printing green.
   That is not hypothetical: `DisplaySettingsViewModelLegibilityTest` was red on clean runs for
   days while every ordinary build called the suite green.
-- Counting: the XML is the truth, and `<skipped/>` is not a failure.
+- Counting: the XML is the truth, `<skipped/>` is not a failure, and the glob below counts
+  **every** result file under **every** `build/` — including one belonging to a module that has
+  been deleted. That is not hypothetical either: a removed module's leftover `build/` was adding
+  167 phantom tests to this count until the directory was deleted. If a number looks high, check
+  which directories exist first:
+
+  ```bash
+  ls -d */*/build/test-results/*/ 2>/dev/null
+  ```
 
   ```bash
   python3 - <<'PY'
@@ -237,21 +245,17 @@ unzip -p app/build/outputs/apk/release/*.apk assets/dexopt/baseline.prof | wc -c
 - The skips are `GoldenPtfTest` and ROM-hash tests whose fixtures live in `~/Downloads` and are
   not present. They have always skipped; they are not passing.
 
-### Known failing, and not from the work around it
+### A fixed failure worth remembering the shape of
 
-`DisplaySettingsViewModelLegibilityTest > text shadow defaults on, toggles off, and persists`
-fails on a clean re-run of its module and passes on an incremental build. Verified failing at
-`3b0827cb`, before the settings and detail work that surrounds it.
+`DisplaySettingsViewModelLegibilityTest` failed only on a clean re-run, and the cause was worth
+the hunt: a test collector launched with `CoroutineScope(dispatcher).launch { ... }` is QUEUED on
+the test scheduler, not started. Until something pumps the scheduler the coroutine has never
+subscribed, so a shared `WhileSubscribed` flow stays cold and a write made in the test body is
+never observed.
 
-The product wiring is correct: `setTextShadow` writes `display_text_shadow` and the state reads
-that same key, in the same combine that carries `iconLegibility`, which does surface. The write
-lands -- the test's "persisted off" check passes -- and only the ViewModel's `uiState` never
-follows. Four attempts did not fix it: preparing DataStore before `Dispatchers.setMain` (which
-did fix a different clean-run failure in the same class), holding one collector open for the
-test, starting that collector before the first read, and settling the state before writing.
+`Job.isActive` reads `true` the whole time, which is what made it hard to see: the job exists, it
+simply has not run. `dispatcher.scheduler.advanceUntilIdle()` at the end of `@Before` is the fix.
 
-Re-check it rather than trusting this paragraph:
-
-```bash
-./gradlew :feature:feature-settings:testDebugUnitTest --rerun-tasks
-```
+If a ViewModel-plus-DataStore test ever reports a state that will not follow a write that
+demonstrably landed, look for a collector that was launched and never pumped before assuming the
+flow is broken.

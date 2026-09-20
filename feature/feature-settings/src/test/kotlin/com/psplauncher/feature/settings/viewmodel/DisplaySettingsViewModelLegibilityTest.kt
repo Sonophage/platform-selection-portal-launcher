@@ -9,6 +9,10 @@ import com.psplauncher.core.data.datastore.pfpDataStore
 import com.psplauncher.core.data.repository.GameBootPreferences
 import com.psplauncher.core.data.repository.UiMediaStore
 import com.psplauncher.core.domain.model.IconLegibilityStyle
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -40,6 +44,7 @@ class DisplaySettingsViewModelLegibilityTest {
     private val dispatcher = StandardTestDispatcher()
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var vm: DisplaySettingsViewModel
+    private lateinit var collector: Job
 
     @Before
     fun setUp() {
@@ -69,10 +74,28 @@ class DisplaySettingsViewModelLegibilityTest {
                 )
             },
         )
+        // ONE subscriber, alive for the whole test, and it is what makes uiState observable here
+        // at all.
+        //
+        // uiState is shared WhileSubscribed(5s). Reading it with first() returns the cached value
+        // and cancels immediately, so the upstream restarts and is dropped again before DataStore's
+        // real read can land -- and eventually() polls with first(), so it can poll forever and
+        // never see a write. Only the FIRST test in the class escaped that, because its very first
+        // read started the upstream and the 5 s stop had not yet elapsed on the virtual clock;
+        // every test after it inherited a stopped flow. That is why this class passed as a whole
+        // and failed whenever a test ran alone, and why renaming a test could move which one broke.
+        collector = CoroutineScope(dispatcher).launch { vm.uiState.collect {} }
+        // ...and RUN it. launch only queues onto the test scheduler; until the scheduler is
+        // pumped the collector exists as a Job but has never subscribed, so the shared flow is
+        // still cold when the test body writes to DataStore, and the write it should have
+        // observed is the one it misses. isActive is true throughout, which is what made this so
+        // hard to see: the Job is alive, it just has not started.
+        dispatcher.scheduler.advanceUntilIdle()
     }
 
     @After
     fun tearDown() {
+        collector.cancel()
         Dispatchers.resetMain()
     }
 
