@@ -34,15 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -92,18 +84,14 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.detail.DetailRowSpacing
 import com.psplauncher.core.ui.detail.PfpDetailBackground
 import com.psplauncher.core.ui.detail.detailPalette
-import com.psplauncher.core.ui.detail.LocalDetailViewportHeight
-import com.psplauncher.core.ui.detail.detailHeroHeightFor
 import com.psplauncher.core.ui.detail.PfpDetailBreadcrumb
 import com.psplauncher.core.ui.detail.PfpDetailField
 import com.psplauncher.core.ui.detail.PfpDetailFieldBand
 import com.psplauncher.core.ui.detail.PfpDetailHelperFooter
-import com.psplauncher.core.ui.detail.PfpDetailHeroBanner
-import com.psplauncher.core.ui.detail.PfpDetailIconTile
+import com.psplauncher.core.ui.detail.PfpDetailArtBackdrop
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpDetailMediaTile
 import com.psplauncher.core.ui.detail.PfpDetailProgressRow
-import com.psplauncher.core.ui.detail.PfpDetailQuickAction
 import com.psplauncher.core.ui.detail.PfpDetailScaffold
 import com.psplauncher.core.ui.detail.PfpDetailSectionLabel
 import com.psplauncher.core.ui.detail.PfpDetailTextRow
@@ -113,6 +101,7 @@ import com.psplauncher.core.ui.theme.menuCursorFill
 import com.psplauncher.feature.xmb.ui.DetailContextMenu
 import com.psplauncher.feature.xmb.ui.DetailMenuRow
 import com.psplauncher.feature.xmb.ui.collection.CollectionPickerPanel
+import com.psplauncher.feature.xmb.viewmodel.gameMetadataLine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -133,6 +122,14 @@ private val ActionFail = Color(0xFFFF8A8A)
 
 /** Descriptions longer than this get a Confirm-to-expand affordance. */
 private const val OVERVIEW_EXPAND_THRESHOLD = 190
+
+// The page's top band is the game's artwork, and these three numbers are all that reserve it: a
+// gap above the logo, the logo's own ceiling, and nothing else between it and the overview.
+private val LOGO_TOP_GAP = 26.dp
+private val LOGO_MAX_HEIGHT = 104.dp
+private val LOGO_MAX_WIDTH = 460.dp
+private val PLAY_BUTTON_WIDTH = 238.dp
+private val DETAILS_BUTTON_WIDTH = 196.dp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -380,125 +377,113 @@ private fun GameDetailContent(
                 visible = !showTouchControls && state.cursorVisible,
             )
         },
+        // The game's own art, full-bleed behind the whole page. heroUri first because that is the
+        // asset the scrapers actually fill and the one the Artwork Studio crops for this shape;
+        // artworkUri is the XMB's backdrop column and boxArtUri the last resort.
+        backdrop = { PfpDetailArtBackdrop(game.heroUri ?: game.artworkUri ?: game.boxArtUri) },
         // Overlays live here rather than in the scrolling body: they must cover the whole page and
         // cannot be scrolled away. Each one pushes its own navigation context, so the page graph
         // behind it is paused and hands back its exact cursor on close.
         overlay = { GameDetailOverlays(state = state, game = game, viewModel = viewModel) },
     ) {
         Box(Modifier.fillMaxWidth().height(1.dp).bringIntoViewRequester(pageTopRequester))
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(LOGO_TOP_GAP))
 
-        PfpDetailHeroBanner(
-            artworkUri = game.heroUri ?: game.artworkUri,
+        // ── Identity ────────────────────────────────────────────
+        // The game's logo, top left, over its own artwork. Nothing frames it: the art IS the page
+        // (see PfpDetailArtBackdrop), so a card around the logo would be a box drawn on a picture.
+        GameLogoBlock(
+            logoUri = game.logoUri,
             title = game.displayTitle,
             platform = state.platform?.name ?: game.platformId.uppercase(),
-            accentColor = accentColor,
-            // The facts move to the panel below, where they get an icon each and room to be read.
-            // Repeating them over the art would be the same four strings twice on one screen.
-            facts = emptyList(),
-            favorite = game.isFavorite,
-            centered = true,
-            action = {
-                // Launch lives IN the art now, under the name, which is where a store page puts
-                // it and where the eye already is after reading the title. It is still the same
-                // node, so nothing about navigation or the page's cursor changes.
-                PfpDetailLaunchButton(
-                    label = "Launch",
-                    icon = Icons.Filled.PlayArrow,
-                    focused = focus == GameDetailKeys.LAUNCH,
-                    onClick = { viewModel.onNodeTapped(GameDetailKeys.LAUNCH) },
-                    modifier = Modifier
-                        .widthIn(max = 260.dp)
-                        .detailNode(GameDetailKeys.LAUNCH, requesterFor, nodeY),
-                )
-            },
-            // Shrinks on short screens so Launch and the quick actions never land under the footer.
-            height = detailHeroHeightFor(
-                LocalDetailViewportHeight.current,
-                messageLine = state.launchError != null || (state.actionMessage ?: state.artworkMessage) != null,
-            ),
         )
 
-        Spacer(Modifier.height(DetailRowSpacing + 6.dp))
+        // ── Overview ──────────────────────────────────────────
+        Spacer(Modifier.height(DetailRowSpacing))
+        val description = game.description?.takeIf { it.isNotBlank() } ?: "No description available."
+        val expandable = description.length > OVERVIEW_EXPAND_THRESHOLD
+        PfpDetailTextRow(
+            label = "Overview",
+            text = description,
+            expanded = state.descriptionExpanded,
+            focused = focus == GameDetailKeys.OVERVIEW,
+            onClick = if (expandable) ({ viewModel.onNodeTapped(GameDetailKeys.OVERVIEW) }) else null,
+            modifier = Modifier.detailNode(GameDetailKeys.OVERVIEW, requesterFor, nodeY),
+        )
 
-        // ── Primary actions ───────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            PfpDetailIconTile(
-                uri = game.iconUri ?: game.logoUri ?: game.artworkUri,
-                title = game.displayTitle,
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                // The game's own facts, one per line with an icon, beside its cover. This is the
-                // panel the reference puts next to the box art, and every value in it was already
-                // in the database with nowhere to show.
-                GameFactsPanel(game = game)
-                Row(
-                    modifier = Modifier.detailNode(GameDetailKeys.ACTIONS, requesterFor, nodeY),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    PfpDetailQuickAction(
-                        label = if (game.isFavorite) "Unfavorite" else "Favorite",
-                        icon = if (game.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        focused = focus == GameDetailKeys.FAVORITE,
-                        available = true,
-                        onClick = { viewModel.onNodeTapped(GameDetailKeys.FAVORITE) },
-                        contentDescription = if (game.isFavorite) "Remove from favorites" else "Add to favorites",
-                        modifier = Modifier.weight(1f),
+        // ── Meta line ─────────────────────────────────────────
+        // The same one-line summary the XMB shows under a focused game, so moving from the list
+        // into the page does not re-say the same facts in a different shape. The full set is in
+        // the information band at the foot of the page.
+        val meta = gameMetadataLine(game.releaseYear, game.genre, game.developer, game.players)
+        if (meta != null || game.isFavorite) {
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Favorite state has nowhere else to live now that the hero badge is gone, and
+                // it is state rather than a scraped fact, so it leads the line instead of joining it.
+                if (game.isFavorite) {
+                    Icon(
+                        imageVector = Icons.Filled.Favorite,
+                        contentDescription = "In favourites",
+                        tint = detailPalette().focus,
+                        modifier = Modifier.size(14.dp),
                     )
-                    PfpDetailQuickAction(
-                        label = "Artwork",
-                        icon = Icons.Filled.Brush,
-                        focused = focus == GameDetailKeys.ARTWORK,
-                        available = true,
-                        onClick = { viewModel.onNodeTapped(GameDetailKeys.ARTWORK) },
-                        contentDescription = "Edit artwork",
-                        modifier = Modifier.weight(1f),
-                    )
-                    PfpDetailQuickAction(
-                        label = "Manual",
-                        icon = Icons.AutoMirrored.Filled.MenuBook,
-                        focused = focus == GameDetailKeys.MANUAL,
-                        // Without a manual it keeps its place in the row (the action set never
-                        // moves) but is disabled: drained, untappable and out of the controller graph.
-                        available = state.hasManual,
-                        onClick = { viewModel.onNodeTapped(GameDetailKeys.MANUAL) },
-                        contentDescription = "Open manual",
-                        modifier = Modifier.weight(1f),
-                    )
-                    // The context menu, for touch as much as the controller's Options button. The
-                    // emulator is changed by confirming (or tapping) the Game Information band.
-                    PfpDetailQuickAction(
-                        label = "Options",
-                        icon = Icons.Filled.MoreHoriz,
-                        focused = focus == GameDetailKeys.OPTIONS_ACTION,
-                        available = true,
-                        onClick = { viewModel.onNodeTapped(GameDetailKeys.OPTIONS_ACTION) },
-                        contentDescription = "Options",
-                        modifier = Modifier.weight(1f),
-                    )
+                    Spacer(Modifier.width(8.dp))
                 }
-                if (state.launchError != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(state.launchError, color = ActionFail, fontSize = 12.sp)
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            "Get help",
-                            color = detailPalette().focus,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable { viewModel.requestLaunchHelp() },
-                        )
-                    }
-                } else (state.actionMessage ?: state.artworkMessage)?.let {
-                    Text(it, color = detailPalette().focus, fontSize = 12.sp)
+                if (meta != null) {
+                    Text(
+                        text = meta,
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
+        }
+
+        // ── Play and Details ─────────────────────────────────────
+        Spacer(Modifier.height(DetailRowSpacing))
+        Row(
+            modifier = Modifier.detailNode(GameDetailKeys.ACTIONS, requesterFor, nodeY),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            PfpDetailLaunchButton(
+                label = "Play",
+                icon = Icons.Filled.PlayArrow,
+                focused = focus == GameDetailKeys.LAUNCH,
+                onClick = { viewModel.onNodeTapped(GameDetailKeys.LAUNCH) },
+                modifier = Modifier
+                    .width(PLAY_BUTTON_WIDTH)
+                    .detailNode(GameDetailKeys.LAUNCH, requesterFor, nodeY),
+            )
+            PfpDetailLaunchButton(
+                label = "Details",
+                icon = Icons.Filled.MoreHoriz,
+                focused = focus == GameDetailKeys.DETAILS,
+                onClick = { viewModel.onNodeTapped(GameDetailKeys.DETAILS) },
+                modifier = Modifier
+                    .width(DETAILS_BUTTON_WIDTH)
+                    .detailNode(GameDetailKeys.DETAILS, requesterFor, nodeY),
+            )
+        }
+
+        if (state.launchError != null) {
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(state.launchError, color = ActionFail, fontSize = 12.sp)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Get help",
+                    color = detailPalette().focus,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { viewModel.requestLaunchHelp() },
+                )
+            }
+        } else (state.actionMessage ?: state.artworkMessage)?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, color = detailPalette().focus, fontSize = 12.sp)
         }
 
         // ── Discs (multi-disc sets only) ──────────────────────────────────
@@ -512,32 +497,6 @@ private fun GameDetailContent(
                 nodeY = nodeY,
                 onSelect = { id -> viewModel.onNodeTapped(GameDetailKeys.disc(id)) },
                 rowModifier = Modifier.detailNode(GameDetailKeys.DISCS, requesterFor, nodeY),
-            )
-        }
-
-        // ── Overview ──────────────────────────────────────────────────────
-        Spacer(Modifier.height(DetailRowSpacing))
-        val description = game.description?.takeIf { it.isNotBlank() } ?: "No description available."
-        val expandable = description.length > OVERVIEW_EXPAND_THRESHOLD
-        PfpDetailTextRow(
-            label = "Overview",
-            text = description,
-            expanded = state.descriptionExpanded,
-            focused = focus == GameDetailKeys.OVERVIEW,
-            onClick = if (expandable) ({ viewModel.onNodeTapped(GameDetailKeys.OVERVIEW) }) else null,
-            modifier = Modifier.detailNode(GameDetailKeys.OVERVIEW, requesterFor, nodeY),
-        )
-
-        // ── Game information ──────────────────────────────────────────────
-        if (state.showInfoBand) {
-            Spacer(Modifier.height(DetailRowSpacing))
-            GameInformationBand(
-                game = game,
-                state = state,
-                focusedKey = focus,
-                requesterFor = requesterFor,
-                nodeY = nodeY,
-                viewModel = viewModel,
             )
         }
 
@@ -570,6 +529,19 @@ private fun GameDetailContent(
                     )
                 }
             }
+        }
+
+        // ── Game information ──────────────────────────────────────────────
+        if (state.showInfoBand) {
+            Spacer(Modifier.height(DetailRowSpacing))
+            GameInformationBand(
+                game = game,
+                state = state,
+                focusedKey = focus,
+                requesterFor = requesterFor,
+                nodeY = nodeY,
+                viewModel = viewModel,
+            )
         }
 
         Spacer(Modifier.height(DetailRowSpacing))
@@ -605,6 +577,24 @@ private fun GameDetailOverlays(
             GameVideoOverlay(
                 videoUri = state.videoUri,
                 onClose  = viewModel::closeVideoPlayer,
+            )
+        }
+
+        AnimatedVisibility(state.showDetailsMenu, enter = fadeIn(), exit = fadeOut()) {
+            DetailContextMenu(
+                title = game.displayTitle,
+                rows = state.visibleDetailRows.map { row ->
+                    DetailMenuRow(
+                        label = when (row) {
+                            DetailQuickAction.FAVORITE ->
+                                if (game.isFavorite) "Unfavorite" else "Favorite"
+                            else -> row.label
+                        },
+                    )
+                },
+                selectedIndex = state.detailsIndex,
+                onRowClick = { viewModel.onDetailsRowTapped(state.visibleDetailRows[it]) },
+                onDismiss = viewModel::closeDetailsMenu,
             )
         }
 
@@ -880,7 +870,7 @@ internal fun gameDetailHelperItems(state: GameDetailUiState): List<ControllerPro
             ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
             ControllerPromptItem(GamepadAction.BACK, "Close"),
         )
-    state.showOptions ->
+    state.showOptions || state.showDetailsMenu ->
         listOf(
             ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Navigate"),
             ControllerPromptItem(GamepadAction.SELECT, "Select"),
@@ -895,31 +885,31 @@ internal fun gameDetailHelperItems(state: GameDetailUiState): List<ControllerPro
 
 /** What Confirm means on the page itself, given the focused node. */
 private fun confirmLabelFor(state: GameDetailUiState): String {
-    val focus = state.navFocusKey ?: return "Launch"
+    val focus = state.navFocusKey ?: return "Play"
     val media = state.detailMedia.firstOrNull { GameDetailKeys.media(mediaStableId(it)) == focus }
     return when {
         media != null -> if (media.isVideo) "Play" else "Preview"
         focus == GameDetailKeys.OVERVIEW ->
             if (state.descriptionExpanded) "Collapse" else "Read more"
         focus.startsWith("game-detail:disc:") -> "Choose disc"
-        focus == GameDetailKeys.FAVORITE ->
-            if (state.game?.isFavorite == true) "Unfavorite" else "Favorite"
-        focus == GameDetailKeys.ARTWORK -> "Edit artwork"
-        focus == GameDetailKeys.MANUAL -> "Open manual"
-        focus == GameDetailKeys.OPTIONS_ACTION -> "Options"
+        focus == GameDetailKeys.DETAILS -> "Details"
         focus == GameDetailKeys.INFO && state.showEmulatorAction -> "Change emulator"
-        else -> "Launch"
+        else -> "Play"
     }
 }
 
-/** Launch and the quick actions sit directly under the hero, so focusing any of them shows the page top. */
+/**
+ * Nodes whose focus scrolls the page back to its top.
+ *
+ * Overview is in here now, and that is the redesign: it is the page's FIRST node, sitting under a
+ * logo and a band of artwork that are not nodes at all. Bringing Overview alone into view would
+ * park the page just above it, and the logo and the art could then never be seen again.
+ */
 private val TopBandKeys = setOf(
+    GameDetailKeys.OVERVIEW,
     GameDetailKeys.LAUNCH,
     GameDetailKeys.ACTIONS,
-    GameDetailKeys.FAVORITE,
-    GameDetailKeys.ARTWORK,
-    GameDetailKeys.MANUAL,
-    GameDetailKeys.OPTIONS_ACTION,
+    GameDetailKeys.DETAILS,
 )
 
 /**
@@ -943,53 +933,49 @@ private fun Game.kindLabel(): String = when {
 }
 
 /**
- * The game's facts beside its cover: one line each, with an icon, in the shape the reference
- * puts next to the box art.
+ * The game's logo over its own artwork, at the top left of the page.
  *
- * Every value here was already stored and shown nowhere, or shown as one run-on line of dots
- * over the artwork. A line per fact with its own glyph is the difference between a caption and
- * something you can actually read at a glance.
- *
- * Deliberately NOT focusable. These are facts, not controls, and a controller that has to step
- * through four read-only rows to reach the quick actions is worse for the sake of looking busier.
+ * A logo is an image a publisher already designed to be read over its own key art, so when there
+ * is one it IS the title and nothing is drawn behind it. Without one the title falls back to text
+ * at the same size, which is why the platform kicker sits above both: it tells you which shelf
+ * this came off in the one place that does not move between the two cases.
  */
 @Composable
-private fun GameFactsPanel(game: Game) {
-    val facts = buildList {
-        if (game.isFavorite) add(Icons.Filled.Favorite to "In favourites")
-        game.totalPlayTimeMillis.takeIf { it > 0 }
-            ?.let { add(Icons.Filled.Schedule to "Time played  ${formatPlayTime(it)}") }
-        game.lastPlayedAt?.let { add(Icons.Filled.Event to "Last played  ${relativeDays(it)}") }
-        game.communityRating?.takeIf { it > 0f }
-            ?.let { add(Icons.Filled.ThumbUp to "${(it * 100).toInt()}%") }
-        game.genre?.trim()?.takeIf { it.isNotEmpty() }
-            ?.let { add(Icons.Filled.LocalOffer to it) }
-        game.releaseYear?.takeIf { it > 0 }
-            ?.let { add(Icons.Filled.CalendarToday to it.toString()) }
-    }
-    // Nothing scraped and never played: draw nothing rather than an empty column holding space.
-    if (facts.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        facts.forEach { (icon, text) ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = detailPalette().focus,
-                    modifier = Modifier.size(15.dp),
-                )
-                Spacer(Modifier.width(9.dp))
-                Text(
-                    text = text,
-                    color = TextMuted,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+private fun GameLogoBlock(logoUri: String?, title: String, platform: String) {
+    Column {
+        Text(
+            text = platform,
+            color = TextMuted,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(8.dp))
+        if (logoUri != null) {
+            coil3.compose.AsyncImage(
+                model = com.psplauncher.core.ui.image.rememberArtworkModel(logoUri),
+                contentDescription = title,
+                // Fit, never Crop: a trimmed logo is a wordmark with a letter missing.
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                alignment = Alignment.CenterStart,
+                modifier = Modifier
+                    .heightIn(max = LOGO_MAX_HEIGHT)
+                    .widthIn(max = LOGO_MAX_WIDTH),
+            )
+        } else {
+            Text(
+                text = title,
+                color = TextPrimary,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = LOGO_MAX_WIDTH),
+            )
         }
     }
 }
+
 
 private fun formatPlayTime(millis: Long): String {
     val minutes = millis / 60_000

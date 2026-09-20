@@ -44,7 +44,11 @@ class GameDetailScrollTest {
         romPath = "/roms/psx/crash.bin",
         releaseYear = 1996,
         developer = "Naughty Dog",
-        description = "Bandicoot jumps.",
+        // Long enough to push the media strip below the fold, which is what gives this test
+        // something to measure. The redesign dropped the 220dp hero card and the icon-tile row,
+        // and with a one-line description the whole page then fit the viewport: the test passed
+        // by having nothing to scroll.
+        description = "Bandicoot jumps. ".repeat(10),
     )
 
     private fun state(focus: String?) = GameDetailUiState(
@@ -74,30 +78,39 @@ class GameDetailScrollTest {
         composeRule.waitForIdle()
     }
 
-    /** Root-space Y of a top-band row, used as the page's scroll instrument. */
+    /**
+     * Root-space Y of the action row, used as the page's scroll instrument.
+     *
+     * Details, not Play: "Play" also appears as the helper footer's Confirm label when the cursor
+     * is on the launch button, and a two-node match would read whichever one came first.
+     */
     private fun topBandTop(): Float =
-        composeRule.onNodeWithText("Artwork").fetchSemanticsNode().boundsInRoot.top
+        composeRule.onNodeWithText("Details").fetchSemanticsNode().boundsInRoot.top
 
     @Test
-    fun `opening the page with Launch focused renders the hero band`() {
+    fun `opening the page with Play focused renders the whole action row`() {
         render(MutableStateFlow(state(GameDetailKeys.LAUNCH)))
 
-        composeRule.onNodeWithText("Artwork").assertIsDisplayed()
-        // "Options" is both the last quick action and the helper footer's prompt: both must show.
+        composeRule.onNodeWithText("Details").assertIsDisplayed()
+        // "Options" is only the helper footer's prompt now: the pill that used to carry it moved
+        // into the Details dropdown, so a second match here means a pill came back.
         val options = composeRule.onAllNodesWithText("Options")
-        options.assertCountEquals(2)
+        options.assertCountEquals(1)
         options[0].assertIsDisplayed()
-        options[1].assertIsDisplayed()
     }
 
     @Test
-    fun `focus returning to the top band brings the page back to the hero`() {
+    fun `focus returning to the top band brings the page back to the artwork`() {
         val flow = MutableStateFlow(state(GameDetailKeys.LAUNCH))
         render(flow)
         val atTop = topBandTop()
 
-        // Moving down to a media tile scrolls the page; the top band must leave the viewport.
-        composeRule.runOnIdle { flow.value = state(GameDetailKeys.media(mediaStableId(flow.value.detailMedia[0]))) }
+        // Moving down to the information band scrolls the page; the top band must move up.
+        //
+        // The band, not a media tile: bring-into-view is a no-op for something already on screen,
+        // and the redesigned page is short enough that the first media tile is visible from the
+        // top. A test that focuses it measures a scroll that correctly never happened.
+        composeRule.runOnIdle { flow.value = state(GameDetailKeys.INFO) }
         composeRule.waitForIdle()
         val scrolledDown = topBandTop()
         assertTrue(
@@ -105,7 +118,8 @@ class GameDetailScrollTest {
             scrolledDown < atTop,
         )
 
-        // Coming back must return the page to the hero, not park it just below it.
+        // Coming back must return the page to the top, not park it just above the action row:
+        // the logo and the backdrop above it are not nodes, so nothing else can bring them back.
         composeRule.runOnIdle { flow.value = state(GameDetailKeys.LAUNCH) }
         composeRule.waitForIdle()
         assertTrue(

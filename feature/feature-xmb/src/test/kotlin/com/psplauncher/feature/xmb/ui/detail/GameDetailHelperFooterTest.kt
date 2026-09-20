@@ -22,7 +22,7 @@ class GameDetailHelperFooterTest {
     fun `the base page documents Confirm, Options and Back`() {
         val items = gameDetailHelperItems(baseState)
 
-        assertEquals(listOf("Launch", "Options", "Back"), labels(baseState))
+        assertEquals(listOf("Play", "Options", "Back"), labels(baseState))
         assertEquals(
             "the footer names the actions, so it can never disagree with the pad",
             listOf(
@@ -84,12 +84,12 @@ class GameDetailHelperFooterTest {
             ).first().label,
         )
         assertEquals(
-            "Favorite",
-            gameDetailHelperItems(baseState.copy(navFocusKey = GameDetailKeys.FAVORITE)).first().label,
+            "Details",
+            gameDetailHelperItems(baseState.copy(navFocusKey = GameDetailKeys.DETAILS)).first().label,
         )
         assertEquals(
-            "Options",
-            gameDetailHelperItems(baseState.copy(navFocusKey = GameDetailKeys.OPTIONS_ACTION)).first().label,
+            "Play",
+            gameDetailHelperItems(baseState.copy(navFocusKey = GameDetailKeys.LAUNCH)).first().label,
         )
         assertEquals(
             "Read more",

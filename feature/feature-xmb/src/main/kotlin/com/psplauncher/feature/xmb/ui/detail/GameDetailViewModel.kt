@@ -118,6 +118,11 @@ data class GameDetailUiState(
     // Mirrors the engine's Options focus for rendering. The engine owns the authoritative node;
     // this index only positions the menu's highlight.
     val optionsIndex: Int = 0,
+
+    // The Details dropdown: the short menu the page's one secondary button opens. Same mirroring
+    // rule as Options above -- the engine owns the cursor, this index only draws it.
+    val showDetailsMenu: Boolean = false,
+    val detailsIndex: Int = 0,
     // The resolved emulator + RetroArch core and the ladder level that decided them for the loaded
     // game; null while nothing resolves (loading / no emulator / package-backed entry).
     val resolvedLaunch: ResolvedLaunch? = null,
@@ -197,6 +202,14 @@ data class GameDetailUiState(
                 else                  -> true
             }
         }
+
+    /**
+     * The Details dropdown's rows. Manual is OMITTED without one rather than shown disabled: the
+     * pill it replaced had a fixed slot in a row whose shape had to stay put, and a dropdown has
+     * no shape to protect. A menu row that cannot be chosen is only there to be bumped into.
+     */
+    val visibleDetailRows: List<DetailQuickAction>
+        get() = DetailQuickAction.entries.filter { it != DetailQuickAction.MANUAL || hasManual }
 }
 
 // ── Metadata preview ──────────────────────────────────────────────────────────
@@ -262,6 +275,23 @@ enum class DetailAction(val label: String, val section: String) {
     LOCATION("Open Location", FILE_SECTION),
     EXPORT("Export Game", FILE_SECTION),
     REMOVE("Remove", FILE_SECTION),
+}
+
+/**
+ * The Details dropdown, in the order it is drawn.
+ *
+ * These four were pills in a row under the hero. They are a menu now because the page's top band
+ * is artwork, and five controls laid across a game's own key art is five things asking to be read
+ * before the art is. One button opens this; the art keeps the rest of the band.
+ *
+ * OPTIONS is last on purpose: it is the way through to the full Options menu, and the three
+ * actions worth reaching directly sit above it.
+ */
+enum class DetailQuickAction(val label: String) {
+    FAVORITE("Favorite"),
+    ARTWORK("Artwork"),
+    MANUAL("Manual"),
+    OPTIONS("Options"),
 }
 
 /**
@@ -386,7 +416,6 @@ class GameDetailViewModel @Inject constructor(
         return GameDetailNavContent(
             gameId      = game?.id ?: 0L,
             loaded      = loaded,
-            hasManual   = s.hasManual,
             // Package-backed entries launch through a package/shortcut/intent — never an emulator,
             // so they get no emulator nodes at all.
             showEmulatorControls = loaded && s.showEmulatorAction,
@@ -404,10 +433,7 @@ class GameDetailViewModel @Inject constructor(
     private fun activateNode(key: String) {
         when {
             key == GameDetailKeys.LAUNCH -> { Timber.d("Controller SELECT activated Launch"); launch() }
-            key == GameDetailKeys.FAVORITE -> toggleFavorite()
-            key == GameDetailKeys.ARTWORK -> openArtworkManager()
-            key == GameDetailKeys.MANUAL -> openManual()
-            key == GameDetailKeys.OPTIONS_ACTION -> openOptions()
+            key == GameDetailKeys.DETAILS -> openDetailsMenu()
             key == GameDetailKeys.INFO -> if (_uiState.value.showEmulatorAction) requestChangeEmulator()
             key == GameDetailKeys.OVERVIEW -> toggleDescriptionExpanded()
             key.startsWith(DISC_KEY_PREFIX) ->
@@ -441,6 +467,10 @@ class GameDetailViewModel @Inject constructor(
                 val index = next.visibleActions.indexOfFirst { GameDetailKeys.option(it.name) == focus }
                 if (index >= 0) next = next.copy(optionsIndex = index)
             }
+            if (next.showDetailsMenu) {
+                val index = next.visibleDetailRows.indexOfFirst { GameDetailKeys.detailsRow(it.name) == focus }
+                if (index >= 0) next = next.copy(detailsIndex = index)
+            }
             if (next.showEmulatorPicker) {
                 val index = next.emulatorPickerOptions.indexOfFirst { GameDetailKeys.emulatorPick(it.id) == focus }
                 if (index >= 0) next = next.copy(emulatorPickerIndex = index)
@@ -471,6 +501,9 @@ class GameDetailViewModel @Inject constructor(
         s.showEmulatorPicker -> GameDetailKeys.MODAL_EMULATOR_PICKER
         s.collectionPicker.visible -> GameDetailKeys.MODAL_COLLECTION_PICKER
         s.showOptions -> GameDetailKeys.MODAL_OPTIONS
+        // Lowest of the stack: choosing Options in here closes this menu and opens that one, so
+        // the two are never both up at once, and the order only decides which wins if they were.
+        s.showDetailsMenu -> GameDetailKeys.MODAL_DETAILS
         else -> null
     }
 
@@ -505,6 +538,9 @@ class GameDetailViewModel @Inject constructor(
         return when (contextId) {
             GameDetailKeys.MODAL_OPTIONS -> s.visibleActions.map { action ->
                 NavigationNode(GameDetailKeys.option(action.name), onSelect = { activateAction(action) })
+            }
+            GameDetailKeys.MODAL_DETAILS -> s.visibleDetailRows.map { row ->
+                NavigationNode(GameDetailKeys.detailsRow(row.name), onSelect = { activateQuickAction(row) })
             }
             GameDetailKeys.MODAL_EMULATOR_PICKER -> s.emulatorPickerOptions.map { profile ->
                 NavigationNode(GameDetailKeys.emulatorPick(profile.id), onSelect = { confirmEmulatorPick(profile.id) })
@@ -550,6 +586,7 @@ class GameDetailViewModel @Inject constructor(
      */
     private fun preferredModalFocus(contextId: String, s: GameDetailUiState): String? = when (contextId) {
         GameDetailKeys.MODAL_OPTIONS -> s.visibleActions.firstOrNull()?.let { GameDetailKeys.option(it.name) }
+        GameDetailKeys.MODAL_DETAILS -> s.visibleDetailRows.firstOrNull()?.let { GameDetailKeys.detailsRow(it.name) }
         GameDetailKeys.MODAL_EMULATOR_PICKER ->
             s.emulatorPickerOptions.getOrNull(s.emulatorPickerIndex)?.let { GameDetailKeys.emulatorPick(it.id) }
         GameDetailKeys.MODAL_COLLECTION_PICKER -> collectionKeyAt(s, s.collectionPicker.selectedIndex)
@@ -591,6 +628,7 @@ class GameDetailViewModel @Inject constructor(
             s.showEmulatorPicker -> closeEmulatorPicker()
             s.collectionPicker.visible -> closeCollectionPicker()
             s.showOptions -> closeOptions()
+            s.showDetailsMenu -> closeDetailsMenu()
             else -> close()
         }
     }
@@ -885,6 +923,32 @@ class GameDetailViewModel @Inject constructor(
         _uiState.update { it.copy(showArtworkStudio = false) }
         val id = _uiState.value.game?.id ?: return
         loadGame(id)
+    }
+
+    // ── Details dropdown ──────────────────────────────────────────────────
+
+    fun openDetailsMenu() =
+        _uiState.update { it.copy(showDetailsMenu = true, detailsIndex = 0, actionMessage = null) }
+
+    fun closeDetailsMenu() = _uiState.update { it.copy(showDetailsMenu = false) }
+
+    /** Tap on a Details row: focus first, then activate, so touch and controller share one path. */
+    fun onDetailsRowTapped(row: DetailQuickAction) {
+        if (!nav.touch(GameDetailKeys.detailsRow(row.name))) activateQuickAction(row)
+        finishInput()
+    }
+
+    fun activateQuickAction(row: DetailQuickAction) {
+        // Closing first is what keeps the overlay stack flat: Options is opened by the branch
+        // below, and if this menu were still up it would be two modal contexts deep for a menu
+        // the user has already left.
+        _uiState.update { it.copy(showDetailsMenu = false) }
+        when (row) {
+            DetailQuickAction.FAVORITE -> toggleFavorite()
+            DetailQuickAction.ARTWORK  -> openArtworkManager()
+            DetailQuickAction.MANUAL   -> openManual()
+            DetailQuickAction.OPTIONS  -> openOptions()
+        }
     }
 
     // ── Options menu ──────────────────────────────────────────────────────

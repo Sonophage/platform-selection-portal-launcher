@@ -1356,18 +1356,18 @@ class GameDetailViewModelTest {
         viewModel.loadGame(1L)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // The dropped press did not accumulate: the cursor starts on Launch, where the design says
+        // The dropped press did not accumulate: the cursor starts on Play, where the design says
         // it starts, and the next press is the one that moves it.
         assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.FAVORITE, viewModel.uiState.value.navFocusKey)
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_RIGHT)
+        assertEquals(GameDetailKeys.DETAILS, viewModel.uiState.value.navFocusKey)
     }
 
     @Test
     fun `Options owns every input while open and hands the page its cursor back`() = runTest {
         loadedAndLaidOut()
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.FAVORITE, viewModel.uiState.value.navFocusKey)
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_RIGHT)
+        assertEquals(GameDetailKeys.DETAILS, viewModel.uiState.value.navFocusKey)
 
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
         assertTrue(viewModel.uiState.value.showOptions)
@@ -1387,7 +1387,7 @@ class GameDetailViewModelTest {
         assertFalse(viewModel.uiState.value.showOptions)
         assertFalse(viewModel.uiState.value.closed)
         // …and the page is back on the exact node it was interrupted on.
-        assertEquals(GameDetailKeys.FAVORITE, viewModel.uiState.value.navFocusKey)
+        assertEquals(GameDetailKeys.DETAILS, viewModel.uiState.value.navFocusKey)
 
         // A second Back, with nothing open, leaves Game Detail.
         viewModel.handleGamepadAction(GamepadAction.BACK)
@@ -1397,16 +1397,18 @@ class GameDetailViewModelTest {
     @Test
     fun `a page action cannot fire through the Options overlay`() = runTest {
         loadedAndLaidOut()
-        // Page cursor parked on Artwork, which would open the Artwork Studio if it ever fired.
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.ARTWORK, viewModel.uiState.value.navFocusKey)
+        // Page cursor parked on Overview, whose Confirm expands the description. Chosen because
+        // its effect is visible in the state: if the page node fired through the overlay, the
+        // description would be expanded as well as the favorite toggled.
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_UP)
+        assertEquals(GameDetailKeys.OVERVIEW, viewModel.uiState.value.navFocusKey)
+        assertFalse(viewModel.uiState.value.descriptionExpanded)
 
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
         viewModel.handleGamepadAction(GamepadAction.SELECT)   // the first option: Favorite
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.showArtworkStudio)
+        assertFalse(viewModel.uiState.value.descriptionExpanded)
         assertTrue(viewModel.uiState.value.game?.isFavorite == true)
         coVerify { gameRepository.setFavorite(1L, true) }
     }
@@ -1424,7 +1426,6 @@ class GameDetailViewModelTest {
         assertTrue(GameDetailKeys.disc(2L) in viewModel.focusableNodeKeys())
         assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
 
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)   // quick actions
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)   // first disc
         assertEquals(GameDetailKeys.disc(1L), viewModel.uiState.value.navFocusKey)
 
@@ -1447,7 +1448,7 @@ class GameDetailViewModelTest {
 
         val keys = viewModel.focusableNodeKeys()
         assertTrue(GameDetailKeys.LAUNCH in keys)
-        assertTrue(GameDetailKeys.OPTIONS_ACTION in keys)
+        assertTrue(GameDetailKeys.DETAILS in keys)
     }
 
     @Test
@@ -1456,13 +1457,19 @@ class GameDetailViewModelTest {
 
         loadedAndLaidOut()
 
-        assertFalse(GameDetailKeys.MANUAL in viewModel.focusableNodeKeys())
-        assertNull(viewModel.uiState.value.navFocusKey?.takeIf { it == GameDetailKeys.MANUAL })
+        // Manual is a row of the Details dropdown now, and a row without a manual is left out
+        // rather than drawn disabled: a menu has no fixed shape to protect.
+        assertFalse(DetailQuickAction.MANUAL in viewModel.uiState.value.visibleDetailRows)
+        assertFalse(viewModel.uiState.value.hasManual)
 
-        // Disabled, not explained: tapping it does nothing at all.
-        viewModel.onNodeTapped(GameDetailKeys.MANUAL)
+        // And the dropdown's own node graph has no row for it either, so neither a controller
+        // nor a tap can reach the action that would have to explain itself.
+        viewModel.onNodeTapped(GameDetailKeys.DETAILS)
         testDispatcher.scheduler.advanceUntilIdle()
-        assertNull(viewModel.uiState.value.actionMessage)
+        assertTrue(viewModel.uiState.value.showDetailsMenu)
+        assertFalse(
+            GameDetailKeys.detailsRow(DetailQuickAction.MANUAL.name) in viewModel.focusableNodeKeys(),
+        )
         assertNull(viewModel.uiState.value.manualViewerUri)
     }
 
@@ -1477,25 +1484,53 @@ class GameDetailViewModelTest {
         loadedAndLaidOut()
 
         assertTrue(viewModel.uiState.value.hasManual)
-        assertTrue(GameDetailKeys.MANUAL in viewModel.focusableNodeKeys())
+        assertTrue(DetailQuickAction.MANUAL in viewModel.uiState.value.visibleDetailRows)
 
-        viewModel.onNodeTapped(GameDetailKeys.MANUAL)
+        viewModel.onDetailsRowTapped(DetailQuickAction.MANUAL)
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals("content://library/psx/manuals/crash.pdf", viewModel.uiState.value.manualViewerUri)
     }
 
     @Test
-    fun `the Options quick action opens the context menu`() = runTest {
+    fun `Details opens its dropdown, and its Options row opens the full menu`() = runTest {
         loadedAndLaidOut()
 
-        viewModel.onNodeTapped(GameDetailKeys.OPTIONS_ACTION)
+        viewModel.onNodeTapped(GameDetailKeys.DETAILS)
         testDispatcher.scheduler.advanceUntilIdle()
 
+        assertTrue(viewModel.uiState.value.showDetailsMenu)
+        assertEquals(
+            GameDetailKeys.detailsRow(DetailQuickAction.FAVORITE.name),
+            viewModel.uiState.value.navFocusKey,
+        )
+
+        // The two menus never stack: choosing Options closes this one as it opens that one.
+        viewModel.onDetailsRowTapped(DetailQuickAction.OPTIONS)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.showDetailsMenu)
         assertTrue(viewModel.uiState.value.showOptions)
         assertEquals(
             GameDetailKeys.option(DetailAction.FAVORITE.name),
             viewModel.uiState.value.navFocusKey,
         )
+    }
+
+    @Test
+    fun `Back closes the Details dropdown before it closes the page`() = runTest {
+        loadedAndLaidOut()
+        viewModel.onNodeTapped(GameDetailKeys.DETAILS)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.showDetailsMenu)
+
+        viewModel.handleGamepadAction(GamepadAction.BACK)
+        assertFalse(viewModel.uiState.value.showDetailsMenu)
+        assertFalse(viewModel.uiState.value.closed)
+        // The page gets its own cursor back, on the button that opened the dropdown.
+        assertEquals(GameDetailKeys.DETAILS, viewModel.uiState.value.navFocusKey)
+
+        viewModel.handleGamepadAction(GamepadAction.BACK)
+        assertTrue(viewModel.uiState.value.closed)
     }
 
     @Test

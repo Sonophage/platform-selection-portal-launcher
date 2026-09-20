@@ -80,8 +80,9 @@ class GameDetailScreenContentTest {
         // The information band's inline emulator field is gone, not disabled.
         assertAbsent("Emulator", "a package-backed entry must not offer an emulator action")
         assertAbsent("MEDIA PREVIEW", "an entry with no media must not show a media band")
-        // The page itself is still a page: Launch and its footer documentation are present.
-        assertPresent("Launch", "the primary action must survive an entry with no extra content")
+        // The page itself is still a page: Play, Details and its footer documentation are present.
+        assertPresent("Play", "the primary action must survive an entry with no extra content")
+        assertPresent("Details", "the secondary action must survive an entry with no extra content")
         assertPresent("Options", "the helper footer must document Options on the base page")
         assertPresent("Back", "the helper footer must document Back")
     }
@@ -107,13 +108,17 @@ class GameDetailScreenContentTest {
             ),
         )
 
-        // The emulator is changed from the information band's field; the quick-action row carries
-        // Options (the context menu) instead of a second emulator control.
-        assertAbsent("Emulator", "the quick actions must not duplicate the emulator field")
-        assertPresent("Options", "the quick-action row opens the context menu")
-        // No manual: the action is simply disabled, with no "unavailable" explanation.
-        assertPresent("Manual", "the manual action keeps its place in the row")
-        assertAbsent("Unavailable", "a missing manual is disabled, not explained")
+        // The emulator is changed from the information band's field, and the action row is now
+        // only Play and Details: everything else lives inside the dropdown Details opens, which
+        // is closed here, so none of its rows may be on the page.
+        assertAbsent("Emulator", "the action row must not duplicate the emulator field")
+        assertPresent("Details", "the action row's second button opens the dropdown")
+        assertAbsent("Manual", "the manual row belongs to the closed dropdown, not to the page")
+        assertAbsent("Favorite", "the favorite row belongs to the closed dropdown, not to the page")
+        assertAbsent("Unavailable", "a missing manual is omitted, not explained")
+        // The hero banner and the icon tile are gone: the art is the page's background now, and
+        // the title is drawn by the logo block at the top left.
+        assertPresent("Crash Bandicoot", "the logo block falls back to the title when there is no logo")
         assertPresent("MEDIA PREVIEW", "the media band appears once the strip has an asset")
         // The named plate on a playable tile: "this is playable" never rests on the glyph alone.
         assertPresent("VIDEO", "a video tile must be named, not just glyphed")

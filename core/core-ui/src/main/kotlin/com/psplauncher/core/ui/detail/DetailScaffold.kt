@@ -165,10 +165,17 @@ fun PfpDetailScaffold(
     horizontalPadding: Dp = DetailContentPadding,
     header: @Composable () -> Unit = {},
     footer: @Composable () -> Unit = {},
+    /**
+     * The layer UNDER the page: the entry's own artwork, full-bleed (see [PfpDetailArtBackdrop]).
+     * Drawn over the plain page gradient and under everything else, including the header and the
+     * footer, so their see-through bands show the art rather than the theme.
+     */
+    backdrop: @Composable BoxScope.() -> Unit = {},
     overlay: @Composable BoxScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     PfpDetailBackground(modifier = modifier.fillMaxSize()) {
+        backdrop()
         Column(modifier = Modifier.fillMaxSize()) {
             header()
             // Hard viewport edge: nothing in the body may paint into the header or footer rows.

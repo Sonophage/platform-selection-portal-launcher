@@ -37,10 +37,8 @@ internal fun mediaStableId(media: DetailMedia): String =
 object GameDetailKeys {
     const val LAUNCH = "game-detail:launch"
     const val ACTIONS = "game-detail:actions"
-    const val FAVORITE = "game-detail:favorite"
-    const val ARTWORK = "game-detail:artwork"
-    const val MANUAL = "game-detail:manual"
-    const val OPTIONS_ACTION = "game-detail:options-action"
+    /** The one secondary button on the page. Its dropdown holds what the pills used to be. */
+    const val DETAILS = "game-detail:details"
     const val DISCS = "game-detail:discs"
     const val OVERVIEW = "game-detail:overview"
     const val INFO = "game-detail:info"
@@ -51,6 +49,8 @@ object GameDetailKeys {
     fun media(stableId: String): String = "game-detail:media:$stableId"
 
     fun option(actionName: String): String = "game-detail:options:$actionName"
+
+    fun detailsRow(actionName: String): String = "game-detail:details:$actionName"
 
     fun emulatorPick(profileId: String): String = "game-detail:emulator-pick:$profileId"
 
@@ -66,6 +66,7 @@ object GameDetailKeys {
     const val CONFIRM_CANCEL = "game-detail:confirm-cancel"
 
     // ── Modal context ids ─────────────────────────────────────────────────────
+    const val MODAL_DETAILS = "game-detail:modal:details"
     const val MODAL_OPTIONS = "game-detail:modal:options"
     const val MODAL_EMULATOR_PICKER = "game-detail:modal:emulator-picker"
     const val MODAL_COLLECTION_PICKER = "game-detail:modal:collection-picker"
@@ -88,8 +89,6 @@ data class GameDetailNavContent(
     /** 0 until the game row is loaded and the page can render. */
     val gameId: Long = 0L,
     val loaded: Boolean = false,
-    /** The manual action exists and can open something. */
-    val hasManual: Boolean = false,
     /** Emulator controls apply (false for package-backed Android/Windows entries). */
     val showEmulatorControls: Boolean = false,
     /** Disc members in visual order; empty unless this is a multi-disc set. */
@@ -123,6 +122,9 @@ class GameDetailNav(
 
     /** The node list currently registered in the active context. */
     private var registeredNodes: List<NavigationNode> = emptyList()
+
+    /** The page has had its opening cursor placed once. See [registerPageGraph]. */
+    private var openingFocusPlaced = false
 
     /**
      * Rows that hand the cursor straight to a child on vertical arrival. Their container is a visual
@@ -188,7 +190,24 @@ class GameDetailNav(
         // The same map is the previous geometry: it still holds the position of any node this
         // update removed, which is exactly what focus recovery needs to look up.
         engine.replaceNodesWithGeometry(registeredNodes, geometry, geometry)
+        placeOpeningFocus()
         normalizeFocus()
+    }
+
+    /**
+     * The page opens on Play, not on the first node in the graph.
+     *
+     * Overview is registered above the action row because that is where it sits on screen, and the
+     * engine focuses the first node it is given. Left alone, opening a game would put the cursor on
+     * its description and charge a DOWN press for the one thing the page exists to do. Only ever
+     * done ONCE, and only while nothing is focused yet, so a later content update can never yank
+     * the cursor back off whatever the user moved it to.
+     */
+    private fun placeOpeningFocus() {
+        if (openingFocusPlaced) return
+        if (engine.focusedKey == null) return
+        openingFocusPlaced = true
+        engine.setFocused(GameDetailKeys.LAUNCH)
     }
 
     /**
@@ -208,22 +227,23 @@ class GameDetailNav(
     private fun pageNodes(): List<NavigationNode> {
         if (!content.loaded) return emptyList()
         val nodes = mutableListOf<NavigationNode>()
-        nodes += NavigationNode(GameDetailKeys.LAUNCH, onSelect = { activate(GameDetailKeys.LAUNCH) })
-
-        val quickActions = buildList {
-            add(NavigationNode(GameDetailKeys.FAVORITE, onSelect = { activate(GameDetailKeys.FAVORITE) }))
-            add(NavigationNode(GameDetailKeys.ARTWORK, onSelect = { activate(GameDetailKeys.ARTWORK) }))
-            // Manual stays visible but disabled without one, and a disabled action is never
-            // focusable — the controller must not be able to land on something that does nothing.
-            if (content.hasManual) {
-                add(NavigationNode(GameDetailKeys.MANUAL, onSelect = { activate(GameDetailKeys.MANUAL) }))
-            }
-            // Options opens the context menu, which every entry has. The emulator itself is changed
-            // by confirming the information band.
-            add(NavigationNode(GameDetailKeys.OPTIONS_ACTION, onSelect = { activate(GameDetailKeys.OPTIONS_ACTION) }))
+        // Registration order is the page's visual order, top to bottom. The logo and the artwork
+        // above it are not nodes, so Overview is the page's first stop.
+        if (content.showOverview) {
+            nodes += NavigationNode(GameDetailKeys.OVERVIEW, onSelect = { activate(GameDetailKeys.OVERVIEW) })
         }
-        nodes += container(GameDetailKeys.ACTIONS, quickActions)
-
+        // Play and Details, side by side, are the whole action row now. The four quick-action
+        // pills that used to sit here moved INTO Details' dropdown: one secondary button beside
+        // Play, instead of five controls competing for the same glance. Details is always present
+        // and always enabled, including without a manual, because its dropdown is what hides the
+        // manual row in that case.
+        nodes += container(
+            GameDetailKeys.ACTIONS,
+            listOf(
+                NavigationNode(GameDetailKeys.LAUNCH, onSelect = { activate(GameDetailKeys.LAUNCH) }),
+                NavigationNode(GameDetailKeys.DETAILS, onSelect = { activate(GameDetailKeys.DETAILS) }),
+            ),
+        )
         if (content.discIds.size > 1) {
             nodes += container(
                 GameDetailKeys.DISCS,
@@ -232,8 +252,13 @@ class GameDetailNav(
                 },
             )
         }
-        if (content.showOverview) {
-            nodes += NavigationNode(GameDetailKeys.OVERVIEW, onSelect = { activate(GameDetailKeys.OVERVIEW) })
+        if (content.mediaIds.isNotEmpty()) {
+            nodes += container(
+                GameDetailKeys.MEDIA,
+                content.mediaIds.map { id ->
+                    NavigationNode(GameDetailKeys.media(id), onSelect = { activate(GameDetailKeys.media(id)) })
+                },
+            )
         }
         if (content.showInfo) {
             // One stop, like every other row: confirming the highlighted band opens the emulator
@@ -243,14 +268,6 @@ class GameDetailNav(
                 key = GameDetailKeys.INFO,
                 selectable = content.showEmulatorControls,
                 onSelect = { activate(GameDetailKeys.INFO) },
-            )
-        }
-        if (content.mediaIds.isNotEmpty()) {
-            nodes += container(
-                GameDetailKeys.MEDIA,
-                content.mediaIds.map { id ->
-                    NavigationNode(GameDetailKeys.media(id), onSelect = { activate(GameDetailKeys.media(id)) })
-                },
             )
         }
         return nodes
