@@ -57,12 +57,10 @@ class StudioCropPreviewTest {
         }
     }
 
-    // A new ArtworkKind must fall through to "no preview" rather than borrow a wrong treatment,
-    // so the resolver is total by construction and never throws.
-    @Test
-    fun `resolver is total over ArtworkKind`() {
-        ArtworkKind.entries.forEach { cropPreviewChromeFor(it) }
-    }
+    // `cropPreviewChromeFor` is an else-less `when` over ArtworkKind returning a non-Unit type,
+    // so a new kind that falls through is a COMPILE error. There was a test here asserting that
+    // by calling it once per entry and asserting nothing; it could only fail if the module did
+    // not build, which every other test in this file already covers.
 
     @Test
     fun `exactly six kinds preview`() {
