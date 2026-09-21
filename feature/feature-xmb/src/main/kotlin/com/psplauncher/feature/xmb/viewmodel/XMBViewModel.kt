@@ -202,7 +202,8 @@ data class ColorSchemePickerState(
 data class ColorSchemeOption(
     val scheme: XmbColorScheme?,
     val label: String,
-    val sublabel: String,
+    /** Null when the row has nothing to add — most presets are just their name and their colour. */
+    val sublabel: String?,
     val swatch: Long,
     val isCustom: Boolean = false,
 )
@@ -3801,7 +3802,13 @@ class XMBViewModel @Inject constructor(
         val state = _uiState.value.search ?: return
         val q = state.query
         val rows = buildList {
-            searchGames.filter { matchesSearch(q, it.title, it.developer, it.publisher) }
+            // The platform is in the haystack because the row already PRINTS it: a list that shows
+            // you "Castlevania · PlayStation" and then finds nothing for "psx castlevania" is
+            // showing you a field it refuses to search. platformCache holds the display name the
+            // row uses, so the two cannot disagree about what the console is called.
+            searchGames.filter {
+                matchesSearch(q, it.title, it.developer, it.publisher, platformCache[it.platformId]?.name)
+            }
                 .take(SEARCH_RESULTS_PER_LIBRARY)
                 .forEach { add(it.toSearchRow()) }
             searchVideos.filter { matchesSearch(q, it.displayTitle, it.displayName) }
@@ -5423,8 +5430,11 @@ class XMBViewModel @Inject constructor(
             // Searches everything, from anywhere on the home screen. The per-library Search rows
             // are the same overlay with a narrower scope.
             GamepadAction.OPEN_SEARCH -> openSearch(SearchScope.ALL)
+            // CHANGE_SORT is deliberately NOT repeated here. It is handled above, and Kotlin takes
+            // the first matching branch, so a second mention was dead — and the kind of dead that
+            // bites, because the next person to change sort behaviour has two places to find and
+            // only one that runs.
             GamepadAction.OPEN_CONTEXT_MENU,
-            GamepadAction.CHANGE_SORT,
             GamepadAction.PREV_CATEGORY,
             GamepadAction.NEXT_CATEGORY -> Unit
         }
@@ -7613,7 +7623,11 @@ class XMBViewModel @Inject constructor(
                 ColorSchemeOption(
                     scheme   = scheme,
                     label    = scheme.displayLabel(),
-                    sublabel = if (scheme == XmbColorScheme.ORIGINAL) "Changes with the month" else "Fixed color preset",
+                    // Only the rows that have something to say get a second line. Eleven identical
+                    // "Fixed color preset" sublabels told the user nothing eleven times, pushed
+                    // the last row off the bottom of the panel, and buried the one line that IS
+                    // information — the month-changing scheme — in the middle of them.
+                    sublabel = if (scheme == XmbColorScheme.ORIGINAL) "Changes with the month" else null,
                     swatch   = scheme.resolve(month).waveColor,
                 )
             }

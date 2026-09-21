@@ -155,12 +155,16 @@ private fun ColorSchemeRow(
                     color = if (isSelected) Color.White else Color.White.copy(alpha = 0.66f),
                     style = TextStyle(shadow = PickerTextShadow),
                 )
-                Text(
-                    text = option.sublabel,
-                    fontSize = 11.sp,
-                    color = Color.White.copy(alpha = if (isSelected) 0.78f else 0.5f),
-                    style = TextStyle(shadow = PickerTextShadow),
-                )
+                // Most presets are their name and their colour, and have nothing to add. A second
+                // line repeated down every row is noise that costs a row's worth of panel height.
+                option.sublabel?.let { sub ->
+                    Text(
+                        text = sub,
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = if (isSelected) 0.78f else 0.5f),
+                        style = TextStyle(shadow = PickerTextShadow),
+                    )
+                }
             }
         }
     }
