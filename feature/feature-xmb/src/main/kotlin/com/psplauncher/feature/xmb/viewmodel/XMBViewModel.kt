@@ -5586,6 +5586,9 @@ class XMBViewModel @Inject constructor(
      * no box art cannot be walked onto a box art page. Non-game rows ignore the shoulders
      * entirely: there is no panel over a settings row or a music folder to walk.
      */
+    /** A tap on the strip goes straight to that page; the strip only draws pages that exist. */
+    fun onPanelPageTapped(page: DetailPanelPage) = _uiState.update { it.copy(panelPage = page) }
+
     private fun stepHoverPanelPage(delta: Int) = _uiState.update { s ->
         val item = s.focusedItem?.takeIf { it.isRealGame } ?: return@update s
         val content = detailPanelContentFor(item, platformCache[item.platformId]?.name ?: "")

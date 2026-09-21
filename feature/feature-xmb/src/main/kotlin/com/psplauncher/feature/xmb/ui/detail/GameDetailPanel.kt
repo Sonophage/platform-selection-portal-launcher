@@ -64,14 +64,23 @@ private fun DetailPanelPage.icon(): ImageVector = when (this) {
     DetailPanelPage.INFO -> Icons.Filled.Info
 }
 
-private val StripIconSize: Dp = 22.dp
-private val StripCellSize: Dp = 40.dp
+private val StripIconSize: Dp = 20.dp
+private val StripCellSize: Dp = 28.dp
 private val PanelCardShape = RoundedCornerShape(14.dp)
 
 /**
- * The page strip. Drawn even at one page, because it is what tells the user L1/R1 do anything
- * here at all — hiding it at one page would make the shoulders look dead on exactly the games
- * with the least artwork, which are the ones a user is most likely to go looking for a scrape on.
+ * The page strip, wearing the helper footer's pill.
+ *
+ * Every other pill in the shell is a ControllerHintBar — black at half alpha, a 10 dp corner and
+ * 8 by 4 of padding around 20 dp glyphs — and this one sits in the opposite corner of the same
+ * screen. The numbers are taken from that component rather than chosen again here, because two
+ * copies of a number with a comment saying they must match is how a shell stops looking like one
+ * thing. It is not a ControllerHintBar itself: those are a glyph plus a label with no selected
+ * state, and this is a set of tabs where exactly one is current.
+ *
+ * Drawn even at one page: it is what says L1/R1 do anything here, and hiding it at one page would
+ * make the shoulders look dead on exactly the games with the least artwork — the ones most worth
+ * going to look for a scrape on.
  */
 @Composable
 fun DetailPanelStrip(
@@ -80,13 +89,11 @@ fun DetailPanelStrip(
     modifier: Modifier = Modifier,
     onPageTapped: ((DetailPanelPage) -> Unit)? = null,
 ) {
-    val palette = detailPalette()
     Row(
         modifier = modifier
-            .background(palette.rowFill, PanelCardShape)
-            .border(1.dp, palette.rowEdge, PanelCardShape)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         pages.forEach { page ->
@@ -95,8 +102,8 @@ fun DetailPanelStrip(
                 modifier = Modifier
                     .size(StripCellSize)
                     .background(
-                        if (selected) palette.focus else Color.Transparent,
-                        RoundedCornerShape(10.dp),
+                        if (selected) Color.White.copy(alpha = 0.22f) else Color.Transparent,
+                        RoundedCornerShape(6.dp),
                     )
                     .then(
                         if (onPageTapped != null) Modifier.clickable { onPageTapped(page) }
@@ -107,7 +114,9 @@ fun DetailPanelStrip(
                 Icon(
                     imageVector = page.icon(),
                     contentDescription = page.label,
-                    tint = if (selected) palette.textPrimary else palette.textMuted,
+                    // The footer's labels are white; its unselected state is the absence of a
+                    // prompt rather than a dim one, so the dimming here is this component's own.
+                    tint = if (selected) Color.White else Color.White.copy(alpha = 0.45f),
                     modifier = Modifier.size(StripIconSize),
                 )
             }
@@ -126,21 +135,13 @@ fun GameDetailPanel(
     content: DetailPanelContent,
     page: DetailPanelPage,
     modifier: Modifier = Modifier,
-    showStrip: Boolean = true,
     titleFallback: Boolean = true,
-    onPageTapped: ((DetailPanelPage) -> Unit)? = null,
     onMediaTapped: ((DetailMedia) -> Unit)? = null,
 ) {
+    // The strip is NOT drawn here. It lives in the host's chrome, under the top bar, so the whole
+    // of this region belongs to the page — which is the difference between a box front you can
+    // read and one you can identify.
     Column(modifier) {
-        if (showStrip) {
-            DetailPanelStrip(
-                pages = content.pages,
-                current = page,
-                onPageTapped = onPageTapped,
-                modifier = Modifier.align(Alignment.End),
-            )
-            Spacer(Modifier.height(14.dp))
-        }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             // resolvePanelPage, not page, so a page that stops being available while the panel
             // is open (a scrape filling in box art, the cursor moving to a game with less art)
@@ -149,7 +150,7 @@ fun GameDetailPanel(
                 DetailPanelPage.LOGO -> LogoPage(content, titleFallback)
                 DetailPanelPage.BOX_ART -> BoxArtPage(content)
                 DetailPanelPage.GALLERY -> GalleryPage(content, onMediaTapped)
-                DetailPanelPage.INFO -> InfoPage(content, titleFallback)
+                DetailPanelPage.INFO -> InfoPage(content)
             }
         }
     }
@@ -239,7 +240,7 @@ private fun GalleryPage(
  * over the art rather than a page of its own.
  */
 @Composable
-private fun InfoPage(content: DetailPanelContent, showTitle: Boolean) {
+private fun InfoPage(content: DetailPanelContent) {
     val palette = detailPalette()
     Column(
         modifier = Modifier
@@ -277,18 +278,16 @@ private fun InfoPage(content: DetailPanelContent, showTitle: Boolean) {
                 .verticalScroll(rememberScrollState()),
         )
         Spacer(Modifier.height(12.dp))
-        // Same question as the logo's title fallback, so the same answer: the crossbar is already
-        // showing this game's name a few hundred dp to the left, and the card repeating it costs
-        // a line the description could have had. The drill-down has no such label.
-        if (showTitle) {
-            Text(
-                text = content.title,
-                color = palette.textPrimary,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        // The card names the game again. It did not, on the grounds that the crossbar row was
+        // already doing it — but the row's label yields to the panel now (see focusedPanelVisible),
+        // so dropping it here would leave the Info page as the one view that names nothing.
+        Text(
+            text = content.title,
+            color = palette.textPrimary,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         content.fileName?.let { fileName ->
             Text(
                 text = fileName,

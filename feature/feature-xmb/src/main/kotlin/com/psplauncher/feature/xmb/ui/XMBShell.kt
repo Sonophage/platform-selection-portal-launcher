@@ -74,6 +74,7 @@ import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.feature.xmb.ui.detail.DetailPanelPage
+import com.psplauncher.feature.xmb.ui.detail.DetailPanelStrip
 import com.psplauncher.feature.xmb.ui.detail.GameDetailPanel
 import com.psplauncher.feature.xmb.ui.detail.detailPanelContentFor
 import com.psplauncher.feature.xmb.ui.detail.resolvePanelPage
@@ -175,6 +176,7 @@ fun XMBShellContainer(
         onTouchBack = viewModel::onHomeBack,
         onTouchInput = viewModel::markTouchInput,
         onXmbSortTapped = viewModel::onSortLabelTapped,
+        onPanelPageTapped = viewModel::onPanelPageTapped,
         onOpenAppDrawer = viewModel::onOpenAppDrawer,
         onItemTap = viewModel::onItemTap,
         onItemLongPress = viewModel::onItemLongPress,
@@ -289,6 +291,7 @@ fun XMBShell(
     onTouchBack: () -> Unit = {},
     onTouchInput: () -> Unit = {},
     onXmbSortTapped: () -> Unit = {},
+    onPanelPageTapped: (DetailPanelPage) -> Unit = {},
     onOpenAppDrawer: () -> Unit = {},
     // Row tap: move the cursor there, or activate if it's already selected (see XMBViewModel.onItemTap).
     onItemTap: (Int) -> Unit = {},
@@ -674,6 +677,15 @@ fun XMBShell(
                 label = "pic0Fade",
             )
             val onLogoPage = panelPage == DetailPanelPage.LOGO
+            // "Is anything on the right already naming this game?" — the question the row label
+            // asks before hiding itself. On the logo page that is still the logo, fade and all,
+            // so the 650 ms gap keeps its label. On any other page the panel is up instantly and
+            // carries the name: the Info card says it in text, the box front says it in art, and
+            // the row label would otherwise run into the panel's left edge.
+            //
+            // One val, two consumers (the crossbar list and the drill flyout). They were the pair
+            // that disagreed — the flyout never received this at all — so they read one value.
+            val focusedNameShownOnRight = if (onLogoPage) pic0Alpha > 0f else panelContent != null
             val panelAlpha = if (onLogoPage) pic0Alpha else 1f
             // On the logo page this is the old condition unchanged, so a game with no logo shows
             // nothing here exactly as before. Off it, the panel is what the user asked for with
@@ -697,8 +709,11 @@ fun XMBShell(
                     // more of it: 30% of the width is right for a wordmark and cramped for a
                     // portrait box or a paragraph, and the still art is solid out to 40% and
                     // gone by 68% (XMBGameBackdrop), so widening to 40% stays in the open side.
-                    val panelWidthFraction = if (onLogoPage) 0.30f else 0.40f
-                    val panelHeightFraction = if (onLogoPage) 0.38f else 0.62f
+                    val panelWidthFraction = if (onLogoPage) 0.30f else 0.42f
+                    // 70%, up from 62%: the strip used to take the top of this region and now
+                    // sits in the chrome under the status bar, so the page gets what it was
+                    // spending on its own tab row.
+                    val panelHeightFraction = if (onLogoPage) 0.38f else 0.70f
                     val logoCenterOffset: Dp = if (uiState.drillTitle != null) {
                         val contentTop = uiState.layoutSpec.contentTopPaddingDp.dp
                         val crossHeight = maxHeight - contentTop
@@ -720,7 +735,6 @@ fun XMBShell(
                         // The strip is chrome, and on the logo page the crossbar should look
                         // exactly as it did before this change — so it appears only once the user
                         // has walked off the logo, which is the only way to get here.
-                        showStrip = !onLogoPage,
                         // The row already shows the title for a logo-less game. See LogoPage.
                         titleFallback = false,
                         modifier = Modifier
@@ -808,6 +822,23 @@ fun XMBShell(
                 modifier = Modifier.align(Alignment.TopCenter),
             )
 
+            // The panel's page strip, directly under the status bar and in the opposite corner
+            // from the helper footer, which is the pill it is wearing. Not on the logo page: that
+            // view is the crossbar exactly as it was, and a tab row over it would be new chrome
+            // on a screen nobody asked to change.
+            if (panelContent != null && panelPage != null && panelPage != DetailPanelPage.LOGO) {
+                DetailPanelStrip(
+                    pages = panelContent.pages,
+                    current = panelPage,
+                    onPageTapped = onPanelPageTapped,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        // StripHeight, not a copy of 28: the gap under the status bar has to
+                        // follow it if it ever changes.
+                        .padding(top = StripHeight + ControllerHintEdgeGap, end = ControllerHintEdgeGap),
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -880,6 +911,7 @@ fun XMBShell(
                             // Tapping the active memory card under the caticon backs out of the
                             // drill; taps on the other (dimmed) cards are ignored.
                             onSiblingTap = { i -> if (i == uiState.drillSiblingIndex) onTouchBack() },
+                            focusedLogoVisible = focusedNameShownOnRight,
                             iconStyle = uiState.iconStyle,
                             barTopY = barTop,
                             belowTopY = anchorTop,
@@ -921,7 +953,7 @@ fun XMBShell(
                                 solidUnfocusedIcons = uiState.solidUnfocusedIcons,
                                 textShadow = uiState.textShadow,
                                 iconAnimatingAllowed = iconAnimatingAllowed,
-                                focusedLogoVisible = pic0Alpha > 0f,
+                                focusedLogoVisible = focusedNameShownOnRight,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

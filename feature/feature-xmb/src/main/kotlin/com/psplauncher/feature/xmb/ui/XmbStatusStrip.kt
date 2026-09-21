@@ -328,7 +328,12 @@ private fun StripSeparator() {
     )
 }
 
-private val StripHeight   = 28.dp
+/**
+ * The strip's height, and therefore the top edge of everything that has to sit under it. Internal
+ * rather than private because the panel strip is placed directly beneath it, and a second copy of
+ * 28 in the shell is a gap that drifts the first time this changes.
+ */
+internal val StripHeight   = 28.dp
 private val StripFontSize = 12.sp
 private val LowBatteryTint = Color(0xFFFF6B6B)
 

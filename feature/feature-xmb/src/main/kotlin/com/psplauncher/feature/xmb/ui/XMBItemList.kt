@@ -223,6 +223,9 @@ fun XmbDrillFlyout(
     belowTopY: Dp = 152.dp,
     // Whether focused-row GIF icons may animate (see XMBItemList).
     iconAnimatingAllowed: Boolean = false,
+    // See XmbVerticalListRow. Required, not defaulted: the flyout is the path where the missing
+    // value went unnoticed, so it does not get to be optional here either.
+    focusedLogoVisible: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -256,6 +259,7 @@ fun XmbDrillFlyout(
             onItemSelected = onItemSelected,
             onItemLongPress = onItemLongPress,
             iconAnimatingAllowed = iconAnimatingAllowed,
+            focusedLogoVisible = focusedLogoVisible,
             modifier = Modifier.fillMaxSize().padding(start = DRILL_GAME_COLUMN_LEFT),
         )
     }
@@ -272,6 +276,7 @@ private fun XmbGameColumn(
     selectedIndex: Int,
     iconStyle: GameIconStyle,
     belowTopY: Dp,
+    focusedLogoVisible: Boolean,
     onItemSelected: (Int) -> Unit,
     onItemLongPress: (Int) -> Unit,
     iconAnimatingAllowed: Boolean = false,
@@ -294,10 +299,15 @@ private fun XmbGameColumn(
                 item = items[i],
                 isSelected = i == selectedIndex,
                 // Text is allowed here; whether a row actually draws any is XmbVerticalListRow's
-                // call. A real game shows its title only while it is the active row and its PIC0
-                // logo is not up (see showGameText) — this has not been "every card keeps its
-                // label" since c1367d8b, and the comment that said so outlived the behaviour.
+                // call. A real game shows its title only while it is the active row and nothing
+                // on the right is already naming it (see showGameText).
                 showText = true,
+                // This was the one call site of three that never passed it, so showGameText
+                // evaluated against the default `false` here and the active row kept its title
+                // whatever was on the right. The comment above described the intended behaviour
+                // and this path could not produce it. The parameter has no default any more, so
+                // a fourth call site cannot repeat it.
+                focusedLogoVisible = focusedLogoVisible,
                 iconStyle = iconStyle,
                 onClick = { onItemSelected(i) },
                 onLongPress = { onItemLongPress(i) },
@@ -530,6 +540,9 @@ fun XMBItemList(
                     // Show the previous item's label too, so its name rises up through the
                     // crossbar with the icon (unless the column is icon-only).
                     showText = showLabels,
+                    // Unused while isSelected is false, but passed rather than defaulted: the
+                    // parameter is required now precisely so nobody has to check that again.
+                    focusedLogoVisible = focusedLogoVisible,
                     iconStyle = iconStyle,
                     onClick = { onItemSelected(selectedIndex - 1) },
                     onLongPress = { onItemLongPress(selectedIndex - 1) },
@@ -564,9 +577,14 @@ private fun XmbVerticalListRow(
     solidUnfocusedIcons: Boolean = false,
     // "Text Shadow" (Display ▸ Appearance): drop shadow behind row helper text (subtitle).
     textShadow: Boolean = true,
-    // The focused row's clear-logo overlay is on screen, so this row may hide its own title.
-    // False means the title shows: a row is never allowed to be nameless.
-    focusedLogoVisible: Boolean = false,
+    // Something to the right is already naming the focused game — its PIC0 logo, or the hover
+    // panel on any of its other pages — so this row may hide its own title. False means the
+    // title shows: a row is never allowed to be nameless.
+    //
+    // No default, deliberately. Two of this function's three call sites used to omit it and got
+    // `false`, which silently disabled the rule on the drill flyout — the busiest path of the
+    // three. A required parameter turns that from a thing you have to notice into a build error.
+    focusedLogoVisible: Boolean,
     // Whether THIS row may animate its GIF icon — true only for the focused row, so exactly
     // one decoder runs at a time (decision 3). Provided per-row around the icon.
     iconAnimatingAllowed: Boolean = false,
