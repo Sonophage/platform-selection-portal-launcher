@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -1012,7 +1013,22 @@ fun SettingsScaffold(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    // The whole screen ends above the soft keyboard.
+                    //
+                    // MainActivity sets decorFitsSystemWindows false, so without this the window
+                    // does not move and the keyboard simply covers whatever is under it. On a
+                    // 462 dp-tall screen that is the lower half of every settings list -- which
+                    // is where the text fields are, because they sit under the rows that explain
+                    // them. Editing a ScreenScraper username meant typing into a field you could
+                    // not see.
+                    //
+                    // On the scaffold rather than on each screen: there are twenty-odd screens
+                    // and the ones with fields are not obviously the ones that need it, so a
+                    // per-screen fix is a rule nobody will remember. The body scrolls, and the
+                    // scaffold already brings the focused row into view, so a shorter viewport is
+                    // all it needs to do the rest.
+                    .imePadding(),
             ) {
                 // Header band — chrome, and therefore a SIBLING of the scrolling body, which is
                 // why a drag here used to die. dragToScroll hands it the body's own scroll state
