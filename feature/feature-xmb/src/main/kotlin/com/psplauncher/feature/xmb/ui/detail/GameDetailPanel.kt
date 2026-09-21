@@ -126,23 +126,27 @@ fun GameDetailPanel(
     content: DetailPanelContent,
     page: DetailPanelPage,
     modifier: Modifier = Modifier,
+    showStrip: Boolean = true,
+    titleFallback: Boolean = true,
     onPageTapped: ((DetailPanelPage) -> Unit)? = null,
     onMediaTapped: ((DetailMedia) -> Unit)? = null,
 ) {
     Column(modifier) {
-        DetailPanelStrip(
-            pages = content.pages,
-            current = page,
-            onPageTapped = onPageTapped,
-            modifier = Modifier.align(Alignment.End),
-        )
-        Spacer(Modifier.height(14.dp))
+        if (showStrip) {
+            DetailPanelStrip(
+                pages = content.pages,
+                current = page,
+                onPageTapped = onPageTapped,
+                modifier = Modifier.align(Alignment.End),
+            )
+            Spacer(Modifier.height(14.dp))
+        }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             // resolvePanelPage, not page, so a page that stops being available while the panel
             // is open (a scrape filling in box art, the cursor moving to a game with less art)
             // cannot leave the body drawing something the strip is no longer offering.
             when (resolvePanelPage(page, content.pages)) {
-                DetailPanelPage.LOGO -> LogoPage(content)
+                DetailPanelPage.LOGO -> LogoPage(content, titleFallback)
                 DetailPanelPage.BOX_ART -> BoxArtPage(content)
                 DetailPanelPage.GALLERY -> GalleryPage(content, onMediaTapped)
                 DetailPanelPage.INFO -> InfoPage(content)
@@ -152,11 +156,16 @@ fun GameDetailPanel(
 }
 
 /**
- * The logo, over the game's own art, with nothing framing it — the art is the page. Falls back to
- * the title, which is why this page is offered for every game whether it has a logo or not.
+ * The logo, over the game's own art, with nothing framing it — the art is the page.
+ *
+ * [titleFallback] is false on the crossbar and true in the drill-down, and that is not a style
+ * choice. XMBItemList hides a row's title exactly when the shell draws its logo — one predicate,
+ * hasVisibleLogo, read by both halves so they cannot disagree — so a logo-less game is already
+ * showing its title in the list, and a title card here would be the crossbar saying it twice.
+ * The drill-down has no such list, so there it is the only thing naming the game.
  */
 @Composable
-private fun LogoPage(content: DetailPanelContent) {
+private fun LogoPage(content: DetailPanelContent, titleFallback: Boolean) {
     val logo = content.logoUri
     if (logo != null) {
         AsyncImage(
@@ -166,7 +175,7 @@ private fun LogoPage(content: DetailPanelContent) {
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize().padding(24.dp),
         )
-    } else {
+    } else if (titleFallback) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = content.title,

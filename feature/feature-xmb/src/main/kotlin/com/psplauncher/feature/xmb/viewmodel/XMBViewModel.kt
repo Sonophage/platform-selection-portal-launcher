@@ -38,6 +38,9 @@ import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameCollection
 import com.psplauncher.core.domain.model.GameContentType
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.feature.xmb.ui.detail.DetailPanelPage
+import com.psplauncher.feature.xmb.ui.detail.detailPanelContentFor
+import com.psplauncher.feature.xmb.ui.detail.stepPanelPage
 import com.psplauncher.core.domain.model.HiddenPlacement
 import com.psplauncher.core.domain.model.HideLocationType
 import com.psplauncher.core.domain.model.IconDisplayMode
@@ -757,6 +760,16 @@ data class XMBUiState(
      * five with a content:// one.
      */
     val focusedItemBackdrop: String? = null,
+    /**
+     * Which page the hover panel is showing in the crossbar's logo region. L1/R1 walk it.
+     *
+     * Deliberately NOT reset when the cursor moves to another game: the page is a preference
+     * ("show me box art"), not a property of the row, and re-reading it per game would make the
+     * region flip back to the logo on every D-pad press. A game that cannot offer the chosen page
+     * falls back for that row only — see resolvePanelPage — and the choice returns intact on the
+     * next row that can.
+     */
+    val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
     val librarySetupComplete: Boolean = false,
     val themeColors: PFPColors = DefaultPFPColors,
     // Custom icon slots of the applied theme (theme slot key → CustomIcon); empty = the
@@ -5558,10 +5571,25 @@ class XMBViewModel @Inject constructor(
             // the first matching branch, so a second mention was dead — and the kind of dead that
             // bites, because the next person to change sort behaviour has two places to find and
             // only one that runs.
-            GamepadAction.OPEN_CONTEXT_MENU,
-            GamepadAction.PREV_CATEGORY,
-            GamepadAction.NEXT_CATEGORY -> Unit
+            GamepadAction.OPEN_CONTEXT_MENU -> Unit
+            // The shoulders were dead on the crossbar root. They now walk the hover panel in the
+            // logo region. No conflict to resolve: nothing else on this screen claimed them.
+            GamepadAction.PREV_CATEGORY -> stepHoverPanelPage(-1)
+            GamepadAction.NEXT_CATEGORY -> stepHoverPanelPage(+1)
         }
+    }
+
+    /**
+     * Walk the hover panel's page for the row under the cursor.
+     *
+     * The available pages are recomputed from the focused row rather than stored, so a row with
+     * no box art cannot be walked onto a box art page. Non-game rows ignore the shoulders
+     * entirely: there is no panel over a settings row or a music folder to walk.
+     */
+    private fun stepHoverPanelPage(delta: Int) = _uiState.update { s ->
+        val item = s.focusedItem?.takeIf { it.isRealGame } ?: return@update s
+        val content = detailPanelContentFor(item, platformCache[item.platformId]?.name ?: "")
+        s.copy(panelPage = stepPanelPage(s.panelPage, content.pages, delta))
     }
 
     // ── Context menu ──────────────────────────────────────────────────────────
