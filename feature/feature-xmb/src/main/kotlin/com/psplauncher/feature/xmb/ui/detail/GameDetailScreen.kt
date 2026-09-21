@@ -818,7 +818,14 @@ private fun GameInformationBand(
         game.genre?.takeIf { it.isNotBlank() }?.let {
             PfpDetailField(label = "Genre", value = it)
         }
-        game.lastPlayedAt?.let {
+        // `> 0`, not merely non-null. A row can carry a lastPlayedAt of 0 — a consolidated library
+        // writes maxOf(0, 0), and a launch that was recorded before it ever succeeded leaves the
+        // column at its default — and 0 is a real instant, so `?.let` sent it to relativeDate and
+        // the page read "Last played · Dec 31, 1969". Seen on the device.
+        //
+        // The video row already guards its own timestamp this way (LibraryRowText's
+        // `lastWatchedAt?.takeIf { it > 0 }`); this was the same pair with only one side checked.
+        game.lastPlayedAt?.takeIf { it > 0L }?.let {
             PfpDetailField(label = "Last played", value = relativeDate(it))
         }
         if (game.totalPlayTimeMillis > 0) {

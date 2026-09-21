@@ -11,7 +11,7 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 </p>
 
 <p align="center">
-  <b>Latest: 1.4.0</b> &nbsp;·&nbsp;
+  <b>Latest: 1.5.0</b> &nbsp;·&nbsp;
   <a href="https://github.com/Sonophage/platform-selection-portal-launcher/releases">Releases</a>
   &nbsp;·&nbsp; Side-loaded APK (not on the Play Store)
   &nbsp;·&nbsp; Desktop <b>Theme Studio</b> companion
@@ -29,19 +29,18 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 *Captured on an AYN Thor unless noted. Game artwork and app icons shown belong to their
 respective owners.*
 
-### New in 1.4
+### New in 1.5
 
-*These four are from a test tablet whose library is empty, which is why the columns are short.
-The Network column is real — those are actual installed apps, classified automatically.*
+*Shot on the AYANEO Pocket FIT Elite at 1920x1080, on a real 148-game library.*
 
 | | |
 |:---:|:---:|
-| <img src="docs/screenshots/quick-search-network.jpg" width="420"> | <img src="docs/screenshots/library-search.jpg" width="420"> |
-| Quick Search leads Network; Moonlight and Boosteroid classified there automatically | Library search — Select from anywhere, or the Search row on a column |
-| <img src="docs/screenshots/settings-one-row.jpg" width="420"> | <img src="docs/screenshots/settings-rail.jpg" width="420"> |
-| Settings is one row now — one press, not three | …and the whole tree is in the rail, with one cursor on screen |
-| <img src="docs/screenshots/add-submenu.jpg" width="420"> | <img src="docs/screenshots/last-played-bar.jpg" width="420"> |
-| Two "Add" rows collapse into one with a submenu | Last Played sits immediately left of Game |
+| <img src="docs/screenshots/game-drill-covers.jpg" width="420"> | <img src="docs/screenshots/artwork-studio.jpg" width="420"> |
+| The drill flyout — covers, hero art, PIC0 logo and the metadata line | Artwork Studio, now with a status band: kinds filled, results found, requests used |
+| <img src="docs/screenshots/game-options-menu.jpg" width="420"> | <img src="docs/screenshots/search-typing.jpg" width="420"> |
+| Options panels take the artwork's hue at a surface's darkness, so nothing reads through | Search shows results while the keyboard is up |
+| <img src="docs/screenshots/settings-rail.jpg" width="420"> | <img src="docs/screenshots/home-memory-cards.jpg" width="420"> |
+| The settings rail centres on wherever you are, not just where the cursor went | Counts read one way everywhere now |
 
 ### Themes
 
@@ -49,19 +48,17 @@ The Network column is real — those are actual installed apps, classified autom
 |:---:|:---:|
 | <img src="docs/screenshots/theme-vaporwave-home.jpg" width="420"> | <img src="docs/screenshots/theme-color-scheme-picker.jpg" width="420"> |
 | A custom `.pfptheme` — wallpaper + one derived color, icons follow | Color Scheme picker, previewing live on the real crossbar |
-| <img src="docs/screenshots/theme-my-themes.jpg" width="420"> | <img src="docs/screenshots/theme-settings.jpg" width="420"> |
-| My Themes library — apply, Share, Remove | Theme install (`.ptf` / `.pfptheme`) and one-tap Reset to Default |
 
 ### Game library
 
 | | |
 |:---:|:---:|
-| <img src="docs/screenshots/game-drill-covers.jpg" width="420"> | <img src="docs/screenshots/game-detail.jpg" width="420"> |
-| Drilling into a Memory Card — covers, platform subtitles | Game detail — hero art and one-tap Play |
+| <img src="docs/screenshots/home-emulation.jpg" width="420"> | <img src="docs/screenshots/game-detail.jpg" width="420"> |
+| The crossbar, with Memory Cards under a custom category | Game detail — hero art, logo and one-tap Play |
 | <img src="docs/screenshots/custom-category.jpg" width="420"> | <img src="docs/screenshots/memory-card-menu.jpg" width="420"> |
 | A custom gaming category with its own icon and wallpaper | Memory Card options (△) — scan, refresh, pin, hide |
-| <img src="docs/screenshots/library-manager.jpg" width="420"> | <img src="docs/screenshots/winlator-pc-games.jpg" width="420"> |
-| Library Manager — ROM roots, per-console cards, scan-all passes | PC-layer titles (Winlator) live next to console games |
+| <img src="docs/screenshots/settings-library-manager.jpg" width="420"> | <img src="docs/screenshots/game-drill-windows.jpg" width="420"> |
+| Library Manager — ROM roots, per-console cards, scan-all passes | PC titles (Winlator / GameNative / Steam) sit next to console games |
 | <img src="docs/screenshots/artwork-manager.jpg" width="420"> | |
 | Artwork Manager — SteamGridDB / TheGamesDB / IGDB / local | |
 
@@ -72,7 +69,7 @@ The Network column is real — those are actual installed apps, classified autom
 | <img src="docs/screenshots/music-now-playing.jpg" width="420"> | <img src="docs/screenshots/music-player.jpg" width="420"> |
 | Music section — Now Playing surfaces on the crossbar | The in-app player (background service keeps it going) |
 | <img src="docs/screenshots/video-library.jpg" width="420"> | <img src="docs/screenshots/video-apps.jpg" width="420"> |
-| Video library — scanned files with thumbnails | Your installed players. **Pre-1.4 capture:** these now sit at the root of the Video column rather than behind a "Video Apps" row |
+| Video library — scanned files with thumbnails | Your installed players. **Older capture:** these now sit at the root of the Video column rather than behind a "Video Apps" row |
 | <img src="docs/screenshots/photo-section.jpg" width="420"> | |
 | Photo section — albums and a fullscreen viewer | |
 
@@ -165,7 +162,7 @@ PFP is distributed as a **side-loaded APK** (it is not on the Google Play Store)
 1. Download `PSPLauncher-<version>.apk` from
    [Releases](https://github.com/Sonophage/platform-selection-portal-launcher/releases).
 
-   > **1.4.0 currently ships a debug build** (`PSPLauncher-1.4.0-debug.apk`). It installs under
+   > **1.5.0 currently ships a debug build** (`PSPLauncher-1.5.0-debug.apk`). It installs under
    > `com.psplauncher.launcher.debug`, so it sits *beside* an existing PSPLauncher with its own
    > library rather than upgrading it, it is marked debuggable, and it is signed with the Android
    > SDK's public debug key. A signed release build replaces it when the key is available. Build
@@ -708,6 +705,44 @@ folders via *Library ▸ Root Access*.
 | **About / Credits** | Version, attributions |
 
 ---
+
+### 4.13 What changed in 1.5
+
+**Video thumbnails and album art come back.** Renaming the app orphaned every cached thumbnail and
+cover: they were recorded at a path inside the old package, which the renamed app is not allowed to
+read. Nothing was lost, but nothing could be shown either, and rescanning did not help because each
+scan handed the same dead path back. Both scanners now notice a cached file they cannot open and
+regenerate it. **Run Rescan once** on Video and on Music and they fill in.
+
+**Steam's own store is a scraper source.** PC games imported from Steam already carry the app id
+Steam uses, so PFP can ask Steam about them directly — no API key, no search, no guessing which
+game a shortcut is. It brings a description, developer, publisher, genre and year, plus the three
+artworks Steam publishes per app: a wide backdrop, portrait box art, and a transparent logo.
+
+**Video rows say more.** Duration, resolution and file size, the same three facts in the same order
+as a photo row.
+
+**The Artwork Studio tells you where you stand.** A band above the tabs shows how many of a game's
+eleven artwork kinds are filled, how many results the current source returned, and how many
+ScreenScraper requests today's account has used against its cap.
+
+**Things that were hard to read, aren't.** On a light colour scheme the app now picks dark text and
+the dimmer label colours follow it, instead of leaving pale labels on a pale wallpaper. Dialog cards
+flip with the text. An options panel takes the artwork's hue at a surface's darkness, so the game's
+own logo no longer reads through the menu on top of it.
+
+**Search works with the keyboard up.** On a 1080p handheld the keyboard took more than half the
+screen and the results list was laid out with no height at all — you typed and saw nothing. The
+title block and prompt bar now stand down while you type.
+
+**A failed launch is answerable.** Every button on the recovery sheet is reachable with a pad, and
+when PFP has lost access to a game's file the sheet leads with reconnecting the storage rather than
+with Retry.
+
+**Smaller things.** Counts read one way everywhere ("3 games", not "3 Games"). Empty rows line up
+with the rest of the column. A game's name is the same on its page and in an error about it. Windows
+shortcuts lose the underscore a filename forced on them. Searching a console's name finds its games.
+The settings rail centres on wherever you are.
 
 ## 5. Permissions & privacy
 
