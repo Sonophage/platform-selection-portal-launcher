@@ -693,14 +693,24 @@ fun XMBShell(
                     // inside the content Box, which is inset by contentTopPadding. This rebuilds
                     // that same line here in the unpadded space, from the very constants the cross
                     // and the game column lay out with, so the two cannot drift apart.
+                    // The logo page keeps the region it has always had. The other pages need
+                    // more of it: 30% of the width is right for a wordmark and cramped for a
+                    // portrait box or a paragraph, and the still art is solid out to 40% and
+                    // gone by 68% (XMBGameBackdrop), so widening to 40% stays in the open side.
+                    val panelWidthFraction = if (onLogoPage) 0.30f else 0.40f
+                    val panelHeightFraction = if (onLogoPage) 0.38f else 0.62f
                     val logoCenterOffset: Dp = if (uiState.drillTitle != null) {
                         val contentTop = uiState.layoutSpec.contentTopPaddingDp.dp
                         val crossHeight = maxHeight - contentTop
                         val anchorTop = crossHeight * layoutAdjust.barTopFraction + CAT_BAR_HEIGHT
                         val rowCenter = contentTop + anchorTop + ROW_HEIGHT / 2
-                        // The logo is 38% of the height and centred, so keep its centre within
-                        // [19%, 81%] — a low crossbar must not push it off the bottom edge.
-                        rowCenter.coerceIn(maxHeight * 0.19f, maxHeight * 0.81f) - maxHeight / 2
+                        // Keep the panel's CENTRE far enough from each edge that the panel itself
+                        // stays on screen — half its own height, derived rather than the literal
+                        // 19% that was correct only while the height was always 38%. A low
+                        // crossbar must not push it off the bottom.
+                        val halfPanel = panelHeightFraction / 2f
+                        rowCenter.coerceIn(maxHeight * halfPanel, maxHeight * (1f - halfPanel)) -
+                            maxHeight / 2
                     } else {
                         0.dp
                     }
@@ -714,8 +724,8 @@ fun XMBShell(
                         // The row already shows the title for a logo-less game. See LogoPage.
                         titleFallback = false,
                         modifier = Modifier
-                            .fillMaxWidth(0.30f)
-                            .fillMaxHeight(0.38f)
+                            .fillMaxWidth(panelWidthFraction)
+                            .fillMaxHeight(panelHeightFraction)
                             .offset(y = logoCenterOffset)
                             .padding(end = 44.dp)
                             .alpha(panelAlpha),
@@ -728,11 +738,15 @@ fun XMBShell(
             // no text, because the logo IS the identity. This is the other half of the PS3's
             // game info -- what the thing IS, not what it is called -- so it lives with the
             // logo rather than in the list.
-            // Not while the panel is on its Info page: that card leads with this exact line, and
-            // the two sit within a few dp of each other. One of them has to go, and the card's
-            // copy is the one with the description under it.
+            // Only on the logo page. This line is positioned for a panel that is 38% of the
+            // height; every other page is 62% and draws straight through it — seen on the
+            // device, the line and its accent bar printed across the middle of the box art.
+            // The Info card also leads with this exact text, so on that page it was saying it
+            // twice as well. A null panel (a row with no backdrop art, so no panel at all)
+            // keeps the line: there is nothing for it to collide with.
+            val panelLeavesRoomForMeta = panelPage == null || panelPage == DetailPanelPage.LOGO
             val metadataLine = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.takeIf { uiState.gameMetadataVisible && it.isRealGame && panelPage != DetailPanelPage.INFO }
+                ?.takeIf { uiState.gameMetadataVisible && it.isRealGame && panelLeavesRoomForMeta }
                 ?.metadataLine
             var metaVisible by remember(metadataLine) { mutableStateOf(false) }
             androidx.compose.runtime.LaunchedEffect(metadataLine) {

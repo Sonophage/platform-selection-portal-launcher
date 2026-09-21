@@ -149,7 +149,7 @@ fun GameDetailPanel(
                 DetailPanelPage.LOGO -> LogoPage(content, titleFallback)
                 DetailPanelPage.BOX_ART -> BoxArtPage(content)
                 DetailPanelPage.GALLERY -> GalleryPage(content, onMediaTapped)
-                DetailPanelPage.INFO -> InfoPage(content)
+                DetailPanelPage.INFO -> InfoPage(content, titleFallback)
             }
         }
     }
@@ -173,7 +173,7 @@ private fun LogoPage(content: DetailPanelContent, titleFallback: Boolean) {
             contentDescription = content.title,
             // Fit, never Crop: a trimmed logo is a wordmark with a letter missing.
             contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(8.dp),
         )
     } else if (titleFallback) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -200,7 +200,7 @@ private fun BoxArtPage(content: DetailPanelContent) {
         // Fit for the same reason as the logo, and more so: box art is the one asset whose aspect
         // ratio carries information (a tall GBA box is not a square PS1 case).
         contentScale = ContentScale.Fit,
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(8.dp),
     )
 }
 
@@ -239,11 +239,15 @@ private fun GalleryPage(
  * over the art rather than a page of its own.
  */
 @Composable
-private fun InfoPage(content: DetailPanelContent) {
+private fun InfoPage(content: DetailPanelContent, showTitle: Boolean) {
     val palette = detailPalette()
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            // Full height on purpose. The card's rows have to fit the region exactly: sized to
+            // its content it overflowed and the bottom row was clipped away silently, and no
+            // constant for the description's height survives a different region or density.
+            // Bounded here, the description can take what is left and the filename always fits.
+            .fillMaxSize()
             .background(palette.rowFill, PanelCardShape)
             .border(1.dp, palette.rowEdge, PanelCardShape)
             .padding(18.dp),
@@ -261,16 +265,30 @@ private fun InfoPage(content: DetailPanelContent) {
             color = palette.textPrimary,
             fontSize = 14.sp,
             lineHeight = 21.sp,
-            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+            // heightIn, not weight. This card wraps its height, and weight() divides the space
+            // LEFT OVER in a column that has some — a wrap-height column has none, so the
+            // description measured to zero and silently took the two rows under it off the card
+            // with it. Seen on the device: the Info page rendered as a meta line and a void.
+            // weight, now that the column above it has a bounded height to divide. This is the
+            // same modifier that measured to zero when the column wrapped its content — the fix
+            // was never the modifier, it was giving it something to take a share of.
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
         )
         Spacer(Modifier.height(12.dp))
-        Text(
-            text = content.title,
-            color = palette.textPrimary,
-            fontSize = 13.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // Same question as the logo's title fallback, so the same answer: the crossbar is already
+        // showing this game's name a few hundred dp to the left, and the card repeating it costs
+        // a line the description could have had. The drill-down has no such label.
+        if (showTitle) {
+            Text(
+                text = content.title,
+                color = palette.textPrimary,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         content.fileName?.let { fileName ->
             Text(
                 text = fileName,
