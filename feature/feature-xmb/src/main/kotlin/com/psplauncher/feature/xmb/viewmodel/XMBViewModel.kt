@@ -762,15 +762,18 @@ data class XMBUiState(
      */
     val focusedItemBackdrop: String? = null,
     /**
-     * Which page the hover panel is showing in the crossbar's logo region. L1/R1 walk it.
+     * Which page the hover panel was walked to with L1/R1, and the game it was walked to ON.
      *
-     * Deliberately NOT reset when the cursor moves to another game: the page is a preference
-     * ("show me box art"), not a property of the row, and re-reading it per game would make the
-     * region flip back to the logo on every D-pad press. A game that cannot offer the chosen page
-     * falls back for that row only — see resolvePanelPage — and the choice returns intact on the
-     * next row that can.
+     * The pair is the whole mechanism. Moving the cursor to another game returns the panel to its
+     * logo page — the crossbar goes back to looking like the crossbar — and that reset is derived
+     * from [panelPageGameId] rather than written at every place the cursor can move. There are
+     * many such places and a reset missed at one of them is a panel stuck open on the wrong
+     * game's art, which is exactly the kind of thing that only shows up on a handheld.
+     *
+     * Read [effectivePanelPage], never these two directly.
      */
     val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
+    val panelPageGameId: Long? = null,
     val librarySetupComplete: Boolean = false,
     val themeColors: PFPColors = DefaultPFPColors,
     // Custom icon slots of the applied theme (theme slot key → CustomIcon); empty = the
@@ -853,6 +856,14 @@ data class XMBUiState(
      * so the strip drew a Video tab that R1 stepped straight over. One property, no second
      * chance to forget an argument.
      */
+    /**
+     * The page the panel is actually on: the walked-to page while the cursor is still on the game
+     * it was walked to on, and the logo page the moment it is not.
+     */
+    val effectivePanelPage: DetailPanelPage
+        get() = if (panelPageGameId != null && panelPageGameId == hoverPanelItem?.gameId) panelPage
+        else DetailPanelPage.LOGO
+
     val hoverPanelContent: DetailPanelContent?
         get() = hoverPanelItem?.let { item ->
             detailPanelContentFor(
@@ -5615,11 +5626,18 @@ class XMBViewModel @Inject constructor(
      * entirely: there is no panel over a settings row or a music folder to walk.
      */
     /** A tap on the strip goes straight to that page; the strip only draws pages that exist. */
-    fun onPanelPageTapped(page: DetailPanelPage) = _uiState.update { it.copy(panelPage = page) }
+    fun onPanelPageTapped(page: DetailPanelPage) = _uiState.update {
+        it.copy(panelPage = page, panelPageGameId = it.hoverPanelItem?.gameId)
+    }
 
     private fun stepHoverPanelPage(delta: Int) = _uiState.update { s ->
         val content = s.hoverPanelContent ?: return@update s
-        s.copy(panelPage = stepPanelPage(s.panelPage, content.pages, delta))
+        s.copy(
+            // Stepping from the EFFECTIVE page, so the first shoulder press after moving to a
+            // new game steps off that game's logo rather than off whatever the last game was on.
+            panelPage = stepPanelPage(s.effectivePanelPage, content.pages, delta),
+            panelPageGameId = s.hoverPanelItem?.gameId,
+        )
     }
 
     // ── Context menu ──────────────────────────────────────────────────────────
@@ -8642,17 +8660,18 @@ class XMBViewModel @Inject constructor(
                     // nothing and so plays in any icon mode, and the hover panel's video page
                     // needs neither.
                     //
-                    // panelPage, not the resolved page: a game's Video tab only exists once a
-                    // snap has been approved, so resolving first would be a loop that never
-                    // starts. Asking the REQUESTED page instead means "the user is sitting on
-                    // Video" is itself the reason to decode -- which is how a snap reaches the
-                    // panel on an icon mode that has no tile to play it over.
+                    // effectivePanelPage, not the page resolved against the available list: a
+                    // game's Video tab only exists once a snap has been approved, so resolving
+                    // against that list first would be a loop that never starts. Asking the
+                    // walked-to page instead means "the user is sitting on Video" is itself the
+                    // reason to decode -- which is how a snap reaches the panel on an icon mode
+                    // that has no tile to play it over.
                     val eligible = item?.gameId != null && item.isRealGame &&
                         !s.hasBlockingOverlay &&
                         com.psplauncher.feature.xmb.ui.snapSiteFor(
                             s.snapPlacement,
                             resolveIconDisplay(item, s.iconDisplayMode, s.iconDisplayModeByPlatform).mode,
-                            s.panelPage == DetailPanelPage.VIDEO,
+                            s.effectivePanelPage == DetailPanelPage.VIDEO,
                         ) != null
                     if (eligible) item.gameId else null
                 }

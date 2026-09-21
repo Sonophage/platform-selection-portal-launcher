@@ -1,5 +1,6 @@
 package com.psplauncher.feature.artwork.match
 
+import com.psplauncher.feature.artwork.api.steamAppIdOf
 import com.psplauncher.feature.artwork.api.IgdbApi
 import com.psplauncher.feature.artwork.api.ScreenScraperApi
 import com.psplauncher.feature.artwork.api.SsSearchHit
@@ -69,9 +70,12 @@ class ProviderMatchEvidence @Inject constructor(
         storefrontGameId: String,
     ): GameCandidate? {
         if (provider != MatchProvider.STEAMGRIDDB) return null
-        if (!storefront.equals("STEAM", ignoreCase = true)) return null
+        // steamAppIdOf, not a second hand-written "STEAM" comparison: the same question is now
+        // asked by the Steam store provider, and two answers to it is how a cross-store id gets
+        // sent to Steam.
+        val appId = steamAppIdOf(storefront, storefrontGameId) ?: return null
 
-        val game = steamGridDb.getGameBySteamAppId(storefrontGameId) ?: return null
+        val game = steamGridDb.getGameBySteamAppId(appId) ?: return null
         return GameCandidate(
             provider = MatchProvider.STEAMGRIDDB,
             providerGameId = game.id.toString(),

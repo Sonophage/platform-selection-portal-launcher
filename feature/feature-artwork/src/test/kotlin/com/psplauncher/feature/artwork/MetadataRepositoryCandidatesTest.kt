@@ -53,6 +53,7 @@ class MetadataRepositoryCandidatesTest {
         screenScraper = screenScraper,
         romHasher = romHasher,
         steamGridDb = steamGridDb,
+        steamStoreApi = mockk(relaxed = true),
         igdbApi = igdbApi,
         sgdbKeyProvider = sgdbKeyProvider,
         imageLoader = mockk(relaxed = true),

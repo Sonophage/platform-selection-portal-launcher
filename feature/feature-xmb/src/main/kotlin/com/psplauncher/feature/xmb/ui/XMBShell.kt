@@ -441,7 +441,7 @@ fun XMBShell(
           LocalFocusedGameVideo provides uiState.focusedGameVideo,
           // Whether the hover panel has claimed the snap. Provided here, next to the snap
           // itself, so a tile several layers down cannot read one without the other.
-          LocalPanelShowingVideo provides (uiState.panelPage == DetailPanelPage.VIDEO),
+          LocalPanelShowingVideo provides (uiState.effectivePanelPage == DetailPanelPage.VIDEO),
           // The icon-legibility treatment: PortalIcon + the theme-override glyph branches read
           // it ambiently, so every XMB silhouette glyph gets the matte from one provider.
           com.psplauncher.core.ui.icons.LocalIconLegibility provides uiState.iconLegibility,
@@ -576,7 +576,7 @@ fun XMBShell(
             // predicate XMBItemList reads to decide whether the row keeps its title. Reading the
             // item again here would be a second answer to one question.
             val panelLogo = panelContent?.logoUri
-            val panelPage = panelContent?.let { resolvePanelPage(uiState.panelPage, it.pages) }
+            val panelPage = panelContent?.let { resolvePanelPage(uiState.effectivePanelPage, it.pages) }
             val panelShowingVideo = panelPage == DetailPanelPage.VIDEO
 
             val selectedItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)

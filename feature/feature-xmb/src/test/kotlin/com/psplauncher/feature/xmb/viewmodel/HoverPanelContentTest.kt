@@ -52,6 +52,40 @@ class HoverPanelContentTest {
     }
 
     @Test
+    fun `the page returns to the logo when the cursor moves to another game`() {
+        // The panel is a thing you opened on ONE game. Carrying it to the next row would mean
+        // walking a list with a box front permanently in the way, and the crossbar should look
+        // like the crossbar until you ask otherwise.
+        val other = game.copy(id = "8", title = "Another", gameId = 8L)
+        val walked = XMBUiState(
+            currentItems = listOf(game, other),
+            selectedItemIndex = 0,
+            panelPage = DetailPanelPage.BOX_ART,
+            panelPageGameId = 7L,
+        )
+
+        assertEquals(DetailPanelPage.BOX_ART, walked.effectivePanelPage)
+        assertEquals(
+            "moving the cursor to the next row puts the panel back on its logo page",
+            DetailPanelPage.LOGO,
+            walked.copy(selectedItemIndex = 1).effectivePanelPage,
+        )
+    }
+
+    @Test
+    fun `a page with no game attached to it is not honoured`() {
+        // The default state: panelPage is LOGO and panelPageGameId is null. A non-null page with
+        // a null id could only come from a partial write, and must not stick to every row.
+        val orphan = XMBUiState(
+            currentItems = listOf(game),
+            panelPage = DetailPanelPage.BOX_ART,
+            panelPageGameId = null,
+        )
+
+        assertEquals(DetailPanelPage.LOGO, orphan.effectivePanelPage)
+    }
+
+    @Test
     fun `a snap approved for a different row is not this row's video`() {
         // focusedGameVideo is a single slot on the state. Reading it without checking the id
         // would hand one game's clip to whatever the cursor is on.
