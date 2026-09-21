@@ -250,6 +250,18 @@ class ScreenScraperApi @Inject constructor(
     // The account's `maxrequestspermin`, from the latest response that carried one. Null until then.
     @Volatile private var maxRequestsPerMinute: Int? = null
 
+    /**
+     * The account's last-seen `ssuser` block, or null before any authenticated response.
+     *
+     * A StateFlow rather than a suspend read: it changes as a side effect of scraping, and the
+     * surface that shows it stays open across a whole run. ScreenScraper has a hard daily cap —
+     * `scrapeStopMessage` and SsFailureReason.DAILY_QUOTA_EXCEEDED both exist because it gets hit
+     * — and this block was parsed on every response and then dropped, so the one screen where you
+     * would hit it had no way to say how close you were.
+     */
+    private val _quota = kotlinx.coroutines.flow.MutableStateFlow<SsUser?>(null)
+    val quota: kotlinx.coroutines.flow.StateFlow<SsUser?> get() = _quota
+
     /** True once the user has supplied a developer account. Reads storage, hence suspend. */
     suspend fun isEnabled(): Boolean = credentials.screenScraperNow() != null
 
@@ -504,9 +516,11 @@ class ScreenScraperApi @Inject constructor(
         }
     }
 
-    /** Keeps the account's per-minute limit from a response's `ssuser` block, when it has one. */
+    /** Keeps what a response's `ssuser` block says: the pacing limit, and the daily counter. */
     private fun rememberRequestLimit(user: SsUser?) {
-        user?.maxRequestsPerMinute?.toIntOrNull()?.let { maxRequestsPerMinute = it }
+        user ?: return
+        user.maxRequestsPerMinute?.toIntOrNull()?.let { maxRequestsPerMinute = it }
+        if (user.requestsToday != null || user.maxRequestsPerDay != null) _quota.value = user
     }
 
     /**

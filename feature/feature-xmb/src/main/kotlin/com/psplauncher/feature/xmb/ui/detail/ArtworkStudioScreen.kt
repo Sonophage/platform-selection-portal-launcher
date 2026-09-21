@@ -293,6 +293,30 @@ internal fun ArtworkStudioContent(
                 }
             }
 
+            // ── Status band ─────────────────────────────────────────────────────────
+            //
+            // Three counters, fixed above the content and never inside a scroll, because the two
+            // things they answer are exactly the two the Studio could not: how much of THIS GAME
+            // is done without walking eleven tabs, and how close ScreenScraper's daily cap is
+            // before you hit it. Shape borrowed from NeoStation's scraping panel, where quota sits
+            // as a peer of progress rather than buried on an account page.
+            //
+            // It costs the grid zero or one rows, not a flat tax: StudioGridCapacity pages by the
+            // MEASURED slot, so a shorter slot only loses a row when it crosses a tile boundary.
+            StudioStatusRow(
+                stats = studioStats(
+                    filledKinds = state.filledKinds,
+                    totalKinds = STUDIO_TABS.size,
+                    foundResults = state.totalResults,
+                    resultsLoading = state.resultsLoading,
+                    requestsToday = state.requestsToday,
+                    dailyCap = state.dailyRequestCap,
+                ),
+                accent = accent,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
             // ── Destination tabs (AD-18: flat, one press apart) — the LB/RB glyphs sit at both
             // ends of the scrolling chip row, so a narrower screen keeps the selected chip visible.
 
@@ -1902,3 +1926,72 @@ private fun StudioPdfPage(
         }
     }
 }
+
+
+/**
+ * The Studio's three counters, side by side and equal width.
+ *
+ * Equal width on purpose: they are peers, and a row that sized itself to its contents would move
+ * every time the numbers changed, which on a screen you watch during a run is exactly the wrong
+ * thing to do. Fixed height for the same reason — a missing quota must not shorten the row.
+ */
+@Composable
+private fun StudioStatusRow(stats: List<StudioStat>, accent: Color) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().height(STUDIO_STATUS_HEIGHT),
+    ) {
+        stats.forEach { stat ->
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = 0.06f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stat.label.uppercase(),
+                        color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        stat.value,
+                        color = Color.White.copy(alpha = 0.92f),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                // The bar is drawn only where a proportion exists. A counter with no cap — Found,
+                // or Requests before the account has answered — shows its number and no track,
+                // rather than an empty bar that reads as "zero of something".
+                stat.fraction?.let { f ->
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.12f)),
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(f)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(accent.copy(alpha = 0.85f)),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Fixed, so the row never changes height as numbers arrive or a cap turns out to be unknown. */
+private val STUDIO_STATUS_HEIGHT = 34.dp

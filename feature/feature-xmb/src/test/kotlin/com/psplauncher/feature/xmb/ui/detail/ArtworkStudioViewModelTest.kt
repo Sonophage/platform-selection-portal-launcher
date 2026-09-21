@@ -122,6 +122,9 @@ class ArtworkStudioViewModelTest {
     private val screenScraperApi =
         mockk<com.psplauncher.feature.artwork.api.ScreenScraperApi>(relaxed = true) {
             coEvery { isEnabled() } returns true
+            // The studio collects this for its status band. A relaxed mock cannot fabricate a
+            // StateFlow, so without an explicit answer every test here dies in init.
+            every { quota } returns kotlinx.coroutines.flow.MutableStateFlow(null)
         }
 
     private fun viewModel() = ArtworkStudioViewModel(

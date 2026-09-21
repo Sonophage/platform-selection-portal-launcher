@@ -261,6 +261,11 @@ data class ArtworkStudioUiState(
     val changeMatchError: String? = null,
     // Current asset of the active tab (what the game uses right now).
     val currentUri: String? = null,
+    /** How many of [STUDIO_TABS]' kinds this game has artwork for. Drives the status band. */
+    val filledKinds: Int = 0,
+    /** ScreenScraper's last-seen daily counter and cap; null until an authenticated response. */
+    val requestsToday: Int? = null,
+    val dailyRequestCap: Int? = null,
     // Bumped on every apply/clear so the preview reloads even when the portable library reuses
     // a stable content URI (same string → Coil would otherwise serve the old bytes).
     val previewVersion: Int = 0,
@@ -680,6 +685,18 @@ class ArtworkStudioViewModel @Inject constructor(
                 _uiState.update { it.copy(cropPreviewEnabled = enabled) }
             }
         }
+        // ScreenScraper republishes its quota block on every authenticated response, so this
+        // updates itself as the user browses rather than needing a poll or an extra request.
+        viewModelScope.launch {
+            screenScraper.quota.collect { user ->
+                _uiState.update {
+                    it.copy(
+                        requestsToday = user?.requestsToday?.toIntOrNull(),
+                        dailyRequestCap = user?.maxRequestsPerDay?.toIntOrNull(),
+                    )
+                }
+            }
+        }
     }
 
     // One finished result list per request key. Replaces the single `allResults` field, whose
@@ -808,20 +825,45 @@ class ArtworkStudioViewModel @Inject constructor(
         else                -> emptyList()
     }
 
+    /**
+     * The game column that backs [kind] when the artwork store has no record of its own.
+     *
+     * One definition because two callers need the same answer: the visible tab's current art, and
+     * the count of how many kinds this game has filled. A second copy would let the band disagree
+     * with the panel about whether a slot is empty.
+     */
+    private fun legacyUriFor(kind: ArtworkKind, game: Game?): String? = when (kind) {
+        ArtworkKind.ICON           -> game?.iconUri
+        ArtworkKind.BOX_ART        -> game?.boxArtUri
+        ArtworkKind.BOX_3D         -> game?.box3dUri
+        ArtworkKind.PHYSICAL_MEDIA -> game?.physicalMediaUri
+        ArtworkKind.HERO           -> game?.heroUri
+        ArtworkKind.BACKGROUND     -> game?.artworkUri
+        ArtworkKind.LOGO           -> game?.logoUri
+        else                       -> null
+    }
+
     private suspend fun refreshCurrent() {
         val kind = tab().kind
-        val current = artworkStore.find(gameId, kind) ?: when (kind) {
-            ArtworkKind.ICON           -> _uiState.value.game?.iconUri
-            ArtworkKind.BOX_ART        -> _uiState.value.game?.boxArtUri
-            ArtworkKind.BOX_3D         -> _uiState.value.game?.box3dUri
-            ArtworkKind.PHYSICAL_MEDIA -> _uiState.value.game?.physicalMediaUri
-            ArtworkKind.HERO           -> _uiState.value.game?.heroUri
-            ArtworkKind.BACKGROUND     -> _uiState.value.game?.artworkUri
-            ArtworkKind.LOGO           -> _uiState.value.game?.logoUri
-            else                       -> null
-        }
+        val current = artworkStore.find(gameId, kind)
+            ?: legacyUriFor(kind, _uiState.value.game)
         _uiState.update { it.copy(currentUri = current) }
+        refreshFilledCount()
         refreshLibrary()
+    }
+
+    /**
+     * How many of the game's artwork kinds have something in them.
+     *
+     * Asked across every tab rather than the visible one, because that is the question the tab row
+     * cannot answer: without it, "how much of this game is done" costs eleven presses.
+     */
+    private suspend fun refreshFilledCount() {
+        val game = _uiState.value.game
+        val filled = STUDIO_TABS.count { tab ->
+            artworkStore.find(gameId, tab.kind) != null || !legacyUriFor(tab.kind, game).isNullOrBlank()
+        }
+        _uiState.update { it.copy(filledKinds = filled) }
     }
 
     /**
