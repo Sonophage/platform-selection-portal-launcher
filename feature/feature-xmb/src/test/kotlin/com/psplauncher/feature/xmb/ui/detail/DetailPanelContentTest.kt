@@ -142,6 +142,26 @@ class DetailPanelContentTest {
     }
 
     @Test
+    fun `a game never launched from here shows no play time at all`() {
+        // Null, not "0 min". Only 2 of the owner's 148 games have a recorded time, because the
+        // column is written on return from a launch; a library of zeroes would read as a broken
+        // counter rather than as one that has not been played through this launcher yet.
+        assertNull(panelPlayTime(0L))
+        assertNull(panelPlayTime(-1L))
+        assertEquals("Under a minute", panelPlayTime(30_000L))
+        assertEquals("45 min", panelPlayTime(45 * 60_000L))
+        assertEquals("2 h 5 min", panelPlayTime((2 * 60 + 5) * 60_000L))
+    }
+
+    @Test
+    fun `the RECENT badge belongs to the shelf, not to the game`() {
+        // The same game on All Games is not "recent", it is just a game. Only the Last Played
+        // column says otherwise, so the flag is the caller's and never derived from the row.
+        assertTrue(detailPanelContentFor(item, "PlayStation", recent = true).recent)
+        assertTrue(!detailPanelContentFor(item, "PlayStation").recent)
+    }
+
+    @Test
     fun `a row with no box art cannot be walked onto a box art page`() {
         // This is what the shoulders read. A page list that disagreed with the row's artwork
         // would let L1 R1 land the user on an empty panel.

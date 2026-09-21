@@ -81,6 +81,8 @@ import com.psplauncher.feature.xmb.ui.detail.resolvePanelPage
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.ui.motion.MotionWallpaperPolicy
 import com.psplauncher.core.ui.motion.rememberAppVisible
+import androidx.compose.ui.text.style.TextOverflow
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.XmbTouchButton
 import com.psplauncher.core.ui.preview.DevicePreviews
@@ -688,15 +690,22 @@ fun XMBShell(
                 label = "pic0Fade",
             )
             val onLogoPage = panelPage == DetailPanelPage.LOGO
-            // The row label hides only once the user has walked the panel off its logo page with
-            // L1/R1. Not while the logo is up: the owner's call, and the reason is that the label
-            // disappearing on its own is a thing happening TO you, where the same label
-            // disappearing one frame after you pressed a shoulder is a thing you did. The logo
-            // page keeps its name whatever else is on screen.
+            // "Is anything on the right already naming this game?"
+            //
+            // Off the logo page the panel is 42% of the width and the label runs straight into
+            // it, so the label goes. ON the logo page it goes only once a logo is actually
+            // DRAWN — pic0Alpha, not merely "this game has one" — because the logo arrives a
+            // beat after the background and a game that was nameless for those 650 ms is the bug
+            // hasVisibleLogo's comment describes having already been fixed once.
+            //
+            // A logo-less game therefore keeps its label on the logo page, which is the whole
+            // point: nothing else is naming it. Seen on the device as SKYRIM's wordmark with the
+            // row's title printed across it.
             //
             // One val, two consumers (the crossbar list and the drill flyout). They were the pair
             // that disagreed — the flyout never received this at all — so they read one value.
-            val focusedNameShownOnRight = panelContent != null && !onLogoPage
+            val focusedNameShownOnRight = panelContent != null &&
+                (!onLogoPage || pic0Alpha > 0f)
             val panelAlpha = if (onLogoPage) pic0Alpha else 1f
             // On the logo page this is the old condition unchanged, so a game with no logo shows
             // nothing here exactly as before. Off it, the panel is what the user asked for with
@@ -824,6 +833,25 @@ fun XMBShell(
                             .alpha(metaAlpha),
                     )
                 }
+            }
+
+            // "Last Played: <game>", bottom left, opposite the hint pill — NeoStation's footer on
+            // the same shelf. Only on that shelf: anywhere else the sentence would be a lie, and
+            // the crossbar already names the focused row in the list itself.
+            uiState.hoverPanelItem?.takeIf { uiState.onLastPlayedShelf }?.let { recent ->
+                Text(
+                    text = "Last Played: ${recent.title}",
+                    color = LocalPfpTextColors.current.primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(shadow = XmbTextShadow),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 24.dp, bottom = ControllerHintEdgeGap + 6.dp)
+                        .fillMaxWidth(0.45f),
+                )
             }
 
             XmbPspStatusStrip(

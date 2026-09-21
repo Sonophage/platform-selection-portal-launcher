@@ -104,6 +104,13 @@ data class DetailPanelContent(
     val description: String? = null,
     val fileName: String? = null,
     /**
+     * How long this game has been played, already formatted, or null when it has never been
+     * launched through the launcher. Shown under the logo on the Last Played shelf.
+     */
+    val playTime: String? = null,
+    /** This row came off the Last Played shelf, so it earns the RECENT badge. */
+    val recent: Boolean = false,
+    /**
      * The game's video snap. On the crossbar this is the already-approved clip and nothing else:
      * the panel's video page becomes that snap's one render site while it is open, so no second
      * decoder opens on the same file. See snapSiteFor.
@@ -129,6 +136,24 @@ data class DetailPanelContent(
         get() = !description.isNullOrBlank() || metaLine != null || fileName != null
 }
 
+/**
+ * Play time for the panel, or null when there is none to show.
+ *
+ * Null rather than "0 min" on purpose: only 2 of the owner's 148 games have any recorded, because
+ * the column is written on return from a launch and most of his library predates that. A row of
+ * zeroes would read as a broken counter rather than as a library that has not been played through
+ * this launcher yet.
+ */
+fun panelPlayTime(millis: Long): String? {
+    if (millis <= 0L) return null
+    val minutes = millis / 60_000
+    return when {
+        minutes < 1 -> "Under a minute"
+        minutes < 60 -> "$minutes min"
+        else -> "${minutes / 60} h ${minutes % 60} min"
+    }
+}
+
 /** The filename a panel shows for a ROM, or null for a package-backed entry that has no file. */
 fun panelFileName(romPath: String?): String? =
     romPath?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
@@ -152,6 +177,7 @@ fun detailPanelContentFor(
     // romPath is derived for SAF-backed games too, so it is the one field that names the file for
     // every ROM. A package-backed Android or Windows entry has none and correctly shows nothing.
     fileName = panelFileName(game.romPath),
+    playTime = panelPlayTime(game.totalPlayTimeMillis),
     videoUri = videoUri,
     media = media,
 )
@@ -167,6 +193,7 @@ fun detailPanelContentFor(
     item: XMBItem,
     platformName: String,
     videoUri: String? = null,
+    recent: Boolean = false,
 ): DetailPanelContent =
     DetailPanelContent(
         title = item.title,
@@ -180,5 +207,7 @@ fun detailPanelContentFor(
         metaLine = item.metadataLine,
         description = item.description,
         fileName = panelFileName(item.romPath),
+        playTime = panelPlayTime(item.totalPlayTimeMillis),
+        recent = recent,
         videoUri = videoUri,
     )

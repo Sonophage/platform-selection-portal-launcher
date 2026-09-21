@@ -864,12 +864,19 @@ data class XMBUiState(
         get() = if (panelPageGameId != null && panelPageGameId == hoverPanelItem?.gameId) panelPage
         else DetailPanelPage.LOGO
 
+    /** The shelf the cursor is on is Last Played, which is what earns a row its RECENT badge. */
+    val onLastPlayedShelf: Boolean
+        get() = categories.getOrNull(selectedCategoryIndex)?.id == BuiltInCategory.RECENTLY_PLAYED
+
     val hoverPanelContent: DetailPanelContent?
         get() = hoverPanelItem?.let { item ->
             detailPanelContentFor(
                 item = item,
                 platformName = item.platformId?.uppercase().orEmpty(),
                 videoUri = focusedGameVideo?.takeIf { it.gameId == item.gameId }?.uri,
+                // The badge is the SHELF's, not the game's: the same game on All Games is not
+                // "recent", it is just a game. Only the Last Played column says otherwise.
+                recent = onLastPlayedShelf,
             )
         }
 
@@ -1373,6 +1380,8 @@ data class XMBItem(
     // database round trip on every D-pad press.
     val description: String? = null,
     val romPath: String? = null,
+    /** Milliseconds this game has been played; 0 when it has never been launched from here. */
+    val totalPlayTimeMillis: Long = 0L,
     val gameId: Long? = null,
     val platformId: String? = null,
     val collectionId: Long? = null,     // set on COLLECTION rows in the Games root
@@ -5076,6 +5085,7 @@ class XMBViewModel @Inject constructor(
             metadataLine = gameMetadataLine(g.releaseYear, g.genre, g.developer, g.players),
             description  = g.description,
             romPath      = g.romPath,
+            totalPlayTimeMillis = g.totalPlayTimeMillis,
             gameId       = g.id,
             platformId   = g.platformId,
             accentColor  = platformCache[g.platformId]?.accentColor,

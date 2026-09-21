@@ -152,7 +152,7 @@ fun GameDetailPanel(
     // of this region belongs to the page — which is the difference between a box front you can
     // read and one you can identify.
     Column(modifier) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             // resolvePanelPage, not page, so a page that stops being available while the panel
             // is open (a scrape filling in box art, the cursor moving to a game with less art)
             // cannot leave the body drawing something the strip is no longer offering.
@@ -164,7 +164,56 @@ fun GameDetailPanel(
                 DetailPanelPage.INFO -> InfoPage(content)
             }
         }
+        // The badge and the play time sit together UNDER the page, not above it.
+        //
+        // NeoStation puts the badge on the top corner of its card, which works because its card
+        // has a frame and empty space above it. This panel's top edge is level with the
+        // crossbar's category icons, and a badge there landed on the Photo icon — seen on the
+        // device. Below, they read as one caption on the shelf's newest game.
+        //
+        // They belong to the SHELF rather than to any one page, so they stay put while L1/R1
+        // walk the body above them.
+        if (content.recent || content.playTime != null) {
+            Spacer(Modifier.height(8.dp))
+            // Stacked, not side by side. The logo page is 30% of the screen wide, and the badge
+            // beside the label pushed "TIME PLAYED: 1 H 46 MIN" into an ellipsis — a play time
+            // that does not say the time. Seen on the device.
+            Column(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (content.recent) RecentBadge()
+                // Null, not "0 min", when a game has never been launched from here: see
+                // panelPlayTime. A recent game with no recorded time shows the badge alone.
+                content.playTime?.let { played ->
+                    Text(
+                        text = "TIME PLAYED: ${played.uppercase()}",
+                        color = LocalPfpTextColors.current.secondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
+}
+
+/** NeoStation's badge on the shelf's newest card: small, loud, and never on anything else. */
+@Composable
+private fun RecentBadge(modifier: Modifier = Modifier) {
+    val palette = detailPalette()
+    Text(
+        text = "RECENT",
+        color = palette.textPrimary,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier
+            .background(palette.focus, RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
 }
 
 /**
