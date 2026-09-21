@@ -684,6 +684,7 @@ fun XMBShell(
                     content = uiState.hoverPanelContent,
                     page = uiState.effectivePanelPage,
                     listState = recentsListState,
+                    directLaunch = uiState.directLaunch,
                     onPageTapped = onPanelPageTapped,
                     onCardTapped = onItemTap,
                     modifier = Modifier

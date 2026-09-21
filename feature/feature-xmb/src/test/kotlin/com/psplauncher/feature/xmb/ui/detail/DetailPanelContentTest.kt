@@ -154,14 +154,6 @@ class DetailPanelContentTest {
     }
 
     @Test
-    fun `the RECENT badge belongs to the shelf, not to the game`() {
-        // The same game on All Games is not "recent", it is just a game. Only the Last Played
-        // column says otherwise, so the flag is the caller's and never derived from the row.
-        assertTrue(detailPanelContentFor(item, "PlayStation", recent = true).recent)
-        assertTrue(!detailPanelContentFor(item, "PlayStation").recent)
-    }
-
-    @Test
     fun `a row with no box art cannot be walked onto a box art page`() {
         // This is what the shoulders read. A page list that disagreed with the row's artwork
         // would let L1 R1 land the user on an empty panel.

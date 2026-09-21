@@ -864,24 +864,17 @@ data class XMBUiState(
         get() = if (panelPageGameId != null && panelPageGameId == hoverPanelItem?.gameId) panelPage
         else DetailPanelPage.LOGO
 
-    /** The shelf the cursor is on is Last Played, which is what earns a row its RECENT badge. */
-    val onLastPlayedShelf: Boolean
-        get() = categories.getOrNull(selectedCategoryIndex)?.id == BuiltInCategory.RECENTLY_PLAYED
-
     /**
-     * Standing on the home page itself — the state in which the crossbar is hidden and LEFT/RIGHT
-     * walk the recent cards instead of stepping a category.
+     * Standing on the home page — the state in which the crossbar is hidden and the screen is the
+     * game you were last playing.
      *
-     * One property because three places read it and they must never disagree: XMBShell decides
-     * whether to draw the page or the crossbar, and the LEFT and RIGHT branches decide whether the
-     * D-pad walks cards. If the shell hid the bar while LEFT still backed out of a drill, a user
-     * drilled into a Last Played row would be looking at the home page with no way off it.
-     *
-     * Not the same as [onLastPlayedShelf], which is about the shelf and stays true while drilled
-     * in — that is what the RECENT badge asks about.
+     * The drill exclusion is not decoration. The shell reads this to decide whether to draw the
+     * page or the bar, and a drilled sub-item under a hidden bar would be a screen LEFT can no
+     * longer back out of.
      */
     val onLastPlayedHome: Boolean
-        get() = onLastPlayedShelf && !isInSubItem
+        get() = categories.getOrNull(selectedCategoryIndex)?.id == BuiltInCategory.RECENTLY_PLAYED &&
+            !isInSubItem
 
     val hoverPanelContent: DetailPanelContent?
         get() = hoverPanelItem?.let { item ->
@@ -889,9 +882,6 @@ data class XMBUiState(
                 item = item,
                 platformName = item.platformId?.uppercase().orEmpty(),
                 videoUri = focusedGameVideo?.takeIf { it.gameId == item.gameId }?.uri,
-                // The badge is the SHELF's, not the game's: the same game on All Games is not
-                // "recent", it is just a game. Only the Last Played column says otherwise.
-                recent = onLastPlayedShelf,
             )
         }
 
@@ -5579,13 +5569,6 @@ class XMBViewModel @Inject constructor(
             GamepadAction.NAVIGATE_UP   -> if (!moveItemCursor(-1)) gamepadInputHandler.cancelRepeat()
             GamepadAction.NAVIGATE_DOWN -> if (!moveItemCursor(+1)) gamepadInputHandler.cancelRepeat()
             GamepadAction.NAVIGATE_LEFT -> {
-                // The home page's cards run left to right, so LEFT walks them rather than
-                // stepping a category. It stops at the first: Last Played IS the leftmost
-                // column, and there is nothing further left to reach.
-                if (state.onLastPlayedHome) {
-                    if (!moveItemCursor(-1)) gamepadInputHandler.cancelRepeat()
-                    return
-                }
                 // While drilled into a sub-item, LEFT does not escape to another category — it
                 // backs out one level, the direction the XMB's own drill-in metaphor implies. It
                 // deliberately does NOT fall through to the App Drawer the way BACK does (that is
@@ -5603,11 +5586,6 @@ class XMBViewModel @Inject constructor(
                 else gamepadInputHandler.cancelRepeat()
             }
             GamepadAction.NAVIGATE_RIGHT -> {
-                // On the home page RIGHT walks the cards first, and only once it runs out of
-                // them does it step to the next category — which is what re-summons the
-                // crossbar. Stepping straight off the page on the first press would make the
-                // other recent games unreachable without leaving home and coming back.
-                if (state.onLastPlayedHome && moveItemCursor(+1)) return
                 if (state.isInSubItem) { gamepadInputHandler.cancelRepeat(); return }
                 val max  = (state.categories.size - 1).coerceAtLeast(0)
                 val next = (state.selectedCategoryIndex + 1).coerceAtMost(max)

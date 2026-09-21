@@ -108,8 +108,6 @@ data class DetailPanelContent(
      * launched through the launcher. Shown under the logo on the Last Played shelf.
      */
     val playTime: String? = null,
-    /** This row came off the Last Played shelf, so it earns the RECENT badge. */
-    val recent: Boolean = false,
     /**
      * The game's video snap. On the crossbar this is the already-approved clip and nothing else:
      * the panel's video page becomes that snap's one render site while it is open, so no second
@@ -193,7 +191,6 @@ fun detailPanelContentFor(
     item: XMBItem,
     platformName: String,
     videoUri: String? = null,
-    recent: Boolean = false,
 ): DetailPanelContent =
     DetailPanelContent(
         title = item.title,
@@ -208,6 +205,5 @@ fun detailPanelContentFor(
         description = item.description,
         fileName = panelFileName(item.romPath),
         playTime = panelPlayTime(item.totalPlayTimeMillis),
-        recent = recent,
         videoUri = videoUri,
     )
