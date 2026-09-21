@@ -83,6 +83,7 @@ import com.psplauncher.core.ui.motion.MotionWallpaperPolicy
 import com.psplauncher.core.ui.motion.rememberAppVisible
 import androidx.compose.ui.text.style.TextOverflow
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.XmbTouchButton
 import com.psplauncher.core.ui.preview.DevicePreviews
@@ -570,6 +571,7 @@ fun XMBShell(
             //
             // Gated on a real game WITH backdrop art: the region has always needed something
             // behind it, and a panel floating on the bare wallpaper reads as a stray card.
+            val recentsListState = rememberLazyListState()
             val panelItem = uiState.hoverPanelItem
             // uiState.hoverPanelContent, not a build of it here: the shoulder walk reads the
             // same property, and the strip's tabs and where R1 lands have to be the same list.
@@ -669,6 +671,26 @@ fun XMBShell(
                 // applying behind it) IS the point, so the foreground stays composed.
                 uiState.customIconSession == null
             ) {
+
+            // ── Home ──────────────────────────────────────────────────────────
+            // Last Played REPLACES the crossbar rather than sitting beside it: standing on the
+            // leftmost column hides the caticon bar and the item list, and the screen becomes
+            // the game you were last playing. RIGHT walks the recents and then steps to the next
+            // category, which is what brings the bar back.
+            if (uiState.onLastPlayedHome) {
+                LastPlayedPage(
+                    items = uiState.currentItems,
+                    selectedIndex = uiState.selectedItemIndex,
+                    content = uiState.hoverPanelContent,
+                    page = uiState.effectivePanelPage,
+                    listState = recentsListState,
+                    onPageTapped = onPanelPageTapped,
+                    onCardTapped = onItemTap,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = StripHeight),
+                )
+            } else {
 
             // The PSP's icon → PIC1 → PIC0 stagger, kept: the logo arrives a beat after the
             // background and snaps away the instant the cursor moves, so the next game's logo is
@@ -833,25 +855,6 @@ fun XMBShell(
                             .alpha(metaAlpha),
                     )
                 }
-            }
-
-            // "Last Played: <game>", bottom left, opposite the hint pill — NeoStation's footer on
-            // the same shelf. Only on that shelf: anywhere else the sentence would be a lie, and
-            // the crossbar already names the focused row in the list itself.
-            uiState.hoverPanelItem?.takeIf { uiState.onLastPlayedShelf }?.let { recent ->
-                Text(
-                    text = "Last Played: ${recent.title}",
-                    color = LocalPfpTextColors.current.primary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = TextStyle(shadow = XmbTextShadow),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 24.dp, bottom = ControllerHintEdgeGap + 6.dp)
-                        .fillMaxWidth(0.45f),
-                )
             }
 
             XmbPspStatusStrip(
@@ -1022,6 +1025,7 @@ fun XMBShell(
                     }
                 }
             }
+            } // end: else — the crossbar, shown on every column but Last Played
             } // end: XMB foreground hidden while music browser is open
 
             // Bottom-right App Drawer affordance. Shown only at the XMB root — while drilled into a

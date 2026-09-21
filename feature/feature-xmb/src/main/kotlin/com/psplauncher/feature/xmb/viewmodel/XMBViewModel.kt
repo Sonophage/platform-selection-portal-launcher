@@ -868,6 +868,21 @@ data class XMBUiState(
     val onLastPlayedShelf: Boolean
         get() = categories.getOrNull(selectedCategoryIndex)?.id == BuiltInCategory.RECENTLY_PLAYED
 
+    /**
+     * Standing on the home page itself — the state in which the crossbar is hidden and LEFT/RIGHT
+     * walk the recent cards instead of stepping a category.
+     *
+     * One property because three places read it and they must never disagree: XMBShell decides
+     * whether to draw the page or the crossbar, and the LEFT and RIGHT branches decide whether the
+     * D-pad walks cards. If the shell hid the bar while LEFT still backed out of a drill, a user
+     * drilled into a Last Played row would be looking at the home page with no way off it.
+     *
+     * Not the same as [onLastPlayedShelf], which is about the shelf and stays true while drilled
+     * in — that is what the RECENT badge asks about.
+     */
+    val onLastPlayedHome: Boolean
+        get() = onLastPlayedShelf && !isInSubItem
+
     val hoverPanelContent: DetailPanelContent?
         get() = hoverPanelItem?.let { item ->
             detailPanelContentFor(
@@ -5564,6 +5579,13 @@ class XMBViewModel @Inject constructor(
             GamepadAction.NAVIGATE_UP   -> if (!moveItemCursor(-1)) gamepadInputHandler.cancelRepeat()
             GamepadAction.NAVIGATE_DOWN -> if (!moveItemCursor(+1)) gamepadInputHandler.cancelRepeat()
             GamepadAction.NAVIGATE_LEFT -> {
+                // The home page's cards run left to right, so LEFT walks them rather than
+                // stepping a category. It stops at the first: Last Played IS the leftmost
+                // column, and there is nothing further left to reach.
+                if (state.onLastPlayedHome) {
+                    if (!moveItemCursor(-1)) gamepadInputHandler.cancelRepeat()
+                    return
+                }
                 // While drilled into a sub-item, LEFT does not escape to another category — it
                 // backs out one level, the direction the XMB's own drill-in metaphor implies. It
                 // deliberately does NOT fall through to the App Drawer the way BACK does (that is
@@ -5581,6 +5603,11 @@ class XMBViewModel @Inject constructor(
                 else gamepadInputHandler.cancelRepeat()
             }
             GamepadAction.NAVIGATE_RIGHT -> {
+                // On the home page RIGHT walks the cards first, and only once it runs out of
+                // them does it step to the next category — which is what re-summons the
+                // crossbar. Stepping straight off the page on the first press would make the
+                // other recent games unreachable without leaving home and coming back.
+                if (state.onLastPlayedHome && moveItemCursor(+1)) return
                 if (state.isInSubItem) { gamepadInputHandler.cancelRepeat(); return }
                 val max  = (state.categories.size - 1).coerceAtLeast(0)
                 val next = (state.selectedCategoryIndex + 1).coerceAtMost(max)
@@ -9024,8 +9051,18 @@ class XMBViewModel @Inject constructor(
     private fun canonicalXmbCategories(categories: List<Category>): List<Category> =
         canonicalXmbCategories(categories, FALLBACK_CATEGORIES)
 
+    /**
+     * Where the launcher opens: Last Played, which is the home.
+     *
+     * It used to be Games. Last Played is the leftmost column and is now a full page that hides
+     * the crossbar, so opening there means the launcher greets you with what you were playing
+     * rather than with a list to walk. Games remains the fallback for a bar that has had Last
+     * Played hidden, and index 0 for one that has neither.
+     */
     private fun defaultXmbCategoryIndex(categories: List<Category>): Int =
-        categories.indexOfFirst { it.id == BuiltInCategory.GAMES }
+        categories.indexOfFirst { it.id == BuiltInCategory.RECENTLY_PLAYED }
             .takeIf { it >= 0 }
+            ?: categories.indexOfFirst { it.id == BuiltInCategory.GAMES }
+                .takeIf { it >= 0 }
             ?: 0
 }
