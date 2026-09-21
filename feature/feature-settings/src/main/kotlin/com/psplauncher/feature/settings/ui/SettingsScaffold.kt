@@ -1619,9 +1619,14 @@ fun SettingsRow(
                 // can afford to: it has a fixed ROW_HEIGHT to absorb the difference and applies the
                 // delta through graphicsLayer, which never touches layout. A settings row has
                 // neither, so the larger text re-laid the list and every row below the cursor
-                // shifted as it moved. It also spent height a 462dp screen does not have —
-                // measured on the device, eleven of the twenty-six settings screens were cut off
-                // at the bottom, five of them ending on a section header with nothing under it.
+                // shifted as it moved. It also spent height a 462dp screen does not have.
+                //
+                // The reflow is the part that was verified here. A review of a 26-screen capture
+                // sweep additionally counted eleven panes ending below the fold, five of them on a
+                // section header with nothing under it — but that was a count off screenshots, not
+                // a measurement, and it predates this change and the rail's centring. Panes do
+                // scroll and do carry a bottom fade ([CONTENT_EDGE_MARGIN]), so "below the fold"
+                // there means content continues, not content lost. Recheck before acting on it.
                 fontSize = XmbLayoutSpec.DEFAULT.itemTextSp.sp,
                 fontWeight = if (rowSelected) FontWeight.SemiBold else FontWeight.Normal,
                 style = TextStyle(shadow = SettingsTextShadow),
