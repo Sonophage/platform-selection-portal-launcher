@@ -356,6 +356,9 @@ that part is correct.
 
 ## Task 2.3 — Vertical cursor movement is a hard cut, and the glide code is dead ✅ (dead code) / 📱 (feel)
 
+**`CenterLockedColumn` is already gone** — verified by grep, no references and no definition. The
+"delete either way" half of this task is closed; only the device feel question remains.
+
 `XMBItemList.kt:531` places the live list with an integer `sel`; nothing interpolates. The per-row
 scale spring cannot help because slot 0 is always the selected slot, so its target never changes.
 `CenterLockedColumn` at `:404` — LazyColumn plus a cadence-adaptive `tween(70..240ms)`, the only
@@ -460,8 +463,25 @@ All five are one line each. None changes behaviour.
 - [ ] **5.5 ✅** Cold start always races a full SAF rescan: `RescanTriggerBus.kt:25` seeds
       `lastResumeRunAt = Long.MIN_VALUE` and `:31` explicitly bypasses the throttle for it
 
-Deferred, needs measurement: foreground/expedited on the six `CoroutineWorker`s (**zero** declare
-any today), batching `LibraryScanner`'s per-row upserts, an index on `disc_set_key`.
+**`disc_set_key` index: done** (`4aaf0206`, MIGRATION_46_47). It needed no measurement in the
+end: the display queries correlate a disc set against itself once per row, and that column was
+the only one they correlate on without an index, so the cost was quadratic in the library rather
+than linear.
+
+**The other two were examined and deliberately left.** Both were looked at properly rather than
+skipped, and in both cases the plan was right to defer them:
+
+* **foreground/expedited on the six workers.** `minSdk` is 29, so `setExpedited` requires
+  `getForegroundInfo()` on every one of them — a notification channel and six notifications
+  appearing during a scrape. These are user-initiated tasks run while the app is in the
+  foreground, which is exactly when WorkManager already runs work promptly. There is no
+  measurement showing any of them being deferred, and the change has a visible cost. Not worth it
+  without evidence.
+* **batching `LibraryScanner`'s upserts.** The per-row loop catches per row on purpose, so one bad
+  row cannot abort a scan and `firstWriteFailure` still reports it. Batching into a transaction
+  buys N commits → 1, which is a real and well-understood win, but it moves failure handling
+  across a module boundary in the code that writes the user's library, and there is no way to
+  measure the gain here. The resilience is worth more than an unmeasured speedup.
 
 ---
 
@@ -541,18 +561,26 @@ member-function clothing: it reads four `_uiState.value` fields and returns `Lis
 - **TalkBack.** The XMB row has no `contentDescription`, `role` or click semantics; every settings
   row is a `pointerInput` tap handler with no click action; Back/Options/app-drawer are unlabelled
   glyphs. All real. This is a personal launcher on one handheld — a choice, not an obligation.
-- **No `imePadding` anywhere in the tree** ⚠️ — with `decorFitsSystemWindows = false` and a 462 dp
-  screen, the keyboard likely covers text fields in the lower half of settings lists. Needs the device.
+- ~~**No `imePadding` anywhere in the tree**~~ ✅ — confirmed on the device and fixed
+  (`31dce88f`): `SettingsScaffold` pads once for the whole settings tree, and the in-window
+  prompt card pads itself. A residual cosmetic gap remains between the settings footer band and
+  the keyboard.
 - **Package-backed entries can never be marked missing** ⚠️ — `is_missing` is keyed on `rom_path`,
   which is null by construction for PC and Android entries.
-- **Scrape failures collapse to a bare count** ⚠️ — `SsFailureReason` (quota, bad credentials, rate
-  limit) exists, is typed, and reaches only Timber.
+- ~~**Scrape failures collapse to a bare count**~~ ✅ — the reasons that stop a whole run now
+  reach the notification and the Settings summary (`8d849367`). Per-game failures stay counted
+  and unexplained on purpose.
 - **Add-by-ID needs two hand-typed fields** ⚠️ and an id GameNative does not display, on a
   controller-only device.
-- **~70 preference keys are declared in two or more production files**, kept in step by 27 "Must
-  match X" comments. `display_custom_wallpaper` is declared in six.
-- **Four byte formatters still disagree** on tiers; `VideoDetailScreen`'s has no KB tier, so a
-  300 KB file reads `"0 MB"`.
+- **77 of 89 preference keys are declared in two or more production files**, kept in step by 27
+  "Must match X" comments. `display_custom_wallpaper` and `theme_accent_override` are each in six.
+  The duplication stands — a single shared key object is ~200 edit sites across every module, and
+  a key whose name changes by accident resets a setting silently. The one way it can actually
+  bite is now guarded: `PreferenceKeyTypeDriftTest` (`61fc8884`) fails if the same key is ever
+  declared with two different DataStore types, which would throw only at runtime on the user's
+  device.
+- ~~**Four byte formatters still disagree**~~ ✅ — merged into `core-common`'s `formatByteSize`
+  (`c759fa7d`). The `"0 MB"` case is pinned by a test.
 - **Zero `androidTest/` anywhere.** `app/` has no tests at all (937 lines, including startup wiring).
 
 # What the council said to leave alone
