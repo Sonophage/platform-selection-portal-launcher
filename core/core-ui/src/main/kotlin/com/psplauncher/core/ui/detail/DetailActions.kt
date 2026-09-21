@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.psplauncher.core.ui.theme.menuCursorEdge
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -67,6 +68,20 @@ fun PfpDetailLaunchButton(
             .defaultMinSize(minHeight = 58.dp)
             .clip(shape)
             .background(if (focused) DetailButtonFocusFill else fill)
+            // The cursor's bright edge, AFTER the fill so it draws on top of it.
+            //
+            // The inverted fill alone is unmistakable on artwork, which is where this button was
+            // designed. It is not unmistakable on a pale overlay card, and a destructive confirm
+            // is exactly that: a light Cancel that happens to be focused next to a pink Remove
+            // that is not, where the eye reads the tint as "this is the one that will happen".
+            // Reported from the device as "it didn't delete" — the A-press had hit Cancel, and
+            // nothing on screen said so. Same edge colour as Modifier.menuCursor, which is the
+            // treatment every menu row in the app already uses to mean "this one".
+            .border(
+                width = if (focused) 2.dp else 0.dp,
+                color = if (focused) menuCursorEdge() else Color.Transparent,
+                shape = shape,
+            )
             .clickable(role = Role.Button, onClick = onClick)
             .padding(vertical = 15.dp, horizontal = 26.dp),
         verticalAlignment = Alignment.CenterVertically,
