@@ -64,10 +64,14 @@ object UiMediaLimits {
     const val NOTIFICATION_MAX_MS   = 2_000L
     /**
      * The built-in GameBoot sequence and the sample it is beat-matched to (`sfx_launch`, exactly
-     * 5.000 s). NOT a user-facing import cap — nothing is imported against this; it is what the
+     * 2.000 s). NOT a user-facing import cap — nothing is imported against this; it is what the
      * gate clips the bundled sound to. See [GAMEBOOT_CLIP_MAX_MS] for what a user may assign.
+     *
+     * Was 5 000 until the sound set was replaced. This number and `GameBootSequence.SEQUENCE_MS`
+     * are a pair that must agree: the gate clips the audio here, the animation ends there, and a
+     * mismatch is either a sound cut off mid-note or a screen sitting on black waiting for it.
      */
-    const val GAMEBOOT_SEQUENCE_MS  = 5_000L
+    const val GAMEBOOT_SEQUENCE_MS  = 2_000L
     /**
      * A user's own GameBoot clip may run twice the built-in sequence, matching the boot clip's
      * ceiling: the presentation is theirs to author, and 5 s was too tight for anything with a

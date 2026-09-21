@@ -28,48 +28,63 @@ import kotlin.math.exp
 import kotlin.math.pow
 
 /**
- * The full length of the bundled `sfx_launch.wav` — 220 500 frames at 44.1 kHz, exactly 5.000 s.
+ * The full length of the bundled `sfx_launch.mp3` — exactly 2.000 s at 48 kHz.
  * The sequence and the sound start together and end together; nothing here is padded or clipped.
+ *
+ * **This was 5 000 with the previous sample, and the shape of the sound changed with the number.**
+ * The old one was a long swell with three separate attacks, which is what gave the sequence a
+ * build. This one is a single hit: it peaks at 200 ms and is essentially silent from 700 ms, so
+ * the visible part of the sequence is now its first third and the rest is the tail going out.
+ * That is the sound's shape, not a tuning choice — see the table below, which is measured.
  */
-private const val SEQUENCE_MS = 5_000
+private const val SEQUENCE_MS = 2_000
 
 /** The sound's leading digital silence — the sequence holds pure black across it. */
-private const val LEAD_SILENCE_MS = 350f
+private const val LEAD_SILENCE_MS = 50f
 
 /**
- * The measured loudness of `sfx_launch.wav`: 50 ms-window RMS, normalized to its own peak
- * (0.388 at 3 000 ms), decimated to the points where the curve actually changes direction.
+ * The measured loudness of `sfx_launch.mp3`: 50 ms-window RMS, normalized to its own peak
+ * (at 200 ms), decimated to the points where the curve actually changes direction.
  *
  * This table is why the light lands on the sound instead of near it. The bloom's brightness IS
- * this curve, so the first hit (2 050 ms), the main body (2 900–3 300 ms) and the late lift at
- * 4 250 ms show up on screen without anyone hand-tuning a fade to match them by ear. Re-measure
- * and replace the table if the sample is ever swapped — see assets/SFX/REFERENCE.md.
+ * this curve, so the attack at 200 ms and the decay through 450 ms show up on screen without
+ * anyone hand-tuning a fade to match them by ear.
+ *
+ * **Re-measure and replace the table if the sample is ever swapped.** 50 ms-window RMS over the
+ * decoded mono PCM, normalized to the file's own peak, decimated to the turning points. A new
+ * sample with the same name would otherwise leave the light peaking where the old sound used to.
  */
 private val LOUDNESS: List<Pair<Int, Float>> = listOf(
-    0 to 0.00f, 350 to 0.00f, 900 to 0.06f, 1_400 to 0.26f, 1_700 to 0.47f,
-    2_050 to 0.86f, 2_250 to 0.45f, 2_500 to 0.51f, 2_900 to 0.87f, 3_100 to 1.00f,
-    3_300 to 0.89f, 3_700 to 0.57f, 3_950 to 0.39f, 4_250 to 0.80f, 4_400 to 0.49f,
-    4_800 to 0.43f, 5_000 to 0.00f,
+    0 to 0.00f, 50 to 0.11f, 100 to 0.37f, 150 to 0.82f, 200 to 1.00f,
+    250 to 0.60f, 300 to 0.37f, 350 to 0.22f, 400 to 0.14f, 450 to 0.06f,
+    500 to 0.03f, 650 to 0.01f, 2_000 to 0.00f,
 )
 
-// The two sweeps, each windowed on one of the sound's attacks (crest at the attack's own ms).
-private const val FIRST_SWEEP_START_MS = 1_550
-private const val FIRST_SWEEP_END_MS = 2_250
-private const val SECOND_SWEEP_START_MS = 2_450
-private const val SECOND_SWEEP_END_MS = 3_350
+// The single sweep, windowed on the sound's one attack (crest at the attack's own ms). The second
+// sweep is gone with the second attack it was windowed on: a sweep with no hit under it is motion
+// the sound does not account for, which is the thing this file exists to avoid.
+private const val FIRST_SWEEP_START_MS = 60
+private const val FIRST_SWEEP_END_MS = 320
+private const val SECOND_SWEEP_START_MS = 320
+private const val SECOND_SWEEP_END_MS = 700
 
-// The title rises out of the second sweep's peak and rides the sequence out.
-private const val TITLE_FADE_START_MS = 2_900
-private const val TITLE_FADE_MS = 500
+// The title rises once the hit has decayed and rides the sequence out.
+private const val TITLE_FADE_START_MS = 700
+private const val TITLE_FADE_MS = 300
 
-// The whole frame sinks to black over the sound's own fade-out (4 850-5 000 ms), started early
-// enough that the screen is genuinely black when the emulator takes it.
-private const val DECAY_START_MS = 4_400
-private const val DECAY_MS = 600
+// The whole frame sinks to black over the sound's own tail, started early enough that the screen
+// is genuinely black when the emulator takes it.
+//
+// These four numbers are bound to SEQUENCE_MS and were the trap when it changed: left at their
+// 5 000 ms values they both sit PAST the end of a 2 000 ms timeline, so `ms` never reaches either.
+// The title would have faded in never, and — worse — the decay would never start, handing the
+// emulator a fully lit screen, which is the one thing the KDoc below says must not happen.
+private const val DECAY_START_MS = 1_500
+private const val DECAY_MS = 500
 
 /**
  * The built-in GameBoot presentation — a PSP-style light sweep drawn in Compose, beat-matched to
- * the bundled launch sound over its full 5.000 s.
+ * the bundled launch sound over its full 2.000 s.
  *
  * This is GameBoot's default, and deliberately NOT a bundled video: it is drawn on a surface that
  * is already live, so it costs no decoder warm-up at the one moment the user is waiting for their
@@ -82,7 +97,7 @@ private const val DECAY_MS = 600
  * duration setting: with animations turned down (developer options, or a battery/accessibility
  * profile) a tween-driven sequence finishes early or instantly, the gate's await returns, and the
  * emulator takes the screen while the sound is still playing. Frame deltas are wall-clock, so
- * five seconds is five seconds and the light stays locked to the sample it was measured from.
+ * two seconds is two seconds and the light stays locked to the sample it was measured from.
  *
  * **Motion budget: less motion, not less time.** [BootSequenceOverlay] hardcodes
  * `WaveStyle.ANIMATED` because it runs once per app start. GameBoot runs on EVERY launch, so it
@@ -141,7 +156,7 @@ fun GameBootSequence(
 
             if (reduced) {
                 // One still frame for the whole presentation — no bloom growth, no sweeps. It
-                // runs the same five seconds so the visual and the sound end together.
+                // runs the same two seconds so the visual and the sound end together.
                 drawRect(
                     brush = Brush.radialGradient(
                         colors = listOf(Color.White.copy(alpha = 0.30f * decay), Color.Transparent),

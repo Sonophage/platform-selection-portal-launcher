@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-/** UI sound effects for XMB menu interactions (see `assets/SFX/active/README.md` for the set). */
+/** UI sound effects for XMB menu interactions. The bundled set lives in `core-ui/res/raw`. */
 enum class MenuSound {
     SCROLL,         // item navigate up/down
     SYSTEM_BROWSE,  // category / filter change
