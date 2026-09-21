@@ -31,7 +31,7 @@ import com.psplauncher.core.domain.model.GamepadAction
  * App Drawer and on every settings screen, and "the same corner" is the whole point: two copies
  * of the number with a comment saying they must match is how it stops being the same corner.
  */
-val ControllerHintEdgeGap = 10.dp
+val ControllerHintEdgeGap = 5.dp
 
 /**
  * A rounded black pill of controller prompts, faded in by the caller when the user has been idle.
@@ -60,10 +60,10 @@ fun ControllerHintBar(
                 color = background,
                 shape = shape,
             )
-            // Tight. Each prompt already carries a 48dp touch target that reaches beyond the
-            // pill's own bounds (minimumInteractiveComponentSize), so the chrome does not need
-            // padding to stay pressable and can sit close to the screen edge instead.
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            // Tight to the glyphs. The pill's height is its content's now that the prompts no
+            // longer reserve a 48dp touch target (see ControllerPromptBar), so this padding is
+            // the only thing between the text and the fill's edge.
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         labelColor = Color.White,
         labelStyle = TextStyle(
             fontSize = 14.sp,

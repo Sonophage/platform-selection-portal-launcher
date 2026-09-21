@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
@@ -252,11 +251,15 @@ fun ControllerPromptBar(
                 labelStyle = labelStyle,
                 glyphSize = glyphSize,
                 modifier = if (tapAction == null) Modifier else Modifier
-                    // The glyph plus a 14sp label is about 36dp tall, under the 48dp a touch
-                    // target needs. This grows the touch area without growing the layout, so
-                    // making a bar tappable never moves the content above it.
-                    .minimumInteractiveComponentSize()
-                    .clip(RoundedCornerShape(8.dp))
+                    // Deliberately NOT minimumInteractiveComponentSize(). That reserves 48dp of
+                    // LAYOUT, not just touch area -- a claim to the contrary was written here and
+                    // was wrong -- and it made the pill about 54dp tall on a 462dp screen, which
+                    // read as heavy padding around the text. A prompt is a glyph plus a label,
+                    // roughly 26dp tall and 90dp wide, and the width is what a thumb actually
+                    // needs to land on; the height is the axis being traded away. Under the 48dp
+                    // guideline on purpose, because this is a gamepad-first shell where the tap
+                    // is the second way in, and the owner asked for the chrome back.
+                    .clip(RoundedCornerShape(6.dp))
                     .clickable(
                         role = Role.Button,
                         onClickLabel = item.label,
