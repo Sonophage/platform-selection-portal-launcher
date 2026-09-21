@@ -43,6 +43,15 @@ data class ArtworkSettingsUiState(
     // Set when a credential was saved but the Keystore refused to seal it, so it is on disk in
     // plaintext. Silently degrading was the old behaviour and the user was never told.
     val unprotectedSecretWarning: String? = null,
+    // What is typed into the credential fields but not saved yet.
+    //
+    // Held here rather than in the screen's own remember, because on a 462dp-tall screen the
+    // keyboard covers everything below the field you are filling: entering a two-part credential
+    // means dismissing it to reach the second box, and any back press that leaves the pane took
+    // the half-typed pair with it. Three of the six drafts were also keyed on the stored value
+    // (`remember(state.igdbClientId)`), so a store emission could blank the field mid-entry.
+    // Surviving the keyboard is the whole point of them living up here.
+    val drafts: CredentialDrafts = CredentialDrafts(),
     val status: ArtworkStatus = ArtworkStatus(),
     val isLoadingStatus: Boolean = false,
     val isScraping: Boolean = false,
@@ -84,6 +93,37 @@ data class ArtworkSettingsUiState(
     val debugCredentialsAvailable: Boolean = com.psplauncher.feature.settings.BuildConfig.DEBUG,
     val debugCredentialsStatus: String? = null,
 )
+
+/** The credential text fields whose in-progress contents outlive the screen. */
+enum class CredentialField { SGDB_KEY, TGDB_KEY, IGDB_CLIENT_ID, IGDB_CLIENT_SECRET, SS_USERNAME, SS_PASSWORD }
+
+@androidx.compose.runtime.Immutable
+data class CredentialDrafts(
+    val sgdbKey: String = "",
+    val tgdbKey: String = "",
+    val igdbClientId: String = "",
+    val igdbClientSecret: String = "",
+    val ssUsername: String = "",
+    val ssPassword: String = "",
+) {
+    operator fun get(field: CredentialField): String = when (field) {
+        CredentialField.SGDB_KEY -> sgdbKey
+        CredentialField.TGDB_KEY -> tgdbKey
+        CredentialField.IGDB_CLIENT_ID -> igdbClientId
+        CredentialField.IGDB_CLIENT_SECRET -> igdbClientSecret
+        CredentialField.SS_USERNAME -> ssUsername
+        CredentialField.SS_PASSWORD -> ssPassword
+    }
+
+    fun with(field: CredentialField, value: String): CredentialDrafts = when (field) {
+        CredentialField.SGDB_KEY -> copy(sgdbKey = value)
+        CredentialField.TGDB_KEY -> copy(tgdbKey = value)
+        CredentialField.IGDB_CLIENT_ID -> copy(igdbClientId = value)
+        CredentialField.IGDB_CLIENT_SECRET -> copy(igdbClientSecret = value)
+        CredentialField.SS_USERNAME -> copy(ssUsername = value)
+        CredentialField.SS_PASSWORD -> copy(ssPassword = value)
+    }
+}
 
 @HiltViewModel
 class ArtworkSettingsViewModel @Inject constructor(
@@ -298,7 +338,11 @@ class ArtworkSettingsViewModel @Inject constructor(
     }
 
     fun saveApiKey(key: String) {
-        viewModelScope.launch { warnIfUnprotected("SteamGridDB key", sgdbKeyProvider.saveKey(key.trim())) }
+        viewModelScope.launch {
+            val protection = sgdbKeyProvider.saveKey(key.trim())
+            clearDrafts(CredentialField.SGDB_KEY)
+            warnIfUnprotected("SteamGridDB key", protection)
+        }
     }
 
     fun clearApiKey() {
@@ -312,17 +356,30 @@ class ArtworkSettingsViewModel @Inject constructor(
     }
 
     fun saveTgdbKey(key: String) {
-        viewModelScope.launch { warnIfUnprotected("TheGamesDB key", metadataKeyProvider.saveTgdbKey(key.trim())) }
+        viewModelScope.launch {
+            val protection = metadataKeyProvider.saveTgdbKey(key.trim())
+            clearDrafts(CredentialField.TGDB_KEY)
+            warnIfUnprotected("TheGamesDB key", protection)
+        }
     }
 
     fun clearTgdbKey() {
         viewModelScope.launch { metadataKeyProvider.clearTgdbKey() }
     }
 
+    fun setDraft(field: CredentialField, value: String) {
+        _extra.update { it.copy(drafts = it.drafts.with(field, value)) }
+    }
+
+    private fun clearDrafts(vararg fields: CredentialField) {
+        _extra.update { s -> s.copy(drafts = fields.fold(s.drafts) { d, f -> d.with(f, "") }) }
+    }
+
     fun saveIgdbCredentials(clientId: String, clientSecret: String) {
         viewModelScope.launch {
             val protection = metadataKeyProvider.saveIgdbCredentials(clientId.trim(), clientSecret.trim())
             _extra.update { it.copy(igdbCredentialStatus = null) }
+            clearDrafts(CredentialField.IGDB_CLIENT_ID, CredentialField.IGDB_CLIENT_SECRET)
             warnIfUnprotected("IGDB client secret", protection)
         }
     }
@@ -352,6 +409,7 @@ class ArtworkSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val protection = metadataKeyProvider.saveSsCredentials(username.trim(), password.trim())
             _extra.update { it.copy(ssCredentialStatus = null) }
+            clearDrafts(CredentialField.SS_USERNAME, CredentialField.SS_PASSWORD)
             warnIfUnprotected("ScreenScraper password", protection)
         }
     }

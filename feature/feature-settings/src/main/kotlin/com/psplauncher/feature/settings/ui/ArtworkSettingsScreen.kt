@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.psplauncher.feature.settings.viewmodel.CredentialField
 import com.psplauncher.feature.settings.viewmodel.ArtworkSettingsViewModel
 
 /**
@@ -57,12 +58,17 @@ fun ArtworkSettingsScreen(
         return
     }
 
-    var sgdbKeyDraft by remember(state.apiKeyMasked) { mutableStateOf("") }
-    var tgdbKeyDraft by remember(state.hasTgdbKey) { mutableStateOf("") }
-    var igdbClientIdDraft by remember(state.igdbClientId) { mutableStateOf("") }
-    var igdbClientSecretDraft by remember { mutableStateOf("") }
-    var ssUsernameDraft by remember(state.ssUsername) { mutableStateOf("") }
-    var ssPasswordDraft by remember { mutableStateOf("") }
+    // Read from the ViewModel, not remembered here: the keyboard covers the field below the one
+    // you are filling on this screen's height, so a two-part credential means dismissing it and
+    // scrolling, and a back press that left the pane used to take the half-typed pair with it.
+    // Three of these were also keyed on the stored value, so a store emission could blank the box
+    // you were typing in.
+    val sgdbKeyDraft = state.drafts.sgdbKey
+    val tgdbKeyDraft = state.drafts.tgdbKey
+    val igdbClientIdDraft = state.drafts.igdbClientId
+    val igdbClientSecretDraft = state.drafts.igdbClientSecret
+    val ssUsernameDraft = state.drafts.ssUsername
+    val ssPasswordDraft = state.drafts.ssPassword
 
     // Debug builds only. Any MIME type: pickers often report .properties files as octet-stream.
     val credentialsFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -335,7 +341,7 @@ fun ArtworkSettingsScreen(
                 SettingsTextFieldRow(
                     label         = if (state.hasApiKey) "API Key (saved)" else "API Key",
                     value         = sgdbKeyDraft,
-                    onValueChange = { sgdbKeyDraft = it },
+                    onValueChange = { viewModel.setDraft(CredentialField.SGDB_KEY, it) },
                     placeholder   = if (state.hasApiKey) "••••••••  (tap to replace)" else "Paste your SteamGridDB key",
                     isPassword    = true,
                     helper        = "Get a free key at steamgriddb.com/api",
@@ -346,7 +352,6 @@ fun ArtworkSettingsScreen(
                         label   = "Save API Key",
                         onClick = {
                             viewModel.saveApiKey(sgdbKeyDraft)
-                            sgdbKeyDraft = ""
                         },
                     )
                 }
@@ -367,7 +372,7 @@ fun ArtworkSettingsScreen(
                 SettingsTextFieldRow(
                     label         = if (state.hasTgdbKey) "API Key (saved)" else "API Key",
                     value         = tgdbKeyDraft,
-                    onValueChange = { tgdbKeyDraft = it },
+                    onValueChange = { viewModel.setDraft(CredentialField.TGDB_KEY, it) },
                     placeholder   = if (state.hasTgdbKey) "••••••••  (tap to replace)" else "Paste your TheGamesDB key",
                     isPassword    = true,
                     helper        = "Request a key from TheGamesDB at thegamesdb.net",
@@ -378,7 +383,6 @@ fun ArtworkSettingsScreen(
                         label   = "Save TheGamesDB Key",
                         onClick = {
                             viewModel.saveTgdbKey(tgdbKeyDraft)
-                            tgdbKeyDraft = ""
                         },
                     )
                 }
@@ -397,13 +401,13 @@ fun ArtworkSettingsScreen(
                 SettingsTextFieldRow(
                     label         = if (state.hasIgdbCredentials) "Client ID (saved)" else "Client ID",
                     value         = igdbClientIdDraft,
-                    onValueChange = { igdbClientIdDraft = it },
+                    onValueChange = { viewModel.setDraft(CredentialField.IGDB_CLIENT_ID, it) },
                     placeholder   = if (state.hasIgdbCredentials) "••••••••" else "Twitch Client ID",
                 )
                 SettingsTextFieldRow(
                     label         = "Client Secret",
                     value         = igdbClientSecretDraft,
-                    onValueChange = { igdbClientSecretDraft = it },
+                    onValueChange = { viewModel.setDraft(CredentialField.IGDB_CLIENT_SECRET, it) },
                     placeholder   = "Twitch Client Secret",
                     isPassword    = true,
                     helper        = "Create app at dev.twitch.tv — improves fallback coverage for modern games",
@@ -422,8 +426,6 @@ fun ArtworkSettingsScreen(
                         label   = "Save Credentials",
                         onClick = {
                             viewModel.saveIgdbCredentials(igdbClientIdDraft, igdbClientSecretDraft)
-                            igdbClientIdDraft = ""
-                            igdbClientSecretDraft = ""
                         },
                     )
                 }
@@ -472,13 +474,13 @@ fun ArtworkSettingsScreen(
                 SettingsTextFieldRow(
                     label         = if (ssUsernameStored) "Username (saved: ${state.ssUsername})" else "Username",
                     value         = ssUsernameDraft,
-                    onValueChange = { ssUsernameDraft = it },
+                    onValueChange = { viewModel.setDraft(CredentialField.SS_USERNAME, it) },
                     placeholder   = if (ssUsernameStored) "Tap to replace" else "ScreenScraper username",
                 )
                 SettingsTextFieldRow(
                     label         = "Password",
                     value         = ssPasswordDraft,
-                    onValueChange = { ssPasswordDraft = it },
+                    onValueChange = { viewModel.setDraft(CredentialField.SS_PASSWORD, it) },
                     placeholder   = if (state.hasSsCredentials) "••••••••  (tap to replace)" else "ScreenScraper password",
                     isPassword    = true,
                     helper        = "Free account at screenscraper.fr — raises the scrape rate limit and daily quota. " +
@@ -512,8 +514,6 @@ fun ArtworkSettingsScreen(
                         label   = "Save Account",
                         onClick = {
                             viewModel.saveSsCredentials(ssUsernameDraft, ssPasswordDraft)
-                            ssUsernameDraft = ""
-                            ssPasswordDraft = ""
                         },
                     )
                 }
