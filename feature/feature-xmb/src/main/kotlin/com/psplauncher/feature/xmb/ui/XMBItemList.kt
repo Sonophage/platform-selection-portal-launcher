@@ -98,6 +98,8 @@ import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
+import com.psplauncher.core.ui.icons.AppIconContainerShape
+import com.psplauncher.core.ui.icons.appIconBitmap
 import com.psplauncher.core.ui.components.ControllerPromptGlyphs
 import com.psplauncher.core.ui.icons.GameIconStyle
 import com.psplauncher.core.ui.icons.LocalXmbIconOverrides
@@ -1154,18 +1156,27 @@ internal fun BundledSilhouetteIcon(assetUri: String, modifier: Modifier = Modifi
     }
 }
 
+/**
+ * An installed app in a crossbar row: its own art, on the wallpaper, with no tile behind it.
+ *
+ * This used to draw the whole `AdaptiveIconDrawable`, background layer included, which is why a
+ * Network column showed a black square and a purple gradient square sitting in the same slot and
+ * at the same size as a flat white magnifier. Sony never tinted third-party art either; it forced
+ * a common container and left the art alone. Dropping the background layer is that, and the
+ * reasoning is in [appIconBitmap].
+ */
 @Composable
 private fun AppListIcon(
     packageName: String,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val drawable = remember(packageName) {
-        runCatching { context.packageManager.getApplicationIcon(packageName) }.getOrNull()
-    } ?: return
+    val bitmap = remember(packageName) { context.appIconBitmap(packageName) } ?: return
     Image(
-        painter = rememberDrawablePainter(drawable),
+        bitmap = bitmap,
         contentDescription = null,
-        modifier = modifier.clip(RoundedCornerShape(6.dp)),
+        // Always ours, never the publisher's. Stripping the background layer fixes the icons that
+        // separate cleanly; the container is what makes the rest agree with them.
+        modifier = modifier.clip(AppIconContainerShape),
     )
 }

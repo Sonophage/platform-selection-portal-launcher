@@ -65,7 +65,7 @@ private val ICON_HEIGHT = 86.dp
 // tiny square. Used for every console's game icons for a consistent XMB look.
 
 private val PspShape    = RoundedCornerShape(4.dp)
-private val SquircleShape = RoundedCornerShape(14.dp)
+private val SquircleShape = com.psplauncher.core.ui.icons.AppIconContainerShape
 
 private val CartridgeBodyColor      = Color(0xFF1C1C22)
 private val CartridgeConnectorColor = Color(0xFF111115)
