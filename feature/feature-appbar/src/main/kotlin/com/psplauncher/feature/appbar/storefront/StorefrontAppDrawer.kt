@@ -86,6 +86,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.drawablepainter.DrawablePainter
 import com.psplauncher.core.ui.components.ControllerPromptBar
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.R
 import com.psplauncher.core.ui.preview.CombinedPreviews
@@ -323,8 +324,9 @@ private fun AppDrawerContent(
         }
 
         state.confirmUninstall?.let { app ->
-            UninstallConfirmDialog(
+            UninstallConfirmOverlay(
                 app = app,
+                confirmFocused = state.uninstallConfirmFocused,
                 onConfirm = onConfirmUninstall,
                 onCancel = onCancelUninstall,
             )
@@ -779,26 +781,33 @@ private fun AppMiniMenu(
     }
 }
 
-// ── Uninstall confirmation dialog ───────────────────────────────────────────────
+// ── Uninstall confirmation ──────────────────────────────────────────────────────
 
+/**
+ * Drawn in the launcher's own window, like every other prompt in the app.
+ *
+ * It was a Material3 AlertDialog, which renders into a separate platform Window: dispatchKeyEvent
+ * never ran, so AppDrawerViewModel's uninstall branch — which was written correctly — could never
+ * fire. No A, no B, no D-pad. The shared overlay also fixes two things the dialog got backwards:
+ * the destructive answer was the confirmButton (so it led), and its red was a hardcoded 0xFFFF6B6B
+ * rather than the app's destructive token.
+ */
 @Composable
-private fun UninstallConfirmDialog(
+private fun UninstallConfirmOverlay(
     app: InstalledApp,
+    confirmFocused: Boolean,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onCancel,
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onConfirm) {
-                Text("Uninstall", color = Color(0xFFFF6B6B))
-            }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onCancel) { Text("Cancel") }
-        },
-        title = { Text("Uninstall ${app.label}?") },
-        text = { Text("This removes ${app.label} from your device. Android will ask you to confirm.") },
+    PfpConfirmOverlay(
+        title = "Uninstall ${app.label}?",
+        message = "This removes ${app.label} from your device. Android will ask you to confirm.",
+        confirmLabel = "Uninstall",
+        cancelLabel = "Cancel",
+        confirmFocused = confirmFocused,
+        cancelFocused = !confirmFocused,
+        onConfirm = onConfirm,
+        onCancel = onCancel,
     )
 }
 

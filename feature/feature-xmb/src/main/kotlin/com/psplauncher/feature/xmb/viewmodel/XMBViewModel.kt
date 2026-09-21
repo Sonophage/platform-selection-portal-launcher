@@ -3817,10 +3817,16 @@ class XMBViewModel @Inject constructor(
                 .take(SEARCH_RESULTS_PER_LIBRARY)
                 .forEach { add(it.toSearchRow()) }
         }
+        // Asks the snapshots this search is actually working from, so a scoped search reports the
+        // state of ITS library rather than the app's — openSearch only fills the lists its scope
+        // reads.
+        val anyContent = searchGames.isNotEmpty() || searchVideos.isNotEmpty() ||
+            searchPhotos.isNotEmpty() || searchBooks.isNotEmpty() || searchTracks.isNotEmpty()
         val display = when {
             rows.isNotEmpty() -> rows
-            else -> when (searchEmptyState(state.loaded, q)) {
+            else -> when (searchEmptyState(state.loaded, q, anyContent)) {
                 SearchEmptyState.LOADING -> searchNoticeItem("Reading your libraries", "One moment.")
+                SearchEmptyState.EMPTY_LIBRARY -> searchNoticeItem(state.scope.emptyTitle, state.scope.emptyHint)
                 SearchEmptyState.PROMPT -> searchNoticeItem("Type to search", state.scope.hint)
                 SearchEmptyState.NO_MATCHES -> searchNoticeItem("No matches", "Nothing here matches that.")
             }.let(::listOf)
@@ -4757,7 +4763,15 @@ class XMBViewModel @Inject constructor(
             )
         }
 
-        if (enabledCards.isEmpty()) {
+        // Windows is import-driven and belongs under Settings ▸ Library rather than the normal
+        // console cards. Only surface it here when the Windows card actually contains game rows.
+        val visibleCards = enabledCards.filter { card ->
+            card.platformId != WINDOWS_PLATFORM_ID ||
+                (_uiState.value.platformGameCounts[WINDOWS_PLATFORM_ID] ?: card.gameCount) > 0
+        }
+
+        // Genuinely no cards at all — the user removed even the seeded Android one.
+        if (visibleCards.isEmpty()) {
             return header + collectionItems + XMBItem(
                 id       = NO_CONSOLES_ITEM_ID,
                 title    = "No consoles configured",
@@ -4766,14 +4780,7 @@ class XMBViewModel @Inject constructor(
             )
         }
 
-        // Windows is import-driven and belongs under Settings ▸ Library rather than the normal
-        // console cards. Only surface it here when the Windows card actually contains game rows.
-        val visibleCards = enabledCards.filter { card ->
-            card.platformId != WINDOWS_PLATFORM_ID ||
-                (_uiState.value.platformGameCounts[WINDOWS_PLATFORM_ID] ?: card.gameCount) > 0
-        }
-
-        return header + collectionItems + visibleCards.map { card ->
+        val cardRows = visibleCards.map { card ->
             val count = _uiState.value.platformGameCounts[card.platformId] ?: card.gameCount
             XMBItem(
                 id          = "card_${card.platformId}",
@@ -4784,20 +4791,42 @@ class XMBViewModel @Inject constructor(
                 type        = XMBItemType.MEMORY_CARD,
             )
         }
+
+        // A column full of cards holding nothing still has to say where to go.
+        //
+        // The pointer above is guarded on there being no cards, and an Android Memory Card is
+        // seeded on a fresh install — so it was false on exactly the device that needed it. A new
+        // user's Games column read "Search Games / All Games (0 games) / Android Memory Card
+        // (0 games)" and pointed nowhere at all. Emptiness here is about GAMES, not about whether
+        // a card exists, and the answer is the same setup-gap row All Games already shows.
+        val gapRow = if (totalGames == 0) setupGapItem() else null
+        return header + collectionItems + cardRows + listOfNotNull(gapRow)
+    }
+
+    /**
+     * The row that names the FIRST unmet setup step and confirms through to the screen that fixes
+     * it, or null once nothing is missing.
+     *
+     * One definition, because two screens need the same answer: All Games when it is empty, and
+     * the Games root when the library has no games in it at all. A second hand-written "go to
+     * Library Manager" message in the other place is a message that can disagree with this one
+     * about which step is actually first.
+     */
+    private fun setupGapItem(): XMBItem? {
+        val gap = setupState.firstGap
+        if (gap == com.psplauncher.feature.launcher.SetupGap.NONE) return null
+        return XMBItem(
+            id       = SETUP_GAP_ITEM_ID,
+            title    = gap.message,
+            subtitle = "Press confirm to open Settings and fix it.",
+            type     = XMBItemType.EMPTY,
+        )
     }
 
     // B3: the empty All Games row names the FIRST unmet setup step and confirms through to the
     // screen that fixes it. "No games imported yet" told a fresh install nothing actionable.
     private fun emptyAllGamesItem(): XMBItem {
-        val gap = setupState.firstGap
-        if (gap != com.psplauncher.feature.launcher.SetupGap.NONE) {
-            return XMBItem(
-                id       = SETUP_GAP_ITEM_ID,
-                title    = gap.message,
-                subtitle = "Press confirm to open Settings and fix it.",
-                type     = XMBItemType.EMPTY,
-            )
-        }
+        setupGapItem()?.let { return it }
         return XMBItem(
             id       = NO_GAMES_ITEM_ID,
             title    = "No games imported yet",

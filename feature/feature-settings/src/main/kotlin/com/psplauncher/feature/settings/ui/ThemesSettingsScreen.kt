@@ -118,35 +118,27 @@ private fun ThemesSettingsContent(
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { onCreateThemeFromPhoto(it) } }
     val pfpPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { onImportPfpTheme(it) } }
 
-    // "Save Current Look as Theme" name entry (reuses the app's rename-dialog pattern).
+    // "Save Current Look as Theme" name entry, drawn in the launcher's own window like every other
+    // prompt in the app. It was a Material3 AlertDialog, which renders into a separate platform
+    // Window, so Activity.dispatchKeyEvent never runs and the pad never reaches it: no A, no B, no
+    // D-pad, and system Back only closing the keyboard. Measured on the device; see PfpOverlayCard.
     var showSaveNameDialog by remember { mutableStateOf(false) }
     var saveName by remember { mutableStateOf("") }
     if (showSaveNameDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showSaveNameDialog = false },
-            title = { androidx.compose.material3.Text("Save Current Look as Theme") },
-            text = {
-                androidx.compose.material3.OutlinedTextField(
-                    value = saveName,
-                    onValueChange = { saveName = it },
-                    singleLine = true,
-                    placeholder = { androidx.compose.material3.Text("Theme name") },
-                )
+        SettingsTextPromptOverlay(
+            title = "Save Current Look as Theme",
+            value = saveName,
+            onValueChange = { saveName = it },
+            onConfirm = {
+                showSaveNameDialog = false
+                onSaveCurrentLook(saveName)
+                saveName = ""
             },
-            confirmButton = {
-                androidx.compose.material3.TextButton(
-                    onClick = {
-                        showSaveNameDialog = false
-                        onSaveCurrentLook(saveName)
-                        saveName = ""
-                    },
-                ) { androidx.compose.material3.Text("Save") }
+            onCancel = {
+                showSaveNameDialog = false
+                saveName = ""
             },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showSaveNameDialog = false }) {
-                    androidx.compose.material3.Text("Cancel")
-                }
-            },
+            placeholder = "Theme name",
         )
     }
 

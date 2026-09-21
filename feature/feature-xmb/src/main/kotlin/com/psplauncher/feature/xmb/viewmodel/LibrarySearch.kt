@@ -10,13 +10,40 @@ package com.psplauncher.feature.xmb.viewmodel
 // subtly wrong and impossible to notice: a rule that is slightly too strict returns nothing for a
 // search the user is sure should work, and says nothing about why.
 
-/** Which library a search looks in. */
-enum class SearchScope(val label: String, val hint: String) {
-    ALL("Search", "Games, video, photos and books"),
-    GAMES("Search Games", "Titles in your game library"),
-    VIDEOS("Search Video", "Titles in your video libraries"),
-    PHOTOS("Search Photos", "File names in your albums"),
-    BOOKS("Search Books", "Titles, authors and series"),
+/**
+ * Which library a search looks in.
+ *
+ * [emptyTitle] and [emptyHint] are what the surface says when there is nothing to search at all,
+ * which is a different sentence from "nothing matched" and has to name the place the user fills.
+ * A search that answers "No matches" on a library that has never held anything sends them looking
+ * in Library Manager for a file they never added.
+ */
+enum class SearchScope(
+    val label: String,
+    val hint: String,
+    val emptyTitle: String,
+    val emptyHint: String,
+) {
+    ALL(
+        "Search", "Games, video, photos and books",
+        "Nothing to search yet", "Add a library in Settings, then search from anywhere",
+    ),
+    GAMES(
+        "Search Games", "Titles in your game library",
+        "No games yet", "Add a ROM root in Settings ▸ Library ▸ Library Manager",
+    ),
+    VIDEOS(
+        "Search Video", "Titles in your video libraries",
+        "No videos yet", "Set a root folder in Settings ▸ Media ▸ Video",
+    ),
+    PHOTOS(
+        "Search Photos", "File names in your albums",
+        "No photos yet", "Set a root folder in Settings ▸ Media ▸ Photo",
+    ),
+    BOOKS(
+        "Search Books", "Titles, authors and series",
+        "No books yet", "Set a root folder in Settings ▸ Media ▸ Books",
+    ),
 }
 
 /**
@@ -63,8 +90,8 @@ fun matchesSearch(query: String, vararg fields: String?): Boolean {
     return terms.all { haystack.contains(it) }
 }
 
-/** Why a search list is empty. Three different things, and they must not be confused. */
-enum class SearchEmptyState { LOADING, PROMPT, NO_MATCHES }
+/** Why a search list is empty. Four different things, and they must not be confused. */
+enum class SearchEmptyState { LOADING, EMPTY_LIBRARY, PROMPT, NO_MATCHES }
 
 /**
  * What an empty result list is actually saying (pure — unit-tested).
@@ -75,8 +102,16 @@ enum class SearchEmptyState { LOADING, PROMPT, NO_MATCHES }
  * looked at, and it is indistinguishable on screen from a real empty result -- the user concludes
  * their game is missing and goes looking for it in Library Manager.
  */
-fun searchEmptyState(loaded: Boolean, query: String): SearchEmptyState = when {
+fun searchEmptyState(loaded: Boolean, query: String, anyContent: Boolean = true): SearchEmptyState = when {
     !loaded -> SearchEmptyState.LOADING
+    // Nothing to search is not the same as nothing matching, and it is the whole argument above
+    // applied one step further out. This branch was missing: with an empty library, typing three
+    // letters got "No matches — nothing here matches that", which is a statement about a library
+    // that has never had anything in it. The user goes looking for a file they never added.
+    //
+    // It sits above the blank-query check on purpose. An empty library with an empty query should
+    // say the library is empty, not invite a search that cannot succeed.
+    !anyContent -> SearchEmptyState.EMPTY_LIBRARY
     normalizeForSearch(query).isEmpty() -> SearchEmptyState.PROMPT
     else -> SearchEmptyState.NO_MATCHES
 }

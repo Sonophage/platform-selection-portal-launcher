@@ -61,7 +61,7 @@ The Network column is real — those are actual installed apps, classified autom
 | <img src="docs/screenshots/custom-category.jpg" width="420"> | <img src="docs/screenshots/memory-card-menu.jpg" width="420"> |
 | A custom gaming category with its own icon and wallpaper | Memory Card options (△) — scan, refresh, pin, hide |
 | <img src="docs/screenshots/library-manager.jpg" width="420"> | <img src="docs/screenshots/winlator-pc-games.jpg" width="420"> |
-| Library Manager — ROM roots, auto-detect, per-console cards | PC-layer titles (Winlator) live next to console games |
+| Library Manager — ROM roots, per-console cards, scan-all passes | PC-layer titles (Winlator) live next to console games |
 | <img src="docs/screenshots/artwork-manager.jpg" width="420"> | |
 | Artwork Manager — SteamGridDB / TheGamesDB / IGDB / local | |
 
@@ -220,9 +220,11 @@ see it.
 > obfuscated built-in pair, so scraping works out of the box — nothing to enter or configure.
 
 With a ROM root set, the fastest way to load your library is
-**Settings ▸ Library ▸ Library Manager ▸ Auto-Detect from ROM Root** — it walks the
-root's ES-DE system folders and creates a Memory Card for every console that contains
-games (including a **Windows Memory Card** for PC games). Full detail in
+**Settings ▸ Library ▸ Library Manager ▸ Add ROM Root** — granting a root walks its
+ES-DE system folders straight away and creates a Memory Card for every console that
+contains games (including a **Windows Memory Card** for PC games). There is no separate
+detect step: a newly added root is not useful until that pass runs, so it always does.
+Full detail in
 [Setting up a console](#42-setting-up-a-console-memory-card).
 
 ---
@@ -279,7 +281,7 @@ Consoles are added as **Memory Cards** and managed entirely through your **ROM R
 one folder grant covers every console; there is no per-console folder picking. PFP never
 auto-scans your whole device.
 
-**The fast path — Auto-Detect.** *Library Manager ▸ Auto-Detect from ROM Root* walks the
+**The fast path — adding the root.** *Library Manager ▸ Add ROM Root* walks the
 root's ES-DE system folders (`gba`, `snes`, `psx`, …), creates a Memory Card for every
 folder that actually contains games, and loads them in one scan. It also sets up the
 **Windows Memory Card** (wiring `<root>/windows` and its `import/` drop folder, and
@@ -692,7 +694,7 @@ folders via *Library ▸ Root Access*.
 
 | Section | What it covers |
 |---|---|
-| **Library** | ROM roots, Library Manager (consoles, Auto-Detect, scan-all passes), Import PC Games, Root Access |
+| **Library** | ROM roots, Library Manager (consoles, scan-all passes), Import PC Games, Root Access |
 | **Emulators** | Detected emulators, Custom Emulator Wizard |
 | **Artwork** | API keys, scrape all/missing, Game Icon Display, Artwork Folder & Import |
 | **Themes** | Color scheme, icon color (presets + Custom HSV), wallpaper, New Theme from Photo, PSP import, My Themes |

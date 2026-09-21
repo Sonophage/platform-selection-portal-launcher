@@ -307,6 +307,90 @@ class AppDrawerViewModelTest {
         }
     }
 
+    // ── Uninstall prompt cursor ──────────────────────────────────────────
+    //
+    // The prompt used to have no cursor at all: it was drawn with Cancel and Uninstall side by
+    // side, nothing focused, and the ViewModel read "SELECT confirms, anything else cancels".
+    // That was coherent only because nothing on screen said otherwise. Now that it is the shared
+    // stacked overlay with a visible cursor, SELECT has to mean "the button you are on", and the
+    // button you start on has to be the harmless one.
+
+    /** Opens the uninstall prompt for PPSSPP, leaving the cursor wherever it opens. */
+    private fun openUninstallPrompt() {
+        viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
+        testDispatcher.scheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `the uninstall prompt opens with the cursor on Cancel`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        openUninstallPrompt()
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals("PPSSPP", state.confirmUninstall?.label)
+            assertFalse("prompt opened on the destructive button", state.uninstallConfirmFocused)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `pressing confirm the instant the prompt opens does not uninstall anything`() = runTest {
+        // The reason the cursor starts on Cancel. Uninstall is reached from a menu whose last
+        // press was also SELECT, so a second one arrives easily and by reflex.
+        testDispatcher.scheduler.advanceUntilIdle()
+        openUninstallPrompt()
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
+        testDispatcher.scheduler.advanceUntilIdle()
+        verify(exactly = 0) { repository.uninstallApp(any()) }
+        viewModel.uiState.test {
+            assertEquals(null, awaitItem().confirmUninstall)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `moving to Uninstall and confirming does uninstall`() = runTest {
+        // The other direction. If this passed while the test above also passed by the prompt simply
+        // never confirming, the guard rail would be a wall.
+        testDispatcher.scheduler.advanceUntilIdle()
+        openUninstallPrompt()
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
+        testDispatcher.scheduler.advanceUntilIdle()
+        verify(exactly = 1) { repository.uninstallApp("org.ppsspp.ppsspp") }
+    }
+
+    @Test
+    fun `the cursor moves back off the destructive button`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        openUninstallPrompt()
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_UP)
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
+        testDispatcher.scheduler.advanceUntilIdle()
+        verify(exactly = 0) { repository.uninstallApp(any()) }
+    }
+
+    @Test
+    fun `a reopened prompt starts on Cancel again, whatever the last answer was`() = runTest {
+        // State that survived the close would put the cursor on Uninstall for the NEXT app, which
+        // is the worst possible place for it to be remembered.
+        testDispatcher.scheduler.advanceUntilIdle()
+        openUninstallPrompt()
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        viewModel.handleGamepadAction(GamepadAction.BACK)
+        testDispatcher.scheduler.advanceUntilIdle()
+        openUninstallPrompt()
+        viewModel.uiState.test {
+            assertFalse("cursor was remembered across prompts", awaitItem().uninstallConfirmFocused)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     // ── isLoading ────────────────────────────────────────────────────────
 
     @Test

@@ -283,7 +283,11 @@ private fun XmbGameColumn(
             XmbVerticalListRow(
                 item = items[i],
                 isSelected = i == selectedIndex,
-                showText = true,   // every game card keeps its [Title] / {Platform (Emulator)} label
+                // Text is allowed here; whether a row actually draws any is XmbVerticalListRow's
+                // call. A real game shows its title only while it is the active row and its PIC0
+                // logo is not up (see showGameText) — this has not been "every card keeps its
+                // label" since c1367d8b, and the comment that said so outlived the behaviour.
+                showText = true,
                 iconStyle = iconStyle,
                 onClick = { onItemSelected(i) },
                 onLongPress = { onItemLongPress(i) },

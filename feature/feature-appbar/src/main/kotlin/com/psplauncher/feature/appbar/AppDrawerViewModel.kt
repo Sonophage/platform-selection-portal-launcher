@@ -52,6 +52,12 @@ data class AppDrawerUiState(
     val menuIndex: Int = 0,
     // Uninstall guard rail: the app awaiting the in-app confirmation (null = no dialog).
     val confirmUninstall: InstalledApp? = null,
+    /**
+     * Which button the uninstall prompt's cursor is on. False is Cancel, and it opens there every
+     * time: a destructive prompt never opens with the cursor on the destructive answer, so a
+     * reflex press cancels rather than uninstalls.
+     */
+    val uninstallConfirmFocused: Boolean = false,
     // True when the menu app is marked as a game (an android-platform GAME row exists for it).
     val menuAppIsGame: Boolean = false,
     /** Per-filter app counts (unfiltered by search query) for the category rail. */
@@ -171,7 +177,7 @@ class AppDrawerViewModel @Inject constructor(
             AppMenuAction.MARK_GAME   -> { setMarkedAsGame(app, marked = true);  _uiState.update { it.copy(menuApp = null) } }
             AppMenuAction.UNMARK_GAME -> { setMarkedAsGame(app, marked = false); _uiState.update { it.copy(menuApp = null) } }
             // Guard rail: show an in-app confirmation before the system uninstall flow.
-            AppMenuAction.UNINSTALL -> _uiState.update { it.copy(menuApp = null, confirmUninstall = app) }
+            AppMenuAction.UNINSTALL -> _uiState.update { it.copy(menuApp = null, confirmUninstall = app, uninstallConfirmFocused = false) }
         }
     }
 
@@ -211,11 +217,11 @@ class AppDrawerViewModel @Inject constructor(
     fun confirmUninstall() {
         val app = _uiState.value.confirmUninstall ?: return
         appRepository.uninstallApp(app.packageName)
-        _uiState.update { it.copy(confirmUninstall = null) }
+        _uiState.update { it.copy(confirmUninstall = null, uninstallConfirmFocused = false) }
         // The app list refreshes on ON_RESUME when the user returns from the uninstall dialog.
     }
 
-    fun cancelUninstall() = _uiState.update { it.copy(confirmUninstall = null) }
+    fun cancelUninstall() = _uiState.update { it.copy(confirmUninstall = null, uninstallConfirmFocused = false) }
 
     fun openUsageAccessSettings() {
         appRepository.openUsageAccessSettings()
@@ -224,11 +230,22 @@ class AppDrawerViewModel @Inject constructor(
     fun handleGamepadAction(action: GamepadAction) {
         val state = _uiState.value
 
-        // Uninstall confirmation captures input first (SELECT confirms, anything else cancels).
+        // Uninstall confirmation captures input first.
+        //
+        // This branch was written correct and was unreachable: the prompt was a Material3
+        // AlertDialog, which draws into its own platform Window, so dispatchKeyEvent never ran and
+        // nothing here ever fired. Now that it is drawn in the launcher's own window the rule has
+        // to be a real two-button one rather than "SELECT confirms, anything else cancels" — with
+        // a cursor on screen, a D-pad press that silently cancelled would be a trap.
         state.confirmUninstall?.let {
             when (action) {
-                GamepadAction.SELECT -> confirmUninstall()
-                else -> cancelUninstall()
+                GamepadAction.SELECT ->
+                    if (state.uninstallConfirmFocused) confirmUninstall() else cancelUninstall()
+                GamepadAction.NAVIGATE_UP, GamepadAction.NAVIGATE_DOWN ->
+                    _uiState.update { s -> s.copy(uninstallConfirmFocused = !s.uninstallConfirmFocused) }
+                GamepadAction.BACK -> cancelUninstall()
+                // Everything else is swallowed rather than falling through to the list behind.
+                else -> Unit
             }
             return
         }

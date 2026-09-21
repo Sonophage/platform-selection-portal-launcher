@@ -338,9 +338,9 @@ internal fun AppDrawerContent(
         state.confirmUninstall?.let { app ->
             UninstallConfirmDialog(
                 app = app,
+                confirmFocused = state.uninstallConfirmFocused,
                 onConfirm = onConfirmUninstall,
                 onCancel = onCancelUninstall,
-                colors = sf,
             )
         }
     }

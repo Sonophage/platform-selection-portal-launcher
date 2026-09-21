@@ -82,4 +82,54 @@ class LibrarySearchTest {
 
         assertEquals(SearchEmptyState.NO_MATCHES, searchEmptyState(loaded = true, query = "zelda"))
     }
+
+    @Test
+    fun `an empty library says so instead of claiming nothing matched`() {
+        // The same argument as LOADING, one step further out, and it was missing. On a device with
+        // no games, typing three letters answered "No matches — nothing here matches that": a
+        // statement about a library that has never held anything, indistinguishable on screen from
+        // a real empty result. The user goes looking in Library Manager for a file they never added.
+        assertEquals(
+            SearchEmptyState.EMPTY_LIBRARY,
+            searchEmptyState(loaded = true, query = "zel", anyContent = false),
+        )
+    }
+
+    @Test
+    fun `an empty library says so before it invites a search`() {
+        // Ordering, like LOADING above. With nothing to find, "Type to search" is an invitation
+        // that cannot succeed, so the emptier fact wins.
+        assertEquals(
+            SearchEmptyState.EMPTY_LIBRARY,
+            searchEmptyState(loaded = true, query = "", anyContent = false),
+        )
+    }
+
+    @Test
+    fun `still loading beats an empty library`() {
+        // A library that has not been read yet LOOKS empty. Saying "no games yet" before the read
+        // finishes is the original bug wearing a new message.
+        assertEquals(
+            SearchEmptyState.LOADING,
+            searchEmptyState(loaded = false, query = "zel", anyContent = false),
+        )
+    }
+
+    @Test
+    fun `a library with content still distinguishes prompt from no matches`() {
+        // The guard on the guard: the new branch must not swallow the two it sits above.
+        assertEquals(SearchEmptyState.PROMPT, searchEmptyState(loaded = true, query = "", anyContent = true))
+        assertEquals(SearchEmptyState.NO_MATCHES, searchEmptyState(loaded = true, query = "zel", anyContent = true))
+    }
+
+    @Test
+    fun `every scope can say what to do about being empty`() {
+        // The message names the screen that fixes it, and it differs per library — a Video search
+        // must not send the user to the ROM roots. A blank one would render an empty second line.
+        SearchScope.entries.forEach { scope ->
+            assertTrue("blank emptyTitle for $scope", scope.emptyTitle.isNotBlank())
+            assertTrue("blank emptyHint for $scope", scope.emptyHint.isNotBlank())
+            assertTrue("$scope does not say where to go", scope.emptyHint.length > 10)
+        }
+    }
 }

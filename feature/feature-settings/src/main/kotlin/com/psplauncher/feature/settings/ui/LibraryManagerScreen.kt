@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -86,7 +85,6 @@ fun LibraryManagerScreen(
         },
         onBeginRelink = { viewModel.beginRelinkRomRoot(it.treeUri) ?: Uri.EMPTY },
         onRemoveRomRoot = { viewModel.removeRomRoot(it.treeUri) },
-        onScanRomRoot = { viewModel.scanRomRoot() },
         onOpenCardDetail = { viewModel.openCardDetail(it) },
         onStartAddConsole = { viewModel.startAddConsole() },
         onRequestRomFolderSetup = { viewModel.requestRomFolderSetup() },
@@ -132,7 +130,6 @@ private fun LibraryManagerContent(
     onRelinkRomRoot: (RootFolderRow, Uri?) -> Unit,
     onBeginRelink: (RootFolderRow) -> Uri,
     onRemoveRomRoot: (RootFolderRow) -> Unit,
-    onScanRomRoot: () -> Unit,
     onOpenCardDetail: (String) -> Unit,
     onStartAddConsole: () -> Unit,
     onRequestRomFolderSetup: () -> Unit,
@@ -170,7 +167,7 @@ private fun LibraryManagerContent(
     val handleBack: () -> Unit = onBack
 
     when (state.step) {
-        LibraryStep.LIST          -> LibraryListContent(state, handleBack, onAddRomRoot, onRelinkRomRoot, onBeginRelink, onRemoveRomRoot, onScanRomRoot, onOpenCardDetail, onStartAddConsole, onRequestRomFolderSetup, onScanAllConsoles, onDismissMessage, modifier)
+        LibraryStep.LIST          -> LibraryListContent(state, handleBack, onAddRomRoot, onRelinkRomRoot, onBeginRelink, onRemoveRomRoot, onOpenCardDetail, onStartAddConsole, onRequestRomFolderSetup, onScanAllConsoles, onDismissMessage, modifier)
         LibraryStep.PICK_PLATFORM -> PickPlatformContent(state, onBack = handleBack, onPlatformChosen = onPlatformChosen, modifier = modifier)
         LibraryStep.PICK_EMULATOR -> PickEmulatorContent(state, onBack = handleBack, onEmulatorChosen = onEmulatorChosen, modifier = modifier)
         LibraryStep.SCAN_PROMPT   -> ScanPromptContent(state, onBack = handleBack, onConfirmAddConsole = onConfirmAddConsole, modifier = modifier)
@@ -202,7 +199,6 @@ private fun LibraryListContent(
     onRelinkRomRoot: (RootFolderRow, Uri?) -> Unit,
     onBeginRelink: (RootFolderRow) -> Uri,
     onRemoveRomRoot: (RootFolderRow) -> Unit,
-    onScanRomRoot: () -> Unit,
     onOpenCardDetail: (String) -> Unit,
     onStartAddConsole: () -> Unit,
     onRequestRomFolderSetup: () -> Unit,
@@ -857,7 +853,6 @@ fun LibraryManagerScreenPreview() {
             onRelinkRomRoot = { _, _ -> },
             onBeginRelink = { Uri.EMPTY },
             onRemoveRomRoot = {},
-            onScanRomRoot = {},
             onOpenCardDetail = {},
             onStartAddConsole = {},
             onRequestRomFolderSetup = {},
