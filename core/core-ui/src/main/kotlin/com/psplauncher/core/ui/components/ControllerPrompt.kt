@@ -1,14 +1,19 @@
 package com.psplauncher.core.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -180,6 +185,24 @@ data class ControllerPromptItem(
 ) {
     constructor(action: GamepadAction, label: String) : this(listOf(action), label)
 
+    /**
+     * The action a TAP on this prompt should perform, or null when a tap would have to guess.
+     *
+     * Only a prompt naming exactly one remappable action is tappable. The two exclusions are the
+     * point of this being a function rather than `actions.first()`:
+     *
+     *  - A [fixedIcons] prompt names a physical position no setting remaps (the D-pad as a whole,
+     *    a raw-keycode escape). There is no action behind it to dispatch.
+     *  - A multi-action prompt is one label over a range -- "◀▶ Seek", "L1/R1 Prev / Next". A tap
+     *    cannot say which end was meant, and silently picking the first would seek backwards when
+     *    the user meant forwards. A prompt that does the wrong half of what it says is worse than
+     *    one that does nothing.
+     *
+     * Both still render; they are read-only legends.
+     */
+    fun tappableAction(): GamepadAction? =
+        if (fixedIcons == null && actions.size == 1) actions[0] else null
+
     companion object {
         /** A prompt for a position no setting remaps (the D-pad, a raw-keycode escape). */
         fun fixed(icon: ControllerIcon, label: String) =
@@ -196,6 +219,11 @@ data class ControllerPromptItem(
  *
  * Takes items rather than action-to-label pairs because a `List<Pair<..>>` and a
  * `List<ControllerPromptItem>` overload erase to the same JVM signature.
+ *
+ * Pass [onAction] and each prompt naming a single remappable action becomes tappable, firing that
+ * action through the same dispatcher the pad uses. A bar that names the buttons is the obvious
+ * place a touch user reaches for, and on a handheld the screen is the pad half the time. Which
+ * prompts can be tapped is [ControllerPromptItem.tappableAction]'s decision, not this layout's.
  */
 @Composable
 fun ControllerPromptBar(
@@ -206,6 +234,8 @@ fun ControllerPromptBar(
     labelStyle: TextStyle = TextStyle.Default,
     glyphSize: Dp = 22.dp,
     arrangement: Arrangement.Horizontal = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
+    /** Runs the tapped prompt's action. Null leaves the bar a read-only legend. */
+    onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     Row(
         modifier = modifier,
@@ -213,6 +243,7 @@ fun ControllerPromptBar(
         horizontalArrangement = arrangement,
     ) {
         for (item in items) {
+            val tapAction = item.tappableAction()?.takeIf { onAction != null }
             ControllerPromptGlyphs(
                 icons = item.fixedIcons ?: style.mappings.iconsFor(item.actions),
                 label = item.label,
@@ -220,6 +251,16 @@ fun ControllerPromptBar(
                 labelColor = labelColor,
                 labelStyle = labelStyle,
                 glyphSize = glyphSize,
+                modifier = if (tapAction == null) Modifier else Modifier
+                    // The glyph plus a 14sp label is about 36dp tall, under the 48dp a touch
+                    // target needs. This grows the touch area without growing the layout, so
+                    // making a bar tappable never moves the content above it.
+                    .minimumInteractiveComponentSize()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = item.label,
+                    ) { onAction?.invoke(tapAction) },
             )
         }
     }

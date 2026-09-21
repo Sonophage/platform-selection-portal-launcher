@@ -14,6 +14,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.psplauncher.core.domain.model.GamepadAction
 
 // ── Idle controller hint pill ────────────────────────────────────────────────
 //
@@ -38,10 +39,13 @@ fun ControllerHintBar(
     shape: Shape = RoundedCornerShape(10.dp),
     background: Color = Color.Black.copy(alpha = 0.5f),
     arrangement: Arrangement.Horizontal = Arrangement.spacedBy(16.dp),
+    /** Forwarded to [ControllerPromptBar]: non-null makes the single-action prompts tappable. */
+    onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     if (items.isEmpty()) return
     ControllerPromptBar(
         items = items,
+        onAction = onAction,
         modifier = modifier
             .background(
                 color = background,
