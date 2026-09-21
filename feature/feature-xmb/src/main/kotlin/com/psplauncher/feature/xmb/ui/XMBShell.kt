@@ -1218,6 +1218,7 @@ fun XMBShell(
             uiState.launchRecovery?.let { recovery ->
                 LaunchRecoverySheet(
                     recovery = recovery,
+                    cursor = uiState.launchRecoveryCursor,
                     onAction = onLaunchRecoveryAction,
                 )
             }
@@ -1485,59 +1486,41 @@ private fun InfoDialog(
 @Composable
 private fun LaunchRecoverySheet(
     recovery: com.psplauncher.feature.launcher.LaunchRecoveryRequest,
+    cursor: Int,
     onAction: (com.psplauncher.feature.launcher.LaunchRecoveryAction) -> Unit,
 ) {
     // This is the surface a failed launch drops you on, which is exactly the moment a controller
-    // has to work -- and as an AlertDialog it was the one place in the app where it could not.
-    // The ViewModel already answers A with Retry and B with Dismiss; the rest are touch targets,
-    // as they were before, and Retry is drawn focused because A is what performs it.
+    // has to work -- and it was the one place in the app where it mostly could not. A had Retry, B
+    // had Dismiss, and the other three buttons were touch targets on a device whose whole premise
+    // is a pad. The order was hard-coded too, so the lead action was Retry no matter what had
+    // happened: on a revoked storage grant that is the one thing the message directly above it has
+    // just finished saying will fail again.
+    //
+    // The buttons now come from launchRecoveryActions, which puts the remedy for THIS failure
+    // first, and the cursor walks them.
+    val actions = com.psplauncher.feature.launcher.launchRecoveryActions(recovery)
+    // Resolved, not a literal: this body text used to be a hardcoded 0xCCFFFFFF, which is how the
+    // card ended up with a theme-resolved dark title over permanently white body copy.
+    val bodyColor = com.psplauncher.core.ui.theme.LocalPfpTextColors.current.secondary
     PfpOverlayCard(onScrimTap = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.DISMISS) }) {
         PfpOverlayTitle("Couldn't launch ${recovery.gameTitle}")
         Spacer(Modifier.height(10.dp))
-        Text(recovery.message, color = Color(0xCCFFFFFF), fontSize = 14.sp)
+        Text(recovery.message, color = bodyColor, fontSize = 14.sp)
         recovery.historyLine?.let {
             Spacer(Modifier.height(8.dp))
-            Text(it, color = Color(0x99FFFFFF), fontSize = 12.sp)
+            Text(it, color = bodyColor.copy(alpha = 0.7f), fontSize = 12.sp)
         }
         Spacer(Modifier.height(16.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            PfpDetailLaunchButton(
-                label = "Retry",
-                icon = null,
-                focused = true,
-                onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.RETRY) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            PfpDetailLaunchButton(
-                label = "Change Emulator",
-                icon = null,
-                focused = false,
-                onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.CHANGE_EMULATOR) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (recovery.resolved != null) {
+            actions.forEachIndexed { index, (action, label) ->
                 PfpDetailLaunchButton(
-                    label = "Change per-system default",
+                    label = label,
                     icon = null,
-                    focused = false,
-                    onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.PER_SYSTEM_DEFAULTS) },
+                    focused = index == cursor.coerceIn(0, actions.lastIndex),
+                    onClick = { onAction(action) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            PfpDetailLaunchButton(
-                label = "Copy diagnostics",
-                icon = null,
-                focused = false,
-                onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.COPY_DIAGNOSTIC) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            PfpDetailLaunchButton(
-                label = "Dismiss",
-                icon = null,
-                focused = false,
-                onClick = { onAction(com.psplauncher.feature.launcher.LaunchRecoveryAction.DISMISS) },
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 }

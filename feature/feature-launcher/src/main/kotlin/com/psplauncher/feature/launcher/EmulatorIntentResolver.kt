@@ -155,9 +155,10 @@ class EmulatorIntentResolver @Inject constructor(
             try {
                 context.contentResolver.openFileDescriptor(romUri, "r")?.close()
             } catch (_: SecurityException) {
-                error(
+                throw LaunchBlockedException(
                     "PSPLauncher lost access to this game's file. Reconnect the " +
-                        "storage and rescan its library."
+                        "storage and rescan its library.",
+                    LaunchFailureKind.STORAGE_ACCESS_LOST,
                 )
             } catch (_: Exception) {
                 // Anything else (a provider we cannot see from here, a transient I/O error) is

@@ -134,18 +134,24 @@ class LaunchDispatcher @Inject constructor(
         resolved: ResolvedLaunch?,
         reason: String,
         offerRecovery: Boolean = true,
+        kind: LaunchFailureKind = LaunchFailureKind.UNKNOWN,
     ) {
         Timber.w("Launch blocked by preflight: gameId=${game.id}, reason=$reason")
         outcomeRecorder.record(
             outcomeFor(game, resolved, LaunchOutcomeStatus.INTENT_FAILED, reason)
         )
         menuSound.play(com.psplauncher.core.ui.sound.MenuSound.ERROR)
-        if (offerRecovery) emitRecovery(game, resolved, reason)
+        if (offerRecovery) emitRecovery(game, resolved, reason, kind)
     }
 
     /** Manual recovery request from a screen (e.g. Game Detail's help affordance). */
-    suspend fun requestRecovery(game: Game, resolved: ResolvedLaunch?, message: String) {
-        emitRecovery(game, resolved, message)
+    suspend fun requestRecovery(
+        game: Game,
+        resolved: ResolvedLaunch?,
+        message: String,
+        kind: LaunchFailureKind = LaunchFailureKind.UNKNOWN,
+    ) {
+        emitRecovery(game, resolved, message, kind)
     }
 
     fun dismissRecovery() {
@@ -271,7 +277,12 @@ class LaunchDispatcher @Inject constructor(
         return LaunchDispatchResult.Rejected(message)
     }
 
-    private suspend fun emitRecovery(game: Game, resolved: ResolvedLaunch?, message: String) {
+    private suspend fun emitRecovery(
+        game: Game,
+        resolved: ResolvedLaunch?,
+        message: String,
+        kind: LaunchFailureKind = LaunchFailureKind.UNKNOWN,
+    ) {
         val recent = runCatching { outcomeRecorder.recentForGame(game.id, RECENT_LIMIT) }
             .getOrDefault(emptyList())
         val recentFailures = recent.count { it.status != LaunchOutcomeStatus.SUCCEEDED }
@@ -288,6 +299,7 @@ class LaunchDispatcher @Inject constructor(
             message         = message,
             historyLine     = historyLine,
             diagnostic      = buildDiagnostic(game, resolved, recent.firstOrNull()),
+            kind            = kind,
         )
     }
 

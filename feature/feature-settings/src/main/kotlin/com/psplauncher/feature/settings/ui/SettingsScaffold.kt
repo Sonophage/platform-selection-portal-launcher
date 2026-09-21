@@ -1364,9 +1364,28 @@ private fun SettingsSectionRail(
 ) {
     // A list, not a Column: two levels of a six-section tree is up to twelve rows, which is
     // taller than the rail on a handheld in landscape. The cursor scrolls it.
+    //
+    // Two things this used to get wrong, both only visible at 462dp. It followed the CURSOR only,
+    // so arriving on a screen any other way — opening Settings, or backing out of a sub-screen —
+    // left the rail wherever it happened to be, with the entry you were actually on sometimes
+    // off-screen or sliced in half at the edge. And `animateScrollToItem` with no offset puts the
+    // target against the TOP of the viewport, which throws away the siblings above it — and the
+    // siblings are the entire reason the rail exists.
+    //
+    // So it follows whichever is live, cursor first and the open screen otherwise, and centres.
     val listState = rememberLazyListState()
-    LaunchedEffect(cursorIndex) {
-        cursorIndex?.let { listState.animateScrollToItem(it.coerceIn(0, (entries.size - 1).coerceAtLeast(0))) }
+    LaunchedEffect(cursorIndex, currentId, entries.size) {
+        if (entries.isEmpty()) return@LaunchedEffect
+        val target = cursorIndex ?: entries.indexOfFirst { it.id == currentId }.takeIf { it >= 0 }
+        target ?: return@LaunchedEffect
+        val info = listState.layoutInfo
+        val viewport = info.viewportSize.height
+        val rowHeight = info.visibleItemsInfo.firstOrNull()?.size ?: 0
+        // Negative offset scrolls the item DOWN from the top edge by half the leftover viewport,
+        // i.e. centres it. Zero while the list has not been measured yet, which top-aligns for one
+        // frame rather than jumping to a wrong place.
+        val centreOffset = if (viewport > 0 && rowHeight in 1 until viewport) -((viewport - rowHeight) / 2) else 0
+        listState.animateScrollToItem(target.coerceIn(0, entries.lastIndex), centreOffset)
     }
     LazyColumn(
         state = listState,

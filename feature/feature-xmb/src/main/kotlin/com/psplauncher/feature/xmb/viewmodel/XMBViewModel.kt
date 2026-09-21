@@ -695,6 +695,8 @@ data class XMBUiState(
     // ── Launch recovery sheet (B1) ─────────────────────────────────────────
     // Non-null while the recovery sheet should be drawn over the shell.
     val launchRecovery: com.psplauncher.feature.launcher.LaunchRecoveryRequest? = null,
+    /** Which recovery button the cursor is on. Reset to 0 — the remedy — with every new sheet. */
+    val launchRecoveryCursor: Int = 0,
 
     // ── Installed-app picker (Android Library / Video / Music) ─────────────
     val appPicker: AppPickerState? = null,
@@ -1574,6 +1576,12 @@ class XMBViewModel @Inject constructor(
             LaunchRecoveryAction.PER_SYSTEM_DEFAULTS -> {
                 launchDispatcher.dismissRecovery()
                 _uiState.update { it.copy(activeSettingsScreen = "settings_emulators_assign") }
+            }
+            // The remedy for a revoked storage grant: Library Manager is where a ROM root is
+            // re-granted, which is the thing the failure message asks the user to do.
+            LaunchRecoveryAction.OPEN_LIBRARY -> {
+                launchDispatcher.dismissRecovery()
+                _uiState.update { it.copy(activeSettingsScreen = "settings_library") }
             }
             LaunchRecoveryAction.COPY_DIAGNOSTIC -> {
                 val request = _uiState.value.launchRecovery ?: return
@@ -5196,12 +5204,25 @@ class XMBViewModel @Inject constructor(
             if (action == GamepadAction.BACK || action == GamepadAction.SELECT) dismissInfoDialog()
             return
         }
-        // Launch recovery sheet (B1) — A confirms the highlighted action, B dismisses.
-        if (state.launchRecovery != null) {
+        // Launch recovery sheet — the cursor walks the buttons, A activates the one it is on.
+        //
+        // A used to mean RETRY outright, which made three of the five buttons unreachable by a pad
+        // on a pad-first device, at the one moment the pad has to work. The order now comes from
+        // launchRecoveryActions, so the button at index 0 is the remedy for THIS failure.
+        state.launchRecovery?.let { recovery ->
+            val actions = com.psplauncher.feature.launcher.launchRecoveryActions(recovery)
             when (action) {
-                GamepadAction.SELECT -> onLaunchRecoveryAction(LaunchRecoveryAction.RETRY)
-                GamepadAction.BACK   -> onLaunchRecoveryAction(LaunchRecoveryAction.DISMISS)
-                else                 -> Unit
+                GamepadAction.NAVIGATE_UP -> _uiState.update {
+                    it.copy(launchRecoveryCursor = (it.launchRecoveryCursor - 1 + actions.size) % actions.size)
+                }
+                GamepadAction.NAVIGATE_DOWN -> _uiState.update {
+                    it.copy(launchRecoveryCursor = (it.launchRecoveryCursor + 1) % actions.size)
+                }
+                GamepadAction.SELECT -> actions
+                    .getOrNull(state.launchRecoveryCursor.coerceIn(0, actions.lastIndex))
+                    ?.let { (a, _) -> onLaunchRecoveryAction(a) }
+                GamepadAction.BACK -> onLaunchRecoveryAction(LaunchRecoveryAction.DISMISS)
+                else -> Unit
             }
             return
         }
@@ -7387,8 +7408,13 @@ class XMBViewModel @Inject constructor(
                 validation.exceptionOrNull(),
                 "Direct emulator launch blocked by preflight: ${profile.name}",
             )
+            val blocked = validation.exceptionOrNull() as? com.psplauncher.feature.launcher.LaunchBlockedException
             launchDispatcher.recordPreflightFailure(
-                game, resolvedLaunch, validation.exceptionOrNull()?.message ?: "Could not launch ${profile.name}",
+                game, resolvedLaunch,
+                validation.exceptionOrNull()?.message ?: "Could not launch ${profile.name}",
+                // The resolver already decided what kind of failure this is; the sheet leads with
+                // the matching remedy instead of always leading with Retry.
+                kind = blocked?.kind ?: com.psplauncher.feature.launcher.LaunchFailureKind.UNKNOWN,
             )
             return
         }
