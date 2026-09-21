@@ -1,0 +1,275 @@
+package com.psplauncher.feature.xmb.ui.detail
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import com.psplauncher.core.ui.detail.DetailMediaTileHeight
+import com.psplauncher.core.ui.detail.DetailMediaTileWidth
+import com.psplauncher.core.ui.detail.PfpDetailMediaTile
+import com.psplauncher.core.ui.detail.detailPalette
+import com.psplauncher.core.ui.image.rememberArtworkModel
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
+
+// ── The Game Detail panel ────────────────────────────────────────────────────
+//
+// One component, two hosts. The crossbar draws it in its open right-hand side for whichever game
+// the cursor is hovering; the drill-down page draws it full width for the game that was opened.
+// Both walk it with L1/R1 and neither owns a game list — the crossbar already IS the list, which
+// is why the drill-down does not grow a second one.
+//
+// It deliberately draws no footer and no Play button. Those belong to the host: the crossbar has
+// its own chrome along the bottom and a second row of prompts there would be two footers arguing,
+// and the drill-down's footer carries actions the hover state must not offer.
+
+/** The strip's icon for a page. Its own function so the strip and any prompt cannot disagree. */
+private fun DetailPanelPage.icon(): ImageVector = when (this) {
+    DetailPanelPage.LOGO -> Icons.Filled.PictureInPictureAlt
+    DetailPanelPage.BOX_ART -> Icons.Filled.Inventory2
+    DetailPanelPage.GALLERY -> Icons.Filled.Image
+    DetailPanelPage.INFO -> Icons.Filled.Info
+}
+
+private val StripIconSize: Dp = 22.dp
+private val StripCellSize: Dp = 40.dp
+private val PanelCardShape = RoundedCornerShape(14.dp)
+
+/**
+ * The page strip. Drawn even at one page, because it is what tells the user L1/R1 do anything
+ * here at all — hiding it at one page would make the shoulders look dead on exactly the games
+ * with the least artwork, which are the ones a user is most likely to go looking for a scrape on.
+ */
+@Composable
+fun DetailPanelStrip(
+    pages: List<DetailPanelPage>,
+    current: DetailPanelPage,
+    modifier: Modifier = Modifier,
+    onPageTapped: ((DetailPanelPage) -> Unit)? = null,
+) {
+    val palette = detailPalette()
+    Row(
+        modifier = modifier
+            .background(palette.rowFill, PanelCardShape)
+            .border(1.dp, palette.rowEdge, PanelCardShape)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        pages.forEach { page ->
+            val selected = page == current
+            Box(
+                modifier = Modifier
+                    .size(StripCellSize)
+                    .background(
+                        if (selected) palette.focus else Color.Transparent,
+                        RoundedCornerShape(10.dp),
+                    )
+                    .then(
+                        if (onPageTapped != null) Modifier.clickable { onPageTapped(page) }
+                        else Modifier
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = page.icon(),
+                    contentDescription = page.label,
+                    tint = if (selected) palette.textPrimary else palette.textMuted,
+                    modifier = Modifier.size(StripIconSize),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The panel body for one page.
+ *
+ * [onMediaTapped] is null in the hover host: the crossbar's cursor is in the item list, so a media
+ * tile there is something to look at and not something to reach.
+ */
+@Composable
+fun GameDetailPanel(
+    content: DetailPanelContent,
+    page: DetailPanelPage,
+    modifier: Modifier = Modifier,
+    onPageTapped: ((DetailPanelPage) -> Unit)? = null,
+    onMediaTapped: ((DetailMedia) -> Unit)? = null,
+) {
+    Column(modifier) {
+        DetailPanelStrip(
+            pages = content.pages,
+            current = page,
+            onPageTapped = onPageTapped,
+            modifier = Modifier.align(Alignment.End),
+        )
+        Spacer(Modifier.height(14.dp))
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // resolvePanelPage, not page, so a page that stops being available while the panel
+            // is open (a scrape filling in box art, the cursor moving to a game with less art)
+            // cannot leave the body drawing something the strip is no longer offering.
+            when (resolvePanelPage(page, content.pages)) {
+                DetailPanelPage.LOGO -> LogoPage(content)
+                DetailPanelPage.BOX_ART -> BoxArtPage(content)
+                DetailPanelPage.GALLERY -> GalleryPage(content, onMediaTapped)
+                DetailPanelPage.INFO -> InfoPage(content)
+            }
+        }
+    }
+}
+
+/**
+ * The logo, over the game's own art, with nothing framing it — the art is the page. Falls back to
+ * the title, which is why this page is offered for every game whether it has a logo or not.
+ */
+@Composable
+private fun LogoPage(content: DetailPanelContent) {
+    val logo = content.logoUri
+    if (logo != null) {
+        AsyncImage(
+            model = rememberArtworkModel(logo),
+            contentDescription = content.title,
+            // Fit, never Crop: a trimmed logo is a wordmark with a letter missing.
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+        )
+    } else {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = content.title,
+                color = LocalPfpTextColors.current.primary,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(text = content.platformName, color = LocalPfpTextColors.current.secondary, fontSize = 13.sp)
+        }
+    }
+}
+
+/** Box art, contained. Only offered when [Game.boxArtUri] is set, so there is no empty state. */
+@Composable
+private fun BoxArtPage(content: DetailPanelContent) {
+    AsyncImage(
+        model = rememberArtworkModel(content.boxArtUri),
+        contentDescription = content.title,
+        // Fit for the same reason as the logo, and more so: box art is the one asset whose aspect
+        // ratio carries information (a tall GBA box is not a square PS1 case).
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+    )
+}
+
+/** The media strip, as a page. Only offered when there is media, so there is no empty state. */
+@Composable
+private fun GalleryPage(
+    content: DetailPanelContent,
+    onMediaTapped: ((DetailMedia) -> Unit)?,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items(content.media, key = { mediaStableId(it) }) { item ->
+            PfpDetailMediaTile(
+                uri = item.uri,
+                isVideo = item.isVideo,
+                // Focus is the host's to draw. The hover panel has no cursor in it at all, and the
+                // drill-down's cursor is the engine's; a tile that drew its own focus would be a
+                // second opinion about where the cursor is.
+                focused = false,
+                onClick = { onMediaTapped?.invoke(item) },
+                posterFallbackUri = content.posterFallbackUri,
+                contentDescription = if (item.isVideo) "Video" else "Screenshot",
+                modifier = Modifier.width(DetailMediaTileWidth).height(DetailMediaTileHeight),
+            )
+        }
+    }
+}
+
+/**
+ * The information card: the meta line, the description, then the two names — the title the library
+ * shows and the filename on disk. Modelled on NeoStation's info page, which is a translucent card
+ * over the art rather than a page of its own.
+ */
+@Composable
+private fun InfoPage(content: DetailPanelContent) {
+    val palette = detailPalette()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(palette.rowFill, PanelCardShape)
+            .border(1.dp, palette.rowEdge, PanelCardShape)
+            .padding(18.dp),
+    ) {
+        Text(
+            text = content.metaLine ?: content.platformName,
+            color = palette.textMuted,
+            fontSize = 13.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = content.description?.takeIf { it.isNotBlank() } ?: "No description available.",
+            color = palette.textPrimary,
+            fontSize = 14.sp,
+            lineHeight = 21.sp,
+            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = content.title,
+            color = palette.textPrimary,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        content.fileName?.let { fileName ->
+            Text(
+                text = fileName,
+                color = palette.textMuted,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}

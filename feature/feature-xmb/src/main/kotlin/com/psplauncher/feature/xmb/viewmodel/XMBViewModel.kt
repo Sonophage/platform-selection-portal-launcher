@@ -1316,6 +1316,11 @@ data class XMBItem(
     // on. Formatted once here rather than carrying four nullable columns into the UI, and null
     // when the game was never scraped.
     val metadataLine: String? = null,
+    // The description and the ROM path, carried on the row so the hover panel can draw its Info
+    // page without a query. Nothing else reads them; they are here because the alternative is a
+    // database round trip on every D-pad press.
+    val description: String? = null,
+    val romPath: String? = null,
     val gameId: Long? = null,
     val platformId: String? = null,
     val collectionId: Long? = null,     // set on COLLECTION rows in the Games root
@@ -5018,6 +5023,8 @@ class XMBViewModel @Inject constructor(
             iconDisplayModeOverride = g.iconDisplayMode,
             subtitle     = platformEmulatorLabel(g),
             metadataLine = gameMetadataLine(g.releaseYear, g.genre, g.developer, g.players),
+            description  = g.description,
+            romPath      = g.romPath,
             gameId       = g.id,
             platformId   = g.platformId,
             accentColor  = platformCache[g.platformId]?.accentColor,

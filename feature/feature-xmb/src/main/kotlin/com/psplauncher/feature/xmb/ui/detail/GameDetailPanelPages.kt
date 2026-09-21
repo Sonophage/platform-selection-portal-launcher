@@ -1,5 +1,9 @@
 package com.psplauncher.feature.xmb.ui.detail
 
+import com.psplauncher.core.domain.model.Game
+import com.psplauncher.feature.xmb.viewmodel.XMBItem
+import com.psplauncher.feature.xmb.viewmodel.gameMetadataLine
+
 /**
  * The pages of the Game Detail panel, in the order the strip draws them and the order L1/R1 walk
  * them.
@@ -62,3 +66,81 @@ fun stepPanelPage(current: DetailPanelPage, pages: List<DetailPanelPage>, delta:
  */
 fun resolvePanelPage(requested: DetailPanelPage, pages: List<DetailPanelPage>): DetailPanelPage =
     if (requested in pages) requested else pages.first()
+
+/**
+ * Everything the panel draws, in one shape.
+ *
+ * The panel has two hosts holding two different row types — the crossbar has an `XMBItem`, the
+ * drill-down has a `Game` — and the one thing that must not happen is the panel growing two
+ * renderers to suit them. They each build one of these instead.
+ *
+ * [media] is empty on the crossbar by design, not by omission: resolving a game's media means
+ * touching the disk, and the crossbar would be doing it on every D-pad press. Everything else the
+ * panel needs is already in memory on both sides, so Logo, Box Art and Info cost nothing to hover
+ * and the Media page simply is not offered there. It is offered in the drill-down, which resolves
+ * once for one game.
+ */
+data class DetailPanelContent(
+    val title: String,
+    val platformName: String,
+    val logoUri: String? = null,
+    val boxArtUri: String? = null,
+    /** Hero or grid art, used as the poster behind a video tile that has no thumbnail of its own. */
+    val posterFallbackUri: String? = null,
+    val metaLine: String? = null,
+    val description: String? = null,
+    val fileName: String? = null,
+    val media: List<DetailMedia> = emptyList(),
+) {
+    /**
+     * The strip's pages, derived rather than passed in. The strip's icons and the L1/R1 walk read
+     * the same property, so they cannot be given different lists by a caller that updated one and
+     * forgot the other.
+     */
+    val pages: List<DetailPanelPage>
+        get() = availablePanelPages(hasBoxArt = boxArtUri != null, hasGallery = media.isNotEmpty())
+}
+
+/** The filename a panel shows for a ROM, or null for a package-backed entry that has no file. */
+fun panelFileName(romPath: String?): String? =
+    romPath?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+
+/**
+ * What the drill-down shows: one loaded [Game], with its media already resolved.
+ */
+fun detailPanelContentFor(
+    game: Game,
+    platformName: String,
+    media: List<DetailMedia>,
+): DetailPanelContent = DetailPanelContent(
+    title = game.displayTitle,
+    platformName = platformName,
+    logoUri = game.logoUri,
+    boxArtUri = game.boxArtUri,
+    posterFallbackUri = game.heroUri ?: game.artworkUri,
+    metaLine = gameMetadataLine(game.releaseYear, game.genre, game.developer, game.players),
+    description = game.description,
+    // romPath is derived for SAF-backed games too, so it is the one field that names the file for
+    // every ROM. A package-backed Android or Windows entry has none and correctly shows nothing.
+    fileName = panelFileName(game.romPath),
+    media = media,
+)
+
+/**
+ * What the crossbar shows for the row under the cursor.
+ *
+ * Every field comes off the already-published row, so hovering costs no query and no disk read.
+ * [DetailPanelContent.media] is left empty, which is what keeps the Media page out of the strip
+ * here — see the note on [DetailPanelContent].
+ */
+fun detailPanelContentFor(item: XMBItem, platformName: String): DetailPanelContent =
+    DetailPanelContent(
+        title = item.title,
+        platformName = platformName,
+        logoUri = item.logoUri,
+        boxArtUri = item.boxArtUri,
+        posterFallbackUri = item.heroUri ?: item.artworkUri,
+        metaLine = item.metadataLine,
+        description = item.description,
+        fileName = panelFileName(item.romPath),
+    )
