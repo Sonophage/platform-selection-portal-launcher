@@ -47,7 +47,8 @@ import androidx.media3.ui.PlayerView
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.Video
 import com.psplauncher.core.ui.components.ControllerPrompt
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.menuCursor
 import com.psplauncher.core.ui.theme.menuCursorEdge
@@ -314,7 +315,7 @@ private fun ControlsOverlay(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    ControllerPromptBar(
+                    PfpControllerHints(
                         items = listOfNotNull(
                             ControllerPromptItem(
                                 GamepadAction.SELECT,
@@ -334,10 +335,7 @@ private fun ControlsOverlay(
                             },
                             ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                         ),
-                        labelColor = Color(0xFFCCCCCC),
-                        labelStyle = TextStyle(fontSize = 12.sp),
-                        glyphSize = 16.dp,
-                        arrangement = Arrangement.spacedBy(16.dp),
+                        style = ControllerHintStyle.OVERLAY,
                     )
                     // Status, not a prompt — no button changes it from here.
                     Text("${speed}× · $screenMode", color = Color(0xFFCCCCCC), fontSize = 12.sp)
@@ -389,7 +387,7 @@ private fun OptionsOverlay(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            ControllerPromptBar(
+            PfpControllerHints(
                 items = listOf(
                     ControllerPromptItem(
                         listOf(GamepadAction.SELECT, GamepadAction.NAVIGATE_RIGHT),
@@ -400,10 +398,7 @@ private fun OptionsOverlay(
                         "Close",
                     ),
                 ),
-                labelColor = Color(0xFF888888),
-                labelStyle = TextStyle(fontSize = 11.sp),
-                glyphSize = 15.dp,
-                arrangement = Arrangement.spacedBy(16.dp),
+                style = ControllerHintStyle.OVERLAY,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
             )
         }

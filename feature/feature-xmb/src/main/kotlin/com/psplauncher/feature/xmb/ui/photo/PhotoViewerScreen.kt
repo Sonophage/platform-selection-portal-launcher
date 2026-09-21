@@ -51,7 +51,8 @@ import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpOverlayCard
 import com.psplauncher.core.ui.detail.PfpOverlayTitle
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.XmbHeaderPill
 import com.psplauncher.core.ui.theme.menuCursorEdge
@@ -210,7 +211,7 @@ fun PhotoViewerScreen(
                     .padding(horizontal = 24.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                ControllerPromptBar(
+                PfpControllerHints(
                     items = listOf(
                         ControllerPromptItem(
                             listOf(GamepadAction.PREV_CATEGORY, GamepadAction.NEXT_CATEGORY),
@@ -220,10 +221,7 @@ fun PhotoViewerScreen(
                         ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                         ControllerPromptItem(GamepadAction.BACK, "Back"),
                     ),
-                    labelColor = TextMuted,
-                    labelStyle = TextStyle(fontSize = 12.sp),
-                    glyphSize = 16.dp,
-                    arrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
+                    style = ControllerHintStyle.OVERLAY,
                 )
             }
             // Header pills matching the detail screens: Back top-left, Options top-right — the
@@ -301,15 +299,12 @@ fun PhotoViewerScreen(
                 Text("Set as launcher wallpaper?", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text("It replaces the XMB wave background.", color = TextMuted, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
-                ControllerPromptBar(
+                PfpControllerHints(
                     items = listOf(
                         ControllerPromptItem(GamepadAction.SELECT, "Apply"),
                         ControllerPromptItem(GamepadAction.BACK, "Cancel"),
                     ),
-                    labelColor = TextMuted,
-                    labelStyle = TextStyle(fontSize = 12.sp),
-                    glyphSize = 16.dp,
-                    arrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
+                    style = ControllerHintStyle.OVERLAY,
                 )
                 Row(horizontalArrangement = Arrangement.Center) {
                     TextButton(onClick = viewModel::confirmWallpaper, enabled = !state.applyingWallpaper) {

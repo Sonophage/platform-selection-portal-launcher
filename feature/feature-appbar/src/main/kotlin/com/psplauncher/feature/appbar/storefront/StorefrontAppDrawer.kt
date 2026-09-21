@@ -84,7 +84,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.drawablepainter.DrawablePainter
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.domain.model.GamepadAction
@@ -688,9 +689,9 @@ private fun AppGridItem(
 private fun ControllerCommandBar(
     colors: com.psplauncher.core.ui.theme.StorefrontColors,
 ) {
-    // Actions, not buttons: ControllerPromptBar resolves each to whichever face
+    // Actions, not buttons: PfpControllerHints resolves each to whichever face
     // button the user's Confirm/Back and X/Y settings currently bind it to.
-    ControllerPromptBar(
+    PfpControllerHints(
         items = listOf(
             ControllerPromptItem(GamepadAction.PREV_CATEGORY, "Prev Category"),
             ControllerPromptItem(GamepadAction.NEXT_CATEGORY, "Next Category"),
@@ -699,13 +700,12 @@ private fun ControllerCommandBar(
             ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
             ControllerPromptItem(GamepadAction.CHANGE_SORT, "Search"),
         ),
+        style = ControllerHintStyle.INLINE,
         modifier = Modifier
             .fillMaxWidth()
             .height(FOOTER_HEIGHT)
             .background(colors.footerBackground.copy(alpha = 0.94f))
             .padding(horizontal = 24.dp),
-        labelColor = colors.textSecondary,
-        labelStyle = TextStyle(fontSize = 12.sp),
     )
 }
 

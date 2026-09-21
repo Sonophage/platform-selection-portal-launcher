@@ -224,8 +224,11 @@ data class ControllerPromptItem(
  * place a touch user reaches for, and on a handheld the screen is the pad half the time. Which
  * prompts can be tapped is [ControllerPromptItem.tappableAction]'s decision, not this layout's.
  */
+// Internal on purpose. Its four look parameters are the reason fifteen screens each ended up
+// with their own grey, font size, glyph size and spacing; a public knob is an invitation to
+// invent a sixteenth. Feature modules call PfpControllerHints and pick one of two styles.
 @Composable
-fun ControllerPromptBar(
+internal fun ControllerPromptBar(
     items: List<ControllerPromptItem>,
     modifier: Modifier = Modifier,
     style: ControllerPromptStyle = LocalControllerPromptStyle.current,

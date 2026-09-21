@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -15,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // ── Idle controller hint pill ────────────────────────────────────────────────
 //
@@ -77,4 +79,88 @@ fun ControllerHintBar(
         glyphSize = 20.dp,
         arrangement = arrangement,
     )
+}
+
+// ── The two looks a prompt row is allowed to have ────────────────────────────
+//
+// Before this there were as many looks as there were call sites. Fifteen screens each passed
+// their own labelColor, labelStyle, glyphSize and arrangement to ControllerPromptBar, which
+// between them came to NINE near-identical greys, three font sizes (10, 11, 12sp), three glyph
+// sizes (14, 15, 16dp) and three spacings (14, 16, 18dp). Nobody chose that; it is what happens
+// when every screen answers the same question for itself. It is also exactly the complaint —
+// the prompts look different in a menu.
+//
+// So the numbers move here and the call sites choose a STYLE instead. Two is the real count:
+// a pill floating over content, and a bare row sitting inside a screen's own chrome.
+
+/** Which of the two looks a row of prompts wears. */
+enum class ControllerHintStyle {
+    /**
+     * A black rounded pill over content — the corner legend on the XMB, the App Drawer, the
+     * detail pages. Loud on purpose: it sits on artwork it does not control.
+     */
+    PILL,
+
+    /**
+     * A bare row inside a screen's own chrome — menus, pickers, settings. No pill and no shadow:
+     * the surface under it is already the app's, so the prompts sit in it rather than on top of
+     * it, and they take the theme's own secondary text colour like every other label there.
+     */
+    INLINE,
+
+    /**
+     * A bare row over a dark media scrim — the photo viewer's gradient, the video player, the
+     * Artwork Studio, the overlays drawn on top of the live crossbar.
+     *
+     * Separate from [INLINE] because the theme cannot answer for these. Their background is black
+     * whatever scheme the user picked, so a themed secondary colour would come out dark on black
+     * the moment they choose a pale one — the inverse of the bug that made INLINE theme-aware in
+     * the first place. Fixed light grey, because the surface is fixed dark.
+     */
+    OVERLAY,
+}
+
+/**
+ * INLINE's label colour: the theme's own secondary text, not a fixed grey.
+ *
+ * A fixed white-at-70% was tried first and was wrong on the device. These rows sit on the app's
+ * own chrome, and on a pale scheme that chrome is light — the hints came out barely legible on
+ * the search screen. The theme already answers this question for every other label in the app
+ * (see PFPTheme), and nine hardcoded greys were the problem here, so a tenth is not the fix.
+ */
+/** OVERLAY's label colour: light, because what it sits on is dark regardless of the theme. */
+private val OverlayLabel = Color.White.copy(alpha = 0.72f)
+
+private val inlineLabelColor: Color
+    @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
+
+/**
+ * A row of controller prompts in one of the app's two looks.
+ *
+ * This is the only thing a feature module should call. [ControllerPromptBar] takes the look as
+ * parameters and is internal for that reason: a public knob is an invitation to invent a tenth
+ * grey.
+ */
+@Composable
+fun PfpControllerHints(
+    items: List<ControllerPromptItem>,
+    style: ControllerHintStyle,
+    modifier: Modifier = Modifier,
+    onAction: ((GamepadAction) -> Unit)? = null,
+) {
+    if (items.isEmpty()) return
+    when (style) {
+        ControllerHintStyle.PILL -> ControllerHintBar(items, modifier, onAction = onAction)
+        ControllerHintStyle.INLINE, ControllerHintStyle.OVERLAY -> ControllerPromptBar(
+            items = items,
+            onAction = onAction,
+            modifier = modifier,
+            labelColor = if (style == ControllerHintStyle.OVERLAY) OverlayLabel else inlineLabelColor,
+            labelStyle = TextStyle(fontSize = 12.sp),
+            glyphSize = 16.dp,
+            // Centred, which is what most of the rows this replaces were already doing, and what
+            // the rest read as once they are all the same row.
+            arrangement = Arrangement.spacedBy(18.dp, androidx.compose.ui.Alignment.CenterHorizontally),
+        )
+    }
 }

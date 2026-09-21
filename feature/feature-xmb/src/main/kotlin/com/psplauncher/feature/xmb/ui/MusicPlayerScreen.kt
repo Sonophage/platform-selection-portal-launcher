@@ -40,7 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.feature.xmb.music.MusicPlaybackState
 import com.psplauncher.feature.xmb.viewmodel.formatDuration
@@ -153,7 +154,7 @@ fun MusicPlayerScreen(
             Spacer(Modifier.height(20.dp))
             // Every binding the player actually honours (XMBViewModel's musicPlayerVisible
             // branch), not just the two the old hint listed.
-            ControllerPromptBar(
+            PfpControllerHints(
                 items = listOf(
                     ControllerPromptItem(GamepadAction.SELECT, "Play / Pause"),
                     ControllerPromptItem(
@@ -167,10 +168,7 @@ fun MusicPlayerScreen(
                     ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                     ControllerPromptItem(GamepadAction.BACK, "Close"),
                 ),
-                labelColor = Secondary.copy(alpha = 0.7f),
-                labelStyle = TextStyle(fontSize = 11.sp),
-                glyphSize = 16.dp,
-                arrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
+                style = ControllerHintStyle.OVERLAY,
             )
         }
     }

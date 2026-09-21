@@ -64,7 +64,8 @@ import androidx.compose.ui.unit.sp
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.StorefrontColors
 import com.psplauncher.core.ui.theme.deriveStorefrontColors
@@ -515,12 +516,9 @@ private fun AppPickerFooter(
             ControllerPromptItem(GamepadAction.BACK, "Cancel"),
         )
     }
-    ControllerPromptBar(
+    PfpControllerHints(
         items = items,
-        labelColor = colors.textSecondary,
-        labelStyle = TextStyle(fontSize = 12.sp),
-        glyphSize = 16.dp,
-        arrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally),
+        style = ControllerHintStyle.INLINE,
         modifier = modifier,
     )
 }

@@ -44,7 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.ui.theme.LocalPFPColors
@@ -187,15 +188,12 @@ fun SearchScreen(
                 }
                 if (imeUp) return@Column
                 Spacer(Modifier.height(8.dp))
-                ControllerPromptBar(
+                PfpControllerHints(
                     items = listOf(
                         ControllerPromptItem(GamepadAction.SELECT, "Open"),
                         ControllerPromptItem(GamepadAction.BACK, "Back"),
                     ),
-                    labelColor = SecondaryText.copy(alpha = 0.7f),
-                    labelStyle = TextStyle(fontSize = 11.sp),
-                    glyphSize = 16.dp,
-                    arrangement = Arrangement.spacedBy(18.dp),
+                    style = ControllerHintStyle.INLINE,
                 )
             }
         }

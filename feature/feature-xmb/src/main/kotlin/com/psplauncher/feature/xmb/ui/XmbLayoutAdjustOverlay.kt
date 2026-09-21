@@ -29,7 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.themekit.XmbLayoutAdjust
 import kotlin.math.roundToInt
@@ -88,7 +89,7 @@ fun XmbLayoutAdjustOverlay(
                 fontSize = 13.sp,
             )
             // Controller hints (the other half of "both" control modes).
-            ControllerPromptBar(
+            PfpControllerHints(
                 items = listOf(
                     // The whole D-pad moves the bar; four direction glyphs in a row would
                     // read as four separate prompts.
@@ -102,10 +103,7 @@ fun XmbLayoutAdjustOverlay(
                     ControllerPromptItem(GamepadAction.SELECT, "Save"),
                     ControllerPromptItem(GamepadAction.BACK, "Cancel"),
                 ),
-                labelColor = Color(0x99B9C6DC),
-                labelStyle = TextStyle(fontSize = 11.sp),
-                glyphSize = 15.dp,
-                arrangement = Arrangement.spacedBy(14.dp),
+                style = ControllerHintStyle.OVERLAY,
             )
 
             if (slidersVisible) {
