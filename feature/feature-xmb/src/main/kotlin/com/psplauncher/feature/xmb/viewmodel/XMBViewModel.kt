@@ -2776,7 +2776,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "vid_${video.id}",
                 title    = video.displayTitle,
-                subtitle = videoRowSubtitle(video.durationMs, video.lastWatchedAt),
+                subtitle = videoRowSubtitle(video.durationMs, video.resolutionLabel, video.sizeBytes),
                 type     = XMBItemType.VIDEO_FILE,
                 mediaUri = video.uri,
                 mimeType = video.mimeType,
@@ -3922,7 +3922,7 @@ class XMBViewModel @Inject constructor(
     private fun com.psplauncher.core.domain.model.Video.toSearchRow(): XMBItem = XMBItem(
         id = "vid_$id",
         title = displayTitle,
-        subtitle = listOfNotNull("Video", videoRowSubtitle(durationMs, lastWatchedAt)).joinToString("  ·  "),
+        subtitle = listOfNotNull("Video", videoRowSubtitle(durationMs, resolutionLabel, sizeBytes)).joinToString("  ·  "),
         coverUri = effectiveThumbnailUri,
         mediaUri = uri,
         mimeType = mimeType,

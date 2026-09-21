@@ -37,18 +37,29 @@ internal fun musicRowSubtitle(artist: String?, album: String?, durationMs: Long?
     join(artist.clean(), album.clean(), durationMs?.let(::formatDuration).clean())
 
 /**
- * A video: how long it runs, and when it was last watched.
+ * A video: how long it runs, how big the picture is, how much disk it takes.
  *
- * "Watched" is said out loud rather than left as a bare date. Beside a running time, an unlabelled
- * "3 days ago" reads just as easily as when the file was added.
+ * The same three slots as [photoRowSubtitle], in the same order — a duration where a photo has a
+ * date, then resolution, then size — so the two media columns read as one list with one rule
+ * rather than two screens that happen to look alike.
+ *
+ * The scanner has read all three since it was written ([VideoScanner] fills width, height and
+ * size on every probe); the row simply never asked for them and showed a running time alone.
+ *
+ * **Last watched is deliberately not here.** It used to be the second slot, labelled out loud
+ * because beside a running time a bare "3 days ago" reads just as easily as when the file was
+ * added. That label was right, and if the watched cue comes back it comes back labelled. It was
+ * dropped because four facts is more than a row can carry, and the file facts are what make this
+ * row agree with the photo row. Resume state still lives on the video's detail page.
  */
 internal fun videoRowSubtitle(
     durationMs: Long?,
-    lastWatchedAt: Long?,
-    now: Long = System.currentTimeMillis(),
+    resolution: String?,
+    sizeBytes: Long?,
 ): String? = join(
     durationMs?.let(::formatDuration).clean(),
-    lastWatchedAt?.takeIf { it > 0 }?.let { "Watched ${relativeDate(it, now)}" },
+    resolution.clean(),
+    sizeBytes?.takeIf { it > 0 }?.let(::formatByteSize),
 )
 
 /**

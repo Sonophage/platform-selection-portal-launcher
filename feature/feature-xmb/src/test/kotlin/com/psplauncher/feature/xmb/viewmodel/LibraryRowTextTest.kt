@@ -46,25 +46,43 @@ class LibraryRowTextTest {
     // ── Video ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `a video row names the running time and when it was last watched`() {
+    fun `a video row names the running time, the resolution and the file size`() {
         assertEquals(
-            "1:42:07  ·  Watched 3 days ago",
-            videoRowSubtitle(6_127_000L, now - 3 * day, now),
+            "1:42:07  ·  1920×1080  ·  4.1 GB",
+            videoRowSubtitle(6_127_000L, "1920×1080", 4_402_341_478L),
         )
     }
 
     @Test
-    fun `an unwatched video says nothing about watching, rather than saying never`() {
-        assertEquals("1:42:07", videoRowSubtitle(6_127_000L, null, now))
-        assertEquals("1:42:07", videoRowSubtitle(6_127_000L, 0L, now))
+    fun `a video row carries the same three facts, in the same order, as a photo row`() {
+        // The whole reason this file exists. A duration stands where a photo has a date, then
+        // resolution, then size. If these two ever drift apart again, the Video and Photo columns
+        // go back to telling the user different amounts about the same kind of file.
+        val video = videoRowSubtitle(6_127_000L, "1920×1080", 4_402_341_478L)!!
+        val photo = photoRowSubtitle(now, "1920×1080", 4_402_341_478L)!!
+        assertEquals(3, video.split("  ·  ").size)
+        assertEquals(video.split("  ·  ").drop(1), photo.split("  ·  ").drop(1))
     }
 
     @Test
-    fun `the watched date is labelled, so it cannot be read as the date added`() {
-        // Beside a running time, a bare "3 days ago" is ambiguous. The label is the fix and it is
-        // the kind of thing a later tidy-up removes as redundant.
-        assertTrue(videoRowSubtitle(1000L, now - 3 * day, now)!!.contains("Watched"))
+    fun `a video whose resolution was never read says only what it knows`() {
+        // An unreadable or DRM-wrapped container yields a duration and nothing else. That must be
+        // one clean fact, not a fact with two empty slots hanging off it.
+        assertEquals("1:42:07", videoRowSubtitle(6_127_000L, null, null))
+        assertEquals("1:42:07", videoRowSubtitle(6_127_000L, "   ", 0L))
     }
+
+    @Test
+    fun `a video the scanner could not read at all has no line, rather than an empty one`() {
+        assertNull(videoRowSubtitle(null, null, null))
+        assertNull(videoRowSubtitle(0L, "", 0L))
+    }
+
+    // NOTE ON WHAT LEFT THIS ROW. "Watched 3 days ago" used to sit in slot two, and the label was
+    // deliberate: beside a running time a bare "3 days ago" reads just as easily as when the file
+    // was added. That reasoning still holds. The slot was given up to the file facts so this row
+    // would agree with the photo row, not because the label was wrong. If watched state returns
+    // here it returns labelled, and `relativeDate` is still the function that formats it.
 
     // ── Books ────────────────────────────────────────────────────────────────
 
@@ -147,7 +165,7 @@ class LibraryRowTextTest {
         // difference and everybody sees it.
         val lines = listOfNotNull(
             musicRowSubtitle("a", "b", 1000L),
-            videoRowSubtitle(1000L, now - day, now),
+            videoRowSubtitle(1000L, "1×1", 2048L),
             bookRowSubtitle("a", "b", 1.0),
             photoRowSubtitle(now, "1×1", 2048L),
         )

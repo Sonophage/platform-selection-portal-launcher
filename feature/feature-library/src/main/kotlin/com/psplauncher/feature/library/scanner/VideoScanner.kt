@@ -39,6 +39,70 @@ sealed interface VideoScanResult {
 }
 
 /**
+ * Whether a quick scan can carry [prior]'s **metadata** over untouched.
+ *
+ * Deliberately says nothing about the thumbnail. Metadata and the frame grab are two separate
+ * MediaMetadataRetriever passes here and either can fail while the other succeeds, so a single
+ * verdict for both is what let a video keep an empty thumbnail slot forever: the row was reused
+ * whole, null included, and no quick scan ever tried again. [thumbActionFor] answers the other
+ * half.
+ *
+ * Metadata is carried over when the file is unchanged AND the row has actually been probed. A row
+ * written before the metadata pass carries only a name and a timestamp, and reusing it would leave
+ * the user's existing library showing bare file names until they found Deep Rescan.
+ */
+internal fun canReuseVideoMetadata(prior: Video?, lastModified: Long?): Boolean {
+    if (prior == null) return false
+    if (prior.lastModified != lastModified) return false
+    return prior.hasProbedMetadata()
+}
+
+/**
+ * Whether this row has been through the metadata pass.
+ *
+ * There is no "probed" flag, so this infers it from the fields the pass fills. Four fields rather
+ * than one because a container is obliged to report none of them in particular: a video that only
+ * declares a duration must not be re-probed on every scan forever.
+ *
+ * The thumbnail is NOT one of them. A frame grab that genuinely cannot be taken leaves exactly the
+ * same null as a row that was never probed, so it cannot tell the two apart.
+ */
+internal fun Video.hasProbedMetadata(): Boolean =
+    durationMs != null || width != null || height != null || codec != null
+
+/**
+ * What a scan should do about a row's thumbnail.
+ *
+ * Two cases and not a nullable string, on purpose. The bug this replaces was a quick scan that
+ * returned `prior.copy(...)` and simply never mentioned the thumbnail, so a null was carried
+ * forward untouched on every pass. A nullable return type lets that mistake be made again and,
+ * worse, lets a test of it pass: "the helper returned null" and "the scanner forgot to look" are
+ * the same value. [Generate] is a value the call site has to handle, so the compiler asks the
+ * question rather than a reviewer having to notice it was never asked.
+ */
+internal sealed interface ThumbAction {
+    /** The cached frame named by [uri] is on disk. Carry it over; do no work. */
+    data class Carry(val uri: String) : ThumbAction
+
+    /** No usable cached frame. Generate one, even on a quick scan. */
+    data object Generate : ThumbAction
+}
+
+/**
+ * Whether [prior]'s thumbnail can be carried over.
+ *
+ * [ThumbAction.Generate] for a row that never got one, and for one whose cached file has gone:
+ * clearing the thumbnail cache must make the next Rescan regenerate rather than report "nothing
+ * changed". Regenerating is cheap when the frame is already on disk, because
+ * [VideoScanner.generateThumbnail] returns the existing file before it opens anything.
+ */
+internal fun thumbActionFor(prior: Video?, thumbExists: (String) -> Boolean): ThumbAction {
+    val uri = prior?.thumbnailUri
+    if (uri.isNullOrBlank()) return ThumbAction.Generate
+    return if (thumbExists(uri)) ThumbAction.Carry(uri) else ThumbAction.Generate
+}
+
+/**
  * Walks a [VideoLibrary]'s SAF document tree and emits the video files it finds. Always
  * user-initiated (never background/observer-driven). Mirrors [MusicScanner]; runs on
  * [Dispatchers.IO], skips unreadable/non-video files with a log rather than crashing, and is
@@ -46,9 +110,14 @@ sealed interface VideoScanResult {
  *
  * Two modes (both add new files and drop files that no longer exist — i.e. stale entries are
  * always pruned):
- *  - **Quick** ([deep] = false): for files whose `lastModified` is unchanged, the existing row is
- *    reused verbatim (metadata, thumbnail, resume position, custom fields) — no per-file
- *    MediaMetadataRetriever cost. Only new/modified files are probed.
+ *  - **Quick** ([deep] = false): for files whose `lastModified` is unchanged, the existing row's
+ *    metadata, resume position and custom fields are carried over — no per-file
+ *    MediaMetadataRetriever probe. Only new/modified files are probed.
+ *
+ *    The thumbnail is **not** carried blindly with them: a row whose cached frame is missing gets
+ *    one generated even on a quick pass ([thumbActionFor]). Reusing the row whole is what left
+ *    every video in a library with an empty thumbnail that no amount of rescanning could fill,
+ *    because the null went round the loop untouched and only a Deep Rescan ever looked again.
  *  - **Deep** ([deep] = true): every file's metadata is re-read and any missing thumbnail is
  *    regenerated, while user data (custom title/thumbnail, resume position) and an existing valid
  *    thumbnail are preserved keyed by uri.
@@ -120,16 +189,27 @@ class VideoScanner @Inject constructor(
         val uriStr = uri.toString()
         val prior = existingByUri[uriStr]
 
-        // Quick scan: reuse an unchanged file's row wholesale.
-        if (!deep && prior != null && prior.lastModified == lastModified) {
-            return prior.copy(libraryId = libraryId, relativePath = relPath.takeIf { it.isNotEmpty() })
+        // Quick scan: carry an unchanged file's metadata over without re-probing it, but still
+        // settle the thumbnail. Reusing the row whole is what left a video with an empty thumbnail
+        // slot that no amount of rescanning could fill.
+        if (!deep && canReuseVideoMetadata(prior, lastModified)) {
+            prior!!
+            return prior.copy(
+                libraryId = libraryId,
+                relativePath = relPath.takeIf { it.isNotEmpty() },
+                thumbnailUri = when (val action = thumbActionFor(prior, ::fileExistsForUri)) {
+                    is ThumbAction.Carry -> action.uri
+                    ThumbAction.Generate -> generateThumbnail(uri, prior.durationMs)
+                },
+            )
         }
 
         val meta = readMetadata(uri)
         // Preserve an existing valid thumbnail; otherwise (or if it's gone) generate one.
-        val thumb = prior?.thumbnailUri
-            ?.takeIf { it.isNotBlank() && fileExistsForUri(it) }
-            ?: generateThumbnail(uri, meta?.durationMs)
+        val thumb = when (val action = thumbActionFor(prior, ::fileExistsForUri)) {
+            is ThumbAction.Carry -> action.uri
+            ThumbAction.Generate -> generateThumbnail(uri, meta?.durationMs)
+        }
 
         return Video(
             id = prior?.id ?: UUID.randomUUID().toString(),
