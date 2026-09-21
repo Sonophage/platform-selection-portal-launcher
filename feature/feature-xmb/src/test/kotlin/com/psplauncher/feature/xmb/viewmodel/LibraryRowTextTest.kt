@@ -173,4 +173,53 @@ class LibraryRowTextTest {
         lines.forEach { assertTrue(it, it.contains("  ·  ") && !it.contains(" · ·")) }
         lines.forEach { assertTrue("dangling separator in $it", !it.trim().endsWith("·")) }
     }
+
+    // ── Counts ───────────────────────────────────────────────────────────────
+
+    @Test
+    fun `a count reads one game and three games`() {
+        assertEquals("1 game", countLabel(1, "game", "games"))
+        assertEquals("3 games", countLabel(3, "game", "games"))
+    }
+
+    @Test
+    fun `none of it takes the singular`() {
+        // An empty library is the state a new user meets first, and "0 game" would be the first
+        // thing the app said to them.
+        assertEquals("0 games", countLabel(0, "game", "games"))
+    }
+
+    @Test
+    fun `the noun is never capitalised, whatever it counts`() {
+        // THE DRIFT THIS REPLACES. Game and App rows were written Title Case and every other
+        // library lowercase, so two D-pad presses apart the same widget in the same slot read
+        // "3 Games" and then "0 libraries". One inline ternary per row is how that happened, so
+        // the rule now has one home and this is its guard.
+        val nouns = listOf(
+            "game" to "games", "app" to "apps", "track" to "tracks", "video" to "videos",
+            "library" to "libraries", "shelf" to "shelves", "book" to "books",
+            "album" to "albums", "photo" to "photos", "series" to "series",
+        )
+        nouns.forEach { (singular, plural) ->
+            listOf(0, 1, 2, 17).forEach { n ->
+                val label = countLabel(n, singular, plural)
+                val noun = label.substringAfter(' ')
+                assertEquals("capitalised noun in \"$label\"", noun.lowercase(), noun)
+            }
+        }
+    }
+
+    @Test
+    fun `an irregular plural is spelled out rather than guessed`() {
+        // "shelfs" and "librarys" are why plural is a parameter. A rule with one silent exception
+        // is not a rule, and the exception would only ever be seen on a device with two shelves.
+        assertEquals("2 shelves", countLabel(2, "shelf", "shelves"))
+        assertEquals("2 libraries", countLabel(2, "library", "libraries"))
+        assertEquals("2 series", countLabel(2, "series", "series"))
+    }
+
+    @Test
+    fun `the default plural is the regular one, so the common case cannot be got wrong`() {
+        assertEquals("2 games", countLabel(2, "game"))
+    }
 }

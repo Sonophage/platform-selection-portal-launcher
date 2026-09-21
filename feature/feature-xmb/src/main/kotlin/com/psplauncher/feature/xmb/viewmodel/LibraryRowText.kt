@@ -24,6 +24,21 @@ private const val DOT = "  ·  "
 
 private fun String?.clean(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
+/**
+ * "1 game", "3 games", "2 shelves". The app's one rule for a count and the thing it counts.
+ *
+ * It is lowercase, and that is the whole reason this exists. Every count in the app was written
+ * inline at the row that needed it, and the Game and App rows came out Title Case while tracks,
+ * videos, libraries, shelves, books, albums and photos came out lowercase. Two D-pad presses apart,
+ * the same widget in the same slot said "3 Games" and then "0 libraries". Nobody can name that
+ * difference and everybody sees it.
+ *
+ * [plural] is explicit rather than always `singular + "s"` because shelf does not pluralise that
+ * way, and a rule with one silent exception is not a rule.
+ */
+internal fun countLabel(count: Int, singular: String, plural: String = singular + "s"): String =
+    "$count ${if (count == 1) singular else plural}"
+
 private fun join(vararg parts: String?): String? =
     parts.filterNotNull().joinToString(DOT).takeIf { it.isNotBlank() }
 

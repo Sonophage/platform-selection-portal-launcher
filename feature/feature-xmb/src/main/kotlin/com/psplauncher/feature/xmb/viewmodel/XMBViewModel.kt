@@ -2219,7 +2219,7 @@ class XMBViewModel @Inject constructor(
                             .filter { it.categoryId == category.id }
                             .sortedByDescending { it.isPinned }
                             .map { collection ->
-                                val games = "${collection.gameCount} ${if (collection.gameCount == 1) "Game" else "Games"}"
+                                val games = countLabel(collection.gameCount, "game", "games")
                                 XMBItem(
                                     id = "col_${collection.id}",
                                     title = collection.name,
@@ -2247,7 +2247,7 @@ class XMBViewModel @Inject constructor(
                             .filter { it.categoryId == category.id }
                             .sortedByDescending { it.isPinned }
                             .map { collection ->
-                                val count = "${collection.gameCount} ${if (collection.gameCount == 1) "App" else "Apps"}"
+                                val count = countLabel(collection.gameCount, "app", "apps")
                                 XMBItem(
                                     id = "col_${collection.id}",
                                     title = collection.name,
@@ -2385,7 +2385,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id       = ALL_MUSIC_ITEM_ID,
                     title    = "Music",
-                    subtitle = "$totalTracks ${if (totalTracks == 1) "track" else "tracks"}",
+                    subtitle = countLabel(totalTracks, "track", "tracks"),
                     coverUri = MEMORY_CARD_ASSET_URI,
                     type     = XMBItemType.MEMORY_CARD,
                 )
@@ -2473,7 +2473,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id         = "pl_${pl.id}",
                 title      = pl.name,
-                subtitle   = "${pl.trackCount} ${if (pl.trackCount == 1) "track" else "tracks"}",
+                subtitle   = countLabel(pl.trackCount, "track", "tracks"),
                 playlistId = pl.id,
                 type       = XMBItemType.PLAYLIST,
             )
@@ -2678,7 +2678,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id       = VIDEO_LIBRARIES_ITEM_ID,
                     title    = "Video Libraries",
-                    subtitle = "${libraries.size} ${if (libraries.size == 1) "library" else "libraries"}",
+                    subtitle = countLabel(libraries.size, "library", "libraries"),
                     type     = XMBItemType.VIDEO_LIBRARY,
                 )
             )
@@ -2686,7 +2686,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id       = ALL_VIDEOS_ITEM_ID,
                     title    = "Videos",
-                    subtitle = "$totalVideos ${if (totalVideos == 1) "video" else "videos"}",
+                    subtitle = countLabel(totalVideos, "video", "videos"),
                     coverUri = MEMORY_CARD_ASSET_URI,
                     type     = XMBItemType.MEMORY_CARD,
                 )
@@ -2741,7 +2741,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "vlib_${lib.id}",
                 title    = lib.displayName,
-                subtitle = "${lib.videoCount} ${if (lib.videoCount == 1) "video" else "videos"}",
+                subtitle = countLabel(lib.videoCount, "video", "videos"),
                 coverUri = lib.artworkUri,
                 type     = XMBItemType.VIDEO_FOLDER,
             )
@@ -2800,7 +2800,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id         = "vpl_${pl.id}",
                 title      = pl.name,
-                subtitle   = "${pl.videoCount} ${if (pl.videoCount == 1) "video" else "videos"}",
+                subtitle   = countLabel(pl.videoCount, "video", "videos"),
                 playlistId = pl.id,
                 type       = XMBItemType.PLAYLIST,
             )
@@ -3158,7 +3158,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id       = BOOK_SHELVES_ITEM_ID,
                     title    = "Shelves",
-                    subtitle = "${shelves.size} ${if (shelves.size == 1) "shelf" else "shelves"}",
+                    subtitle = countLabel(shelves.size, "shelf", "shelves"),
                     type     = XMBItemType.LIBRARY_SHELVES,
                 )
             )
@@ -3170,7 +3170,7 @@ class XMBViewModel @Inject constructor(
                     XMBItem(
                         id       = BOOK_SERIES_ITEM_ID,
                         title    = "Series",
-                        subtitle = "${series.size} ${if (series.size == 1) "series" else "series"}",
+                        subtitle = countLabel(series.size, "series", "series"),
                         type     = XMBItemType.LIBRARY_SERIES,
                     )
                 )
@@ -3179,7 +3179,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id       = ALL_BOOKS_ITEM_ID,
                     title    = "Books",
-                    subtitle = "$totalBooks ${if (totalBooks == 1) "book" else "books"}",
+                    subtitle = countLabel(totalBooks, "book", "books"),
                     coverUri = MEMORY_CARD_ASSET_URI,
                     type     = XMBItemType.MEMORY_CARD,
                 )
@@ -3254,7 +3254,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "shelf_${it.id}",
                 title    = it.displayName,
-                subtitle = "${it.bookCount} ${if (it.bookCount == 1) "book" else "books"}",
+                subtitle = countLabel(it.bookCount, "book", "books"),
                 type     = XMBItemType.LIBRARY_FOLDER,
             )
         }
@@ -3264,7 +3264,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "series_${series.name}",
                 title    = series.name,
-                subtitle = "${series.bookCount} ${if (series.bookCount == 1) "book" else "books"}",
+                subtitle = countLabel(series.bookCount, "book", "books"),
                 coverUri = series.coverUri,
                 artworkUri = series.coverUri,
                 type     = XMBItemType.LIBRARY_SERIES,
@@ -3407,7 +3407,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id       = PHOTO_ALBUMS_ITEM_ID,
                     title    = "Albums",
-                    subtitle = "${libraries.size} ${if (libraries.size == 1) "album" else "albums"}",
+                    subtitle = countLabel(libraries.size, "album", "albums"),
                     type     = XMBItemType.PHOTO_ALBUMS,
                 )
             )
@@ -3415,7 +3415,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id       = ALL_PHOTOS_ITEM_ID,
                     title    = "Photos",
-                    subtitle = "$totalPhotos ${if (totalPhotos == 1) "photo" else "photos"}",
+                    subtitle = countLabel(totalPhotos, "photo", "photos"),
                     coverUri = MEMORY_CARD_ASSET_URI,
                     type     = XMBItemType.MEMORY_CARD,
                 )
@@ -3463,7 +3463,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = "plib_${lib.id}",
                 title    = lib.displayName,
-                subtitle = "${lib.photoCount} ${if (lib.photoCount == 1) "photo" else "photos"}",
+                subtitle = countLabel(lib.photoCount, "photo", "photos"),
                 type     = XMBItemType.PHOTO_FOLDER,
             )
         }
@@ -4709,7 +4709,7 @@ class XMBViewModel @Inject constructor(
         val allGamesItem = XMBItem(
             id       = ALL_GAMES_ITEM_ID,
             title    = "All Games",
-            subtitle = "Total Games $totalGames",
+            subtitle = countLabel(totalGames, "game", "games"),
             type     = XMBItemType.ALL_GAMES,
         )
 
@@ -4719,7 +4719,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = FAVORITES_ITEM_ID,
                 title    = "Favorites",
-                subtitle = "$favoritesCount ${if (favoritesCount == 1) "Game" else "Games"}",
+                subtitle = countLabel(favoritesCount, "game", "games"),
                 type     = XMBItemType.FAVORITES,
             )
         } else null
@@ -4731,7 +4731,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id       = MISSING_ITEM_ID,
                 title    = "Missing",
-                subtitle = "$missingCount ${if (missingCount == 1) "Game" else "Games"}",
+                subtitle = countLabel(missingCount, "game", "games"),
                 type     = XMBItemType.MISSING,
             )
         } else null
@@ -4746,7 +4746,7 @@ class XMBViewModel @Inject constructor(
             .filter { it.categoryId == BuiltInCategory.GAMES }
             .sortedByDescending { it.isPinned }
             .map { collection ->
-            val games = "${collection.gameCount} ${if (collection.gameCount == 1) "Game" else "Games"}"
+            val games = countLabel(collection.gameCount, "game", "games")
             XMBItem(
                 id           = "collection_${collection.id}",
                 title        = collection.name,
@@ -4778,7 +4778,7 @@ class XMBViewModel @Inject constructor(
             XMBItem(
                 id          = "card_${card.platformId}",
                 title       = if (card.platformId == WINDOWS_PLATFORM_ID) "Windows Games" else card.displayName,
-                subtitle    = "$count ${if (count == 1) "Game" else "Games"}",
+                subtitle    = countLabel(count, "game", "games"),
                 platformId  = card.platformId,
                 accentColor = platformCache[card.platformId]?.accentColor,
                 type        = XMBItemType.MEMORY_CARD,
@@ -5649,10 +5649,10 @@ class XMBViewModel @Inject constructor(
             // duplicating the app's metadata. Works for every Android app, GameHub included.
             add(XMBContextMenuItem("favorite",          "Add to Favorites"))
             add(XMBContextMenuItem("add_to_collection", "Add to Collection"))
-            add(XMBContextMenuItem("move",     "Move To Category"))
-            add(XMBContextMenuItem("add",      "Add To Category"))
-            if (categoryId != null) add(XMBContextMenuItem("remove", "Remove From Category"))
-            if (categoryId != null) add(XMBContextMenuItem("pin",    "Pin To Category"))
+            add(XMBContextMenuItem("move",     "Move to Category"))
+            add(XMBContextMenuItem("add",      "Add to Category"))
+            if (categoryId != null) add(XMBContextMenuItem("remove", "Remove from Category"))
+            if (categoryId != null) add(XMBContextMenuItem("pin",    "Pin to Category"))
             // Per-location hide (recoverable in Settings ▸ Hidden Items) + global hide-everywhere.
             if (categoryId != null) add(XMBContextMenuItem("hide_from_category", "Hide from ${categoryDisplayName(categoryId)}"))
             add(XMBContextMenuItem("hide_everywhere", "Hide Everywhere"))

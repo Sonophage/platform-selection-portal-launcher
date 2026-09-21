@@ -1110,7 +1110,15 @@ private fun XmbItemLeadingIcon(
                 }
             }
         }
-        else -> Spacer(modifier = Modifier.width(12.dp))
+        // Everything else still holds the icon gutter, empty rows included.
+        //
+        // A 12dp spacer here used to put an empty column's one line 62dp left of every other row
+        // in the app ("Nothing played yet" began where its neighbours begin their glyph), so the
+        // column's left edge went ragged at exactly the moment the user is least sure what they
+        // are looking at. Holding the slot is what the hardware does: an empty Memory Stick still
+        // draws the Memory Stick. There are two dozen sites that produce an EMPTY row, so this is
+        // every empty column, not one screen.
+        else -> Spacer(modifier = Modifier.width(LEADING_ICON_SLOT))
     }
 }
 

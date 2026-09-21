@@ -291,10 +291,6 @@ val SettingsTextShadow = Shadow(
 // reads as decoration at every accent.
 val SettingsDivider = com.psplauncher.core.ui.theme.PfpPalette.Divider
 
-// The focused-row wash IS the accent, so it follows it.
-val SettingsSelectedBg: Color
-    @Composable get() = LocalPFPColors.current.accentColor.copy(alpha = 0.14f)
-
 /**
  * How wide the settings column is allowed to get.
  *
@@ -388,18 +384,23 @@ private fun SettingsHelperFooter(items: List<ControllerPromptItem>) {
             .fillMaxWidth()
             .focusProperties { canFocus = false },
     ) {
-        HorizontalDivider(color = SettingsDivider)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            ControllerHintBar(
-                items = items.ifEmpty { SettingsDefaultHelperItems },
-                background = Color.Black.copy(alpha = 0.70f),
-                modifier = Modifier.alpha(alpha),
-            )
+        // The divider fades WITH the hint it underlines, rather than staying at full strength over
+        // an empty band. The band keeps its height either way: reserving the space is deliberate,
+        // because a footer that collapsed as the idle hint came and went would shift every row
+        // above it. What was wrong was drawing a hairline under nothing.
+        Column(modifier = Modifier.alpha(alpha)) {
+            HorizontalDivider(color = SettingsDivider)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                ControllerHintBar(
+                    items = items.ifEmpty { SettingsDefaultHelperItems },
+                    background = Color.Black.copy(alpha = 0.70f),
+                )
+            }
         }
     }
 }

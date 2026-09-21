@@ -45,8 +45,8 @@ import com.psplauncher.core.ui.components.ControllerPromptBar
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.ui.theme.LocalPFPColors
+import com.psplauncher.core.ui.theme.menuCursor
 import com.psplauncher.core.ui.theme.menuCursorEdge
-import com.psplauncher.core.ui.theme.menuCursorFill
 import com.psplauncher.feature.xmb.viewmodel.SearchState
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
@@ -90,10 +90,14 @@ fun SearchScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            // The same scrim as MusicBrowserScreen, which this screen says it is shaped after, and
+            // the same solved pair the settings scaffold uses. It was 0.78/0.93 here: darker than
+            // the sibling it copies, for no stated reason, which is how one screen ends up reading
+            // as a different app from the one next to it.
             .background(
                 Brush.verticalGradient(
-                    0f to pfpColors.backgroundTop.copy(alpha = 0.78f),
-                    1f to pfpColors.backgroundBottom.copy(alpha = 0.93f),
+                    0f to pfpColors.backgroundTop.copy(alpha = 0.72f),
+                    1f to pfpColors.backgroundBottom.copy(alpha = 0.90f),
                 )
             ),
     ) {
@@ -171,13 +175,20 @@ fun SearchScreen(
 @Composable
 private fun SearchResultRow(row: XMBItem, selected: Boolean, onClick: () -> Unit) {
     val clickable = row.type != XMBItemType.EMPTY
+    // The cursor only ever sits on something that answers. "Type to search" and "No matches" are
+    // EMPTY rows at index 0, so painting the fill on `selected` alone drew the brightest band on
+    // the screen around a row that cannot be pressed, under a footer reading "A Open". The
+    // crossbar already gets this right: an empty row is dimmed and does not activate.
+    val cursored = selected && clickable
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) menuCursorFill() else Color.Transparent)
+            // The shared cursor rather than a hand-rolled fill. This row used to paint
+            // menuCursorFill() with no edge, which made it the one focused row in the app without
+            // the bright border that every menu, picker and settings list draws.
+            .menuCursor(cursored)
             .then(if (clickable) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 12.dp, vertical = 9.dp),
     ) {
