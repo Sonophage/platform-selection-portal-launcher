@@ -8,6 +8,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import com.psplauncher.themekit.ColorCascade
 
@@ -134,21 +136,26 @@ fun PFPTheme(
     colors: PFPColors = DefaultPFPColors,
     content: @Composable () -> Unit,
 ) {
-    // The theme's text roles, resolved once per theme change. Today [colors.textPrimary] is white
-    // on every path (XmbPalette.textColor is hardcoded white, DefaultPFPColors matches), so this
-    // is a no-op seam — which is the point: it lands with no visible change, and the user's font
-    // colour and the measured-backdrop clamp arrive through it later without touching call sites.
+    // The theme's text roles, resolved against the theme's own backdrop, once per theme change.
     //
-    // Only `primary` is taken from the theme. `secondary` deliberately stays PfpPalette.Subtext:
-    // PFPColors.textSecondary is textPrimary at 0.7 alpha, so adopting it here would repaint every
-    // sublabel in the app from #AAAAAA to translucent white — a real visual change, smuggled in
-    // under a refactor. Deriving secondary from the user's picked colour is Phase 3's job, where
-    // it is a deliberate decision rather than a side effect.
-    val textColors = remember(colors.textPrimary) {
-        DefaultPfpTextColors.copy(
-            primary = colors.textPrimary,
-            requested = colors.textPrimary,
-        )
+    // This used to pass [colors.textPrimary] straight through and keep `secondary` pinned to
+    // PfpPalette.Subtext, with a note that deriving it was a later phase's job "where it is a
+    // deliberate decision rather than a side effect". This is that decision, and the device made
+    // it: on the pale Silver scheme white text on a near-white wallpaper left the whole unselected
+    // tier at roughly 1.3:1, and BOTH candidate sublabel colours — the XMB's cool 0xAAC8DAF2 and
+    // PfpPalette.Subtext's neutral #AAAAAA — are light. Picking between them could not have
+    // worked, because the problem was never the hue.
+    //
+    // So the pole is measured rather than assumed. [ensureReadable] flips primary to black when
+    // white cannot clear 3:1 on the theme's own mid-tone, and when it does flip, secondary and
+    // inactive follow it into the dark family instead of staying light against a light page. The
+    // 3.0 floor is the App Drawer's, for its stated reason: classic PSP blue sits at ~3.9:1 and
+    // only genuinely pale washes should flip.
+    //
+    // NOT the measured-backdrop clamp: [TextProtection] still resolves to Shadow for everyone,
+    // because nothing reads it yet and a plate engine is a feature rather than a colour fix.
+    val textColors = remember(colors.textPrimary, colors.backgroundTop, colors.backgroundBottom) {
+        resolveTextColors(colors.textPrimary, colors.backgroundTop, colors.backgroundBottom)
     }
 
     CompositionLocalProvider(

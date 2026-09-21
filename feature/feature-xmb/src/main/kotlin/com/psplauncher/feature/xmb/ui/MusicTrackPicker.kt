@@ -40,9 +40,13 @@ import com.psplauncher.core.ui.components.ControllerPromptBar
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.feature.xmb.viewmodel.MusicTrackPickerState
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 private val PickerText = Color.White
-private val PickerSubtext = Color(0xFFC9C7E8)
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val PickerSubtext: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val PickerCheck = Color(0xFF7CE5A2)
 private val CoverPlaceholder = Color(0xFF1B1B27)
 

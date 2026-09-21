@@ -90,11 +90,17 @@ import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpDetailQuickAction
 import com.psplauncher.core.ui.detail.PfpDetailScaffold
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // Neutral dark surfaces stay fixed; accent/focus colors come from the active theme via
 // menuCursorFill()/menuCursorEdge() so this screen follows the chosen color scheme.
-private val TextPrimary = Color(0xFFEEEEEE)
-private val TextMuted   = Color(0xAAEEEEEE)
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val ActionFill    = Color(0xFF1B1B26)
 
 @Composable

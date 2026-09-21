@@ -33,14 +33,20 @@ import com.psplauncher.feature.artwork.match.MetadataApplyPolicy
 import com.psplauncher.feature.artwork.match.MetadataField
 import com.psplauncher.feature.artwork.match.MetadataFieldRow
 import kotlin.math.roundToInt
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // ── Current-vs-Incoming metadata preview (C16 task 3.2) ──────────────────────
 // GameDetailViewModel owns the state and routes controller input (Up/Down rows, Left/Right policy,
 // L1/R1 source, Select toggles a row or applies, Back closes without writing); this renders it and
 // forwards taps.
 
-private val TextPrimary = Color(0xFFEEEEEE)
-private val TextMuted = Color(0xAAEEEEEE)
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val RowFill = Color(0xFF1B1B26)
 private val ChangeGreen = Color(0xFF45C46A)
 private val RowScrollStep = 52.dp

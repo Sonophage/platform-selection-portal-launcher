@@ -3,6 +3,8 @@ package com.psplauncher.core.ui.theme
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 
 /**
  * How a text run separates itself from the pixels behind it, *after* the engine has measured them.
@@ -89,3 +91,39 @@ val DefaultPfpTextColors = PfpTextColors(
  * against reading it on every frame.
  */
 val LocalPfpTextColors = staticCompositionLocalOf { DefaultPfpTextColors }
+
+/**
+ * The app's text palette for a theme, decided by that theme's own backdrop (pure — unit-tested).
+ *
+ * Pure and top-level rather than inlined in `PFPTheme`, for the reason this repo always does it:
+ * a policy written inside a @Composable can only be tested by a copy of itself, and a copy cannot
+ * fail when the original changes. `PFPTheme` calls this; so does the test.
+ *
+ * The policy: white is kept while it clears [minContrast] on the theme's mid-tone, and flipped to
+ * whichever pole does clear it when it does not. **When primary flips, secondary and inactive flip
+ * with it** — that is the half that matters. Every sublabel colour in this app was light, because
+ * every one of them was picked against a dark theme, so a dark title left sitting over light
+ * sublabels on a pale page is the original bug with one line fixed.
+ *
+ * The flipped roles are lifted off pure black rather than set to it, so the three stay
+ * distinguishable from one another; the same construction `StorefrontColors` uses for its own
+ * light-chrome direction.
+ */
+fun resolveTextColors(
+    requested: Color,
+    backgroundTop: Color,
+    backgroundBottom: Color,
+    minContrast: Float = 3.0f,
+): PfpTextColors {
+    val backdrop = lerp(backgroundTop, backgroundBottom, 0.5f)
+    val primary = ensureReadable(requested, backdrop, minContrast)
+    val darkFamily = primary.luminance() < 0.5f
+    return DefaultPfpTextColors.copy(
+        primary = primary,
+        requested = requested,
+        adjusted = primary != requested,
+        achievedRatio = contrastRatio(primary, backdrop).toFloat(),
+        secondary = if (darkFamily) lerp(Color.Black, Color.White, 0.28f) else DefaultPfpTextColors.secondary,
+        inactive = if (darkFamily) lerp(Color.Black, Color.White, 0.46f) else DefaultPfpTextColors.inactive,
+    )
+}

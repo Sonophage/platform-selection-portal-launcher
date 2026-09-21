@@ -40,12 +40,16 @@ import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.ui.icons.CategoryIconGlyph
 import com.psplauncher.themekit.XmbLayoutSpec
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // Classic PSP blue theme: the active category's label is crisp white with a dark glow. Labels on
 // other categories are hidden entirely (alpha 0) until the user navigates to them — the bar stays
 // uncluttered and only the focused category announces itself.
 private val SelectedIcon = Color.White
-private val LabelInactive = Color(0xCCD8E6FF)
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val LabelInactive: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.inactive
 private val SelectedLabelShadow = Shadow(
     color = Color(0x73001627),
     offset = Offset.Zero,

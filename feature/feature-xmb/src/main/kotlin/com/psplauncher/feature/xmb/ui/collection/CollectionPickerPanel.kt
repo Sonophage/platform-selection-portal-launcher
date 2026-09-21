@@ -25,6 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // ── Shared, controller-navigable "Add to Collection" picker ──────────────────
 // Used by both the console Game Detail and the Android App Detail screens. The owning
@@ -48,8 +50,12 @@ data class CollectionPickerUi(
     val isCreateRow: Boolean get() = selectedIndex >= options.size
 }
 
-private val TextPrimary = Color(0xFFEEEEEE)
-private val TextMuted = Color(0xAAEEEEEE)
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val RowFill = Color(0xFF1B1B26)
 private val CheckGreen = Color(0xFF45C46A)
 

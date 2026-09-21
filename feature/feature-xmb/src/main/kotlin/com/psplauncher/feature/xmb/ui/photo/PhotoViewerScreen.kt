@@ -60,11 +60,17 @@ import com.psplauncher.feature.xmb.ui.DetailMenuRow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // Neutral dark surfaces stay fixed; accent colors come from the active theme.
 private val ViewerBg = Color(0xFF000000)
-private val TextPrimary = Color(0xFFEEEEEE)
-private val TextMuted = Color(0xAAEEEEEE)
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val PanelBg = Color(0xF0101018)
 
 // Header pills float over the photo itself, so they need a real scrim: the default 12% white

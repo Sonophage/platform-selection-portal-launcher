@@ -107,6 +107,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // The Game Detail page: a controller-first, console-style information page on the shell's accent
 // surface. Its structure is the shared core-ui detail scaffold — breadcrumb header, scrolling body
@@ -117,8 +119,12 @@ import timber.log.Timber
 // replaces the old fixed page-scroll steps. Touch taps route through the same nodes, so a tap and a
 // Cross press can never do different things.
 
-private val TextPrimary = Color(0xFFEEEEEE)
-private val TextMuted = Color(0xAAB8C6E0)
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val ActionFail = Color(0xFFFF8A8A)
 
 /** Descriptions longer than this get a Confirm-to-expand affordance. */

@@ -53,9 +53,15 @@ import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.xmb.viewmodel.MusicBrowserState
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
-private val PrimaryText = Color.White
-private val SecondaryText = Color(0xFFC9C7E8)
+// Resolved per theme rather than fixed white: on a pale scheme the selected row was the
+// brightest thing on an already bright wallpaper. See PFPTheme.
+private val PrimaryText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val SecondaryText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val CoverPlaceholder = Color(0xFF1B1B27)
 
 /**

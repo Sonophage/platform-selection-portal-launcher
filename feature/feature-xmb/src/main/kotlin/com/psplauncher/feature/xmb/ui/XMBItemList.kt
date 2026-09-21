@@ -112,6 +112,8 @@ import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
 import com.psplauncher.themekit.XmbLayoutSpec
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // Game icons use the authentic PSP ICON0 ratio 144:80 (= 1.8), scaled for the list.
 private val GAME_ICON_WIDTH = 126.dp
@@ -145,9 +147,15 @@ internal val LEADING_ICON_CENTER = 18.dp + LEADING_ICON_SLOT / 2
 
 // Classic PSP blue theme: the selected row is crisp white; unselected rows recede into a dimmer
 // blue-white so they read against the saturated blue gradient.
-private val PrimaryText = Color.White
-private val SecondaryText = Color(0xAAC8DAF2)
-private val InactiveText = Color(0xCCD8E6FF)
+// Resolved per theme rather than fixed white: on a pale scheme the selected row was the
+// brightest thing on an already bright wallpaper. See PFPTheme.
+private val PrimaryText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val SecondaryText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val InactiveText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.inactive
 // Soft dark halo behind the bright selected label — keeps white legible on the light wave.
 private val SelectedTextShadow = Shadow(
     color = Color(0x73001627),

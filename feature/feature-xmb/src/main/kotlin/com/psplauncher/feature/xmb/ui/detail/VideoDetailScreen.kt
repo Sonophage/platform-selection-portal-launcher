@@ -74,13 +74,19 @@ import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.xmb.ui.DetailContextMenu
 import com.psplauncher.feature.xmb.ui.DetailMenuRow
 import com.psplauncher.feature.xmb.video.VideoPlayerScreen
+import androidx.compose.runtime.ReadOnlyComposable
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // Neutral dark surfaces stay fixed; accent colors come from the active theme so this screen
 // follows the chosen color scheme.
 private val PageBg = Color(0xFF06060C)
 private val ActionFill = Color(0xFF1B1B26)
-private val TextPrimary = Color(0xFFEEEEEE)
-private val TextMuted = Color(0xAAEEEEEE)
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
+// Resolved per theme rather than fixed: on a pale scheme a light label on a light
+// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 
 @UnstableApi
 @Composable
