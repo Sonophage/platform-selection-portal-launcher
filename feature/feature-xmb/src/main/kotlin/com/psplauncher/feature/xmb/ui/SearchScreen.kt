@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,6 +37,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -101,23 +104,40 @@ fun SearchScreen(
                 )
             ),
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 24.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onBack,
-                ),
-            ) {
-                Text("◀", color = SecondaryText, fontSize = 18.sp, modifier = Modifier.padding(end = 16.dp))
-                Column {
-                    Text(state.scope.label, color = PrimaryText, fontSize = 22.sp)
-                    Text(state.scope.hint, color = SecondaryText, fontSize = 12.sp)
+        // The header stands down while the keyboard is up, and that is not a nicety.
+        //
+        // On the 1920x1080 handheld this screen is 462dp tall and the IME takes about 254 of them.
+        // Header, field and padding took the rest, so the results list was laid out at zero height:
+        // you typed "final", four Final Fantasy games matched, and the screen showed nothing at all
+        // until you dismissed the keyboard — which the screen never asks you to do, because it
+        // opens with the field focused on purpose. Measured on the device, not reasoned about.
+        //
+        // Giving the title and the hint back is worth roughly two result rows, and neither is
+        // needed mid-query: you know what you are searching, you are looking at what you typed.
+        val imeUp = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 40.dp, vertical = if (imeUp) 10.dp else 24.dp),
+        ) {
+            if (!imeUp) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onBack,
+                    ),
+                ) {
+                    Text("◀", color = SecondaryText, fontSize = 18.sp, modifier = Modifier.padding(end = 16.dp))
+                    Column {
+                        Text(state.scope.label, color = PrimaryText, fontSize = 22.sp)
+                        Text(state.scope.hint, color = SecondaryText, fontSize = 12.sp)
+                    }
                 }
-            }
 
-            Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(14.dp))
+            }
 
             OutlinedTextField(
                 value = state.query,
@@ -141,11 +161,14 @@ fun SearchScreen(
             Spacer(Modifier.height(12.dp))
 
             // imePadding here, around the results and the prompts, rather than on the whole
-            // screen. Padding everything squeezes the title and the field up into the top of the
-            // display, and the keyboard is up the entire time this screen is on, so that is not
-            // a transient state -- it is the layout. This way the header stays put, the results
-            // get every pixel above the keyboard, and the prompt bar stays visible rather than
-            // sitting behind it.
+            // screen: the keyboard is up the entire time this screen is on, so that is not a
+            // transient state, it is the layout, and the results get every pixel above it.
+            //
+            // The prompt bar drops out while the keyboard is up, for the same reason the header
+            // does. It costs a result row to say "A Open, B Back" next to a keyboard that is
+            // already showing its own confirm key, and on this screen a row is most of what
+            // there is. It also used to sit ON the last result rather than under it, because the
+            // list had no room to give it.
             Column(modifier = Modifier.weight(1f).fillMaxWidth().imePadding()) {
                 LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth()) {
                     itemsIndexed(state.rows, key = { _, row -> row.id }) { index, row ->
@@ -156,6 +179,7 @@ fun SearchScreen(
                         )
                     }
                 }
+                if (imeUp) return@Column
                 Spacer(Modifier.height(8.dp))
                 ControllerPromptBar(
                     items = listOf(
