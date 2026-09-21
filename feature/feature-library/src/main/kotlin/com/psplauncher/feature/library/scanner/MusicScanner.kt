@@ -34,6 +34,24 @@ sealed interface MusicScanResult {
 }
 
 /**
+ * Whether a quick scan may carry a track's cached album art over (pure — unit-tested).
+ *
+ * A track that declares **no** art returns true, and that is the case that is easy to get wrong.
+ * "Has no art file" and "has art that has gone missing" look identical from the row, but only the
+ * second is a reason to reparse: treating both as a reason turns every quick scan into a deep one
+ * for every track without embedded art, which is silent and just makes scanning slow forever.
+ * [BookQuickScanTest] documents the same trap for covers.
+ */
+internal fun musicArtStillOnDisk(artUri: String?, exists: (String) -> Boolean): Boolean {
+    if (artUri.isNullOrBlank()) return true
+    // Plain string handling rather than Uri.parse, which is an Android stub returning null off the
+    // device and would have made this "pure" function answer false for everything in a unit test.
+    // These are always file:// uris this app wrote itself, via Uri.fromFile in cacheAlbumArt.
+    val path = artUri.trim().removePrefix("file://").takeIf { it.startsWith("/") } ?: return false
+    return exists(path)
+}
+
+/**
  * Walks a [MusicFolder]'s SAF document tree and emits the audio tracks it finds. Always
  * user-initiated (never background/observer-driven). Skips unreadable or non-audio files with a
  * log rather than crashing, and runs on [Dispatchers.IO]. The caller persists the result via
@@ -113,8 +131,16 @@ class MusicScanner @Inject constructor(
         if (!AudioFileFilter.isAudio(name, mime)) return null
 
         val prior = existingByUri[uri.toString()]
-        // Missing scan: reuse an unchanged file's row wholesale — no metadata or art extraction.
-        if (!deep && prior != null && prior.lastModified == lastModified) {
+        // Quick scan: reuse an unchanged file's row wholesale — no metadata or art extraction —
+        // but only while the art file it names is still on disk.
+        //
+        // Album art comes out of the same metadata pass as the title, unlike a video thumbnail, so
+        // there is no cheap way to redo just the art: a missing file means reparsing the track.
+        // That is worth it, because without the check a row can name a file that is gone and keep
+        // naming it forever. Measured on the device after the package rename: 3,965 of 3,966
+        // tracks pointed into the OLD package's private directory, which this app cannot read, and
+        // no quick scan would ever have looked again.
+        if (!deep && prior != null && prior.lastModified == lastModified && artStillOnDisk(prior.artUri)) {
             return prior.copy(folderId = folderId, relativePath = relPath.takeIf { it.isNotEmpty() })
         }
 
@@ -186,6 +212,9 @@ class MusicScanner @Inject constructor(
     private val artCacheDir: File by lazy {
         File(context.filesDir, "music_art").apply { mkdirs() }
     }
+
+    private fun artStillOnDisk(artUri: String?): Boolean =
+        musicArtStillOnDisk(artUri) { path -> runCatching { File(path).exists() }.getOrDefault(false) }
 
     private fun cacheAlbumArt(bytes: ByteArray?, key: String): String? {
         if (bytes == null || bytes.isEmpty()) return null
