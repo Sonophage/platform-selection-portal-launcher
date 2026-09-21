@@ -25,6 +25,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.psplauncher.feature.library.scanner.cleanRomTitle
 
 /** Outcome of one full PC scan, with a ready-made settings/toast message. */
 data class PcScanReport(
@@ -117,7 +118,15 @@ class PcGameScanner @Inject constructor(
                 if (existing == null) {
                     gameRepository.upsert(
                         Game(
-                            title           = file.title,
+                            // Through the same cleaner the ROM side uses, which this path skipped.
+                            //
+                            // cleanRomTitle turns underscores into spaces, drops (USA)/[!] tags and
+                            // rewrites " - " to ": ". Every ROM row goes through it; no PC row did,
+                            // so a shortcut named "The Elder Scrolls V_ Skyrim Special Edition.lnk"
+                            // reached the crossbar with the underscore intact, sitting next to ROM
+                            // titles that had been cleaned. One cleaner, two callers, only one of
+                            // them using it.
+                            title           = cleanRomTitle(file.title),
                             platformId      = WINDOWS_PLATFORM_ID,
                             packageName     = launch.packageName,
                             isManualEntry   = true,

@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -70,9 +71,11 @@ fun PspContextMenuOverlay(
     onRowActivated: (index: Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    // Default keeps the XMB's light PSP-style scrim (wave visible behind); busier hosts
-    // (e.g. the Artwork Studio) pass a darker one so the menu reads clearly.
-    scrim: Color = Color(0x40000000),
+    // Dims what is behind the menu. This was 0x40 — 25% black — which is a fine scrim over a
+    // plain gradient and far too little over artwork: on a game's options menu the hero art and
+    // the metadata line stayed at near-full brightness right up to the panel's edge. The hardware
+    // dims the whole cross hard behind its options menu, and the menu is modal here too.
+    scrim: Color = Color(0x99000000),
 ) {
     val colors = LocalPFPColors.current
     val listState = rememberLazyListState()
@@ -89,15 +92,25 @@ fun PspContextMenuOverlay(
             .background(scrim)
             .clickable(onClick = onDismiss),
     ) {
-        // Right-edge column. A solid backdrop at 75% alpha in the scheme's theme
-        // color (the wave color — blue for Classic Blue, etc.) gives contrast
-        // while still letting the wave show through.
+        // Right-edge column: the theme's HUE at a surface's darkness, not the theme's colour.
+        //
+        // Two failures got fixed here and the second was only visible after the first. At alpha
+        // 0.75 the panel was a wash, so on a game's flyout the PIC0 logo and the metadata line
+        // read straight THROUGH it — "Change Emulator" sat on the word "FANTASY". Making it
+        // opaque stopped that and revealed why the wash had been hiding it: on a game flyout the
+        // wave colour is tinted by the ARTWORK, so an opaque panel came out as a full-strength
+        // slab of whatever the box art happened to be — scarlet for one game, gold for another —
+        // and the destructive row went red on red.
+        //
+        // So the hue is kept, because the menu should belong to the theme and to the game, and
+        // the value is taken down to where a list of white labels and one red one both read. The
+        // wave showing through is the scrim's job, never the panel's.
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(PanelWidth)
-                .background(colors.waveColor.copy(alpha = 0.75f))
+                .background(lerp(colors.waveColor, Color.Black, 0.62f).copy(alpha = 0.96f))
                 .clickable(onClick = {}) // consume clicks so the scrim isn't triggered inside
                 .padding(start = 28.dp, end = 40.dp),
             verticalArrangement = Arrangement.Center,

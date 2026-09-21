@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -24,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -72,17 +75,34 @@ fun PfpOverlayCard(
             ),
         contentAlignment = Alignment.Center,
     ) {
+        // The card follows the text, because the text already follows the theme.
+        //
+        // This was a fixed dark `0xF21A1A22`, and on a pale scheme it produced the one genuinely
+        // unreadable thing in the app: `DetailTextPrimary` resolves through `ensureReadable` and
+        // returns BLACK on a light theme, so every overlay title in the app rendered black on a
+        // near-black card while the body text beside it stayed white. Seen on the Silver theme,
+        // on the launch-recovery sheet, on the device.
+        //
+        // The rule is the one `StorefrontColors` already applies to its own glass surfaces, whose
+        // comment names this exact failure: when the text flips to the black family, the surface
+        // under it has to flip too, or only half the pair moved.
+        val lightCard = DetailTextPrimary.luminance() < 0.5f
         Column(
             modifier = Modifier
                 .widthIn(min = CARD_MIN_WIDTH, max = CARD_MAX_WIDTH)
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xF21A1A22))
-                .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+                .background(if (lightCard) Color(0xF2F2F2F6) else Color(0xF21A1A22))
+                .border(
+                    1.dp,
+                    if (lightCard) Color.Black.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.16f),
+                    RoundedCornerShape(14.dp),
+                )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = {},
                 )
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 20.dp),
             content = content,
         )

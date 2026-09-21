@@ -1594,8 +1594,16 @@ fun SettingsRow(
                 text = label,
                 color = (if (rowSelected) Color.White else SettingsText)
                     .let { if (enabled) it else it.copy(alpha = it.alpha * DISABLED_ROW_ALPHA) },
-                fontSize = if (rowSelected) XmbLayoutSpec.DEFAULT.itemTextSelectedSp.sp
-                           else XmbLayoutSpec.DEFAULT.itemTextSp.sp,
+                // One size, whatever the cursor is on. Weight and the plate carry focus instead.
+                //
+                // The XMB reads these same two spec values and DOES grow its selected row, but it
+                // can afford to: it has a fixed ROW_HEIGHT to absorb the difference and applies the
+                // delta through graphicsLayer, which never touches layout. A settings row has
+                // neither, so the larger text re-laid the list and every row below the cursor
+                // shifted as it moved. It also spent height a 462dp screen does not have —
+                // measured on the device, eleven of the twenty-six settings screens were cut off
+                // at the bottom, five of them ending on a section header with nothing under it.
+                fontSize = XmbLayoutSpec.DEFAULT.itemTextSp.sp,
                 fontWeight = if (rowSelected) FontWeight.SemiBold else FontWeight.Normal,
                 style = TextStyle(shadow = SettingsTextShadow),
             )
@@ -1612,8 +1620,8 @@ fun SettingsRow(
                 // shadow fixes that, because a shadow changes the edge and not the fill.
                 color = (if (rowSelected) Color.White else SettingsSubtext)
                     .let { if (enabled) it else it.copy(alpha = it.alpha * DISABLED_ROW_ALPHA) },
-                fontSize = if (rowSelected) XmbLayoutSpec.DEFAULT.itemTextSelectedSp.sp
-                           else XmbLayoutSpec.DEFAULT.itemTextSp.sp,
+                // Same reason as the label above: no size change on focus.
+                fontSize = XmbLayoutSpec.DEFAULT.itemTextSp.sp,
                 fontWeight = if (rowSelected) FontWeight.SemiBold else FontWeight.Normal,
                 textAlign = TextAlign.End,
                 style = TextStyle(shadow = SettingsTextShadow),
