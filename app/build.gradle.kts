@@ -43,6 +43,10 @@ android {
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
+                // v3 is what makes key rotation possible later; without it this key is
+                // permanent. v1 is dead weight above minSdk 24 and we are at 29.
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
