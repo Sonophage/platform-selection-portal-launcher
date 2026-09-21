@@ -39,6 +39,9 @@ object GameDetailKeys {
     const val ACTIONS = "game-detail:actions"
     /** The one secondary button on the page. Its dropdown holds what the pills used to be. */
     const val DETAILS = "game-detail:details"
+    /** The footer's heart and gear, beside Play. The gear opens Options — scrape and edit live there. */
+    const val FAVORITE = "game-detail:favorite"
+    const val OPTIONS = "game-detail:options-button"
     const val DISCS = "game-detail:discs"
     const val OVERVIEW = "game-detail:overview"
     const val INFO = "game-detail:info"
@@ -93,12 +96,16 @@ data class GameDetailNavContent(
     val showEmulatorControls: Boolean = false,
     /** Disc members in visual order; empty unless this is a multi-disc set. */
     val discIds: List<Long> = emptyList(),
-    /** The overview row is shown. */
-    val showOverview: Boolean = false,
-    /** The structured information band has anything to show. */
-    val showInfo: Boolean = false,
     /** Media strip stable ids in visual order (videos first, then screenshots). */
     val mediaIds: List<String> = emptyList(),
+    /**
+     * The panel is on its media page, so the tiles are on screen and reachable.
+     *
+     * The strip used to be a row of the scrolling body and its tiles were always in the graph.
+     * They are a PAGE now, and a node the user cannot see is a place the cursor can vanish into,
+     * so they join the graph only while that page is showing.
+     */
+    val onMediaPage: Boolean = false,
 )
 
 /**
@@ -197,11 +204,10 @@ class GameDetailNav(
     /**
      * The page opens on Play, not on the first node in the graph.
      *
-     * Overview is registered above the action row because that is where it sits on screen, and the
-     * engine focuses the first node it is given. Left alone, opening a game would put the cursor on
-     * its description and charge a DOWN press for the one thing the page exists to do. Only ever
-     * done ONCE, and only while nothing is focused yet, so a later content update can never yank
-     * the cursor back off whatever the user moved it to.
+     * The footer reads heart, gear, Play, left to right, and the engine focuses the first node it
+     * is given — which would charge two RIGHT presses for the one thing the page exists to do.
+     * Only ever done ONCE, and only while nothing is focused yet, so a later content update can
+     * never yank the cursor back off whatever the user moved it to.
      */
     private fun placeOpeningFocus() {
         if (openingFocusPlaced) return
@@ -227,21 +233,19 @@ class GameDetailNav(
     private fun pageNodes(): List<NavigationNode> {
         if (!content.loaded) return emptyList()
         val nodes = mutableListOf<NavigationNode>()
-        // Registration order is the page's visual order, top to bottom. The logo and the artwork
-        // above it are not nodes, so Overview is the page's first stop.
-        if (content.showOverview) {
-            nodes += NavigationNode(GameDetailKeys.OVERVIEW, onSelect = { activate(GameDetailKeys.OVERVIEW) })
-        }
-        // Play and Details, side by side, are the whole action row now. The four quick-action
-        // pills that used to sit here moved INTO Details' dropdown: one secondary button beside
-        // Play, instead of five controls competing for the same glance. Details is always present
-        // and always enabled, including without a manual, because its dropdown is what hides the
-        // manual row in that case.
+        // The page is a panel and a footer now. Overview, the information band and the media strip
+        // were rows of a scrolling body; they are PAGES, walked with L1/R1, and a page is not a
+        // node — so the graph is the footer, the disc row, and the media tiles while their page
+        // is up. Nothing else on this screen is something you move a cursor to.
+        //
+        // Favorite and Options are real buttons rather than rows inside a dropdown, which is what
+        // the owner asked for: the gear is where scrape and edit live.
         nodes += container(
             GameDetailKeys.ACTIONS,
             listOf(
+                NavigationNode(GameDetailKeys.FAVORITE, onSelect = { activate(GameDetailKeys.FAVORITE) }),
+                NavigationNode(GameDetailKeys.OPTIONS, onSelect = { activate(GameDetailKeys.OPTIONS) }),
                 NavigationNode(GameDetailKeys.LAUNCH, onSelect = { activate(GameDetailKeys.LAUNCH) }),
-                NavigationNode(GameDetailKeys.DETAILS, onSelect = { activate(GameDetailKeys.DETAILS) }),
             ),
         )
         if (content.discIds.size > 1) {
@@ -252,22 +256,12 @@ class GameDetailNav(
                 },
             )
         }
-        if (content.mediaIds.isNotEmpty()) {
+        if (content.onMediaPage && content.mediaIds.isNotEmpty()) {
             nodes += container(
                 GameDetailKeys.MEDIA,
                 content.mediaIds.map { id ->
                     NavigationNode(GameDetailKeys.media(id), onSelect = { activate(GameDetailKeys.media(id)) })
                 },
-            )
-        }
-        if (content.showInfo) {
-            // One stop, like every other row: confirming the highlighted band opens the emulator
-            // picker directly, with no RIGHT into an inner field first. Package-backed entries have
-            // no emulator, so for them the band is a reading stop whose Confirm does nothing.
-            nodes += NavigationNode(
-                key = GameDetailKeys.INFO,
-                selectable = content.showEmulatorControls,
-                onSelect = { activate(GameDetailKeys.INFO) },
             )
         }
         return nodes

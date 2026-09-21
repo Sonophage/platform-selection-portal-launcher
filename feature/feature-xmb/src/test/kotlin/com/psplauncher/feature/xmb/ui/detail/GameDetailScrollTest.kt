@@ -78,53 +78,35 @@ class GameDetailScrollTest {
         composeRule.waitForIdle()
     }
 
-    /**
-     * Root-space Y of the action row, used as the page's scroll instrument.
-     *
-     * Details, not Play: "Play" also appears as the helper footer's Confirm label when the cursor
-     * is on the launch button, and a two-node match would read whichever one came first.
-     */
-    private fun topBandTop(): Float =
-        composeRule.onNodeWithText("Details").fetchSemanticsNode().boundsInRoot.top
-
     @Test
-    fun `opening the page with Play focused renders the whole action row`() {
-        render(MutableStateFlow(state(GameDetailKeys.LAUNCH)))
-
-        composeRule.onNodeWithText("Details").assertIsDisplayed()
-        // "Options" is only the helper footer's prompt now: the pill that used to carry it moved
-        // into the Details dropdown, so a second match here means a pill came back.
-        val options = composeRule.onAllNodesWithText("Options")
-        options.assertCountEquals(1)
-        options[0].assertIsDisplayed()
+    fun `every panel page renders without the scroll crash`() {
+        // What this file has always really guarded. The page's scroll effect used to branch on
+        // ScrollState.animateScrollTo, and opening the page died with
+        // "ClassCastException: Float cannot be cast to kotlin.Unit". Rendering is the test.
+        //
+        // The distance assertions that used to sit here measured a scrolling body: Overview at
+        // the top, the information band at the bottom, and the page moving between them. The body
+        // is a panel now — one page at a time, sized to the viewport — so there is nothing to
+        // scroll and a test measuring how far it scrolled would be measuring zero and calling it
+        // a pass. Each page is rendered instead, which is the failure mode that remains.
+        // One composition, walked through the pages: the rule allows setContent once.
+        val flow = MutableStateFlow(state(GameDetailKeys.LAUNCH))
+        render(flow)
+        DetailPanelPage.entries.forEach { page ->
+            composeRule.runOnIdle { flow.value = flow.value.copy(panelPage = page) }
+            composeRule.waitForIdle()
+        }
     }
 
     @Test
-    fun `focus returning to the top band brings the page back to the artwork`() {
-        val flow = MutableStateFlow(state(GameDetailKeys.LAUNCH))
-        render(flow)
-        val atTop = topBandTop()
+    fun `the footer carries Play and the two buttons beside it`() {
+        render(MutableStateFlow(state(GameDetailKeys.LAUNCH)))
 
-        // Moving down to the information band scrolls the page; the top band must move up.
-        //
-        // The band, not a media tile: bring-into-view is a no-op for something already on screen,
-        // and the redesigned page is short enough that the first media tile is visible from the
-        // top. A test that focuses it measures a scroll that correctly never happened.
-        composeRule.runOnIdle { flow.value = state(GameDetailKeys.INFO) }
-        composeRule.waitForIdle()
-        val scrolledDown = topBandTop()
-        assertTrue(
-            "focusing a media tile must scroll the page (top band moved from $atTop to $scrolledDown)",
-            scrolledDown < atTop,
-        )
-
-        // Coming back must return the page to the top, not park it just above the action row:
-        // the logo and the backdrop above it are not nodes, so nothing else can bring them back.
-        composeRule.runOnIdle { flow.value = state(GameDetailKeys.LAUNCH) }
-        composeRule.waitForIdle()
-        assertTrue(
-            "returning to the top band must restore the page top (expected ~$atTop, was ${topBandTop()})",
-            kotlin.math.abs(topBandTop() - atTop) < 1f,
-        )
+        // "Play" matches twice — the launch button and the helper footer's Confirm prompt, which
+        // is labelled for what Confirm does. Same for "Options" and the gear. Counting is the
+        // assertion: zero would mean the button never rendered.
+        composeRule.onAllNodesWithText("Play").assertCountEquals(2)
+        composeRule.onAllNodesWithText("Favourite").assertCountEquals(1)
+        composeRule.onAllNodesWithText("Options").assertCountEquals(2)
     }
 }

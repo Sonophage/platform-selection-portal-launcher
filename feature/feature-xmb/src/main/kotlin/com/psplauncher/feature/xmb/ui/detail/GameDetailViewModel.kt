@@ -115,6 +115,14 @@ data class GameDetailUiState(
     // The Overview row's expanded state — Confirm toggles it.
     val descriptionExpanded: Boolean = false,
 
+    /**
+     * Which page of the panel the body is showing. L1/R1 walk it, exactly as on the crossbar.
+     *
+     * Not reset per game the way the crossbar's is: this page is opened FOR one game and closed
+     * again, so there is no next row to carry a stale choice onto.
+     */
+    val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
+
     val showOptions: Boolean = false,
     // Mirrors the engine's Options focus for rendering. The engine owns the authoritative node;
     // this index only positions the menu's highlight.
@@ -163,6 +171,25 @@ data class GameDetailUiState(
 
     // Package-backed gaming apps (Android / Windows card entries) launch through their package,
     // shortcut, or captured-intent handle — never an emulator.
+    /**
+     * What the panel draws, built from the loaded game. Same shape the crossbar's hover panel
+     * uses — one component, one content type, two hosts — so the two can never describe the same
+     * game differently.
+     */
+    val panelContent: DetailPanelContent?
+        get() = game?.let { g ->
+            detailPanelContentFor(
+                game = g,
+                platformName = platform?.name ?: g.platformId.uppercase(),
+                media = detailMedia,
+                videoUri = videoUri,
+            )
+        }
+
+    /** The page actually on screen: the walked-to one, or the first the strip offers. */
+    val effectivePanelPage: DetailPanelPage
+        get() = panelContent?.let { resolvePanelPage(panelPage, it.pages) } ?: DetailPanelPage.LOGO
+
     val isPackageBacked: Boolean
         get() = game != null && game.romPath == null && game.packageName != null
 
@@ -427,9 +454,9 @@ class GameDetailViewModel @Inject constructor(
             // so they get no emulator nodes at all.
             showEmulatorControls = loaded && s.showEmulatorAction,
             discIds     = if (s.showDiscPicker) s.discMembers.map { it.id } else emptyList(),
-            showOverview = loaded,
-            showInfo    = loaded && s.showInfoBand,
             mediaIds    = s.detailMedia.map { mediaStableId(it) },
+            // The tiles are reachable only while their page is up — see GameDetailNavContent.
+            onMediaPage = loaded && s.effectivePanelPage == DetailPanelPage.GALLERY,
         )
     }
 
@@ -441,8 +468,10 @@ class GameDetailViewModel @Inject constructor(
         when {
             key == GameDetailKeys.LAUNCH -> { Timber.d("Controller SELECT activated Launch"); launch() }
             key == GameDetailKeys.DETAILS -> openDetailsMenu()
-            key == GameDetailKeys.INFO -> if (_uiState.value.showEmulatorAction) requestChangeEmulator()
-            key == GameDetailKeys.OVERVIEW -> toggleDescriptionExpanded()
+            // The footer's two other buttons. The gear is Options, which is where scrape and edit
+            // already lived — the owner's call, and it cost no new action plumbing.
+            key == GameDetailKeys.FAVORITE -> toggleFavorite()
+            key == GameDetailKeys.OPTIONS -> openOptions()
             key.startsWith(DISC_KEY_PREFIX) ->
                 key.removePrefix(DISC_KEY_PREFIX).toLongOrNull()?.let(::selectDisc)
             key.startsWith(MEDIA_KEY_PREFIX) -> {
@@ -923,10 +952,24 @@ class GameDetailViewModel @Inject constructor(
             GamepadAction.BACK -> if (nav.isModalActive) closeActiveModal() else close()
             // HOME belongs to the shell (the XMB bar), never to this page.
             GamepadAction.HOME -> Unit
+            // The shoulders walk the panel's pages, the same as on the crossbar. Inside a modal
+            // they belong to whatever is on top (the metadata preview cycles its source with
+            // them), which is why this sits after the modal branches above.
+            GamepadAction.PREV_CATEGORY -> if (!nav.isModalActive) stepPanelPage(-1)
+            GamepadAction.NEXT_CATEGORY -> if (!nav.isModalActive) stepPanelPage(+1)
             else -> nav.handleAction(action)
         }
         finishInput()
     }
+
+    /** Walk the panel by [delta], clamped to the pages this game actually offers. */
+    private fun stepPanelPage(delta: Int) = _uiState.update { s ->
+        val pages = s.panelContent?.pages ?: return@update s
+        s.copy(panelPage = com.psplauncher.feature.xmb.ui.detail.stepPanelPage(s.effectivePanelPage, pages, delta))
+    }
+
+    /** A tap on the strip goes straight to that page. */
+    fun onPanelPageTapped(page: DetailPanelPage) = _uiState.update { it.copy(panelPage = page) }
 
     // ── Artwork Studio open / close ───────────────────────────────────────
 

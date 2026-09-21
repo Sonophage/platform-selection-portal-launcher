@@ -140,6 +140,12 @@ fun GameDetailPanel(
     page: DetailPanelPage,
     modifier: Modifier = Modifier,
     titleFallback: Boolean = true,
+    /**
+     * The media tile the host's cursor is on, by stable id, or null when the host has no cursor
+     * in here. The crossbar passes null: its cursor is in the item list, so a tile there is
+     * something to look at and not something to reach.
+     */
+    focusedMediaId: String? = null,
     onMediaTapped: ((DetailMedia) -> Unit)? = null,
 ) {
     // The strip is NOT drawn here. It lives in the host's chrome, under the top bar, so the whole
@@ -154,7 +160,7 @@ fun GameDetailPanel(
                 DetailPanelPage.LOGO -> LogoPage(content, titleFallback)
                 DetailPanelPage.BOX_ART -> BoxArtPage(content)
                 DetailPanelPage.VIDEO -> VideoPage(content)
-                DetailPanelPage.GALLERY -> GalleryPage(content, onMediaTapped)
+                DetailPanelPage.GALLERY -> GalleryPage(content, focusedMediaId, onMediaTapped)
                 DetailPanelPage.INFO -> InfoPage(content)
             }
         }
@@ -232,6 +238,7 @@ private fun VideoPage(content: DetailPanelContent) {
 @Composable
 private fun GalleryPage(
     content: DetailPanelContent,
+    focusedMediaId: String?,
     onMediaTapped: ((DetailMedia) -> Unit)?,
 ) {
     LazyRow(
@@ -244,10 +251,9 @@ private fun GalleryPage(
             PfpDetailMediaTile(
                 uri = item.uri,
                 isVideo = item.isVideo,
-                // Focus is the host's to draw. The hover panel has no cursor in it at all, and the
-                // drill-down's cursor is the engine's; a tile that drew its own focus would be a
-                // second opinion about where the cursor is.
-                focused = false,
+                // The host says which tile is focused; the tile never decides for itself. The
+                // hover panel passes null because its cursor is in the crossbar's item list.
+                focused = mediaStableId(item) == focusedMediaId,
                 onClick = { onMediaTapped?.invoke(item) },
                 posterFallbackUri = content.posterFallbackUri,
                 contentDescription = if (item.isVideo) "Video" else "Screenshot",
