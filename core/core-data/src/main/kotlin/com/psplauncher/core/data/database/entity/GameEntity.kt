@@ -18,6 +18,10 @@ import kotlinx.serialization.Serializable
         Index("last_played_at"),
         Index("rom_path", unique = true),
         Index("artwork_key"),
+        // The display queries correlate a disc set against itself once per row
+        // (WHERE member.disc_set_key = games.disc_set_key). Without this the cost of All Games,
+        // Favorites, a platform list and Missing is quadratic in the library size.
+        Index("disc_set_key"),
         // Duplicate lookup for PC games, on the PAIR — an app id is unique within its store, so
         // ("STEAM","620") and ("GOG","620") are different games. Not unique: two library entries
         // can legitimately point at one installed title (a pin and a folder import) until they

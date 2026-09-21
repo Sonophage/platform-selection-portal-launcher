@@ -70,7 +70,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
  * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
  * version bump cannot leave the test still asserting against the old number.
  */
-const val PFP_DATABASE_VERSION = 46
+const val PFP_DATABASE_VERSION = 47
 
 @Database(
     entities = [
@@ -1357,6 +1357,25 @@ abstract class PFPDatabase : RoomDatabase() {
         }
 
         /**
+         * An index on `disc_set_key`.
+         *
+         * It is the one column the display queries correlate on and the only one they correlate
+         * on without an index: All Games, Favorites, the platform lists and Missing each carry a
+         * `WHERE member.disc_set_key = games.disc_set_key` subquery that runs once per row. With
+         * no index that is a full scan per row, so the cost is quadratic in the library rather
+         * than linear, and it is invisible until the library is large enough to feel it.
+         *
+         * Not unique: a disc set has several rows by definition, which is the entire point of the
+         * column. IF NOT EXISTS because Room creates the index itself on a fresh install, and
+         * this migration must be safe to meet a database that already has it.
+         */
+        val MIGRATION_46_47 = object : Migration(46, 47) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_games_disc_set_key ON games(disc_set_key)")
+            }
+        }
+
+        /**
          * Every migration, in order, as ONE list.
          *
          * DatabaseModule used to hand-type all of these into `addMigrations(...)`, which made the
@@ -1413,6 +1432,7 @@ abstract class PFPDatabase : RoomDatabase() {
             MIGRATION_43_44,
             MIGRATION_44_45,
             MIGRATION_45_46,
+            MIGRATION_46_47,
         )
 
     }
