@@ -3259,7 +3259,6 @@ class XMBViewModel @Inject constructor(
     private fun booksRootSections(): List<XMBItem> {
         val shelves = _uiState.value.bookLibraries
         val totalBooks = shelves.sumOf { it.bookCount }
-        val hasScannedShelf = shelves.any { it.lastScannedAt != null }
         val reader = _uiState.value.defaultReader
         return buildList {
             // The reader, first, so the app you read in is one press away whether or not you are

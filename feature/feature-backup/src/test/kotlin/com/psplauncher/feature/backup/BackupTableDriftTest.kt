@@ -33,8 +33,6 @@ class BackupTableDriftTest {
         // Cached ScreenScraper responses. Re-fetched, and carrying them would restore another
         // device's quota state alongside them.
         "SsMediaCacheEntity" to "a provider response cache",
-        // Rebuilt by the next scan.
-        "UnmatchedRomEntity" to "rebuilt by the next scan",
         // The entity's own comment says it is RETIRED: nothing reads or writes it, and it exists
         // only to hold the schema version steady for existing installs.
         "ScanTombstoneEntity" to "retired; nothing reads or writes it",
