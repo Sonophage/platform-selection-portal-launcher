@@ -464,11 +464,16 @@ fun ArtworkSettingsScreen(
                 // Only raises the rate limit and daily quota; scraping works without it.
                 SettingsGroup("ScreenScraper Account (Optional)")
 
+                // A stored username is shown whether or not the account is complete, and the
+                // two are now separate questions: a restore from another device keeps the
+                // username and drops the password, so "a username is saved" and "the account
+                // works" stopped being the same thing.
+                val ssUsernameStored = state.ssUsername.isNotBlank()
                 SettingsTextFieldRow(
-                    label         = if (state.hasSsCredentials) "Username (saved: ${state.ssUsername})" else "Username",
+                    label         = if (ssUsernameStored) "Username (saved: ${state.ssUsername})" else "Username",
                     value         = ssUsernameDraft,
                     onValueChange = { ssUsernameDraft = it },
-                    placeholder   = if (state.hasSsCredentials) "Tap to replace" else "ScreenScraper username",
+                    placeholder   = if (ssUsernameStored) "Tap to replace" else "ScreenScraper username",
                 )
                 SettingsTextFieldRow(
                     label         = "Password",
@@ -479,6 +484,18 @@ fun ArtworkSettingsScreen(
                     helper        = "Free account at screenscraper.fr — raises the scrape rate limit and daily quota. " +
                         "Stored encrypted on this device (Android Keystore).",
                 )
+
+                // The re-prompt the restore path's log line already promises. BackupManager logs
+                // "Dropped un-decryptable credential on restore ... (re-prompt)" and nothing was
+                // ever prompting, so the account sat half-saved and the scrape quietly ran at
+                // anonymous limits.
+                if (ssUsernameStored && !state.hasSsCredentials) {
+                    SettingsRow(
+                        label    = "Password needed to use this account",
+                        sublabel = "The saved password did not survive a restore from another device. " +
+                            "Enter it again to leave anonymous rate limits.",
+                    )
+                }
 
                 state.ssCredentialStatus?.let {
                     SettingsRow(label = it, sublabel = "Tap to dismiss", onClick = { viewModel.dismissSsCredentialStatus() })
@@ -501,7 +518,9 @@ fun ArtworkSettingsScreen(
                     )
                 }
 
-                if (state.hasSsCredentials) {
+                // Offered whenever ANYTHING is stored, so a half-restored account can be cleared
+                // rather than stranded.
+                if (ssUsernameStored || state.hasSsCredentials) {
                     SettingsRow(
                         label    = "Clear ScreenScraper Account",
                         sublabel = "Scraping continues at anonymous rate limits",

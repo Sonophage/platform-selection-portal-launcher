@@ -60,8 +60,23 @@ class MetadataApiKeyProvider @Inject constructor(
     }
 
     suspend fun hasTgdbKey(): Boolean = getTgdbKey()?.isNotBlank() == true
-    suspend fun hasIgdbCredentials(): Boolean = getIgdbClientId()?.isNotBlank() == true &&
-        getIgdbClientSecret()?.isNotBlank() == true
+
+    /**
+     * "IGDB is configured" as a flow, so a screen cannot answer it differently from the scraper.
+     *
+     * These pairs are a public half and a secret half, and the secret half can go missing on its
+     * own: a restore carries `igdb_client_id` but DROPS `igdb_client_secret` when the archive came
+     * from another device, because it cannot be decrypted here (BackupManager's
+     * ENCRYPTED_CREDENTIAL_KEYS). A predicate that only checks the public half then reports a
+     * configured provider that cannot authenticate, which is the most expensive way to be wrong
+     * about a credential: everything looks right and nothing works.
+     */
+    val hasIgdbCredentialsFlow: Flow<Boolean> = context.pfpDataStore.data.map { prefs ->
+        !prefs[KEY_IGDB_CLIENT_ID].isNullOrBlank() &&
+            !prefs[KEY_IGDB_CLIENT_SECRET]?.let { KeystoreSecretCipher.decryptOrLegacy(it) }.isNullOrBlank()
+    }
+
+    suspend fun hasIgdbCredentials(): Boolean = hasIgdbCredentialsFlow.first()
 
     // ── ScreenScraper (user account — raises thread count & daily quota) ──────
     // The username is a public handle (plaintext); the password is encrypted at rest like the
@@ -88,8 +103,13 @@ class MetadataApiKeyProvider @Inject constructor(
         }
     }
 
-    suspend fun hasSsCredentials(): Boolean = getSsUsername()?.isNotBlank() == true &&
-        getSsPassword()?.isNotBlank() == true
+    /** "The ScreenScraper account is usable" — one definition, for the same reason as IGDB above. */
+    val hasSsCredentialsFlow: Flow<Boolean> = context.pfpDataStore.data.map { prefs ->
+        !prefs[KEY_SS_USERNAME].isNullOrBlank() &&
+            !prefs[KEY_SS_PASSWORD]?.let { KeystoreSecretCipher.decryptOrLegacy(it) }.isNullOrBlank()
+    }
+
+    suspend fun hasSsCredentials(): Boolean = hasSsCredentialsFlow.first()
 
     // Note on the ScreenScraper developer pair: it is required for the API to answer at all, but
     // it is not user-entered — it ships obfuscated inside the APK (see the buildConfigField byte

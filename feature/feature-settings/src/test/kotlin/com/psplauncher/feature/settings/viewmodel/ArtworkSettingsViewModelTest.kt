@@ -64,6 +64,11 @@ class ArtworkSettingsViewModelTest {
         every { metadataKeyProvider.igdbClientIdFlow }   returns flowOf(null)
         every { metadataKeyProvider.tgdbKeyFlow }        returns flowOf(null)
         every { metadataKeyProvider.ssUsernameFlow }     returns flowOf(null)
+        // "Is it configured?" is the provider's answer now, not something this screen infers from
+        // the public half of the pair. Both are combine upstreams, so a relaxed mock's
+        // never-emitting Flow would stall uiState at its initial value.
+        every { metadataKeyProvider.hasIgdbCredentialsFlow } returns flowOf(false)
+        every { metadataKeyProvider.hasSsCredentialsFlow }   returns flowOf(false)
         // ssEnabled comes from the credential source (bundled dev pair), not a build constant,
         // so it is an extra combine upstream — a relaxed mock returns a Flow that never emits,
         // which would stall uiState at its initial value.
@@ -134,12 +139,40 @@ class ArtworkSettingsViewModelTest {
         assertTrue(viewModel.uiState.value.hasApiKey)
     }
 
+    // This pair replaces a test that asserted hasIgdbCredentials went true on a non-blank client
+    // id alone. That was the bug written down as the intent: the client id is the PUBLIC half and
+    // restores normally, while the secret is dropped on a cross-device restore, so a client id on
+    // its own describes a provider that cannot authenticate. The screen said "configured" and the
+    // scrape path -- which asked MetadataApiKeyProvider, and got the both-halves answer -- did not.
+
     @Test
-    fun `hasIgdbCredentials is true when igdb client id flow is non-blank`() = runTest(testDispatcher) {
+    fun `hasIgdbCredentials follows the provider, not the client id on its own`() = runTest(testDispatcher) {
         every { metadataKeyProvider.igdbClientIdFlow } returns flowOf("my-client")
+        every { metadataKeyProvider.hasIgdbCredentialsFlow } returns flowOf(false)
+        viewModel = activeViewModel()
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hasIgdbCredentials)
+        // The id itself is still surfaced, so the screen can show what is stored.
+        assertEquals("my-client", viewModel.uiState.value.igdbClientId)
+    }
+
+    @Test
+    fun `hasIgdbCredentials is true once the provider says both halves are present`() = runTest(testDispatcher) {
+        every { metadataKeyProvider.igdbClientIdFlow } returns flowOf("my-client")
+        every { metadataKeyProvider.hasIgdbCredentialsFlow } returns flowOf(true)
         viewModel = activeViewModel()
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.hasIgdbCredentials)
+    }
+
+    @Test
+    fun `a saved ScreenScraper username alone does not report a usable account`() = runTest(testDispatcher) {
+        every { metadataKeyProvider.ssUsernameFlow }       returns flowOf("someone")
+        every { metadataKeyProvider.hasSsCredentialsFlow } returns flowOf(false)
+        viewModel = activeViewModel()
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hasSsCredentials)
+        assertEquals("someone", viewModel.uiState.value.ssUsername)
     }
 
     // TheGamesDB's key was stored and read by MetadataApiKeyProvider but never writable from the UI.

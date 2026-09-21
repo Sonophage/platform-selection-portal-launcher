@@ -53,6 +53,9 @@ class ArtworkSettingsDebugCredentialsTest {
                 every { igdbClientIdFlow } returns flowOf(null)
                 every { tgdbKeyFlow } returns flowOf(null)
                 every { ssUsernameFlow } returns flowOf(null)
+                // Both-halves predicates, read by uiState's combine.
+                every { hasIgdbCredentialsFlow } returns flowOf(false)
+                every { hasSsCredentialsFlow } returns flowOf(false)
             },
             artworkLinkRepair = mockk(relaxed = true),
             artworkRepository = mockk(relaxed = true) { coEvery { computeStatus() } returns ArtworkStatus() },

@@ -211,7 +211,11 @@ class ArtworkSettingsViewModel @Inject constructor(
     private val ssAccounts = combine(
         metadataKeyProvider.ssUsernameFlow,
         screenScraperApi.isEnabledFlow,
-    ) { username, enabled -> username to enabled }
+        // Whether the account is COMPLETE, asked of the provider rather than inferred from the
+        // username. A restore keeps ss_username and drops ss_password, so the username alone does
+        // not mean the account works -- and this screen was the thing telling the owner it did.
+        metadataKeyProvider.hasSsCredentialsFlow,
+    ) { username, enabled, hasBoth -> Triple(username, enabled, hasBoth) }
 
     // SteamGridDB + TheGamesDB keys as one upstream: combine's typed overloads stop at five flows.
     private val apiKeys = combine(
@@ -219,23 +223,30 @@ class ArtworkSettingsViewModel @Inject constructor(
         metadataKeyProvider.tgdbKeyFlow,
     ) { sgdb, tgdb -> sgdb to tgdb }
 
+    // Same pairing for IGDB: the public client id and whether the secret is actually there.
+    private val igdb = combine(
+        metadataKeyProvider.igdbClientIdFlow,
+        metadataKeyProvider.hasIgdbCredentialsFlow,
+    ) { clientId, hasBoth -> clientId to hasBoth }
+
     val uiState: StateFlow<ArtworkSettingsUiState> = combine(
         apiKeys,
-        metadataKeyProvider.igdbClientIdFlow,
+        igdb,
         ssAccounts,
         scrapePreferences.preferSteamGridDbHeroesFlow,
         _extra,
-    ) { keys, igdbClientId, ss, preferSgdbHeroes, extra ->
+    ) { keys, igdbPair, ss, preferSgdbHeroes, extra ->
         val (sgdbKey, tgdbKey) = keys
-        val (ssUsername, ssEnabled) = ss
+        val (igdbClientId, hasIgdb) = igdbPair
+        val (ssUsername, ssEnabled, hasSs) = ss
         extra.copy(
             hasApiKey             = !sgdbKey.isNullOrBlank(),
             apiKeyMasked          = if (!sgdbKey.isNullOrBlank()) "••••••" else "",
             hasTgdbKey            = !tgdbKey.isNullOrBlank(),
-            hasIgdbCredentials    = !igdbClientId.isNullOrBlank(),
+            hasIgdbCredentials    = hasIgdb,
             igdbClientId          = igdbClientId ?: "",
             ssEnabled             = ssEnabled,
-            hasSsCredentials      = !ssUsername.isNullOrBlank(),
+            hasSsCredentials      = hasSs,
             ssUsername            = ssUsername ?: "",
             preferSteamGridDbHeroes = preferSgdbHeroes,
         )
