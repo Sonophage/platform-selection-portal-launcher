@@ -187,9 +187,15 @@ class ArtworkSettingsViewModel @Inject constructor(
                 val out = finished.outputData
                 val label = if (out.getString(MetadataScrapeWorker.KEY_MODE) == MetadataScrapeWorker.MODE_ALL)
                     "Re-scraped all games" else "Scraped missing games"
-                "$label: ${out.getInt(MetadataScrapeWorker.KEY_SUCCEEDED, 0)} succeeded, " +
+                val counts = "$label: ${out.getInt(MetadataScrapeWorker.KEY_SUCCEEDED, 0)} succeeded, " +
                     "${out.getInt(MetadataScrapeWorker.KEY_FAILED, 0)} failed of " +
                     "${out.getInt(MetadataScrapeWorker.KEY_TOTAL, 0)}"
+                // A run that stopped part-way says why. Without this a quota that ran out and a
+                // library of unrecognised games produce the same sentence, and only one of them
+                // is worth doing anything about.
+                out.getString(MetadataScrapeWorker.KEY_STOPPED_REASON)
+                    ?.let { "$counts. $it" }
+                    ?: counts
             }
             androidx.work.WorkInfo.State.CANCELLED -> "Scrape cancelled — artwork fetched so far is kept"
             else -> "Scrape failed: ${finished?.outputData?.getString(MetadataScrapeWorker.KEY_ERROR) ?: "unknown error"}"

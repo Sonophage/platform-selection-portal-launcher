@@ -63,9 +63,12 @@ class MetadataScrapeWorker @AssistedInject constructor(
         return try {
             val result = if (mode == MODE_ALL) artworkRepository.reScrapeAllGames(onProgress)
             else artworkRepository.scrapeMissingOnly(onProgress)
+            // The stop reason leads when there is one: "42 failed" with no explanation reads
+            // as a broken library, and the actual cause is usually that a quota ran out.
+            val counts = "${result.succeeded} succeeded, ${result.failed} failed of ${result.total}"
             notifier.complete(
                 TASK_ID, "Artwork scrape finished",
-                "${result.succeeded} succeeded, ${result.failed} failed of ${result.total}",
+                result.stoppedReason?.let { "$counts. $it" } ?: counts,
             )
             Result.success(
                 workDataOf(
@@ -73,6 +76,7 @@ class MetadataScrapeWorker @AssistedInject constructor(
                     KEY_FAILED to result.failed,
                     KEY_TOTAL to result.total,
                     KEY_MODE to mode,
+                    KEY_STOPPED_REASON to result.stoppedReason,
                 )
             )
         } catch (e: CancellationException) {
@@ -99,6 +103,8 @@ class MetadataScrapeWorker @AssistedInject constructor(
         const val KEY_SOURCE = "source"
         const val KEY_ASSET = "asset"
         const val KEY_ERROR = "error"
+        /** Why ScreenScraper stopped part-way, in the user's words, or absent when it did not. */
+        const val KEY_STOPPED_REASON = "stopped_reason"
 
         /** Enqueues a scrape (no-op if one is already running — KEEP policy). */
         fun enqueue(context: Context, mode: String): UUID {

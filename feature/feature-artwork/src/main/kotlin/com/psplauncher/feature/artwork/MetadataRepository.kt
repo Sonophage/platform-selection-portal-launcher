@@ -25,6 +25,7 @@ import io.ktor.client.HttpClient
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import timber.log.Timber
+import com.psplauncher.feature.artwork.api.SsFailureReason
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -90,9 +91,22 @@ class MetadataRepository @Inject constructor(
     @Volatile private var ssStopped = false
     @Volatile private var ssUnhashedStopped = false
 
+    /**
+     * Why ScreenScraper stopped, when it did.
+     *
+     * The flags above already knew this and threw it away: the reason arrived typed, turned into
+     * a boolean, and reached the user as one more entry in a bare failed count. "Ran out of your
+     * daily quota" and "your credentials were rejected" are different instructions to the person
+     * looking at the screen -- one means come back tomorrow, the other means the scrape will
+     * never work until something is fixed -- and both looked identical to "no match".
+     */
+    @Volatile var ssStopReason: SsFailureReason? = null
+        private set
+
     fun resetSsBatchGuards() {
         ssStopped = false
         ssUnhashedStopped = false
+        ssStopReason = null
     }
     /**
      * The retrieval half of [fetchForGame] (C16 task 3.1, AD-12): asks the four providers in
@@ -151,7 +165,12 @@ class MetadataRepository @Inject constructor(
                     rom        = romIdentity,
                     ssGameId   = gameEntity?.ssId,   // known id → direct fetch, no matching
                 )
-                if (ssResult.isBatchStopper) ssStopped = true
+                if (ssResult.isBatchStopper) {
+                    ssStopped = true
+                    // First reason wins: it is the one that actually stopped the run, and every
+                    // later lookup is skipped rather than failing for its own reason.
+                    if (ssStopReason == null) ssStopReason = ssResult.diagnostics.failureReason
+                }
                 if (ssResult.stopsUnhashedLookups) ssUnhashedStopped = true
                 ssInfo = ssResult.info
                 // Every successful live response refreshes the media-URL cache.

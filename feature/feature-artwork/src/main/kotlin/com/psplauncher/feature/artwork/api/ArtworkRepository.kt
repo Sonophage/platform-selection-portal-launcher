@@ -40,7 +40,35 @@ data class ScrapeProgress(
     val title: String,
     val scrapeSource: String = "",   // e.g. "TheGamesDB", "SteamGridDB"
     val scrapeAsset: String = "",    // e.g. "Box Art", "Hero", "Logo"
+    /**
+     * Why ScreenScraper stopped part-way, when it did, ready to show.
+     *
+     * Only set on the final progress a batch emits. A run that ends with a pile of failures and
+     * no reason is indistinguishable from a library of games nobody has ever heard of, and the
+     * two call for opposite responses from the person reading the screen.
+     */
+    val stoppedReason: String? = null,
 )
+
+/**
+ * A stop reason in the words the person who hit it needs (pure — unit-tested).
+ *
+ * Each one says what happened AND what to do about it, because the difference between these is
+ * entirely in what the user should do next: wait a day, fix a credential, or nothing at all.
+ * Reasons that stop a single lookup rather than the run return null -- they are already counted
+ * as failures and explaining them per game would be noise.
+ */
+fun scrapeStopMessage(reason: SsFailureReason?): String? = when (reason) {
+    SsFailureReason.DAILY_QUOTA_EXCEEDED ->
+        "ScreenScraper's daily quota for this account ran out, so the rest was skipped. It resets tomorrow."
+    SsFailureReason.BAD_DEV_CREDENTIALS ->
+        "ScreenScraper rejected the app's developer credentials, so it was skipped. Check Scraping Sources."
+    SsFailureReason.API_CLOSED ->
+        "ScreenScraper is closed to non-members right now, so it was skipped. Other sources still ran."
+    SsFailureReason.DISABLED ->
+        "ScreenScraper has no credentials configured, so it was skipped. Other sources still ran."
+    else -> null
+}
 
 @Singleton
 class ArtworkRepository @Inject constructor(
@@ -305,7 +333,10 @@ class ArtworkRepository @Inject constructor(
             if (result?.success == true) ok++ else fail++
             if (index < games.size - 1) delay(500)
         }
-        return ScrapeProgress(games.size, games.size, ok, fail, "")
+        return ScrapeProgress(
+            games.size, games.size, ok, fail, "",
+            stoppedReason = scrapeStopMessage(metadataRepository.ssStopReason),
+        )
             .also { Timber.i("Scrape complete: ${it.succeeded} ok, ${it.failed} failed of ${it.total}") }
     }
 }
