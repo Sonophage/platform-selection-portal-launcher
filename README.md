@@ -11,7 +11,10 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 </p>
 
 <p align="center">
-  Side-loaded APK (not on the Play Store) &nbsp;·&nbsp; Desktop <b>Theme Studio</b> companion
+  <b>Latest: 1.4.0</b> &nbsp;·&nbsp;
+  <a href="https://github.com/Sonophage/platform-selection-portal-launcher/releases">Releases</a>
+  &nbsp;·&nbsp; Side-loaded APK (not on the Play Store)
+  &nbsp;·&nbsp; Desktop <b>Theme Studio</b> companion
 </p>
 
 > This document is the **user manual**. It walks you from install to daily use, feature by
@@ -23,7 +26,22 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 
 ## Screenshots
 
-*Captured on an AYN Thor. Game artwork and app icons shown belong to their respective owners.*
+*Captured on an AYN Thor unless noted. Game artwork and app icons shown belong to their
+respective owners.*
+
+### New in 1.4
+
+*These four are from a test tablet whose library is empty, which is why the columns are short.
+The Network column is real — those are actual installed apps, classified automatically.*
+
+| | |
+|:---:|:---:|
+| <img src="docs/screenshots/quick-search-network.jpg" width="420"> | <img src="docs/screenshots/library-search.jpg" width="420"> |
+| Quick Search leads Network; Moonlight and Boosteroid classified there automatically | Library search — Select from anywhere, or the Search row on a column |
+| <img src="docs/screenshots/settings-one-row.jpg" width="420"> | <img src="docs/screenshots/settings-rail.jpg" width="420"> |
+| Settings is one row now — one press, not three | …and the whole tree is in the rail, with one cursor on screen |
+| <img src="docs/screenshots/add-submenu.jpg" width="420"> | <img src="docs/screenshots/last-played-bar.jpg" width="420"> |
+| Two "Add" rows collapse into one with a submenu | Last Played sits immediately left of Game |
 
 ### Themes
 
@@ -54,7 +72,7 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 | <img src="docs/screenshots/music-now-playing.jpg" width="420"> | <img src="docs/screenshots/music-player.jpg" width="420"> |
 | Music section — Now Playing surfaces on the crossbar | The in-app player (background service keeps it going) |
 | <img src="docs/screenshots/video-library.jpg" width="420"> | <img src="docs/screenshots/video-apps.jpg" width="420"> |
-| Video library — scanned files with thumbnails | Video Apps — your installed players, one row away |
+| Video library — scanned files with thumbnails | Your installed players. **Pre-1.4 capture:** these now sit at the root of the Video column rather than behind a "Video Apps" row |
 | <img src="docs/screenshots/photo-section.jpg" width="420"> | |
 | Photo section — albums and a fullscreen viewer | |
 
@@ -74,6 +92,7 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
    - [4.1 The Game library](#41-the-game-library)
    - [4.2 Setting up a console (Memory Card)](#42-setting-up-a-console-memory-card)
    - [4.3 Emulators](#43-emulators)
+   - [4.3b Last Played](#43b-last-played)
    - [4.4 Favorites & Collections](#44-favorites--collections)
    - [4.5 Game & app options (△)](#45-game--app-options-)
    - [4.6 Artwork & the Artwork Studio](#46-artwork--the-artwork-studio)
@@ -81,6 +100,7 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
    - [4.8 Android apps & non-gaming categories](#48-android-apps--non-gaming-categories)
    - [4.9 The App Drawer](#49-the-app-drawer)
    - [4.10 Music, Video & Photo](#410-music-video--photo)
+   - [4.10b Finding things](#410b-finding-things)
    - [4.11 Categories](#411-categories)
    - [4.12 Themes & personalization](#412-themes--personalization)
    - [4.13 Custom XMB icons](#413-custom-xmb-icons)
@@ -142,7 +162,8 @@ to fetch artwork. See [Permissions & privacy](#5-permissions--privacy).
 
 PFP is distributed as a **side-loaded APK** (it is not on the Google Play Store).
 
-1. Download the APK (`PSPLauncher-<version>.apk`).
+1. Download `PSPLauncher-<version>.apk` from
+   [Releases](https://github.com/Sonophage/platform-selection-portal-launcher/releases).
 2. Open the file on your device. Android will ask you to allow installs from your browser or file
    manager the first time — approve it.
 3. Tap **Install**.
@@ -212,6 +233,7 @@ PFP is built for a controller but works fully with touch.
 | Back / close / exit a folder | **B / ◯**, or D-Pad ◀ (see below) | On-screen Back / left-edge swipe / swipe left |
 | Options (context) menu | **Y / △** (or long-press) | Long-press |
 | Switch App-Drawer tabs | **L1 / R1** | Tap a tab |
+| Search your libraries | **Select** | Magnifier, bottom-right |
 | Confirm in pickers | **Start** | Confirm button |
 
 **D-Pad ◀ backs you out.** Inside a folder, a flyout or a settings screen, LEFT leaves one level —
@@ -221,8 +243,8 @@ adjusting a slider), so nothing it used to do is taken away. Turn it off in
 flyout — is always on, like the left-edge pull. On a Settings screen or a wizard page, a drag
 anywhere scrolls the page, including on the header and the footer.
 
-The **horizontal bar** is your categories — by default **Settings, Photo, Music, Video, Game,
-Network, App Store**, plus any custom ones. The **vertical list** under the selected category is its
+The **horizontal bar** is your categories — by default **Settings, Photo, Music, Video,
+Last Played, Game, Network, App Store, Library**, plus any custom ones. The **vertical list** under the selected category is its
 items. While any menu, settings screen, picker or dialog is open, the crossbar is locked — input
 only drives the overlay on top. Every binding is remappable in *Settings ▸ Controller*.
 
@@ -322,6 +344,16 @@ report.
 Emulator* walks you through it: pick an installed app, let PFP auto-detect its launch settings,
 edit any field, **Test Launch** with a real ROM, then **Save**. The result is usable as a platform,
 Memory Card, or per-game emulator.
+
+### 4.3b Last Played
+
+A column immediately left of Game holding the games you actually played, most recent first, each
+one wearing its own artwork behind the whole screen as you move over it.
+
+It fills as you play: a game is recorded when the emulator hands the launcher back the foreground,
+so a title that crashed on boot is deliberately not counted. An existing install starts empty —
+nothing wrote that column before 1.4 — and says so rather than looking broken. The order is the
+meaning, so the column is never sorted, and nothing can be assigned to it by hand.
 
 ### 4.4 Favorites & Collections
 
@@ -470,7 +502,30 @@ screen (SAF folder picker — no storage permission):
 - **Photo** — scanned albums, a fullscreen viewer (zoom, pan, rotate, L1/R1 paging), and
   **Set as Launcher Wallpaper** (EXIF-stripped; location data is never read).
 
-Each section shows a single "＋ Add" getting-started row until a root has been added and scanned.
+Each section also lists **the apps that belong to it** — YouTube and Plex under Video, Spotify
+under Music, your readers under Library — at the root of the column rather than behind an extra
+row, with **Add …** at the end. Where a column would otherwise end in two "Add" rows (one for a
+folder, one for apps), they collapse into a single **Add** row that opens the rest as a submenu.
+
+### 4.10b Finding things
+
+Two searches, both reached without leaving the crossbar.
+
+**Library search** looks in your own libraries:
+
+- The **Search** row at the top of Game, Video, Photo and Library searches only that library.
+- The **Select** button searches everything from anywhere on the home screen — games, video,
+  photos, books and music at once. With touch on, the magnifier beside the app-drawer button does
+  the same.
+- Matching ignores punctuation and takes the words in any order, so `ocarina zelda` finds
+  *The Legend of Zelda: Ocarina of Time*, and a partial word is enough. Each result says which
+  library it came from, and opening one takes you to it in the column it lives in.
+- Music has no Search row of its own: its **Music** and **Playlist** rows already open a
+  searchable browser, and it is still covered by the Select-button search.
+
+**Quick Search** at the top of Network searches the *web*. Type words and it searches; type
+something that looks like an address and it opens that instead. PFP never picks a browser — the
+intent goes to whichever one you have already chosen.
 
 ### 4.11 Categories
 
