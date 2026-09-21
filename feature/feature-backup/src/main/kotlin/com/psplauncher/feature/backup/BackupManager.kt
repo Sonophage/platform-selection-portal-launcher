@@ -599,6 +599,11 @@ open class BackupManager @Inject constructor(
         )
 
         private val BACKED_UP_BOOLEAN_KEYS = listOf(
+            // Whether the Android Memory Card has been seeded. Carried, unlike the other seed
+            // markers, because this one records a USER DECISION rather than schema progress: the
+            // archive's memory_cards table already says whether the card exists, and a restore
+            // that dropped this flag would seed a card the user had deliberately deleted.
+            booleanPreferencesKey("android_card_seeded_v1"),
             // Display
             booleanPreferencesKey("display_show_boot"),
             booleanPreferencesKey("display_boot_on_resume"),
