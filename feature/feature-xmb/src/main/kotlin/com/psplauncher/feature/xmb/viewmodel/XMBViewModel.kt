@@ -38,6 +38,7 @@ import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameCollection
 import com.psplauncher.core.domain.model.GameContentType
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.feature.xmb.ui.detail.DetailPanelContent
 import com.psplauncher.feature.xmb.ui.detail.DetailPanelPage
 import com.psplauncher.feature.xmb.ui.detail.detailPanelContentFor
 import com.psplauncher.feature.xmb.ui.detail.stepPanelPage
@@ -833,6 +834,33 @@ data class XMBUiState(
     // The item currently under the XMB cursor, or null.
     val focusedItem: XMBItem?
         get() = currentItems.getOrNull(selectedItemIndex)
+
+    /**
+     * The row the hover panel is drawn for, or null when there is no panel.
+     *
+     * Gated on a real game WITH backdrop art: the region has always needed something behind it,
+     * and a panel floating on the bare wallpaper reads as a stray card.
+     */
+    val hoverPanelItem: XMBItem?
+        get() = focusedItem?.takeIf { it.isRealGame && it.backdropArt.isNotEmpty() }
+
+    /**
+     * What the hover panel is showing, INCLUDING which pages it offers.
+     *
+     * Computed here rather than at each consumer because there are two and they must not
+     * disagree: XMBShell draws the panel and its strip, and stepHoverPanelPage decides where
+     * L1/R1 land. They did disagree — the shell passed the approved snap and the walk did not,
+     * so the strip drew a Video tab that R1 stepped straight over. One property, no second
+     * chance to forget an argument.
+     */
+    val hoverPanelContent: DetailPanelContent?
+        get() = hoverPanelItem?.let { item ->
+            detailPanelContentFor(
+                item = item,
+                platformName = item.platformId?.uppercase().orEmpty(),
+                videoUri = focusedGameVideo?.takeIf { it.gameId == item.gameId }?.uri,
+            )
+        }
 
     // True iff a Y/Triangle press on the focused item would open a context menu — the exact mirror
     // of XMBViewModel.onItemLongPress / dispatchGamepadAction(OPEN_CONTEXT_MENU)'s when-branches, so the
@@ -5590,8 +5618,7 @@ class XMBViewModel @Inject constructor(
     fun onPanelPageTapped(page: DetailPanelPage) = _uiState.update { it.copy(panelPage = page) }
 
     private fun stepHoverPanelPage(delta: Int) = _uiState.update { s ->
-        val item = s.focusedItem?.takeIf { it.isRealGame } ?: return@update s
-        val content = detailPanelContentFor(item, platformCache[item.platformId]?.name ?: "")
+        val content = s.hoverPanelContent ?: return@update s
         s.copy(panelPage = stepPanelPage(s.panelPage, content.pages, delta))
     }
 
@@ -8610,14 +8637,22 @@ class XMBViewModel @Inject constructor(
                 .map { s ->
                     val item = s.currentItems.getOrNull(s.selectedItemIndex)
                     // Approve only if the snap has somewhere to draw. snapSiteFor is the one
-                    // definition of that, shared with the two render sites -- the in-tile
+                    // definition of that, shared with the three render sites -- the in-tile
                     // placement needs an ICON0 tile to play over, the background placement needs
-                    // nothing and so plays in any icon mode.
+                    // nothing and so plays in any icon mode, and the hover panel's video page
+                    // needs neither.
+                    //
+                    // panelPage, not the resolved page: a game's Video tab only exists once a
+                    // snap has been approved, so resolving first would be a loop that never
+                    // starts. Asking the REQUESTED page instead means "the user is sitting on
+                    // Video" is itself the reason to decode -- which is how a snap reaches the
+                    // panel on an icon mode that has no tile to play it over.
                     val eligible = item?.gameId != null && item.isRealGame &&
                         !s.hasBlockingOverlay &&
                         com.psplauncher.feature.xmb.ui.snapSiteFor(
                             s.snapPlacement,
                             resolveIconDisplay(item, s.iconDisplayMode, s.iconDisplayModeByPlatform).mode,
+                            s.panelPage == DetailPanelPage.VIDEO,
                         ) != null
                     if (eligible) item.gameId else null
                 }

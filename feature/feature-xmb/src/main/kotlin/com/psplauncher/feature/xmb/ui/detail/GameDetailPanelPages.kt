@@ -8,7 +8,8 @@ import com.psplauncher.feature.xmb.viewmodel.gameMetadataLine
  * The pages of the Game Detail panel, in the order the strip draws them and the order L1/R1 walk
  * them.
  *
- * NeoStation's panel has five: logo, box art, fanart, info, trophies. This one has four. Trophies
+ * NeoStation's panel has five: logo, box art, fanart, info, trophies. This one has five too, but
+ * not the same five. Trophies
  * is absent because there is nothing behind it — the codebase has no achievement or trophy store
  * of any kind (the only surviving uses of the word are a Vita scanner folder name and a comment on
  * GameEntity), so the page would be a permanently empty tab. Fanart is not a page either: it is
@@ -19,6 +20,7 @@ import com.psplauncher.feature.xmb.viewmodel.gameMetadataLine
 enum class DetailPanelPage(val label: String) {
     LOGO("Logo"),
     BOX_ART("Box Art"),
+    VIDEO("Video"),
     GALLERY("Media"),
     INFO("Info"),
 }
@@ -26,19 +28,30 @@ enum class DetailPanelPage(val label: String) {
 /**
  * The pages worth walking to for one game.
  *
- * A tab the user can land on and find nothing is worse than a tab that is not there, so the two
- * pages that are purely an asset drop out when the asset is missing. [DetailPanelPage.LOGO] stays
- * either way — it falls back to the title, which every game has — and [DetailPanelPage.INFO] stays
- * even with no description, because the filename and the platform are always something to say.
- * Both therefore make the list non-empty, which the callers below rely on.
+ * A tab the user can land on and find nothing is worse than a tab that is not there, so every
+ * page that is only worth opening when something filled it in drops out when nothing did. Box
+ * art, video and media go when their asset is missing; Info goes when the game has no
+ * description, no scraped metadata line and no filename, which is a scraped-nothing homebrew.
+ *
+ * [DetailPanelPage.LOGO] is the exception and is always offered, because it is not an asset page
+ * — it is the resting state. The crossbar on its logo page looks exactly like the crossbar always
+ * has (a logo, or nothing), so dropping it would leave no way back to that view once the user has
+ * walked off it, and would pop box art onto the screen unprompted for every logo-less game. It is
+ * also what keeps this list non-empty for the callers below.
  */
-fun availablePanelPages(hasBoxArt: Boolean, hasGallery: Boolean): List<DetailPanelPage> =
+fun availablePanelPages(
+    hasBoxArt: Boolean,
+    hasVideo: Boolean,
+    hasGallery: Boolean,
+    hasInfo: Boolean,
+): List<DetailPanelPage> =
     DetailPanelPage.entries.filter {
         when (it) {
             DetailPanelPage.LOGO -> true
             DetailPanelPage.BOX_ART -> hasBoxArt
+            DetailPanelPage.VIDEO -> hasVideo
             DetailPanelPage.GALLERY -> hasGallery
-            DetailPanelPage.INFO -> true
+            DetailPanelPage.INFO -> hasInfo
         }
     }
 
@@ -90,6 +103,12 @@ data class DetailPanelContent(
     val metaLine: String? = null,
     val description: String? = null,
     val fileName: String? = null,
+    /**
+     * The game's video snap. On the crossbar this is the already-approved clip and nothing else:
+     * the panel's video page becomes that snap's one render site while it is open, so no second
+     * decoder opens on the same file. See snapSiteFor.
+     */
+    val videoUri: String? = null,
     val media: List<DetailMedia> = emptyList(),
 ) {
     /**
@@ -98,7 +117,16 @@ data class DetailPanelContent(
      * forgot the other.
      */
     val pages: List<DetailPanelPage>
-        get() = availablePanelPages(hasBoxArt = boxArtUri != null, hasGallery = media.isNotEmpty())
+        get() = availablePanelPages(
+            hasBoxArt = boxArtUri != null,
+            hasVideo = videoUri != null,
+            hasGallery = media.isNotEmpty(),
+            hasInfo = hasInfo,
+        )
+
+    /** The Info card would have at least one line in it. Nothing scraped and no file: no tab. */
+    val hasInfo: Boolean
+        get() = !description.isNullOrBlank() || metaLine != null || fileName != null
 }
 
 /** The filename a panel shows for a ROM, or null for a package-backed entry that has no file. */
@@ -112,6 +140,7 @@ fun detailPanelContentFor(
     game: Game,
     platformName: String,
     media: List<DetailMedia>,
+    videoUri: String? = null,
 ): DetailPanelContent = DetailPanelContent(
     title = game.displayTitle,
     platformName = platformName,
@@ -123,6 +152,7 @@ fun detailPanelContentFor(
     // romPath is derived for SAF-backed games too, so it is the one field that names the file for
     // every ROM. A package-backed Android or Windows entry has none and correctly shows nothing.
     fileName = panelFileName(game.romPath),
+    videoUri = videoUri,
     media = media,
 )
 
@@ -133,14 +163,22 @@ fun detailPanelContentFor(
  * [DetailPanelContent.media] is left empty, which is what keeps the Media page out of the strip
  * here — see the note on [DetailPanelContent].
  */
-fun detailPanelContentFor(item: XMBItem, platformName: String): DetailPanelContent =
+fun detailPanelContentFor(
+    item: XMBItem,
+    platformName: String,
+    videoUri: String? = null,
+): DetailPanelContent =
     DetailPanelContent(
         title = item.title,
         platformName = platformName,
-        logoUri = item.logoUri,
+        // hasVisibleLogo, not logoUri: this is the same predicate XMBItemList reads to decide
+        // whether the row keeps its own title, and the shell reads this field to drive the PIC0
+        // fade. One answer to "will a logo actually be drawn", not three.
+        logoUri = item.logoUri.takeIf { item.hasVisibleLogo },
         boxArtUri = item.boxArtUri,
         posterFallbackUri = item.heroUri ?: item.artworkUri,
         metaLine = item.metadataLine,
         description = item.description,
         fileName = panelFileName(item.romPath),
+        videoUri = videoUri,
     )

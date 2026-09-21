@@ -439,6 +439,9 @@ fun XMBShell(
           LocalIconDisplayMode provides uiState.iconDisplayMode,
           LocalIconDisplayModeByPlatform provides uiState.iconDisplayModeByPlatform,
           LocalFocusedGameVideo provides uiState.focusedGameVideo,
+          // Whether the hover panel has claimed the snap. Provided here, next to the snap
+          // itself, so a tile several layers down cannot read one without the other.
+          LocalPanelShowingVideo provides (uiState.panelPage == DetailPanelPage.VIDEO),
           // The icon-legibility treatment: PortalIcon + the theme-override glyph branches read
           // it ambiently, so every XMB silhouette glyph gets the matte from one provider.
           com.psplauncher.core.ui.icons.LocalIconLegibility provides uiState.iconLegibility,
@@ -554,14 +557,40 @@ fun XMBShell(
             // resolved to nothing and the wallpaper showed instead. The ViewModel now hands over
             // the first candidate that actually DECODED, which is the same image its colour came
             // from, so the backdrop and the tint over it can never be of two different pictures.
+            // The hover panel, computed here rather than beside the code that draws it: the
+            // full-bleed snap layer below has to know whether the panel has claimed the clip,
+            // and it is composed before the foreground. Pure reads of uiState, no remember, so
+            // the position is free.
+            //
+            // The crossbar's right-hand region, which used to draw only the PIC0 logo. It still draws exactly that by default; L1/R1 now walk it to the game's
+            // box art or its information card. One component draws this region, shared with the
+            // drill-down page, so the two cannot describe the same game differently.
+            //
+            // Gated on a real game WITH backdrop art: the region has always needed something
+            // behind it, and a panel floating on the bare wallpaper reads as a stray card.
+            val panelItem = uiState.hoverPanelItem
+            // uiState.hoverPanelContent, not a build of it here: the shoulder walk reads the
+            // same property, and the strip's tabs and where R1 lands have to be the same list.
+            val panelContent = uiState.hoverPanelContent
+            // The content's own logo field, which is already gated on hasVisibleLogo — the same
+            // predicate XMBItemList reads to decide whether the row keeps its title. Reading the
+            // item again here would be a second answer to one question.
+            val panelLogo = panelContent?.logoUri
+            val panelPage = panelContent?.let { resolvePanelPage(uiState.panelPage, it.pages) }
+            val panelShowingVideo = panelPage == DetailPanelPage.VIDEO
+
             val selectedItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
             val selectedBg = uiState.focusedItemBackdrop?.takeIf { uiState.itemBackdropEnabled }
             // PS3 placement: the approved snap plays full-bleed here instead of in the tile,
             // over the still art and UNDER the legibility scrim, so the crossbar keeps the same
             // contrast it has over a still background. Same FocusedGameVideo, same gates, same
             // single player — Icon1VideoOverlay centre-crops to whatever bounds it is given.
+            // shellSnapSite, not a placement test: the shortcut of reading the placement alone
+            // stopped being safe the moment a third site could claim the clip. With the panel on
+            // its video page this returns PANEL and the full-bleed layer draws nothing.
             val backgroundSnap = uiState.focusedGameVideo?.takeIf {
-                it.placement == VideoSnapPlacement.BACKGROUND && it.gameId == selectedItem?.gameId
+                shellSnapSite(it.placement, panelShowingVideo) == SnapSite.BACKGROUND &&
+                    it.gameId == selectedItem?.gameId
             }
             Crossfade(targetState = selectedBg, animationSpec = tween(320), label = "xmbGameBackground") { bg ->
                 if (bg != null || backgroundSnap != null) {
@@ -639,24 +668,6 @@ fun XMBShell(
                 uiState.customIconSession == null
             ) {
 
-            // The hover panel — the crossbar's right-hand region, which used to draw only the
-            // PIC0 logo. It still draws exactly that by default; L1/R1 now walk it to the game's
-            // box art or its information card. One component draws this region, shared with the
-            // drill-down page, so the two cannot describe the same game differently.
-            //
-            // Gated on a real game WITH backdrop art: the region has always needed something
-            // behind it, and a panel floating on the bare wallpaper reads as a stray card.
-            val panelItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.takeIf { it.isRealGame && it.backdropArt.isNotEmpty() }
-            // hasVisibleLogo, not logoUri: XMBItemList hides a row's title on exactly this
-            // predicate, so reading anything else here would put the title in both places or in
-            // neither. It is the same pair the comment on hasVisibleLogo describes.
-            val panelLogo = panelItem?.takeIf { it.hasVisibleLogo }?.logoUri
-            val panelContent = panelItem?.let {
-                detailPanelContentFor(it, it.platformId?.uppercase().orEmpty())
-            }
-            val panelPage = panelContent?.let { resolvePanelPage(uiState.panelPage, it.pages) }
-
             // The PSP's icon → PIC1 → PIC0 stagger, kept: the logo arrives a beat after the
             // background and snaps away the instant the cursor moves, so the next game's logo is
             // never glimpsed before its own linger completes.
@@ -677,15 +688,15 @@ fun XMBShell(
                 label = "pic0Fade",
             )
             val onLogoPage = panelPage == DetailPanelPage.LOGO
-            // "Is anything on the right already naming this game?" — the question the row label
-            // asks before hiding itself. On the logo page that is still the logo, fade and all,
-            // so the 650 ms gap keeps its label. On any other page the panel is up instantly and
-            // carries the name: the Info card says it in text, the box front says it in art, and
-            // the row label would otherwise run into the panel's left edge.
+            // The row label hides only once the user has walked the panel off its logo page with
+            // L1/R1. Not while the logo is up: the owner's call, and the reason is that the label
+            // disappearing on its own is a thing happening TO you, where the same label
+            // disappearing one frame after you pressed a shoulder is a thing you did. The logo
+            // page keeps its name whatever else is on screen.
             //
             // One val, two consumers (the crossbar list and the drill flyout). They were the pair
             // that disagreed — the flyout never received this at all — so they read one value.
-            val focusedNameShownOnRight = if (onLogoPage) pic0Alpha > 0f else panelContent != null
+            val focusedNameShownOnRight = panelContent != null && !onLogoPage
             val panelAlpha = if (onLogoPage) pic0Alpha else 1f
             // On the logo page this is the old condition unchanged, so a game with no logo shows
             // nothing here exactly as before. Off it, the panel is what the user asked for with

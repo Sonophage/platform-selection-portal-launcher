@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +43,9 @@ import com.psplauncher.core.ui.detail.DetailMediaTileHeight
 import com.psplauncher.core.ui.detail.DetailMediaTileWidth
 import com.psplauncher.core.ui.detail.PfpDetailMediaTile
 import com.psplauncher.core.ui.detail.detailPalette
+import androidx.compose.ui.draw.clip
 import com.psplauncher.core.ui.image.rememberArtworkModel
+import com.psplauncher.feature.xmb.ui.Icon1VideoOverlay
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
 // ── The Game Detail panel ────────────────────────────────────────────────────
@@ -60,6 +63,7 @@ import com.psplauncher.core.ui.theme.LocalPfpTextColors
 private fun DetailPanelPage.icon(): ImageVector = when (this) {
     DetailPanelPage.LOGO -> Icons.Filled.PictureInPictureAlt
     DetailPanelPage.BOX_ART -> Icons.Filled.Inventory2
+    DetailPanelPage.VIDEO -> Icons.Filled.PlayCircleOutline
     DetailPanelPage.GALLERY -> Icons.Filled.Image
     DetailPanelPage.INFO -> Icons.Filled.Info
 }
@@ -149,6 +153,7 @@ fun GameDetailPanel(
             when (resolvePanelPage(page, content.pages)) {
                 DetailPanelPage.LOGO -> LogoPage(content, titleFallback)
                 DetailPanelPage.BOX_ART -> BoxArtPage(content)
+                DetailPanelPage.VIDEO -> VideoPage(content)
                 DetailPanelPage.GALLERY -> GalleryPage(content, onMediaTapped)
                 DetailPanelPage.INFO -> InfoPage(content)
             }
@@ -202,6 +207,24 @@ private fun BoxArtPage(content: DetailPanelContent) {
         // ratio carries information (a tall GBA box is not a square PS1 case).
         contentScale = ContentScale.Fit,
         modifier = Modifier.fillMaxSize().padding(8.dp),
+    )
+}
+
+/**
+ * The game's video snap, playing in the panel.
+ *
+ * This page IS the snap's render site while it is open — the tile and the full-bleed background
+ * both stand down (snapSiteFor returns PANEL), so there is still exactly one decoder on the clip.
+ * Only offered when there is a video, so there is no empty state.
+ */
+@Composable
+private fun VideoPage(content: DetailPanelContent) {
+    val uri = content.videoUri ?: return
+    Icon1VideoOverlay(
+        videoUri = uri,
+        // The overlay centre-crops to whatever bounds it is given, so the page's own box is all
+        // the framing it needs.
+        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)),
     )
 }
 

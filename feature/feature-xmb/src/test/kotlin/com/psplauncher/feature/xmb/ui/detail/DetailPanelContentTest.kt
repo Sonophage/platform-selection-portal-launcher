@@ -92,6 +92,21 @@ class DetailPanelContentTest {
     }
 
     @Test
+    fun `the video page follows the clip, on both hosts`() {
+        // The crossbar gets the snap it already had approved; the drill-down gets the game's
+        // resolved video. Neither offers the tab without one.
+        assertTrue(DetailPanelPage.VIDEO !in detailPanelContentFor(item, "PlayStation").pages)
+        assertTrue(
+            DetailPanelPage.VIDEO in
+                detailPanelContentFor(item, "PlayStation", videoUri = "file:///snap.mp4").pages,
+        )
+        assertTrue(
+            DetailPanelPage.VIDEO in
+                detailPanelContentFor(game, "PlayStation", emptyList(), videoUri = "file:///snap.mp4").pages,
+        )
+    }
+
+    @Test
     fun `the drill-down offers the media page once there is media`() {
         val content = detailPanelContentFor(
             game,
@@ -100,6 +115,30 @@ class DetailPanelContentTest {
         )
 
         assertTrue(DetailPanelPage.GALLERY in content.pages)
+    }
+
+    @Test
+    fun `the info tab goes when the game filled nothing in`() {
+        // No description, no scraped line, no file on disk: the card would be one sentence
+        // saying there is no description. The rail should not offer it.
+        val bare = item.copy(description = null, metadataLine = null, romPath = null)
+        val content = detailPanelContentFor(bare, "PlayStation")
+
+        assertTrue(DetailPanelPage.INFO !in content.pages)
+        // One filled field is enough to be worth opening.
+        assertTrue(
+            DetailPanelPage.INFO in detailPanelContentFor(bare.copy(romPath = "/r/x.bin"), "PS").pages,
+        )
+    }
+
+    @Test
+    fun `a logo that will never be drawn is not offered as a logo`() {
+        // hasVisibleLogo needs backdrop art as well as a logo. Without it the crossbar draws no
+        // logo at all, so the content must not claim one — the shell reads this same field to
+        // drive the PIC0 fade.
+        val orphanLogo = item.copy(artworkUri = null, heroUri = null, boxArtUri = null)
+
+        assertNull(detailPanelContentFor(orphanLogo, "PlayStation").logoUri)
     }
 
     @Test
