@@ -25,6 +25,15 @@ import com.psplauncher.core.domain.model.GamepadAction
 // features must not depend on each other.
 
 /**
+ * The gap from the screen edge to a hint pill.
+ *
+ * Here rather than at each surface because the pill sits in the same corner on the XMB, in the
+ * App Drawer and on every settings screen, and "the same corner" is the whole point: two copies
+ * of the number with a comment saying they must match is how it stops being the same corner.
+ */
+val ControllerHintEdgeGap = 10.dp
+
+/**
  * A rounded black pill of controller prompts, faded in by the caller when the user has been idle.
  *
  * Surface-level chrome ([shape], [background], [arrangement]) is parameterized; the inner prompt
@@ -51,7 +60,10 @@ fun ControllerHintBar(
                 color = background,
                 shape = shape,
             )
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            // Tight. Each prompt already carries a 48dp touch target that reaches beyond the
+            // pill's own bounds (minimumInteractiveComponentSize), so the chrome does not need
+            // padding to stay pressable and can sit close to the screen edge instead.
+            .padding(horizontal = 12.dp, vertical = 5.dp),
         labelColor = Color.White,
         labelStyle = TextStyle(
             fontSize = 14.sp,

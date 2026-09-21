@@ -1,6 +1,10 @@
 package com.psplauncher.feature.settings.ui
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -28,6 +32,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -96,6 +101,7 @@ import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.isDirectional
 import com.psplauncher.core.ui.components.ControllerHintBar
+import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.ControllerPromptBar
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.gesture.dragToScroll
@@ -365,7 +371,17 @@ private const val SETTINGS_HELP_TEXT_SP = 13
  * starts, so a row the cursor is on is never dimmed, while a row scrolled under the fold dissolves
  * instead of being sliced by the helper footer's divider.
  */
-private val CONTENT_EDGE_MARGIN = 16.dp
+internal val CONTENT_EDGE_MARGIN = 16.dp
+
+/**
+ * Test handle for the scrolling content viewport.
+ *
+ * The navigation tests used to derive the viewport's bottom edge from the footer prompt's
+ * position minus a hand-written 20.dp. Both halves were wrong: the prompt is chrome and moved
+ * when the chrome did, and the real inset is [CONTENT_EDGE_MARGIN], which is 16.dp. The tests
+ * passed on the slack between the two. They measure this box now, and subtract the constant.
+ */
+internal const val SettingsContentViewportTag = "settings_content_viewport"
 
 // ── Standard helper footer ────────────────────────────────────────────────────
 
@@ -375,46 +391,43 @@ val SettingsDefaultHelperItems = listOf(
 )
 
 /**
- * The shared controller-helper section is present on every ordinary fullscreen settings screen.
- * Alpha keeps the section measured while the idle hint is hidden, so the content viewport and
- * row geometry never change when the helper appears or disappears. The wizard may still provide
- * its own themed footer through the scaffold's chrome override.
+ * The button-hint pill every ordinary fullscreen settings screen carries, at the right-hand end
+ * of the help band.
+ *
+ * It had a full-width strip of its own below that band, with a divider and centred prompts, and
+ * the strip stayed measured whether or not the hint was showing: the hint faded in on an idle
+ * pause, and a strip that collapsed would have shifted every row above it. The hints do not wait
+ * for a pause any more, and sharing the band that was already reserved means there is no height
+ * to collapse in the first place.
+ *
+ * The wizard still supplies its own themed footer through the scaffold's chrome override, and
+ * this is not drawn when it does.
  */
 @Composable
-private fun SettingsHelperFooter(items: List<ControllerPromptItem>) {
+private fun SettingsHelperFooter(
+    items: List<ControllerPromptItem>,
+    modifier: Modifier = Modifier,
+) {
     val showHint = LocalSettingsShowControllerHint.current
     val onAction = LocalSettingsPromptAction.current
-    val alpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (showHint) 1f else 0f,
-        animationSpec = androidx.compose.animation.core.tween(200),
-        label = "settingsHelperFooter",
-    )
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .focusProperties { canFocus = false },
+    // Removed rather than faded to alpha 0. An invisible pill that is still laid out would
+    // accept taps on a control nobody can see; as an overlay there is no layout reason to keep
+    // it measured, so it simply goes.
+    AnimatedVisibility(
+        visible = showHint,
+        enter = fadeIn(tween(200)),
+        exit = fadeOut(tween(200)),
+        modifier = modifier,
     ) {
-        // The divider fades WITH the hint it underlines, rather than staying at full strength over
-        // an empty band. The band keeps its height either way: reserving the space is deliberate,
-        // because a footer that collapsed as the idle hint came and went would shift every row
-        // above it. What was wrong was drawing a hairline under nothing.
-        Column(modifier = Modifier.alpha(alpha)) {
-            HorizontalDivider(color = SettingsDivider)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                ControllerHintBar(
-                    items = items.ifEmpty { SettingsDefaultHelperItems },
-                    background = Color.Black.copy(alpha = 0.70f),
-                    onAction = onAction,
-                )
-            }
-        }
+        ControllerHintBar(
+            items = items.ifEmpty { SettingsDefaultHelperItems },
+            background = Color.Black.copy(alpha = 0.70f),
+            onAction = onAction,
+            modifier = Modifier.focusProperties { canFocus = false },
+        )
     }
 }
+
 
 // ── Scaffold ──────────────────────────────────────────────────────────────────
 
@@ -1135,6 +1148,7 @@ fun SettingsScaffold(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
+                        .testTag(SettingsContentViewportTag)
                         // NOTE: deliberately NOT dragToScroll'd. This Box is an ANCESTOR of the
                         // body's own verticalScroll, and both would drive the SAME ScrollState.
                         // Modifier.scrollable takes part in nested scrolling, so the two contend
@@ -1146,14 +1160,13 @@ fun SettingsScaffold(
                             firstVisibleContentY.value = it.localToRoot(Offset.Zero).y
                             contentViewportHeight.value = it.size.height.toFloat()
                         }
-                        // Bottom edge fade. Content is flush against the helper footer's divider,
-                        // so a row straddling the fold was sliced mid-glyph by a hard rule and read
-                        // as deliberate clipping rather than "there is more below". Fading the
-                        // content's own alpha (DstIn over an offscreen layer, NOT an opaque
-                        // gradient) is what keeps this correct over the scaffold's semi-transparent
-                        // scrim: the partial row dissolves into the same wallpaper the footer band
-                        // already shows, instead of into a painted band that would only match on
-                        // one theme.
+                        // Bottom edge fade. Content runs flush to the help band, so a row
+                        // straddling the fold read as deliberate clipping rather than "there is
+                        // more below". Fading the content's own alpha (DstIn over an offscreen
+                        // layer, NOT an opaque gradient) is what keeps this correct over the
+                        // scaffold's semi-transparent scrim: the partial row dissolves into the
+                        // same wallpaper the band behind it shows, instead of into a painted band
+                        // that would only match on one theme.
                         //
                         // Draw-only, so the measured viewport above is untouched. The fade shares
                         // [CONTENT_EDGE_MARGIN] with keep-in-view, which is what guarantees a
@@ -1220,24 +1233,44 @@ fun SettingsScaffold(
                     //
                     // Hidden while the cursor is, because then there is no focused row to explain
                     // and the last one's text would be a lie about where you are.
-                    Box(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(SETTINGS_HELP_BAND_HEIGHT)
-                            .padding(horizontal = 48.dp),
-                        contentAlignment = Alignment.CenterStart,
+                            .padding(start = 48.dp, end = ControllerHintEdgeGap),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val help = helpText.value?.takeIf { cursorVisible.value && it.isNotBlank() }
-                        if (help != null) {
-                            Text(
-                                text = help,
-                                color = SettingsSubtext,
-                                fontSize = SETTINGS_HELP_TEXT_SP.sp,
-                                lineHeight = (SETTINGS_HELP_TEXT_SP + 4).sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                style = TextStyle(shadow = SettingsTextShadow),
-                            )
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            if (help != null) {
+                                Text(
+                                    text = help,
+                                    color = SettingsSubtext,
+                                    fontSize = SETTINGS_HELP_TEXT_SP.sp,
+                                    lineHeight = (SETTINGS_HELP_TEXT_SP + 4).sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = TextStyle(shadow = SettingsTextShadow),
+                                )
+                            }
+                        }
+                        // The hints share this band rather than getting one of their own.
+                        //
+                        // They used to sit below it in a full-width strip of their own: a
+                        // divider, centred prompts and 24dp of padding, about 61dp of every
+                        // screen's height, on a display that is 462dp tall. This band is already
+                        // reserved at a fixed height for the focused row's explanation, the pill
+                        // is shorter than it, and the explanation is left-aligned prose that was
+                        // never using the right-hand end. So the whole strip goes and nothing
+                        // moves. It also puts the prompts in the same corner as the XMB's and the
+                        // App Drawer's, instead of centred here and bottom right everywhere else.
+                        //
+                        // Floating it over the content was the other option and it does not fit:
+                        // the rail is 216dp and the content column up to 560dp, which on this
+                        // 821dp-wide screen leaves 45dp clear, so a ~200dp pill would have sat on
+                        // top of the rows' right-hand values.
+                        if (footer == null) {
+                            SettingsHelperFooter(items = helperFooterItems)
                         }
                     }
                     if (footer != null) {
@@ -1250,9 +1283,13 @@ fun SettingsScaffold(
                         ) {
                             footer()
                         }
-                    } else {
-                        SettingsHelperFooter(helperFooterItems)
                     }
+                    // Nothing here in the ordinary case. The button-hint pill used to sit in this
+                    // slot as a centred band with a divider and a reserved height, because it
+                    // faded in and out and a band that collapsed would have shifted every row
+                    // above it. It does not fade in and out any more, and it is now drawn bottom
+                    // right over the content like the XMB's, which puts it in the same corner on
+                    // every screen in the app and hands its reserved height back to the list.
                 }
             }
 

@@ -76,6 +76,7 @@ import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.ui.motion.MotionWallpaperPolicy
 import com.psplauncher.core.ui.motion.rememberAppVisible
+import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.XmbTouchButton
 import com.psplauncher.core.ui.preview.DevicePreviews
 import com.psplauncher.core.ui.preview.PfpPreview
@@ -954,9 +955,12 @@ fun XMBShell(
                     showSort = uiState.canSortCurrentList,
                     showOptions = uiState.focusedItemHasContextMenu,
                     onAction = onPromptTapped,
+                    // Bottom right, close in. The larger bottom inset is only to clear the App
+                    // Drawer button when that is up; with it hidden the pill sits at the shared
+                    // edge gap, so the corner reads the same wherever you are.
                     modifier = Modifier.padding(
-                        bottom = if (drawerButtonVisible) 76.dp else 24.dp,
-                        end = 20.dp,
+                        bottom = if (drawerButtonVisible) 68.dp else ControllerHintEdgeGap,
+                        end = ControllerHintEdgeGap,
                     ),
                 )
             }

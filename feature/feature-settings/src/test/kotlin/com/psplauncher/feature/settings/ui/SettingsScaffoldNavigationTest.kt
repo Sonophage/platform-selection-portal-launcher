@@ -25,6 +25,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
@@ -476,15 +477,14 @@ class SettingsScaffoldNavigationTest {
         // Opens focused on the first row.
         assertFocusedRow("Row 1")
 
-        // Measure the geometry the scaffold re-anchors against. The content box ends above the
-        // reserved helper footer, so derive the viewport from the footer prompt rather than the
-        // full root height.
-        val firstRowNode = composeRule.onNode(isFocused()).fetchSemanticsNode()
-        val contentTop = firstRowNode.boundsInRoot.top
-        val rowHeight = firstRowNode.boundsInRoot.height
-        val footerPromptTop = composeRule.onNodeWithText("Enter").fetchSemanticsNode().boundsInRoot.top
-        val contentBottom = footerPromptTop - with(composeRule.density) { 20.dp.toPx() }
-        val viewportCenter = contentTop + (contentBottom - contentTop) / 2f
+        // Measure the geometry the scaffold re-anchors against, off the content viewport itself
+        // rather than off whatever chrome happens to sit under it.
+        val rowHeight = composeRule.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.height
+        // The scaffold re-anchors on the FULL viewport centre, with no edge margin applied
+        // (SettingsScaffold's revivalPress branch: viewportTop + viewportHeight / 2). The old
+        // model here measured from the first row's top to a chrome-derived bottom, which is a
+        // different midpoint and only agreed by accident.
+        val viewportCenter = viewportCenterY()
 
         // A real touch drag: the contact itself flags the screen as touch-scrolled (the scaffold
         // hides the cursor on any pointer activity); the small move keeps the list from scrolling.
@@ -525,19 +525,38 @@ class SettingsScaffoldNavigationTest {
             }
         }
         assertFocusedRow("Row 1")
-        val contentTop = composeRule.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.top
-        // The content box ends above the reserved helper footer, so use its prompt position to
-        // derive the actual visible content bottom and catch a clipped final row.
-        val footerPromptTop = composeRule.onNodeWithText("Enter").fetchSemanticsNode().boundsInRoot.top
-        val contentBottom = footerPromptTop - with(composeRule.density) { 20.dp.toPx() }
+        // Both edges as the scaffold enforces them: row top >= viewportTop + margin, row bottom
+        // <= viewportBottom - margin.
+        val contentTop = viewportTop()
+        val contentBottom = viewportBottom()
         var rowHeight = 0f
         repeat(30) { step ->
             press(GamepadAction.NAVIGATE_DOWN)
             val bounds = composeRule.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
             if (step == 0) rowHeight = bounds.height
             assertTrue("step $step: row top ${bounds.top} drifted above viewport top $contentTop", bounds.top >= contentTop - 0.5f)
-            assertTrue("step $step: row bottom ${bounds.bottom} hit the viewport bottom $contentBottom", bounds.bottom <= contentBottom - 1f)
+            assertTrue("step $step: row bottom ${bounds.bottom} hit the viewport bottom $contentBottom", bounds.bottom <= contentBottom + 0.5f)
             assertTrue("step $step: row clipped to height ${bounds.height}", abs(bounds.height - rowHeight) < 1f)
         }
     }
+    /**
+     * The bottom edge the scaffold keeps a focused row above.
+     *
+     * Read off the tagged content viewport and the production margin, not inferred from the
+     * footer prompt's position minus a hand-written 20.dp. That older derivation modelled the
+     * chrome rather than the viewport, and its number did not even match CONTENT_EDGE_MARGIN's
+     * 16.dp: it passed on the slack between them, and went red the moment the chrome moved.
+     */
+    private fun viewportBounds() =
+        composeRule.onNodeWithTag(SettingsContentViewportTag).fetchSemanticsNode().boundsInRoot
+
+    private fun margin(): Float = with(composeRule.density) { CONTENT_EDGE_MARGIN.toPx() }
+
+    private fun viewportTop(): Float = viewportBounds().top + margin()
+
+    private fun viewportBottom(): Float = viewportBounds().bottom - margin()
+
+    /** The point the revival press re-anchors to: the whole viewport's midpoint, margins aside. */
+    private fun viewportCenterY(): Float = viewportBounds().center.y
+
 }
