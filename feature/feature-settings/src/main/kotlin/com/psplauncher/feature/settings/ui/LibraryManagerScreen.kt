@@ -426,7 +426,39 @@ private fun CardDetailContent(
     onRemoveApp: (Long) -> Unit,
     modifier: Modifier,
 ) {
-    val card = state.detailCard ?: return
+    // No card for this platform. It happens for real: Settings > Windows Games opens this
+    // directly, and the Windows card only exists once a PC game has been imported. It used to
+    // `return` here, which drew NOTHING -- no header, no rail, no Back, just the wallpaper, with
+    // no way to tell a missing console from a broken screen.
+    val card = state.detailCard
+    if (card == null) {
+        SettingsScaffold(
+            title = "Library Manager",
+            subtitle = "Not in your library",
+            onBack = onBack,
+            modifier = modifier,
+        ) {
+            val scrollState = rememberScrollState()
+            LocalSettingsScrollStateRegistrar.current(scrollState)
+            Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
+                // The explanation is a row's LABEL, not its sublabel: a sublabel feeds the
+                // focused-row help band at the bottom, which is empty until something takes
+                // focus -- and on a screen whose entire point is that it has nothing, that is
+                // exactly when the user needs to be told why.
+                SettingsGroup("Nothing here yet")
+                SettingsValueRow(label = "No console to show", value = "")
+                SettingsValueRow(
+                    label = "Windows Games appears once a PC game has been imported.",
+                    value = "",
+                )
+                SettingsValueRow(
+                    label = "Other consoles appear once you add them in Library Manager.",
+                    value = "",
+                )
+            }
+        }
+        return
+    }
 
     var showEmulatorDialog by remember { mutableStateOf(false) }
     var showRemoveConfirm  by remember { mutableStateOf(false) }

@@ -31,6 +31,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.detail.PfpOverlayCard
 import com.psplauncher.core.ui.detail.PfpOverlayTitle
@@ -288,44 +301,89 @@ private fun CollectionIconPickerDialog(
 ) {
     // A grid of fifty-odd icons, picked by eye. The list overlays would turn that into a long
     // scroll of names, which is worse for the one job this has, so it keeps the grid and uses the
-    // shared card for the chrome.
+    // shared card for the chrome -- and carries its own two-dimensional cursor, because a grid
+    // you can only escape from is not a picker.
     //
-    // Honest limitation: the pad only does B here. Registering the input at least makes the
-    // overlay escapable with the controller, which it was not while it was an AlertDialog, but
-    // moving a cursor around a two-dimensional grid is its own piece of work and this is not it.
+    // The column count is measured rather than assumed: the cells are adaptive, so the same
+    // arithmetic has to use whatever number the layout actually produced. One source of truth for
+    // "how many columns", used by both the grid and the cursor.
+    val gridState = rememberLazyGridState()
+    var cursor by remember { mutableIntStateOf(GRID_CURSOR_HEADER) }
+    var columns by remember { mutableIntStateOf(1) }
+
     SettingsOverlayInput { action ->
-        if (action == GamepadAction.BACK) onCancel()
+        when (action) {
+            GamepadAction.SELECT ->
+                if (cursor == GRID_CURSOR_HEADER) onPick(null)
+                else CATEGORY_ICON_CATALOG.getOrNull(cursor)?.let { onPick(it.key) }
+            GamepadAction.BACK -> onCancel()
+            else -> cursor = gridCursorStep(cursor, columns, CATEGORY_ICON_CATALOG.size, action)
+        }
     }
+    // Keep the focused icon on screen. The grid is taller than the card shows, so without this
+    // the cursor walks off the bottom and the user is moving something they cannot see.
+    LaunchedEffect(cursor) {
+        if (cursor >= 0) runCatching { gridState.animateScrollToItem(cursor) }
+    }
+
     PfpOverlayCard(onScrimTap = onCancel) {
         PfpOverlayTitle("Collection Icon")
         Spacer(Modifier.height(12.dp))
-        TextButton(
-            onClick = { onPick(null) },
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (cursor == GRID_CURSOR_HEADER) Color(0x33FFFFFF) else Color.Transparent)
+                .clickable { onPick(null) }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             Text(
                 "Default (Memory Card)",
-                modifier = Modifier.fillMaxWidth().padding(8.dp),
                 color = if (selectedIconKey == null) MaterialTheme.colorScheme.primary else Color.White,
             )
         }
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(56.dp),
-            modifier = Modifier.fillMaxWidth().height(320.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(CATEGORY_ICON_CATALOG, key = { it.key }) { icon ->
-                Image(
-                    painter = painterResource(icon.resId),
-                    contentDescription = icon.label,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .selectable(
-                            selected = icon.key == selectedIconKey,
-                            onClick = { onPick(icon.key) },
-                        ),
-                )
+        Spacer(Modifier.height(8.dp))
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(320.dp)) {
+            val cell = 56.dp
+            val gap = 8.dp
+            // The same formula LazyVerticalGrid's Adaptive uses, so the cursor and the layout
+            // cannot disagree about where a row ends.
+            val measured = ((maxWidth + gap) / (cell + gap)).toInt().coerceAtLeast(1)
+            LaunchedEffect(measured) { columns = measured }
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Fixed(measured),
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                itemsIndexed(CATEGORY_ICON_CATALOG, key = { _, icon -> icon.key }) { index, icon ->
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(cell)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (index == cursor) Color(0x33FFFFFF) else Color.Transparent)
+                            .then(
+                                if (icon.key == selectedIconKey) {
+                                    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                    ) {
+                        Image(
+                            painter = painterResource(icon.resId),
+                            contentDescription = icon.label,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .selectable(
+                                    selected = icon.key == selectedIconKey,
+                                    onClick = { onPick(icon.key) },
+                                ),
+                        )
+                    }
+                }
             }
         }
     }
