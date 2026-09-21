@@ -223,7 +223,7 @@ class CachingMatchEvidenceTest {
         val store = FakeStore()
         val cached = cachedOver(CountingEvidence(), store)
 
-        listOf(MatchProvider.STEAMGRIDDB, MatchProvider.IGDB, MatchProvider.THEGAMESDB).forEach {
+        listOf(MatchProvider.STEAMGRIDDB, MatchProvider.IGDB).forEach {
             cached.searchByTitle(it, "Tactics Ogre", "psp")
         }
 

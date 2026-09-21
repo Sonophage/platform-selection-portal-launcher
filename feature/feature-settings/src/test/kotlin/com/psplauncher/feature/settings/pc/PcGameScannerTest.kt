@@ -77,7 +77,7 @@ class PcGameScannerTest {
             launcherPackage = "banner.hub",
             shortcutId = "game_620",
             ssId = 425726L, // ignored: existing.ssId already set
-            tgdbId = 66L,   // missing on existing: must be filled
+            igdbId = 66L,   // missing on existing: must be filled
             userTitleOverride = "Portal 2 (Co-op)", // missing on existing: must be filled
             storefront = "STEAM",
             storefrontGameId = "620",
@@ -91,7 +91,7 @@ class PcGameScannerTest {
         coVerify(exactly = 0) { gameRepository.upsert(any()) }
         coVerify(exactly = 1) { gameRepository.updateUserTitleOverride(7L, "Portal 2 (Co-op)") }
         coVerify(exactly = 1) { gameRepository.updateStorefrontIdentity(7L, "STEAM", "620") }
-        coVerify(exactly = 1) { gameRepository.updateProviderMatch(7L, "THEGAMESDB", 66L) }
+        coVerify(exactly = 1) { gameRepository.updateProviderMatch(7L, "IGDB", 66L) }
         // Already-set columns are left alone.
         coVerify(exactly = 0) { gameRepository.updateScrapedTitle(any(), any()) }
         coVerify(exactly = 0) { gameRepository.updateProviderMatch(7L, "SCREENSCRAPER", any()) }

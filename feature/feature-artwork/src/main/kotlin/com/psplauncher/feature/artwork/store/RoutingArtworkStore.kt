@@ -539,7 +539,6 @@ class RoutingArtworkStore @Inject constructor(
                 portableName = portableName,
                 romCrc32 = game.romCrc32,
                 ssId = game.ssId,
-                tgdbId = game.tgdbId,
                 igdbId = game.igdbId,
                 sgdbId = game.steamGridDbId,
                 artworkKey = game.artworkKey,

@@ -17,25 +17,9 @@ import javax.inject.Singleton
 class MetadataApiKeyProvider @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    // Secrets (TGDB key, IGDB client secret) are encrypted at rest via the Keystore-backed cipher;
-    // the IGDB client id is a public identifier and stays plaintext. decryptOrLegacy keeps any
-    // pre-encryption values working until they're re-saved.
-    // ── TheGamesDB ────────────────────────────────────────────────────────────
-    val tgdbKeyFlow: Flow<String?> = context.pfpDataStore.data
-        .map { prefs -> prefs[KEY_TGDB_API_KEY]?.let { KeystoreSecretCipher.decryptOrLegacy(it) } }
-
-    suspend fun getTgdbKey(): String? = tgdbKeyFlow.first()
-
-    suspend fun saveTgdbKey(key: String): SecretProtection {
-        val sealed = KeystoreSecretCipher.seal(key.trim())
-        context.pfpDataStore.edit { it[KEY_TGDB_API_KEY] = sealed.stored }
-        return SecretProtection.of(sealed)
-    }
-
-    suspend fun clearTgdbKey() {
-        context.pfpDataStore.edit { it.remove(KEY_TGDB_API_KEY) }
-    }
-
+    // The IGDB client secret is encrypted at rest via the Keystore-backed cipher; the client id
+    // is a public identifier and stays plaintext. decryptOrLegacy keeps any pre-encryption values
+    // working until they're re-saved.
     // ── IGDB ──────────────────────────────────────────────────────────────────
     val igdbClientIdFlow: Flow<String?> = context.pfpDataStore.data.map { it[KEY_IGDB_CLIENT_ID] }
 
@@ -58,8 +42,6 @@ class MetadataApiKeyProvider @Inject constructor(
             it.remove(KEY_IGDB_CLIENT_SECRET)
         }
     }
-
-    suspend fun hasTgdbKey(): Boolean = getTgdbKey()?.isNotBlank() == true
 
     /**
      * "IGDB is configured" as a flow, so a screen cannot answer it differently from the scraper.
@@ -117,7 +99,6 @@ class MetadataApiKeyProvider @Inject constructor(
     // optional user account above is stored here.
 
     companion object {
-        private val KEY_TGDB_API_KEY       = stringPreferencesKey("tgdb_api_key")
         private val KEY_IGDB_CLIENT_ID     = stringPreferencesKey("igdb_client_id")
         private val KEY_IGDB_CLIENT_SECRET = stringPreferencesKey("igdb_client_secret")
         private val KEY_SS_USERNAME        = stringPreferencesKey("ss_username")

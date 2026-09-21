@@ -103,7 +103,7 @@ fun MetadataPreviewPanel(
                     if (ui.failed) {
                         "Nothing was changed. Check the connection and try again."
                     } else {
-                        // Presets come from ScreenScraper (by its saved id) and TheGamesDB (by title),
+                        // Presets come from ScreenScraper (by its saved id),
                         // so a ScreenScraper Change Match is what gives this game a source.
                         "Nothing was changed. To identify it, open Artwork, choose ScreenScraper and " +
                             "use Change Match, then update metadata again."

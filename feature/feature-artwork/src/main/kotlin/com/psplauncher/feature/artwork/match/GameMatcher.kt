@@ -174,12 +174,11 @@ class GameMatcher(private val evidence: MatchEvidenceSource) {
 
     /**
      * The id this game already carries for [provider], as a string. Never crossed between
-     * providers — a `tgdb_id` is meaningless to IGDB, and reading one as the other is exactly the
+     * providers — an `ss_id` is meaningless to IGDB, and reading one as the other is exactly the
      * bug this indirection exists to prevent.
      */
     private fun savedIdFor(game: Game, provider: MatchProvider): String? = when (provider) {
         MatchProvider.SCREENSCRAPER -> game.ssId
-        MatchProvider.THEGAMESDB -> game.tgdbId
         MatchProvider.IGDB -> game.igdbId
         MatchProvider.STEAMGRIDDB -> game.steamGridDbId
         // Steam needs no id column of its own: the app id IS games.storefront_game_id, written by

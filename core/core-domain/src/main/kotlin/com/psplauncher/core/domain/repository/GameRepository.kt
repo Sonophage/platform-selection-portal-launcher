@@ -90,7 +90,7 @@ interface GameRepository {
     /**
      * Records (or, with a null [providerGameId], forgets) the confirmed match for ONE provider.
      *
-     * Exactly one of `ss_id` / `tgdb_id` / `igdb_id` / `steam_grid_db_id` is written and the other
+     * Exactly one of `ss_id` / `igdb_id` / `steam_grid_db_id` is written and the other
      * three are left alone — provider ids are never crossed. Forgetting a match clears the id and
      * nothing else: no artwork file and no metadata column is touched (C16 task 2.3).
      *

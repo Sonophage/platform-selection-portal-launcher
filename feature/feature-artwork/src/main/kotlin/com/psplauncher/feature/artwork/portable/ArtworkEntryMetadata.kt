@@ -24,7 +24,6 @@ data class ArtworkEntryMetadata(
     // Scraper database ids, when a scrape supplied them.
     @SerialName("ss_id") val ssId: Long? = null,
     @SerialName("sgdb_id") val sgdbId: Long? = null,
-    @SerialName("tgdb_id") val tgdbId: Long? = null,
     @SerialName("igdb_id") val igdbId: Long? = null,
     val assets: List<AssetRecord> = emptyList(),
     @SerialName("updated_at") val updatedAt: Long = 0,

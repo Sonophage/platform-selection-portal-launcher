@@ -54,7 +54,6 @@ data class Game(
     // Scraper database ids persisted after a successful match: re-scrapes fetch by id (never
     // re-matched), and a portable artwork library reconnects by id after a device migration.
     val ssId: Long?               = null,   // ScreenScraper
-    val tgdbId: Long?             = null,   // TheGamesDB
     val igdbId: Long?             = null,   // IGDB
     // Streamed CRC-32 of the ROM payload (zip-inner for zipped cartridge ROMs), uppercase hex.
     val romCrc32: String?         = null,

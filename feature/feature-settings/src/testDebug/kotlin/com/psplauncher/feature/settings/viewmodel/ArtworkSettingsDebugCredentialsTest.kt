@@ -51,7 +51,6 @@ class ArtworkSettingsDebugCredentialsTest {
             sgdbKeyProvider = mockk(relaxed = true) { every { apiKeyFlow } returns flowOf(null) },
             metadataKeyProvider = mockk(relaxed = true) {
                 every { igdbClientIdFlow } returns flowOf(null)
-                every { tgdbKeyFlow } returns flowOf(null)
                 every { ssUsernameFlow } returns flowOf(null)
                 // Both-halves predicates, read by uiState's combine.
                 every { hasIgdbCredentialsFlow } returns flowOf(false)

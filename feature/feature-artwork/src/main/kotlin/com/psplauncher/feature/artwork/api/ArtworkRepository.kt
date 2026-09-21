@@ -38,7 +38,7 @@ data class ScrapeProgress(
     val succeeded: Int,
     val failed: Int,
     val title: String,
-    val scrapeSource: String = "",   // e.g. "TheGamesDB", "SteamGridDB"
+    val scrapeSource: String = "",   // e.g. "IGDB", "SteamGridDB"
     val scrapeAsset: String = "",    // e.g. "Box Art", "Hero", "Logo"
     /**
      * Why ScreenScraper stopped part-way, when it did, ready to show.

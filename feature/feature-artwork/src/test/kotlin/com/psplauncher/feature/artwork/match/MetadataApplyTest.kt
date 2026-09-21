@@ -4,7 +4,6 @@ import com.psplauncher.core.data.database.dao.GameDao
 import com.psplauncher.core.data.database.entity.GameEntity
 import com.psplauncher.feature.artwork.MetadataCandidates
 import com.psplauncher.feature.artwork.MetadataRepository
-import com.psplauncher.feature.artwork.TgdbGameInfo
 import com.psplauncher.feature.artwork.api.ArtworkRepository
 import com.psplauncher.feature.artwork.api.IgdbGameInfo
 import com.psplauncher.feature.artwork.api.ScrapeOptions
@@ -44,32 +43,27 @@ class MetadataApplyTest {
 
     private fun candidates(
         ssInfo: SsGameInfo? = null,
-        tgdbInfo: TgdbGameInfo? = null,
         igdbInfo: IgdbGameInfo? = null,
     ) = MetadataCandidates(
         gameEntity = null, bestTitle = "Chrono Trigger", ssInfo = ssInfo, romIdentity = null,
-        usedSsCache = false, cachedSsId = null, tgdbInfo = tgdbInfo, igdbInfo = igdbInfo,
+        usedSsCache = false, cachedSsId = null, igdbInfo = igdbInfo,
         sgdbGameId = null, sgdbGridUrl = null, sgdbHeroUrl = null, sgdbLogoUrl = null,
     )
 
-    private val tgdb = TgdbGameInfo(
-        tgdbId = 7L, title = "Chrono Trigger", description = "TGDB blurb", releaseYear = 1995,
-        artworkUrl = null, heroUrl = null, logoUrl = null,
-    )
-
     @Test
-    fun `ScreenScraper and TheGamesDB become presets, artwork-only answers never do`() {
+    fun `ScreenScraper becomes a preset, artwork-only answers never do`() {
+        // TheGamesDB was the second preset here until it was removed as a provider. ScreenScraper
+        // is the only one left that carries text, so the assertion that matters is the negative
+        // one: an artwork-only answer must not become a preset with nothing in it.
         val presets = MetadataApply.presetsFrom(
             candidates(
                 ssInfo = ss(),
-                tgdbInfo = tgdb,
                 igdbInfo = IgdbGameInfo(artworkUrl = "https://igdb/cover.jpg", heroUrl = null, logoUrl = null),
             )
         )
 
-        assertEquals(listOf(MatchProvider.SCREENSCRAPER, MatchProvider.THEGAMESDB), presets.map { it.provider })
+        assertEquals(listOf(MatchProvider.SCREENSCRAPER), presets.map { it.provider })
         assertEquals("Square", presets[0].developer)
-        assertEquals("TGDB blurb", presets[1].description)
     }
 
     @Test
@@ -173,12 +167,12 @@ class MetadataApplyTest {
     fun `the preview asks for text only and bypasses the URL-only ScreenScraper cache`() = runTest {
         givenStoredGame()
         coEvery { metadataRepository.fetchCandidates(any(), any(), any(), any(), any(), any()) } returns
-            candidates(tgdbInfo = tgdb)
+            candidates(ssInfo = ss())
 
         val preview = repo.fetchMetadataPreview(1L)
 
         assertEquals("My own notes", preview?.current?.get(MetadataField.DESCRIPTION))
-        assertEquals(listOf(MatchProvider.THEGAMESDB), preview?.presets?.map { it.provider })
+        assertEquals(listOf(MatchProvider.SCREENSCRAPER), preview?.presets?.map { it.provider })
         coVerify {
             metadataRepository.fetchCandidates(
                 1L, "chrono_trigger", "snes", null,
@@ -219,7 +213,7 @@ class MetadataApplyTest {
                 releaseYear = null, genre = null, artworkUri = null, heroUri = null, logoUri = null,
                 iconUri = null, boxArtUri = null, physicalMediaUri = null, box3dUri = null,
                 scrapedTitle = null, players = null, ageRating = null, franchise = null,
-                communityRating = null, releaseDate = null, ssId = null, tgdbId = null, igdbId = null,
+                communityRating = null, releaseDate = null, ssId = null, igdbId = null,
                 steamGridDbId = null, romCrc32 = null,
             )
         }

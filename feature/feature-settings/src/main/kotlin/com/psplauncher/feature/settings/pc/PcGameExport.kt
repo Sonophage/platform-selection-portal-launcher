@@ -35,7 +35,6 @@ data class PcGameExport(
     val storefront: String? = null,
     val storefrontGameId: String? = null,
     val ssId: Long? = null,
-    val tgdbId: Long? = null,
     val igdbId: Long? = null,
     val steamGridDbId: Long? = null,
     val artwork: List<PcGameExportArtwork> = emptyList(),
@@ -157,7 +156,6 @@ object PcGameExportCodec {
                 storefront = if (hasValidStorefrontPair) normalizedStore else null,
                 storefrontGameId = if (hasValidStorefrontPair) storefrontGameId else null,
                 ssId = raw.ssId.orNullIfNotPositive(),
-                tgdbId = raw.tgdbId.orNullIfNotPositive(),
                 igdbId = raw.igdbId.orNullIfNotPositive(),
                 steamGridDbId = raw.steamGridDbId.orNullIfNotPositive(),
                 artwork = raw.artwork.mapNotNull { item ->

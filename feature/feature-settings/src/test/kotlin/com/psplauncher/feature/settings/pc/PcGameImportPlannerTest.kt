@@ -264,14 +264,14 @@ class PcGameImportPlannerTest {
     @Test
     fun `an entry's artwork also seeds durable identity from the export's ids`() {
         val seeds = PcGameArtworkClaims()
-            .apply { add(entry.copy(ssId = 55, tgdbId = 66), gameId = 12) }
+            .apply { add(entry.copy(ssId = 55, igdbId = 66), gameId = 12) }
             .toIdentitySeeds()
 
         assertEquals(2, seeds.size)
         val icon = seeds.single { it.kind == "ICON" }
         assertEquals("windows", icon.platformId)
         assertEquals(55L, icon.ssId)
-        assertEquals(66L, icon.tgdbId)
+        assertEquals(66L, icon.igdbId)
         // A PC game has no ROM, so there is nothing to hash.
         assertNull(icon.romCrc32)
     }
@@ -291,7 +291,7 @@ class PcGameImportPlannerTest {
     // with nothing durable in it is exactly the case that must seed nothing.
     @Test
     fun `an export carrying no ids at all seeds nothing`() {
-        val anonymous = entry.copy(ssId = null, tgdbId = null, igdbId = null, steamGridDbId = null)
+        val anonymous = entry.copy(ssId = null, igdbId = null, steamGridDbId = null)
         val seeds = PcGameArtworkClaims()
             .apply { add(anonymous, gameId = 12) }
             .toIdentitySeeds()

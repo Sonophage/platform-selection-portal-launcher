@@ -58,7 +58,7 @@ object MetadataApply {
 
     /**
      * Text presets from one retrieval. Only providers that return text can produce one:
-     * ScreenScraper and TheGamesDB. IGDB's `IgdbGameInfo` carries cover/hero URLs and no text today,
+     * ScreenScraper. IGDB's `IgdbGameInfo` carries cover/hero URLs and no text today,
      * and SteamGridDB is artwork-only by design, so neither is offered.
      */
     fun presetsFrom(candidates: MetadataCandidates): List<MetadataPreset> = listOfNotNull(
@@ -75,14 +75,6 @@ object MetadataApply {
                 ageRating = ss.ageRating,
                 franchise = ss.franchise,
                 communityRating = ss.communityRating,
-            )
-        },
-        candidates.tgdbInfo?.let { tgdb ->
-            MetadataPreset(
-                provider = MatchProvider.THEGAMESDB,
-                title = tgdb.title,
-                description = tgdb.description,
-                releaseYear = tgdb.releaseYear,
             )
         },
     ).filterNot { it.isEmpty }

@@ -1164,9 +1164,9 @@ class GameDetailViewModelTest {
         description = "Bandicoot jumps.",
         developer = "Naughty Dog",
     )
-    private val tgdbPreset = MetadataPreset(provider = MatchProvider.THEGAMESDB, description = "TGDB text")
+    private val secondPreset = MetadataPreset(provider = MatchProvider.IGDB, description = "IGDB text")
 
-    private fun openLoadedPreview(presets: List<MetadataPreset> = listOf(ssPreset, tgdbPreset)) {
+    private fun openLoadedPreview(presets: List<MetadataPreset> = listOf(ssPreset, secondPreset)) {
         coEvery { artworkRepository.fetchMetadataPreview(1L) } returns MetadataPreview(metadataCurrent, presets)
         viewModel.loadGame(1L)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -1325,7 +1325,7 @@ class GameDetailViewModelTest {
 
         viewModel.handleGamepadAction(GamepadAction.NEXT_CATEGORY)   // ScreenScraper → TheGamesDB
         var preview = viewModel.uiState.value.metadataPreview!!
-        assertEquals(MatchProvider.THEGAMESDB, preview.preset?.provider)
+        assertEquals(MatchProvider.IGDB, preview.preset?.provider)
         assertEquals(setOf(MetadataField.DESCRIPTION), preview.chosen)
         assertEquals(preview.applyIndex, preview.focus)
 

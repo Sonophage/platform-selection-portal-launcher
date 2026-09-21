@@ -582,7 +582,6 @@ open class BackupManager @Inject constructor(
             stringPreferencesKey("sgdb_api_key"),
             stringPreferencesKey("igdb_client_id"),
             stringPreferencesKey("igdb_client_secret"),
-            stringPreferencesKey("tgdb_api_key"),
             stringPreferencesKey("ss_username"),
             stringPreferencesKey("ss_password"),
         ) +
@@ -596,7 +595,6 @@ open class BackupManager @Inject constructor(
         private val ENCRYPTED_CREDENTIAL_KEYS = setOf(
             "sgdb_api_key",
             "igdb_client_secret",
-            "tgdb_api_key",
             "ss_password",   // ss_username is a public handle and restores normally
         )
 

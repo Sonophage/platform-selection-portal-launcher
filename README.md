@@ -60,7 +60,7 @@ respective owners.*
 | <img src="docs/screenshots/settings-library-manager.jpg" width="420"> | <img src="docs/screenshots/game-drill-windows.jpg" width="420"> |
 | Library Manager — ROM roots, per-console cards, scan-all passes | PC titles (Winlator / GameNative / Steam) sit next to console games |
 | <img src="docs/screenshots/artwork-manager.jpg" width="420"> | |
-| Artwork Manager — SteamGridDB / TheGamesDB / IGDB / local | |
+| Artwork Manager — SteamGridDB / IGDB / local | |
 
 ### Media & more
 
@@ -388,14 +388,14 @@ screenshots, publisher, and total play time.
 ### 4.6 Artwork & the Artwork Studio
 
 Box art, hero banners, logos, screenshots and icons are fetched **on request**. Add a free
-**SteamGridDB** key (and optionally ScreenScraper / TheGamesDB / IGDB) in *Settings ▸ Artwork*.
+**SteamGridDB** key (and optionally ScreenScraper / IGDB) in *Settings ▸ Artwork*.
 
 - **Quick scrape** — *Settings ▸ Artwork* offers scrape-all, scrape-missing-only, and cache
   clearing. "Scrape Missing" fills only the gaps and never overwrites existing art.
 - **Artwork Studio** — from a game's **Artwork** button, a full-screen, controller-first editor with
   a tab per artwork kind (ICON0, ICON1, Box Art, 3D Box, Physical Media, Hero, Background, Logo,
   Screenshot, Manual, Video). Each tab can pull from **ScreenScraper, SteamGridDB** (with an NSFW
-  filter), **TheGamesDB, IGDB,** and **Local File**. Preview a candidate before applying (videos
+  filter), **IGDB,** and **Local File**. Preview a candidate before applying (videos
   play a muted loop, manuals page through), then commit. Press **Start** for per-slot actions:
   Adjust Crop, Restore Previous, Reset to Scraped Default, Clear, and File Info.
 - **Crop / position editor** — an aspect-locked frame per kind with the image panning and scaling
@@ -748,7 +748,7 @@ The settings rail centres on wherever you are.
 
 PFP is a **local-first** launcher: your data stays on your device. There is no analytics, no
 telemetry, and no account. PFP reaches the network only for the things you connect:
-artwork/metadata scraping (SteamGridDB, ScreenScraper, TheGamesDB, IGDB). Everything is HTTPS.
+artwork/metadata scraping (SteamGridDB, ScreenScraper, IGDB). Everything is HTTPS.
 
 **What PFP stores, and how**
 - **On-device only.** Your library, settings and artwork live in app storage. **Backup is disabled**
@@ -1010,7 +1010,7 @@ replaced by the original set. You can replace any of the seven with your own aud
 ### Game artwork & metadata
 Fetched at the user's request from third-party providers and remaining the property of their owners:
 - **SteamGridDB** — community artwork (grids, heroes, logos, icons)
-- **IGDB** and **TheGamesDB** — optional metadata / artwork sources
+- **IGDB** — optional metadata / artwork source
 
 If you are a rights holder and would like attribution changed or an asset removed, please open an
 issue and it will be addressed promptly.

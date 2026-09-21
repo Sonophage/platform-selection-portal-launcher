@@ -315,7 +315,6 @@ interface GameDao {
             community_rating = COALESCE(:communityRating, community_rating),
             release_date    = COALESCE(:releaseDate,  release_date),
             ss_id           = COALESCE(:ssId,         ss_id),
-            tgdb_id         = COALESCE(:tgdbId,       tgdb_id),
             igdb_id         = COALESCE(:igdbId,       igdb_id),
             steam_grid_db_id = COALESCE(:steamGridDbId, steam_grid_db_id),
             rom_crc32       = COALESCE(:romCrc32,     rom_crc32)
@@ -343,7 +342,6 @@ interface GameDao {
         communityRating: Float? = null,
         releaseDate: String? = null,
         ssId: Long? = null,
-        tgdbId: Long? = null,
         igdbId: Long? = null,
         steamGridDbId: Long? = null,
         romCrc32: String? = null,
@@ -415,7 +413,6 @@ interface GameDao {
         """
         UPDATE games SET
             ss_id            = CASE WHEN :provider = 'SCREENSCRAPER' THEN :providerGameId ELSE ss_id            END,
-            tgdb_id          = CASE WHEN :provider = 'THEGAMESDB'    THEN :providerGameId ELSE tgdb_id          END,
             igdb_id          = CASE WHEN :provider = 'IGDB'          THEN :providerGameId ELSE igdb_id          END,
             steam_grid_db_id = CASE WHEN :provider = 'STEAMGRIDDB'   THEN :providerGameId ELSE steam_grid_db_id END
         WHERE id = :id

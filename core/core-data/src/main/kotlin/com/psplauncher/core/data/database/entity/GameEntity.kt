@@ -129,6 +129,18 @@ data class GameEntity(
     @ColumnInfo(name = "ss_id")
     val ssId: Long? = null,
 
+    /**
+     * RETIRED. TheGamesDB was removed as a provider; nothing reads or writes this any more.
+     *
+     * The column stays because dropping one is not free here: minSdk is 29, whose SQLite has no
+     * `ALTER TABLE ... DROP COLUMN`, so the only portable way out is to rebuild the whole `games`
+     * table and its indices in a migration. That is real risk against no gain — the column is
+     * NULL on every one of the owner's 148 rows, and it was NULL on every row anywhere the moment
+     * the provider stopped writing it. Room needs the field declared to match the schema, so it
+     * is declared and documented rather than quietly left looking live.
+     *
+     * Delete it if the games table is ever rebuilt for another reason.
+     */
     @ColumnInfo(name = "tgdb_id")
     val tgdbId: Long? = null,
 
@@ -243,7 +255,6 @@ fun GameEntity.toDomain() = Game(
     releaseDate = releaseDate,
     steamGridDbId = steamGridDbId,
     ssId = ssId,
-    tgdbId = tgdbId,
     igdbId = igdbId,
     romCrc32 = romCrc32,
     artworkKey = artworkKey,
@@ -297,7 +308,6 @@ fun Game.toEntity() = GameEntity(
     releaseDate = releaseDate,
     steamGridDbId = steamGridDbId,
     ssId = ssId,
-    tgdbId = tgdbId,
     igdbId = igdbId,
     romCrc32 = romCrc32,
     artworkKey = artworkKey,

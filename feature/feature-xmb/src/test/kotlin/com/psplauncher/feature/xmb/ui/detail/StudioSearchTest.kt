@@ -62,7 +62,7 @@ class StudioSearchTest {
     @Test
     fun `source, category and query each make a different request`() {
         val base = StudioRequestKey.of("Halo", StudioSource.IGDB, ArtworkKind.HERO, false)
-        assertNotEquals(base, StudioRequestKey.of("Halo", StudioSource.THEGAMESDB, ArtworkKind.HERO, false))
+        assertNotEquals(base, StudioRequestKey.of("Halo", StudioSource.STEAMGRIDDB, ArtworkKind.HERO, false))
         assertNotEquals(base, StudioRequestKey.of("Halo", StudioSource.IGDB, ArtworkKind.LOGO, false))
         assertNotEquals(base, StudioRequestKey.of("Halo 2", StudioSource.IGDB, ArtworkKind.HERO, false))
     }

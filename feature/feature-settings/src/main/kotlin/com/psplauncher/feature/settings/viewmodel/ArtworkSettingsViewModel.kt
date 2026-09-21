@@ -25,8 +25,6 @@ import javax.inject.Inject
 data class ArtworkSettingsUiState(
     val hasApiKey: Boolean = false,
     val apiKeyMasked: String = "",
-    // TheGamesDB has no free anonymous access: without a key every lookup is skipped.
-    val hasTgdbKey: Boolean = false,
     // The Artwork Studio crop editor's live result inset. Also switchable with Ⓨ inside the editor.
     val cropPreviewEnabled: Boolean =
         com.psplauncher.core.data.repository.CropPreviewPreferences.DEFAULT_ENABLED,
@@ -95,12 +93,11 @@ data class ArtworkSettingsUiState(
 )
 
 /** The credential text fields whose in-progress contents outlive the screen. */
-enum class CredentialField { SGDB_KEY, TGDB_KEY, IGDB_CLIENT_ID, IGDB_CLIENT_SECRET, SS_USERNAME, SS_PASSWORD }
+enum class CredentialField { SGDB_KEY, IGDB_CLIENT_ID, IGDB_CLIENT_SECRET, SS_USERNAME, SS_PASSWORD }
 
 @androidx.compose.runtime.Immutable
 data class CredentialDrafts(
     val sgdbKey: String = "",
-    val tgdbKey: String = "",
     val igdbClientId: String = "",
     val igdbClientSecret: String = "",
     val ssUsername: String = "",
@@ -108,7 +105,6 @@ data class CredentialDrafts(
 ) {
     operator fun get(field: CredentialField): String = when (field) {
         CredentialField.SGDB_KEY -> sgdbKey
-        CredentialField.TGDB_KEY -> tgdbKey
         CredentialField.IGDB_CLIENT_ID -> igdbClientId
         CredentialField.IGDB_CLIENT_SECRET -> igdbClientSecret
         CredentialField.SS_USERNAME -> ssUsername
@@ -117,7 +113,6 @@ data class CredentialDrafts(
 
     fun with(field: CredentialField, value: String): CredentialDrafts = when (field) {
         CredentialField.SGDB_KEY -> copy(sgdbKey = value)
-        CredentialField.TGDB_KEY -> copy(tgdbKey = value)
         CredentialField.IGDB_CLIENT_ID -> copy(igdbClientId = value)
         CredentialField.IGDB_CLIENT_SECRET -> copy(igdbClientSecret = value)
         CredentialField.SS_USERNAME -> copy(ssUsername = value)
@@ -257,12 +252,6 @@ class ArtworkSettingsViewModel @Inject constructor(
         metadataKeyProvider.hasSsCredentialsFlow,
     ) { username, enabled, hasBoth -> Triple(username, enabled, hasBoth) }
 
-    // SteamGridDB + TheGamesDB keys as one upstream: combine's typed overloads stop at five flows.
-    private val apiKeys = combine(
-        sgdbKeyProvider.apiKeyFlow,
-        metadataKeyProvider.tgdbKeyFlow,
-    ) { sgdb, tgdb -> sgdb to tgdb }
-
     // Same pairing for IGDB: the public client id and whether the secret is actually there.
     private val igdb = combine(
         metadataKeyProvider.igdbClientIdFlow,
@@ -270,19 +259,17 @@ class ArtworkSettingsViewModel @Inject constructor(
     ) { clientId, hasBoth -> clientId to hasBoth }
 
     val uiState: StateFlow<ArtworkSettingsUiState> = combine(
-        apiKeys,
+        sgdbKeyProvider.apiKeyFlow,
         igdb,
         ssAccounts,
         scrapePreferences.preferSteamGridDbHeroesFlow,
         _extra,
-    ) { keys, igdbPair, ss, preferSgdbHeroes, extra ->
-        val (sgdbKey, tgdbKey) = keys
+    ) { sgdbKey, igdbPair, ss, preferSgdbHeroes, extra ->
         val (igdbClientId, hasIgdb) = igdbPair
         val (ssUsername, ssEnabled, hasSs) = ss
         extra.copy(
             hasApiKey             = !sgdbKey.isNullOrBlank(),
             apiKeyMasked          = if (!sgdbKey.isNullOrBlank()) "••••••" else "",
-            hasTgdbKey            = !tgdbKey.isNullOrBlank(),
             hasIgdbCredentials    = hasIgdb,
             igdbClientId          = igdbClientId ?: "",
             ssEnabled             = ssEnabled,
@@ -349,22 +336,8 @@ class ArtworkSettingsViewModel @Inject constructor(
         viewModelScope.launch { sgdbKeyProvider.clearKey() }
     }
 
-    // TheGamesDB key. MetadataApiKeyProvider has stored and read this since TheGamesDB was added,
-    // but nothing ever wrote it — so TheGamesDB was silently disabled for everyone.
     fun setCropPreviewEnabled(enabled: Boolean) {
         viewModelScope.launch { cropPreviewPreferences.setEnabled(enabled) }
-    }
-
-    fun saveTgdbKey(key: String) {
-        viewModelScope.launch {
-            val protection = metadataKeyProvider.saveTgdbKey(key.trim())
-            clearDrafts(CredentialField.TGDB_KEY)
-            warnIfUnprotected("TheGamesDB key", protection)
-        }
-    }
-
-    fun clearTgdbKey() {
-        viewModelScope.launch { metadataKeyProvider.clearTgdbKey() }
     }
 
     fun setDraft(field: CredentialField, value: String) {

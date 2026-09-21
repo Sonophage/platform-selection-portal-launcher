@@ -12,7 +12,6 @@ package com.psplauncher.feature.artwork.match
 /** A provider a game can be identified against. Kept separate from the Studio's source list. */
 enum class MatchProvider(val label: String) {
     SCREENSCRAPER("ScreenScraper"),
-    THEGAMESDB("TheGamesDB"),
     IGDB("IGDB"),
     STEAMGRIDDB("SteamGridDB"),
     STEAM_STORE("Steam"),
@@ -21,7 +20,7 @@ enum class MatchProvider(val label: String) {
 /**
  * What a provider can actually be addressed by, as the tree stands today.
  *
- * [supportsTitleSearch] is true for every provider EXCEPT Steam. The other four each have a
+ * [supportsTitleSearch] is true for every provider EXCEPT Steam. The other three each have a
  * multi-result title endpoint (ScreenScraper's jeuRecherche included); Steam's appdetails takes an
  * app id and nothing else, which is the whole reason it is worth having — it is the one provider
  * that is told which game this is instead of guessing. Saved ids and ROM checksums still resolve
@@ -32,7 +31,7 @@ enum class MatchProvider(val label: String) {
  */
 data class ProviderCapability(
     val provider: MatchProvider,
-    /** Has a persisted per-game id on `games` (`ss_id`, `tgdb_id`, `igdb_id`, `steam_grid_db_id`). */
+    /** Has a persisted per-game id on `games` (`ss_id`, `igdb_id`, `steam_grid_db_id`). */
     val addressableBySavedId: Boolean,
     /** Can be asked for a game by ROM checksum (`games.rom_crc32`). */
     val addressableByRomHash: Boolean,
@@ -56,17 +55,6 @@ object ProviderCapabilities {
             provider = MatchProvider.SCREENSCRAPER,
             addressableBySavedId = true,
             addressableByRomHash = true,
-            addressableByStorefrontId = false,
-            supportsTitleSearch = true,
-            suppliesMetadata = true,
-            suppliesArtwork = true,
-        ),
-        // Games/ByGameName returns every hit (TheGamesDbApi.searchGames), platform-filtered when the
-        // platform is mapped, so TheGamesDB backs Tier 3 and Change Match.
-        ProviderCapability(
-            provider = MatchProvider.THEGAMESDB,
-            addressableBySavedId = true,
-            addressableByRomHash = false,
             addressableByStorefrontId = false,
             supportsTitleSearch = true,
             suppliesMetadata = true,
@@ -124,9 +112,9 @@ object ProviderCapabilities {
 /**
  * One game a provider believes this ROM/installation could be. Retrieved, never written.
  *
- * [providerGameId] is a string because providers disagree on the type (SGDB and TGDB use numbers,
+ * [providerGameId] is a string because providers disagree on the type (SGDB and IGDB use numbers,
  * ScreenScraper a numeric string); it is only ever compared within one provider, never across
- * them — a tgdb_id is meaningless to IGDB.
+ * them — an ss_id is meaningless to IGDB.
  */
 data class GameCandidate(
     val provider: MatchProvider,

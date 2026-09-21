@@ -29,7 +29,6 @@ class DebugCredentialsTest {
             """
             # PlayFieldPortal debug credentials
             steamgriddb.apiKey = sgdb-key
-            thegamesdb.apiKey = tgdb-key
             igdb.clientId = igdb-id
             igdb.clientSecret = igdb-secret
             screenscraper.username = ss-user
@@ -38,7 +37,6 @@ class DebugCredentialsTest {
         )
 
         assertEquals("sgdb-key", file.steamGridDbKey)
-        assertEquals("tgdb-key", file.theGamesDbKey)
         assertEquals("igdb-id" to "igdb-secret", file.igdb)
         assertEquals("ss-user" to "ss-pass", file.screenScraper)
         assertTrue(file.problems.isEmpty())
@@ -46,10 +44,9 @@ class DebugCredentialsTest {
 
     @Test
     fun `blank and missing values are left out, not saved as empty`() {
-        val file = DebugCredentialsFile.parse("steamgriddb.apiKey =\nthegamesdb.apiKey =    \n".reader())
+        val file = DebugCredentialsFile.parse("steamgriddb.apiKey =\nigdb.clientId =    \n".reader())
 
         assertNull(file.steamGridDbKey)
-        assertNull(file.theGamesDbKey)
         assertNull(file.igdb)
         assertTrue(file.isEmpty)
         assertTrue(file.problems.isEmpty())
@@ -85,7 +82,6 @@ class DebugCredentialsTest {
 
     private fun protectedSaves() {
         coEvery { sgdb.saveKey(any()) } returns SecretProtection.PROTECTED
-        coEvery { metadata.saveTgdbKey(any()) } returns SecretProtection.PROTECTED
         coEvery { metadata.saveIgdbCredentials(any(), any()) } returns SecretProtection.PROTECTED
         coEvery { metadata.saveSsCredentials(any(), any()) } returns SecretProtection.PROTECTED
     }
@@ -96,18 +92,16 @@ class DebugCredentialsTest {
         val report = loader.apply(
             DebugCredentialsFile(
                 steamGridDbKey = "sgdb-key",
-                theGamesDbKey = "tgdb-key",
                 igdb = "igdb-id" to "igdb-secret",
                 screenScraper = "ss-user" to "ss-pass",
             ),
         )
 
         coVerify { sgdb.saveKey("sgdb-key") }
-        coVerify { metadata.saveTgdbKey("tgdb-key") }
         coVerify { metadata.saveIgdbCredentials("igdb-id", "igdb-secret") }
         coVerify { metadata.saveSsCredentials("ss-user", "ss-pass") }
         assertEquals(
-            listOf("SteamGridDB", "TheGamesDB", "IGDB", "ScreenScraper"),
+            listOf("SteamGridDB", "IGDB", "ScreenScraper"),
             report.loaded,
         )
         assertTrue(report.failed.isEmpty())
@@ -119,8 +113,8 @@ class DebugCredentialsTest {
         protectedSaves()
         loader.apply(DebugCredentialsFile(steamGridDbKey = "sgdb-key"))
 
-        coVerify(exactly = 0) { metadata.saveTgdbKey(any()) }
-        coVerify(exactly = 0) { metadata.clearTgdbKey() }
+        coVerify(exactly = 0) { metadata.saveIgdbCredentials(any(), any()) }
+        coVerify(exactly = 0) { metadata.clearIgdbCredentials() }
     }
 
     @Test
@@ -136,14 +130,14 @@ class DebugCredentialsTest {
     @Test
     fun `a store that fails is reported and the rest still save`() = runTest {
         protectedSaves()
-        coEvery { metadata.saveTgdbKey(any()) } throws java.io.IOException("disk full")
+        coEvery { metadata.saveIgdbCredentials(any(), any()) } throws java.io.IOException("disk full")
 
         val report = loader.apply(
-            DebugCredentialsFile(steamGridDbKey = "sgdb-key", theGamesDbKey = "tgdb-key", igdb = "i" to "s"),
+            DebugCredentialsFile(steamGridDbKey = "sgdb-key", igdb = "i" to "s", screenScraper = "u" to "p"),
         )
 
-        assertEquals(listOf("SteamGridDB", "IGDB"), report.loaded)
-        assertEquals(listOf("TheGamesDB"), report.failed)
+        assertEquals(listOf("SteamGridDB", "ScreenScraper"), report.loaded)
+        assertEquals(listOf("IGDB"), report.failed)
     }
 
     // ── One call from text to a status line ───────────────────────────────
@@ -151,12 +145,9 @@ class DebugCredentialsTest {
     @Test
     fun `loading text says what was filled and what went wrong`() = runTest {
         protectedSaves()
-        coEvery { metadata.saveTgdbKey(any()) } throws java.io.IOException("disk full")
-
-        val result = loader.load("steamgriddb.apiKey=k\nthegamesdb.apiKey=t\nigdb.clientId=only-half\n")
+        val result = loader.load("steamgriddb.apiKey=k\nigdb.clientId=only-half\n")
 
         assertTrue(result.status, "Loaded SteamGridDB" in result.status)
-        assertTrue(result.status, "TheGamesDB" in result.status)
         assertTrue(result.status, "igdb.clientSecret" in result.status)
         assertFalse(result.anyUnprotected)
     }

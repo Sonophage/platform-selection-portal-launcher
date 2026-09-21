@@ -375,7 +375,7 @@ class ArtworkImportManager @Inject constructor(
         val ownersByToken = HashMap<String, MutableSet<Long>>()
         games.forEach { g ->
             ArtworkIdentityIndex.tokensOf(
-                romCrc32 = g.romCrc32, ssId = g.ssId, tgdbId = g.tgdbId,
+                romCrc32 = g.romCrc32, ssId = g.ssId,
                 igdbId = g.igdbId, sgdbId = g.steamGridDbId, artworkKey = g.artworkKey,
             ).forEach { token -> ownersByToken.getOrPut(token) { mutableSetOf() }.add(g.id) }
         }
@@ -480,7 +480,6 @@ class ArtworkImportManager @Inject constructor(
                                 portableName = fileStem,
                                 romCrc32 = game.romCrc32,
                                 ssId = game.ssId,
-                                tgdbId = game.tgdbId,
                                 igdbId = game.igdbId,
                                 sgdbId = game.steamGridDbId,
                                 artworkKey = game.artworkKey,
@@ -562,7 +561,6 @@ class ArtworkImportManager @Inject constructor(
                             portableName = fileStem,
                             romCrc32 = game.romCrc32,
                             ssId = game.ssId,
-                            tgdbId = game.tgdbId,
                             igdbId = game.igdbId,
                             sgdbId = game.steamGridDbId,
                             artworkKey = game.artworkKey,

@@ -53,7 +53,6 @@ data class StudioTab(
 enum class StudioSource(val label: String) {
     SCREENSCRAPER("ScreenScraper"),
     STEAMGRIDDB("SteamGridDB"),
-    THEGAMESDB("TheGamesDB"),
     IGDB("IGDB"),
     LOCAL("Local File"),
 }
@@ -596,12 +595,12 @@ private val SS_TYPES_FOR_KIND: Map<ArtworkKind, List<String>> = mapOf(
     ArtworkKind.ICON1          to listOf("video-normalized", "video"),  // icon-slot snap
 )
 
-// Tabs SteamGridDB, TheGamesDB and IGDB have nothing for: all three are image providers, and none
+// Tabs SteamGridDB and IGDB have nothing for: both are image providers, and neither
 // offers an icon-slot snap, a PDF manual or a gameplay video. Listed but disabled there.
 private val NO_IMAGE_PROVIDER_KINDS = setOf(ArtworkKind.ICON1, ArtworkKind.MANUAL, ArtworkKind.VIDEO)
 
-// Resolved in the background when the Studio opens (AD-22). Never TheGamesDB (monthly allowance on
-// free keys) and never ScreenScraper (one request slot): those two resolve only when visited.
+// Resolved in the background when the Studio opens (AD-22). Never ScreenScraper (one request
+// slot): that one resolves only when visited.
 private val BACKGROUND_SOURCES = listOf(
     StudioSource.STEAMGRIDDB to MatchProvider.STEAMGRIDDB,
     StudioSource.IGDB to MatchProvider.IGDB,
@@ -651,7 +650,6 @@ class ArtworkStudioViewModel @Inject constructor(
     private val steamGridDb: SteamGridDbApi,
     private val screenScraper: com.psplauncher.feature.artwork.api.ScreenScraperApi,
     private val sgdbKeyProvider: SgdbApiKeyProvider,
-    private val theGamesDb: com.psplauncher.feature.artwork.TheGamesDbApi,
     private val igdbApi: com.psplauncher.feature.artwork.api.IgdbApi,
     private val videoSnapTranscoder: com.psplauncher.feature.artwork.video.VideoSnapTranscoder,
     private val matchEvidence: ProviderMatchEvidence,
@@ -752,7 +750,7 @@ class ArtworkStudioViewModel @Inject constructor(
         if (this.gameId == gameId && _uiState.value.game != null) {
             // Same game reopened. The VM outlives the screen, so a key added or removed in Settings
             // since the last open has to be re-read here — reading it once per game is what kept a
-            // freshly entered TheGamesDB key from ever taking effect.
+            // freshly entered API key from ever taking effect.
             viewModelScope.launch {
                 val before = _uiState.value.unavailableSources
                 refreshProviderAvailability()
@@ -804,13 +802,12 @@ class ArtworkStudioViewModel @Inject constructor(
     override fun sourcesForTab(): List<StudioSource> = StudioSource.entries
 
     /**
-     * Whether [source] has anything at all for [kind]. SteamGridDB, TheGamesDB and IGDB are image
+     * Whether [source] has anything at all for [kind]. SteamGridDB and IGDB are image
      * providers with no icon-slot snap, manual or gameplay video; ScreenScraper covers every tab.
      */
     private fun servesKind(source: StudioSource, kind: ArtworkKind): Boolean = when (source) {
         StudioSource.SCREENSCRAPER -> SS_TYPES_FOR_KIND.containsKey(kind)
         StudioSource.STEAMGRIDDB,
-        StudioSource.THEGAMESDB,
         StudioSource.IGDB          -> kind !in NO_IMAGE_PROVIDER_KINDS
         StudioSource.LOCAL         -> true
     }
@@ -1017,7 +1014,6 @@ class ArtworkStudioViewModel @Inject constructor(
         val fetched = when (source) {
             StudioSource.SCREENSCRAPER -> ssResults(kind, match, romLookup)
             StudioSource.STEAMGRIDDB   -> sgdbResults(kind, query, match)
-            StudioSource.THEGAMESDB    -> tgdbResults(kind, query, match)
             StudioSource.IGDB          -> igdbResults(kind, query, match)
             StudioSource.LOCAL         -> emptyList()
         }
@@ -1175,42 +1171,6 @@ class ArtworkStudioViewModel @Inject constructor(
         null
     }
 
-    /** Browsed by the matched id when there is one, exactly like [igdbResults]. */
-    private suspend fun tgdbResults(kind: ArtworkKind, query: String, match: GameMatch?): List<StudioArt> {
-        val game = _uiState.value.game ?: return emptyList()
-        val matchedId = match?.candidate
-            ?.takeIf { it.provider == MatchProvider.THEGAMESDB }
-            ?.providerGameId?.toLongOrNull()
-        // No per-open memo any more — the result cache is keyed on the query, so it already
-        // collapses repeat browses AND keeps a second query from serving the first one's art.
-        val info = runCatching {
-            if (matchedId != null) theGamesDb.fetchGameInfoById(matchedId)
-            else theGamesDb.fetchGameInfo(game.platformId, query)
-        }
-            .onFailure { Timber.w(it, "TGDB browse failed") }.getOrNull()
-            ?: return emptyList()
-        if (kind in SHOW_ALL_ART_KINDS) {
-            return listOfNotNull(
-                info.artworkUrl?.let { StudioArt(it, null, "TheGamesDB", "box art") },
-                info.heroUrl?.let { StudioArt(it, null, "TheGamesDB", "fanart") },
-                info.logoUrl?.let { StudioArt(it, null, "TheGamesDB", "clear logo") },
-            )
-        }
-        if (kind == ArtworkKind.ICON) {
-            return listOfNotNull(
-                info.artworkUrl?.let { StudioArt(it, null, "TheGamesDB", "box art · crop to tile") },
-                info.heroUrl?.let { StudioArt(it, null, "TheGamesDB", "hero · crop to tile") },
-            )
-        }
-        val url = when (kind) {
-            ArtworkKind.BOX_ART                        -> info.artworkUrl
-            ArtworkKind.HERO, ArtworkKind.BACKGROUND   -> info.heroUrl
-            ArtworkKind.LOGO                           -> info.logoUrl
-            else                                       -> null
-        } ?: return emptyList()
-        return listOf(StudioArt(url = url, thumb = null, provider = "TheGamesDB", label = "best title match"))
-    }
-
     /**
      * A matched IGDB game is browsed BY ID — the whole point of Change Match is that the art comes
      * from the game the user picked, not from whatever a title search ranks first. Unmatched, it
@@ -1346,7 +1306,6 @@ class ArtworkStudioViewModel @Inject constructor(
         val unavailable = buildSet {
             if (!screenScraper.isEnabled()) add(StudioSource.SCREENSCRAPER)
             if (sgdbKeyProvider.getKey().isNullOrBlank()) add(StudioSource.STEAMGRIDDB)
-            if (!theGamesDb.hasApiKey()) add(StudioSource.THEGAMESDB)
             if (!igdbApi.hasCredentials()) add(StudioSource.IGDB)
         }
         _uiState.update {
@@ -1406,7 +1365,6 @@ class ArtworkStudioViewModel @Inject constructor(
     private fun providerFor(source: StudioSource?): MatchProvider? = when (source) {
         StudioSource.SCREENSCRAPER -> MatchProvider.SCREENSCRAPER
         StudioSource.STEAMGRIDDB   -> MatchProvider.STEAMGRIDDB
-        StudioSource.THEGAMESDB    -> MatchProvider.THEGAMESDB
         StudioSource.IGDB          -> MatchProvider.IGDB
         StudioSource.LOCAL, null   -> null
     }

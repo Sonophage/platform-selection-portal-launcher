@@ -1,6 +1,5 @@
 package com.psplauncher.feature.artwork.match
 
-import com.psplauncher.feature.artwork.TheGamesDbApi
 import com.psplauncher.feature.artwork.api.IgdbApi
 import com.psplauncher.feature.artwork.api.ScreenScraperApi
 import com.psplauncher.feature.artwork.api.SsSearchHit
@@ -25,7 +24,6 @@ class ProviderMatchEvidence @Inject constructor(
     private val steamGridDb: SteamGridDbApi,
     private val screenScraper: ScreenScraperApi,
     private val igdbApi: IgdbApi,
-    private val theGamesDb: TheGamesDbApi,
 ) : MatchEvidenceSource {
 
     /**
@@ -82,11 +80,11 @@ class ProviderMatchEvidence @Inject constructor(
     }
 
     /**
-     * Multi-result title search: SteamGridDB's autocomplete, IGDB's `search`, TheGamesDB's
+     * Multi-result title search: SteamGridDB's autocomplete, IGDB's `search`, and
      * `ByGameName` and ScreenScraper's `jeuRecherche`. These back Tier 3 and Change Match; a saved
      * id or ROM checksum still wins first (Tiers 1-2).
      *
-     * [platformId] scopes TheGamesDB (`filter[platform]`) and ScreenScraper (`systemeid`) when the
+     * [platformId] scopes ScreenScraper (`systemeid`) when the
      * platform is mapped. SGDB indexes games rather than platform releases, and the tree has no IGDB
      * platform-id table, so those two search every platform. The matcher establishes uniqueness on
      * the returned list.
@@ -125,16 +123,6 @@ class ProviderMatchEvidence @Inject constructor(
                 title = name,
                 releaseYear = game.firstReleaseDate?.let(::yearOf),
                 thumbUrl = game.cover?.imageId?.let { IgdbApi.coverThumbUrl(it) },
-            )
-        }
-        // TheGamesDbApi rethrows cancellation and maps every other failure to an empty list too.
-        MatchProvider.THEGAMESDB -> theGamesDb.searchGames(platformId, query).mapNotNull { game ->
-            val title = game.gameTitle.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            GameCandidate(
-                provider = MatchProvider.THEGAMESDB,
-                providerGameId = game.id.toString(),
-                title = title,
-                releaseYear = game.releaseDate?.take(4)?.toIntOrNull(),
             )
         }
         // Not asked on a platform without ROM files (AD-23). ScreenScraper catalogues few of those

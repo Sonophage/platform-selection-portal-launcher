@@ -305,9 +305,6 @@ class PcGameScanner @Inject constructor(
         if (filled.ssId != original.ssId) {
             gameRepository.updateProviderMatch(id, MatchProvider.SCREENSCRAPER.name, filled.ssId)
         }
-        if (filled.tgdbId != original.tgdbId) {
-            gameRepository.updateProviderMatch(id, MatchProvider.THEGAMESDB.name, filled.tgdbId)
-        }
         if (filled.igdbId != original.igdbId) {
             gameRepository.updateProviderMatch(id, MatchProvider.IGDB.name, filled.igdbId)
         }

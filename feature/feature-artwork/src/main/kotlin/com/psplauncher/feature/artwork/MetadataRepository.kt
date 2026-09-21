@@ -31,7 +31,7 @@ import javax.inject.Singleton
 
 data class MetadataFetchResult(
     val success: Boolean,
-    val source: String,   // "screenscraper" | "thegamesdb" | "steamgriddb" | "igdb" | "none"
+    val source: String,   // "screenscraper" | "steamgriddb" | "igdb" | "none"
     val message: String,
     val scrapedTitle: String? = null,
 )
@@ -50,7 +50,6 @@ data class MetadataCandidates(
     /** ScreenScraper was served from `ss_media_cache` rather than a live jeuInfos call. */
     val usedSsCache: Boolean,
     val cachedSsId: Long?,
-    val tgdbInfo: TgdbGameInfo?,
     val igdbInfo: IgdbGameInfo?,
     val sgdbGameId: Long?,
     val sgdbGridUrl: String?,
@@ -59,12 +58,12 @@ data class MetadataCandidates(
 ) {
     /** No provider returned anything — the seam where [MetadataRepository.fetchForGame] stops. */
     val isEmpty: Boolean
-        get() = ssInfo == null && tgdbInfo == null && igdbInfo == null && sgdbGridUrl == null
+        get() = ssInfo == null && igdbInfo == null && sgdbGridUrl == null
 }
 
 // Fetches metadata + artwork from multiple sources in priority order.
 //
-// Default source priority: ScreenScraper (hash-based) → TheGamesDB → IGDB → SteamGridDB (artwork)
+// Default source priority: ScreenScraper (hash-based) → IGDB → SteamGridDB (artwork)
 //
 // ScreenScraper matches by CRC32 + size + filename (never by cleaned-up title), so it is tried
 // first and the later sources only fill the gaps it leaves. Per-asset overrides:
@@ -75,7 +74,6 @@ class MetadataRepository @Inject constructor(
     private val gameDao: GameDao,
     private val screenScraper: ScreenScraperApi,
     private val romHasher: RomHasher,
-    private val theGamesDb: TheGamesDbApi,
     private val steamGridDb: SteamGridDbApi,
     private val igdbApi: IgdbApi,
     private val sgdbKeyProvider: SgdbApiKeyProvider,
@@ -186,20 +184,11 @@ class MetadataRepository @Inject constructor(
             }
         }
 
-        // ── 2. TheGamesDB (fills what ScreenScraper left open) ────────────────
-        var tgdbInfo: TgdbGameInfo? = null
-        if (ssInfo == null || ssInfo.artworkUrl == null || ssInfo.description == null) {
-            onAssetProgress?.invoke("TheGamesDB", "Searching…")
-            tgdbInfo = runCatching {
-                theGamesDb.fetchGameInfo(platformId = platformId, title = bestTitle)
-            }.onFailure { Timber.w(it, "TheGamesDB error for '$bestTitle'") }.getOrNull()
-        }
-
-        // ── 3. IGDB (secondary artwork; skipped on metadata-only runs) ────────
+        // ── 2. IGDB (secondary artwork; skipped on metadata-only runs) ────────
         var igdbInfo: IgdbGameInfo? = null
         if (igdbApi.hasCredentials() && !options.metadataOnly) {
-            val needsBoxArt = ssInfo?.artworkUrl == null && tgdbInfo?.artworkUrl == null
-            val needsHero   = ssInfo?.heroUrl == null && tgdbInfo?.heroUrl == null
+            val needsBoxArt = ssInfo?.artworkUrl == null
+            val needsHero   = ssInfo?.heroUrl == null
             if (needsBoxArt || needsHero) {
                 onAssetProgress?.invoke("IGDB", "Searching…")
                 igdbInfo = runCatching {
@@ -235,7 +224,6 @@ class MetadataRepository @Inject constructor(
             romIdentity = romIdentity,
             usedSsCache = usedSsCache,
             cachedSsId  = cachedSsId,
-            tgdbInfo    = tgdbInfo,
             igdbInfo    = igdbInfo,
             sgdbGameId  = sgdbGameId,
             sgdbGridUrl = sgdbGridUrl,
@@ -266,7 +254,6 @@ class MetadataRepository @Inject constructor(
         val romIdentity = candidates.romIdentity
         val usedSsCache = candidates.usedSsCache
         val cachedSsId  = candidates.cachedSsId
-        val tgdbInfo    = candidates.tgdbInfo
         val igdbInfo    = candidates.igdbInfo
         val sgdbGameId  = candidates.sgdbGameId
         val sgdbGridUrl = candidates.sgdbGridUrl
@@ -274,17 +261,17 @@ class MetadataRepository @Inject constructor(
         val sgdbLogoUrl = candidates.sgdbLogoUrl
 
         // ── Assemble per-asset winners ─────────────────────────────────────────
-        val finalBoxArtUrl = ssInfo?.artworkUrl ?: tgdbInfo?.artworkUrl ?: igdbInfo?.artworkUrl ?: sgdbGridUrl
+        val finalBoxArtUrl = ssInfo?.artworkUrl ?: igdbInfo?.artworkUrl ?: sgdbGridUrl
         val finalHeroUrl   = if (options.preferSteamGridDbHeroes)
-            sgdbHeroUrl ?: ssInfo?.heroUrl ?: tgdbInfo?.heroUrl ?: igdbInfo?.heroUrl
+            sgdbHeroUrl ?: ssInfo?.heroUrl ?: igdbInfo?.heroUrl
         else
-            ssInfo?.heroUrl ?: tgdbInfo?.heroUrl ?: igdbInfo?.heroUrl ?: sgdbHeroUrl
+            ssInfo?.heroUrl ?: igdbInfo?.heroUrl ?: sgdbHeroUrl
         val finalLogoUrl = if (options.downloadClearLogos)
-            ssInfo?.logoUrl ?: igdbInfo?.logoUrl ?: tgdbInfo?.logoUrl ?: sgdbLogoUrl
+            ssInfo?.logoUrl ?: igdbInfo?.logoUrl ?: sgdbLogoUrl
         else null
 
         // ── Download to disk ───────────────────────────────────────────────────
-        val src = primarySource(ssInfo, tgdbInfo, igdbInfo, sgdbGridUrl)
+        val src = primarySource(ssInfo, igdbInfo, sgdbGridUrl)
 
         // Dead-URL fallback bookkeeping: kinds whose CACHED ScreenScraper URL failed to
         // download. Only meaningful on cache-hit runs; live-URL failures keep old behavior.
@@ -320,9 +307,9 @@ class MetadataRepository @Inject constructor(
         logoPath = finalLogoUrl?.let { savedTracked(ArtworkKind.LOGO, it, fromSs = it == ssInfo?.logoUrl) }
 
         // Icon-display-mode tiles — small images, always fetched (no toggles). Box art accepts
-        // TGDB/IGDB covers as fallback; SGDB grids are stylized, not boxes, so they stay out.
+        // IGDB covers as fallback; SGDB grids are stylized, not boxes, so they stay out.
         // Physical media and 3D boxes are ScreenScraper-only.
-        val boxArtSrcUrl = ssInfo?.boxArtUrl ?: tgdbInfo?.artworkUrl ?: igdbInfo?.artworkUrl
+        val boxArtSrcUrl = ssInfo?.boxArtUrl ?: igdbInfo?.artworkUrl
         if (boxArtSrcUrl != null) onAssetProgress?.invoke(src, "Box Art")
         boxArtPath = boxArtSrcUrl?.let { savedTracked(ArtworkKind.BOX_ART, it, fromSs = it == ssInfo?.boxArtUrl) }
         physicalMediaPath = ssInfo?.physicalMediaUrl?.let {
@@ -383,18 +370,18 @@ class MetadataRepository @Inject constructor(
 
         }   // end !options.metadataOnly
 
-        // Scraped title: ScreenScraper's canonical name, TheGamesDB fallback. Deliberately NOT
+        // Scraped title: ScreenScraper's canonical name. Deliberately NOT
         // written through updateMetadata below — see the fill-only write after it.
-        val newScrapedTitle = ssInfo?.title ?: tgdbInfo?.title
+        val newScrapedTitle = ssInfo?.title
         val existingOverride = gameEntity?.userTitleOverride
 
         // ── Persist metadata (COALESCE in SQL preserves existing non-null values) ─
         gameDao.updateMetadata(
             id           = gameId,
-            description  = ssInfo?.description ?: tgdbInfo?.description,
+            description  = ssInfo?.description,
             developer    = ssInfo?.developer,
             publisher    = ssInfo?.publisher,
-            releaseYear  = ssInfo?.releaseYear ?: tgdbInfo?.releaseYear,
+            releaseYear  = ssInfo?.releaseYear,
             genre        = ssInfo?.genre,
             // Metadata-only runs pass null artwork columns — COALESCE leaves them untouched.
             artworkUri   = if (options.metadataOnly) null else backgroundPath ?: finalHeroUrl ?: finalBoxArtUrl,
@@ -409,7 +396,6 @@ class MetadataRepository @Inject constructor(
             communityRating = ssInfo?.communityRating,
             releaseDate  = ssInfo?.releaseDate,
             ssId         = ssInfo?.ssId,
-            tgdbId       = tgdbInfo?.tgdbId,
             steamGridDbId = sgdbGameId,
             romCrc32     = romIdentity?.crc32,
         )
@@ -486,10 +472,9 @@ class MetadataRepository @Inject constructor(
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private fun primarySource(ss: SsGameInfo?, tgdb: TgdbGameInfo?, igdb: IgdbGameInfo?, sgdbUrl: String?): String =
+    private fun primarySource(ss: SsGameInfo?, igdb: IgdbGameInfo?, sgdbUrl: String?): String =
         when {
             ss != null      -> "screenscraper"
-            tgdb != null    -> "thegamesdb"
             igdb != null    -> "igdb"
             sgdbUrl != null -> "steamgriddb"
             else            -> "mixed"

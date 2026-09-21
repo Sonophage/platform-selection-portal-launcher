@@ -19,7 +19,6 @@ class ProviderMatchEvidenceScreenScraperTest {
         steamGridDb = mockk(relaxed = true),
         screenScraper = screenScraper,
         igdbApi = mockk(relaxed = true),
-        theGamesDb = mockk(relaxed = true),
     )
 
     private fun hit(ssId: Long, systemId: Int, systemName: String) =
@@ -44,7 +43,7 @@ class ProviderMatchEvidenceScreenScraperTest {
     fun `only ScreenScraper on Windows skips the platform search`() {
         assertTrue(evidence.searchesEveryPlatformFirst(MatchProvider.SCREENSCRAPER, "windows"))
         assertFalse(evidence.searchesEveryPlatformFirst(MatchProvider.SCREENSCRAPER, "psx"))
-        assertFalse(evidence.searchesEveryPlatformFirst(MatchProvider.THEGAMESDB, "windows"))
+        assertFalse(evidence.searchesEveryPlatformFirst(MatchProvider.IGDB, "windows"))
     }
 
     @Test

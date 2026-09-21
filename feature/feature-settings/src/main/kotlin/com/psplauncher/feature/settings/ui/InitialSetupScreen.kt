@@ -210,7 +210,6 @@ fun InitialSetupScreen(
             SetupStep.SERVICES -> ServicesPage(
                 state = state,
                 onConnectSgdb = viewModel::connectSgdb,
-                onConnectTgdb = viewModel::connectTgdb,
                 onTestIgdb = viewModel::testIgdbCredentials,
                 onConnectIgdb = viewModel::connectIgdb,
                 onTestSs = viewModel::testSsCredentials,
@@ -267,7 +266,7 @@ private fun hintFor(step: SetupStep): String? = when (step) {
     SetupStep.VIDEO     -> "Add several roots to span internal storage and an SD card."
     SetupStep.PHOTO     -> "Add several roots to span internal storage and an SD card."
     SetupStep.ARTWORK   -> "One folder hosts the artwork library — you can import into it right after."
-    SetupStep.SERVICES  -> "All optional and free. SteamGridDB, TheGamesDB, IGDB, and ScreenScraper fetch game artwork and metadata."
+    SetupStep.SERVICES  -> "All optional and free. SteamGridDB, IGDB, and ScreenScraper fetch game artwork and metadata."
     SetupStep.VITA      -> "Vita3K is installed — one grant links every installed Vita title for discovery and trophies."
     SetupStep.RETROARCH -> "Lets the launcher know exactly which cores you have, so only those are offered."
     SetupStep.FINISH    -> "Everything below can be adjusted anytime in Settings."
@@ -437,7 +436,6 @@ private fun InitialSetupUiState.sizeLabelForSources(): String {
 private fun ServicesPage(
     state: InitialSetupUiState,
     onConnectSgdb: (String) -> Unit,
-    onConnectTgdb: (String) -> Unit,
     onTestIgdb: (String, String) -> Unit,
     onConnectIgdb: (String, String) -> Unit,
     onTestSs: (String, String) -> Unit,
@@ -446,14 +444,13 @@ private fun ServicesPage(
     nextLabel: String,
 ) {
     var sgdbKeyDraft by remember(state.hasSgdb) { mutableStateOf("") }
-    var tgdbKeyDraft by remember(state.hasTgdb) { mutableStateOf("") }
     var igdbIdDraft by remember(state.hasIgdb) { mutableStateOf("") }
     var igdbSecretDraft by remember(state.hasIgdb) { mutableStateOf("") }
     var ssUserDraft by remember(state.hasScreenScraper) { mutableStateOf("") }
     var ssPassDraft by remember(state.hasScreenScraper) { mutableStateOf("") }
 
     WizardInfoText(
-        "All accounts are optional and free. SteamGridDB, TheGamesDB, IGDB, and ScreenScraper " +
+        "All accounts are optional and free. SteamGridDB, IGDB, and ScreenScraper " +
             "fetch game artwork and metadata for your library."
     )
 
@@ -470,22 +467,6 @@ private fun ServicesPage(
         WizardRow(label = "Connect SteamGridDB", onClick = { onConnectSgdb(sgdbKeyDraft) })
     }
 
-    // ── TheGamesDB ────────────────────────────────────────────────────────────
-    // Same shape as SteamGridDB: one free API key. Mirrors the card in Settings ▸ Artwork, and
-    // writes through the same MetadataApiKeyProvider, so either place configures the other.
-    WizardSectionHeader("TheGamesDB")
-    WizardTextField(
-        label = if (state.hasTgdb) "API Key (saved)" else "API Key",
-        value = tgdbKeyDraft,
-        onValueChange = { tgdbKeyDraft = it },
-        placeholder = if (state.hasTgdb) "••••••••  (tap to replace)" else "Paste your TheGamesDB key",
-        isPassword = true,
-    )
-    if (tgdbKeyDraft.isNotBlank()) {
-        WizardRow(label = "Connect TheGamesDB", onClick = { onConnectTgdb(tgdbKeyDraft) })
-    }
-
-    // ── IGDB (Twitch) ─────────────────────────────────────────────────────────
     WizardSectionHeader("IGDB (Twitch)")
     WizardTextField(
         label = if (state.hasIgdb) "Client ID (saved)" else "Client ID",
@@ -626,7 +607,6 @@ private fun FinishPage(
     WizardValueRow(label = "Photo", value = rootsShortLabel(state.photoRoots))
     WizardValueRow(label = "Artwork Library", value = state.artworkFolderName ?: "Not set")
     WizardValueRow(label = "SteamGridDB", value = if (state.hasSgdb) "Connected" else "Not set")
-    WizardValueRow(label = "TheGamesDB", value = if (state.hasTgdb) "Connected" else "Not set")
     WizardValueRow(label = "IGDB (Twitch)", value = state.igdbClientId.ifBlank { "Not set" })
     if (state.ssEnabled) {
         WizardValueRow(label = "ScreenScraper", value = state.ssUsername.ifBlank { "Not set" })
@@ -846,18 +826,16 @@ private fun ServicesPagePreview() {
     WizardPagePreview(
         stepNumber = 7,
         heading = "Connect your artwork sources.",
-        hint = "All optional and free. SteamGridDB, TheGamesDB, IGDB, and ScreenScraper fetch game artwork and metadata.",
+        hint = "All optional and free. SteamGridDB, IGDB, and ScreenScraper fetch game artwork and metadata.",
     ) {
         ServicesPage(
             state = InitialSetupUiState(
                 hasSgdb = true,
-                hasTgdb = true,
                 igdbClientId = "client_id_abc",
                 ssEnabled = true,
                 ssUsername = "scraper_user",
             ),
             onConnectSgdb = {},
-            onConnectTgdb = {},
             onTestIgdb = { _, _ -> },
             onConnectIgdb = { _, _ -> },
             onTestSs = { _, _ -> },

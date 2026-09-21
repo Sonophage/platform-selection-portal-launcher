@@ -4,8 +4,6 @@ import android.content.Context
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.repository.GameRepository
-import com.psplauncher.feature.artwork.TgdbGameInfo
-import com.psplauncher.feature.artwork.TheGamesDbApi
 import com.psplauncher.feature.artwork.api.IgdbApi
 import com.psplauncher.feature.artwork.api.IgdbGameInfo
 import com.psplauncher.feature.artwork.api.SgdbApiKeyProvider
@@ -58,7 +56,6 @@ class ArtworkStudioViewModelTest {
     private lateinit var ssMediaCatalog: SsMediaCatalog
     private lateinit var steamGridDb: SteamGridDbApi
     private lateinit var sgdbKeyProvider: SgdbApiKeyProvider
-    private lateinit var theGamesDb: TheGamesDbApi
     private lateinit var igdbApi: IgdbApi
     private lateinit var videoSnapTranscoder: VideoSnapTranscoder
     private lateinit var matchEvidence: com.psplauncher.feature.artwork.match.ProviderMatchEvidence
@@ -82,7 +79,6 @@ class ArtworkStudioViewModelTest {
         ssMediaCatalog = mockk(relaxed = true)
         steamGridDb = mockk(relaxed = true)
         sgdbKeyProvider = mockk(relaxed = true)
-        theGamesDb = mockk(relaxed = true)
         igdbApi = mockk(relaxed = true)
         videoSnapTranscoder = mockk(relaxed = true)
         matchEvidence = mockk(relaxed = true)
@@ -94,7 +90,6 @@ class ArtworkStudioViewModelTest {
         coEvery { gameRepository.getById(1L) } returns game
         coEvery { sgdbKeyProvider.getKey() } returns "sgdb-key"
         coEvery { igdbApi.hasCredentials() } returns true
-        coEvery { theGamesDb.hasApiKey() } returns true
         coEvery { artworkStore.find(any(), any(), any()) } returns null
         coEvery { ssMediaCatalog.mediasFor(any(), any()) } returns emptyList()
         // SteamGridDB's autocomplete, as the Studio asks it (task M.2): one hit, not an exact title
@@ -103,7 +98,6 @@ class ArtworkStudioViewModelTest {
             matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.STEAMGRIDDB, any(), any())
         } returns listOf(sgdbCandidate("77", "Crash"))
         coEvery { steamGridDb.getArt(any(), any(), any(), any(), any()) } returns Result.success(emptyList())
-        coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns null
         coEvery { igdbApi.fetchGameInfo(any(), any()) } returns null
     }
 
@@ -129,7 +123,7 @@ class ArtworkStudioViewModelTest {
 
     private fun viewModel() = ArtworkStudioViewModel(
         context, gameRepository, artworkStore, routingStore, ssMediaCatalog,
-        steamGridDb, screenScraperApi, sgdbKeyProvider, theGamesDb, igdbApi,
+        steamGridDb, screenScraperApi, sgdbKeyProvider, igdbApi,
         videoSnapTranscoder, matchEvidence,
         cropPreviewPreferences,
         // Nothing kept between opens: these tests count what each open asks.
@@ -248,7 +242,7 @@ class ArtworkStudioViewModelTest {
             coEvery { steamGridDb.getArt(any(), any(), any(), any(), any()) } coAnswers {
                 Result.success(slow.await())
             }
-            coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns tgdb("tgdb-hero")
+            coEvery { igdbApi.fetchGameInfo(any(), any()) } returns igdb("igdb-hero")
 
             val vm = viewModel()
             vm.load(1L)
@@ -260,10 +254,10 @@ class ArtworkStudioViewModelTest {
             assertTrue("SGDB should still be in flight", vm.uiState.value.resultsLoading)
 
             // The user gives up on SteamGridDB and switches.
-            vm.selectSource(sources.indexOf(StudioSource.THEGAMESDB))
+            vm.selectSource(sources.indexOf(StudioSource.IGDB))
             advanceUntilIdle()
             val afterSwitch = vm.uiState.value.results
-            assertEquals(listOf("tgdb-hero"), afterSwitch.map { it.url })
+            assertEquals(listOf("igdb-hero"), afterSwitch.map { it.url })
 
             // SteamGridDB finally answers.
             slow.complete(listOf(SgdbArtItem(id = 9L, url = "sgdb-late")))
@@ -280,7 +274,7 @@ class ArtworkStudioViewModelTest {
     fun `switching source never leaves the previous provider's tiles on screen`() =
         runTest(testDispatcher) {
             val slow = CompletableDeferred<List<SgdbArtItem>>()
-            coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns tgdb("tgdb-hero")
+            coEvery { igdbApi.fetchGameInfo(any(), any()) } returns igdb("igdb-hero")
             coEvery { steamGridDb.getArt(any(), any(), any(), any(), any()) } coAnswers {
                 Result.success(slow.await())
             }
@@ -290,14 +284,14 @@ class ArtworkStudioViewModelTest {
             advanceUntilIdle()
 
             val sources = vm.sourcesForTab()
-            vm.selectSource(sources.indexOf(StudioSource.THEGAMESDB))
+            vm.selectSource(sources.indexOf(StudioSource.IGDB))
             advanceUntilIdle()
             assertEquals(1, vm.uiState.value.results.size)
 
             vm.selectSource(sources.indexOf(StudioSource.STEAMGRIDDB))
             advanceUntilIdle()
 
-            // Skeletons, not TheGamesDB's art.
+            // Skeletons, not IGDB's art.
             assertTrue(vm.uiState.value.resultsLoading)
             assertTrue(vm.uiState.value.results.isEmpty())
             assertEquals(StudioGridCapacity.UNMEASURED.pageSize, vm.uiState.value.skeletonCount)
@@ -309,22 +303,22 @@ class ArtworkStudioViewModelTest {
     @Test
     fun `returning to a source already browsed renders from cache without refetching`() =
         runTest(testDispatcher) {
-            coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns tgdb("tgdb-hero")
+            coEvery { igdbApi.fetchGameInfo(any(), any()) } returns igdb("igdb-hero")
             coEvery { igdbApi.fetchGameInfo(any(), any()) } returns igdb("igdb-hero")
 
-            val vm = loadedOn(StudioSource.THEGAMESDB)
+            val vm = loadedOn(StudioSource.IGDB)
             val sources = vm.sourcesForTab()
 
             vm.selectSource(sources.indexOf(StudioSource.IGDB))
             advanceUntilIdle()
-            vm.selectSource(sources.indexOf(StudioSource.THEGAMESDB))
+            vm.selectSource(sources.indexOf(StudioSource.IGDB))
             advanceUntilIdle()
 
-            assertEquals(listOf("tgdb-hero"), vm.uiState.value.results.map { it.url })
+            assertEquals(listOf("igdb-hero"), vm.uiState.value.results.map { it.url })
             // Instant: a cache hit never shows a loading state...
             assertFalse(vm.uiState.value.resultsLoading)
             // ...and never hits the provider a second time.
-            coVerify(exactly = 1) { theGamesDb.fetchGameInfo(any(), any()) }
+            coVerify(exactly = 1) { igdbApi.fetchGameInfo(any(), any()) }
         }
 
     // ── Mature is SteamGridDB's alone (task 1.3) ──────────────────────────────
@@ -332,9 +326,9 @@ class ArtworkStudioViewModelTest {
     @Test
     fun `toggling mature refetches SteamGridDB and leaves other sources' caches intact`() =
         runTest(testDispatcher) {
-            coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns tgdb("tgdb-hero")
+            coEvery { igdbApi.fetchGameInfo(any(), any()) } returns igdb("igdb-hero")
 
-            val vm = loadedOn(StudioSource.THEGAMESDB)
+            val vm = loadedOn(StudioSource.IGDB)
             val sources = vm.sourcesForTab()
             vm.selectSource(sources.indexOf(StudioSource.STEAMGRIDDB))
             advanceUntilIdle()
@@ -345,11 +339,11 @@ class ArtworkStudioViewModelTest {
             assertTrue(vm.uiState.value.includeNsfw)
             coVerify(exactly = 2) { steamGridDb.getArt(any(), any(), any(), any(), any()) }
 
-            // TheGamesDB's page is still cached: going back does not re-hit it.
-            vm.selectSource(sources.indexOf(StudioSource.THEGAMESDB))
+            // IGDB's page is still cached: going back does not re-hit it.
+            vm.selectSource(sources.indexOf(StudioSource.IGDB))
             advanceUntilIdle()
-            assertEquals(listOf("tgdb-hero"), vm.uiState.value.results.map { it.url })
-            coVerify(exactly = 1) { theGamesDb.fetchGameInfo(any(), any()) }
+            assertEquals(listOf("igdb-hero"), vm.uiState.value.results.map { it.url })
+            coVerify(exactly = 1) { igdbApi.fetchGameInfo(any(), any()) }
         }
 
     @Test
@@ -885,11 +879,11 @@ class ArtworkStudioViewModelTest {
     @Test
     fun `skeletons fill the measured page`() = runTest(testDispatcher) {
         val slow = CompletableDeferred<List<SgdbArtItem>>()
-        coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns tgdb("tgdb-hero")
+        coEvery { igdbApi.fetchGameInfo(any(), any()) } returns igdb("igdb-hero")
         coEvery { steamGridDb.getArt(any(), any(), any(), any(), any()) } coAnswers {
             Result.success(slow.await())
         }
-        val vm = loadedOn(StudioSource.THEGAMESDB)
+        val vm = loadedOn(StudioSource.IGDB)
         vm.onGridMeasured(635f, 259f)
 
         vm.selectSource(vm.sourcesForTab().indexOf(StudioSource.STEAMGRIDDB))
@@ -965,7 +959,7 @@ class ArtworkStudioViewModelTest {
         // Every provider now has a multi-result title search, ScreenScraper's jeuRecherche included.
         assertTrue(loadedOn(StudioSource.STEAMGRIDDB).uiState.value.canChangeMatch)
         assertTrue(loadedOn(StudioSource.IGDB).uiState.value.canChangeMatch)
-        assertTrue(loadedOn(StudioSource.THEGAMESDB).uiState.value.canChangeMatch)
+        assertTrue(loadedOn(StudioSource.IGDB).uiState.value.canChangeMatch)
         assertTrue(loadedOn(StudioSource.SCREENSCRAPER).uiState.value.canChangeMatch)
     }
 
@@ -982,55 +976,55 @@ class ArtworkStudioViewModelTest {
         }
     }
 
-    /** Without a key TheGamesDB is disabled and skipped — never hidden, and never asked. */
+    /** Without credentials IGDB is disabled and skipped — never hidden, and never asked. */
     @Test
-    fun `a keyless TheGamesDB stays listed but disabled, is refused, and is skipped by cycling`() =
+    fun `a credential-less IGDB stays listed but disabled, is refused, and is skipped by cycling`() =
         runTest(testDispatcher) {
-            coEvery { theGamesDb.hasApiKey() } returns false
+            coEvery { igdbApi.hasCredentials() } returns false
 
             val vm = viewModel()
             vm.load(1L)
             advanceUntilIdle()
 
             val sources = vm.sourcesForTab()
-            val tgdb = sources.indexOf(StudioSource.THEGAMESDB)
-            assertTrue("still listed", tgdb >= 0)
-            assertTrue(StudioSource.THEGAMESDB in vm.uiState.value.unavailableSources)
+            val igdbIndex = sources.indexOf(StudioSource.IGDB)
+            assertTrue("still listed", igdbIndex >= 0)
+            assertTrue(StudioSource.IGDB in vm.uiState.value.unavailableSources)
 
             // Picking it directly explains instead of switching.
-            vm.selectSource(tgdb)
+            vm.selectSource(igdbIndex)
             advanceUntilIdle()
-            assertTrue(sources[vm.uiState.value.sourceIndex] != StudioSource.THEGAMESDB)
-            assertTrue(vm.uiState.value.message?.contains("TheGamesDB") == true)
+            assertTrue(sources[vm.uiState.value.sourceIndex] != StudioSource.IGDB)
+            assertTrue(vm.uiState.value.message?.contains("IGDB") == true)
 
             // Cycling from the source before it steps straight over it.
-            vm.selectSource(tgdb - 1)
+            vm.selectSource(igdbIndex - 1)
             advanceUntilIdle()
             vm.cycleSource(+1)
             advanceUntilIdle()
-            assertEquals(sources[tgdb + 1], sources[vm.uiState.value.sourceIndex])
+            assertEquals(sources[igdbIndex + 1], sources[vm.uiState.value.sourceIndex])
 
-            coVerify(exactly = 0) { theGamesDb.fetchGameInfo(any(), any()) }
+            coVerify(exactly = 0) { igdbApi.fetchGameInfo(any(), any()) }
         }
 
     /** The reported bug: a key entered in Settings never took effect for a game already opened. */
     @Test
     fun `a key added after the Studio was opened is picked up on the next open`() = runTest(testDispatcher) {
-        coEvery { theGamesDb.hasApiKey() } returns false
+        coEvery { igdbApi.hasCredentials() } returns false
         val vm = viewModel()
         vm.load(1L)
         advanceUntilIdle()
-        assertTrue(StudioSource.THEGAMESDB in vm.uiState.value.unavailableSources)
+        assertTrue(StudioSource.IGDB in vm.uiState.value.unavailableSources)
 
         // The user adds the key in Settings, then reopens the Studio for the same game.
-        coEvery { theGamesDb.hasApiKey() } returns true
+        coEvery { igdbApi.hasCredentials() } returns true
         vm.load(1L)
         advanceUntilIdle()
 
-        assertFalse(StudioSource.THEGAMESDB in vm.uiState.value.unavailableSources)
-        vm.selectSource(vm.sourcesForTab().indexOf(StudioSource.THEGAMESDB))
+        assertFalse(StudioSource.IGDB in vm.uiState.value.unavailableSources)
+        vm.selectSource(vm.sourcesForTab().indexOf(StudioSource.IGDB))
         advanceUntilIdle()
-        assertEquals(StudioSource.THEGAMESDB, vm.sourcesForTab()[vm.uiState.value.sourceIndex])
+        assertEquals(StudioSource.IGDB, vm.sourcesForTab()[vm.uiState.value.sourceIndex])
     }
 
     /** The reported case: IGDB had the game, and the Studio said "No IGDB match". */
@@ -1051,27 +1045,6 @@ class ArtworkStudioViewModelTest {
 
         assertEquals("IGDB:1234", vm.uiState.value.match?.matchKey)
         assertEquals(listOf("igdb-by-id"), vm.uiState.value.results.map { it.url })
-    }
-
-    @Test
-    fun `a unique exact TheGamesDB title matches and the grid browses that game by id`() = runTest(testDispatcher) {
-        coEvery {
-            matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.THEGAMESDB, any(), any())
-        } returns listOf(
-            com.psplauncher.feature.artwork.match.GameCandidate(
-                provider = com.psplauncher.feature.artwork.match.MatchProvider.THEGAMESDB,
-                providerGameId = "55",
-                title = "Cr4sh Bandicoot",
-            ),
-        )
-        coEvery { theGamesDb.fetchGameInfoById(55L) } returns tgdb("tgdb-by-id")
-
-        val vm = loadedOn(StudioSource.THEGAMESDB)
-
-        assertEquals("THEGAMESDB:55", vm.uiState.value.match?.matchKey)
-        assertEquals(listOf("tgdb-by-id"), vm.uiState.value.results.map { it.url })
-        // The match is scoped to the game's own platform, not searched across every system.
-        coVerify { matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.THEGAMESDB, any(), "psx") }
     }
 
     /**
@@ -1184,7 +1157,7 @@ class ArtworkStudioViewModelTest {
         val vm = loadedOn(StudioSource.IGDB)
         val sources = vm.sourcesForTab()
 
-        vm.selectSource(sources.indexOf(StudioSource.THEGAMESDB))
+        vm.selectSource(sources.indexOf(StudioSource.IGDB))
         advanceUntilIdle()
         vm.selectSource(sources.indexOf(StudioSource.IGDB))
         advanceUntilIdle()
@@ -1201,30 +1174,30 @@ class ArtworkStudioViewModelTest {
     @Test
     fun `switching tabs keeps the match and never browses without it`() = runTest(testDispatcher) {
         coEvery {
-            matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.THEGAMESDB, any(), any())
+            matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.IGDB, any(), any())
         } returns listOf(
             com.psplauncher.feature.artwork.match.GameCandidate(
-                provider = com.psplauncher.feature.artwork.match.MatchProvider.THEGAMESDB,
+                provider = com.psplauncher.feature.artwork.match.MatchProvider.IGDB,
                 providerGameId = "55",
                 title = "Cr4sh Bandicoot",
             ),
         )
-        coEvery { theGamesDb.fetchGameInfoById(55L) } returns tgdb("tgdb-by-id")
-        val vm = loadedOn(StudioSource.THEGAMESDB)
+        coEvery { igdbApi.fetchGameInfoById(55L) } returns igdb("igdb-by-id")
+        val vm = loadedOn(StudioSource.IGDB)
 
-        // A tab change lands on the first source, so each tab is walked back to TheGamesDB.
+        // A tab change lands on the first source, so each tab is walked back to IGDB.
         listOf(ArtworkKind.BOX_ART, ArtworkKind.LOGO).forEach { kind ->
             vm.selectTab(STUDIO_TABS.indexOfFirst { it.kind == kind })
             advanceUntilIdle()
-            vm.selectSource(vm.sourcesForTab().indexOf(StudioSource.THEGAMESDB))
+            vm.selectSource(vm.sourcesForTab().indexOf(StudioSource.IGDB))
             advanceUntilIdle()
-            assertEquals("THEGAMESDB:55", vm.uiState.value.match?.matchKey)
+            assertEquals("IGDB:55", vm.uiState.value.match?.matchKey)
         }
 
-        coVerify(exactly = 0) { theGamesDb.fetchGameInfo(any(), any()) }
-        coVerify(exactly = 3) { theGamesDb.fetchGameInfoById(55L) }
+        coVerify(exactly = 0) { igdbApi.fetchGameInfo(any(), any()) }
+        coVerify(exactly = 3) { igdbApi.fetchGameInfoById(55L) }
         coVerify(exactly = 1) {
-            matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.THEGAMESDB, any(), any())
+            matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.IGDB, any(), any())
         }
     }
 
@@ -1349,7 +1322,7 @@ class ArtworkStudioViewModelTest {
 
         vm.load(1L)
         advanceUntilIdle()
-        vm.selectSource(sources.indexOf(StudioSource.THEGAMESDB))
+        vm.selectSource(sources.indexOf(StudioSource.IGDB))
         advanceUntilIdle()
         vm.selectSource(sources.indexOf(StudioSource.IGDB))
         advanceUntilIdle()
@@ -1417,7 +1390,7 @@ class ArtworkStudioViewModelTest {
     )
 
     @Test
-    fun `opening the Studio resolves SteamGridDB and IGDB in the background, never TheGamesDB`() =
+    fun `opening the Studio resolves SteamGridDB and IGDB in the background, never ScreenScraper`() =
         runTest(testDispatcher) {
             val vm = viewModel()
             vm.load(1L)   // lands on ScreenScraper
@@ -1428,9 +1401,6 @@ class ArtworkStudioViewModelTest {
             }
             coVerify(exactly = 1) {
                 matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.IGDB, any(), any())
-            }
-            coVerify(exactly = 0) {
-                matchEvidence.searchByTitle(com.psplauncher.feature.artwork.match.MatchProvider.THEGAMESDB, any(), any())
             }
             // ScreenScraper only by its own visit, and nothing browsed for the background providers.
             coVerify(exactly = 1) {
@@ -1727,7 +1697,7 @@ class ArtworkStudioViewModelTest {
      */
     @Test
     fun `a browse cancelled by a source switch is never cached as No results`() = runTest(testDispatcher) {
-        coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns tgdb("tgdb-hero")
+        coEvery { igdbApi.fetchGameInfo(any(), any()) } returns igdb("igdb-hero")
         val never = CompletableDeferred<Unit>()
         var igdbCalls = 0
         coEvery { igdbApi.fetchGameInfo(any(), any()) } coAnswers {
@@ -1741,13 +1711,15 @@ class ArtworkStudioViewModelTest {
             }
         }
 
-        val vm = loadedOn(StudioSource.THEGAMESDB)
+        // Two distinct sources are the point: load on one, switch to IGDB while it hangs,
+        // switch away and back. TheGamesDB was the other one; SteamGridDB stands in.
+        val vm = loadedOn(StudioSource.STEAMGRIDDB)
         val sources = vm.sourcesForTab()
         vm.selectSource(sources.indexOf(StudioSource.IGDB))
         advanceUntilIdle()
         assertTrue("IGDB should still be in flight", vm.uiState.value.resultsLoading)
 
-        vm.selectSource(sources.indexOf(StudioSource.THEGAMESDB))
+        vm.selectSource(sources.indexOf(StudioSource.STEAMGRIDDB))
         advanceUntilIdle()
         vm.selectSource(sources.indexOf(StudioSource.IGDB))
         advanceUntilIdle()
@@ -2119,7 +2091,7 @@ class ArtworkStudioViewModelTest {
             val vm = viewModel()
             vm.load(1L)
             advanceUntilIdle()
-            val imageProviders = listOf(StudioSource.STEAMGRIDDB, StudioSource.THEGAMESDB, StudioSource.IGDB)
+            val imageProviders = listOf(StudioSource.STEAMGRIDDB, StudioSource.IGDB, StudioSource.IGDB)
             val noImageTabs = setOf(ArtworkKind.ICON1, ArtworkKind.MANUAL, ArtworkKind.VIDEO)
 
             STUDIO_TABS.forEachIndexed { index, tab ->
@@ -2164,17 +2136,19 @@ class ArtworkStudioViewModelTest {
     }
 
     @Test
-    fun `on the Screenshot tab TheGamesDB offers its box art, fanart and logo`() = runTest(testDispatcher) {
-        coEvery { theGamesDb.fetchGameInfo(any(), any()) } returns TgdbGameInfo(
-            tgdbId = 1L, title = "Crash", description = null, releaseYear = null,
-            artworkUrl = "tgdb-box", heroUrl = "tgdb-fanart", logoUrl = "tgdb-logo",
+    fun `on the Screenshot tab IGDB offers its box art and fanart`() = runTest(testDispatcher) {
+        // Two assets, not three. TheGamesDB was the provider that offered a clear logo here as
+        // well; IGDB's Screenshot-tab mapping is box art and fanart, so the expectation follows
+        // the provider that is left rather than the one the case was written against.
+        coEvery { igdbApi.fetchGameInfo(any(), any()) } returns IgdbGameInfo(
+            artworkUrl = "igdb-box", heroUrl = "igdb-fanart", logoUrl = "igdb-logo",
         )
         val vm = loadedOnTab(ArtworkKind.SCREENSHOT)
 
-        vm.selectSource(vm.sourcesForTab().indexOf(StudioSource.THEGAMESDB))
+        vm.selectSource(vm.sourcesForTab().indexOf(StudioSource.IGDB))
         advanceUntilIdle()
 
-        assertEquals(listOf("tgdb-box", "tgdb-fanart", "tgdb-logo"), vm.uiState.value.results.map { it.url })
+        assertEquals(listOf("igdb-box", "igdb-fanart"), vm.uiState.value.results.map { it.url })
     }
 
     // ── Duplicate detection on the single-art tabs (task 5.3) ─────────────────
@@ -2455,11 +2429,6 @@ class ArtworkStudioViewModelTest {
         advanceUntilIdle()
         return vm
     }
-
-    private fun tgdb(heroUrl: String) = TgdbGameInfo(
-        tgdbId = 1L, title = "Crash", description = null, releaseYear = null,
-        artworkUrl = null, heroUrl = heroUrl, logoUrl = null,
-    )
 
     private fun igdb(heroUrl: String) = IgdbGameInfo(artworkUrl = null, heroUrl = heroUrl, logoUrl = null)
 

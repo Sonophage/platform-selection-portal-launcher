@@ -83,7 +83,6 @@ object PcGameExportBuilder {
             storefront = game.storefront,
             storefrontGameId = game.storefrontGameId,
             ssId = game.ssId,
-            tgdbId = game.tgdbId,
             igdbId = game.igdbId,
             steamGridDbId = game.steamGridDbId,
             artwork = artwork

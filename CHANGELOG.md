@@ -5,6 +5,19 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+### Removed
+- **TheGamesDB is gone as a provider.** The API client, its key (storage, Settings field, first-run
+  wizard card, debug credentials file entry and backup entry), its place in the capability table
+  and the tiered matcher, its metadata preset, and its Artwork Studio source are all deleted.
+  Remaining sources: ScreenScraper, SteamGridDB, IGDB, and the Steam store provider.
+
+  `games.tgdb_id` is kept and documented as retired rather than dropped. `minSdk` is 29, whose
+  SQLite has no `ALTER TABLE ... DROP COLUMN`, so removing it means rebuilding the whole `games`
+  table and its indices in a migration — real risk for no gain, since nothing writes the column
+  and it was NULL on every row. The serialized `tgdb_id` in the portable artwork index and the
+  `.pfpgame` export IS dropped; both readers are built with `ignoreUnknownKeys`, so an older
+  library or export still parses, and a test now pins that rather than assuming it.
+
 ### Changed
 - **Renamed to PSPLauncher, with a new mark.** The launcher is now PSPLauncher — the repository's
   own name read as an initialism (Platform Selection Portal). The PlayField "P" is replaced by a

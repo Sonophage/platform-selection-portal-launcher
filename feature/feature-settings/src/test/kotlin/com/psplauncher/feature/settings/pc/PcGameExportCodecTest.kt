@@ -173,7 +173,7 @@ class PcGameExportCodecTest {
         val text = """
             {"format":"pfp-pc-game","version":1,"title":" Portal 2 ","launcherPackage":" banner.hub ",
              "launchIntentUri":"intent:#Intent;end","scrapedTitle":"","userTitleOverride":"  ",
-             "storefront":"","storefrontGameId":" ","ssId":0,"tgdbId":-4}
+             "storefront":"","storefrontGameId":" ","ssId":0,"igdbId":-4}
         """.trimIndent()
 
         val export = decodedExport(text)
@@ -185,6 +185,6 @@ class PcGameExportCodecTest {
         assertNull(export.storefront)
         assertNull(export.storefrontGameId)
         assertNull(export.ssId)
-        assertNull(export.tgdbId)
+        assertNull(export.igdbId)
     }
 }

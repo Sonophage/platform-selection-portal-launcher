@@ -17,7 +17,6 @@ import javax.inject.Inject
 // variant has a stub loader in its place (src/release), so none of this code ships.
 //
 //   steamgriddb.apiKey=
-//   thegamesdb.apiKey=
 //   igdb.clientId=
 //   igdb.clientSecret=
 //   screenscraper.username=
@@ -26,25 +25,23 @@ import javax.inject.Inject
 /** What a credentials file holds. A null entry was absent or blank and is left untouched. */
 data class DebugCredentialsFile(
     val steamGridDbKey: String? = null,
-    val theGamesDbKey: String? = null,
     val igdb: Pair<String, String>? = null,
     val screenScraper: Pair<String, String>? = null,
     /** Half-filled pairs and unknown keys: said out loud rather than silently dropped. Never values. */
     val problems: List<String> = emptyList(),
 ) {
     val isEmpty: Boolean
-        get() = listOf(steamGridDbKey, theGamesDbKey, igdb, screenScraper).all { it == null }
+        get() = listOf(steamGridDbKey, igdb, screenScraper).all { it == null }
 
     companion object {
         private const val SGDB_KEY = "steamgriddb.apiKey"
-        private const val TGDB_KEY = "thegamesdb.apiKey"
         private const val IGDB_ID = "igdb.clientId"
         private const val IGDB_SECRET = "igdb.clientSecret"
         private const val SS_USER = "screenscraper.username"
         private const val SS_PASSWORD = "screenscraper.password"
 
         private val KNOWN_KEYS = setOf(
-            SGDB_KEY, TGDB_KEY, IGDB_ID, IGDB_SECRET, SS_USER, SS_PASSWORD,
+            SGDB_KEY, IGDB_ID, IGDB_SECRET, SS_USER, SS_PASSWORD,
         )
 
         /** Throws [IllegalArgumentException] for a malformed file (a bad `\u` escape). */
@@ -69,7 +66,6 @@ data class DebugCredentialsFile(
 
             return DebugCredentialsFile(
                 steamGridDbKey = value(SGDB_KEY),
-                theGamesDbKey = value(TGDB_KEY),
                 igdb = pair(IGDB_ID, IGDB_SECRET),
                 screenScraper = pair(SS_USER, SS_PASSWORD),
                 problems = problems,
@@ -139,7 +135,6 @@ class DebugCredentialsLoader @Inject constructor(
         }
 
         file.steamGridDbKey?.let { attempt("SteamGridDB") { sgdbKeyProvider.saveKey(it) } }
-        file.theGamesDbKey?.let { attempt("TheGamesDB") { metadataKeyProvider.saveTgdbKey(it) } }
         file.igdb?.let { (id, secret) -> attempt("IGDB") { metadataKeyProvider.saveIgdbCredentials(id, secret) } }
         file.screenScraper?.let { (user, password) ->
             attempt("ScreenScraper") { metadataKeyProvider.saveSsCredentials(user, password) }

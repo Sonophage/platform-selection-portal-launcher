@@ -50,7 +50,7 @@ app  ──▶ feature:*  ──▶ core:core-ui ──▶ core:core-data ──
 | `feature:feature-xmb` | The XMB shell — wave background, category bar, item list, status bar, game/app detail, context menus, the custom-icon editor overlay, the main `XMBViewModel` |
 | `feature:feature-library` | ROM scanning into the Memory Card library, plus the rescan triggers |
 | `feature:feature-launcher` | Emulator detection, the launch-resolution ladder, and the launch dispatcher |
-| `feature:feature-artwork` | Metadata/artwork scrapers (ScreenScraper/TGDB/IGDB/SteamGridDB), the `ArtworkStore` storage seam, the portable artwork library (`portable/` — user-owned SAF folder, manifest, per-entry metadata) and the ES-DE artwork importer (`importer/`) |
+| `feature:feature-artwork` | Metadata/artwork scrapers (ScreenScraper/IGDB/SteamGridDB), the `ArtworkStore` storage seam, the portable artwork library (`portable/` — user-owned SAF folder, manifest, per-entry metadata) and the ES-DE artwork importer (`importer/`) |
 | `feature:feature-themes` | Theme loader/repository, built-in themes, `.pfptheme` / PSP `.ptf` install paths |
 | `feature:feature-settings` | All settings screens, the first-run setup wizard, PC game import |
 | `feature:feature-appbar` | App drawer, app→category classification, filtering |

@@ -137,7 +137,7 @@ fun CreditsSettingsScreen(
             )
             CreditLine("Primary scraper", "ScreenScraper — screenscraper.fr, community-maintained game media database")
             CreditLine("Artwork", "SteamGridDB — steamgriddb.com")
-            CreditLine("Metadata", "TheGamesDB · IGDB")
+            CreditLine("Metadata", "IGDB")
 
 
             Spacer(Modifier.height(16.dp))

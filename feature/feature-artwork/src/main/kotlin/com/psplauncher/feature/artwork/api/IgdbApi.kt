@@ -3,11 +3,15 @@ package com.psplauncher.feature.artwork.api
 import com.psplauncher.feature.artwork.MetadataApiKeyProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.statement.bodyAsText
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.isSuccess
+import io.ktor.http.parameters
 import io.ktor.http.contentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -110,14 +114,38 @@ class IgdbApi @Inject constructor(
         logoUrl    = null,
     )
 
-    /** Test credentials without caching the resulting token. */
+    /**
+     * Test credentials without caching the resulting token.
+     *
+     * The token request is a FORM POST, which is what OAuth2 specifies and what Twitch answers.
+     * It used to hang the three values off the URL as query parameters on a POST with no body,
+     * and ContentNegotiation then labelled that bodyless request as JSON. Twitch's reply could
+     * not be read as an IgdbTokenResponse, the exception was swallowed into `false`, and the
+     * screen said "Invalid — check Client ID and Secret" about credentials that were perfectly
+     * good: verified against Twitch with curl, which returned a token for the very pair the app
+     * was rejecting.
+     *
+     * [obtainToken] made the identical call, so this was never only a broken test button. IGDB
+     * could not authenticate at all, which is why it has never returned anything.
+     */
     suspend fun testCredentials(clientId: String, clientSecret: String): Boolean = try {
-        val response: IgdbTokenResponse = httpClient.post("$AUTH_BASE/token") {
-            parameter("client_id",     clientId)
-            parameter("client_secret", clientSecret)
-            parameter("grant_type",    "client_credentials")
-        }.body()
-        response.accessToken.isNotBlank()
+        val http = httpClient.submitForm(
+            url = "$AUTH_BASE/token",
+            formParameters = parameters {
+                append("client_id", clientId)
+                append("client_secret", clientSecret)
+                append("grant_type", "client_credentials")
+            },
+        )
+        if (!http.status.isSuccess()) {
+            // Twitch says WHY in the body. This used to be swallowed into a bare false, and the
+            // screen then blamed the credentials for every possible cause -- including two that
+            // had nothing to do with them.
+            Timber.w("IGDB token request refused: " + http.status + " " + http.bodyAsText())
+            false
+        } else {
+            http.body<IgdbTokenResponse>().accessToken.isNotBlank()
+        }
     } catch (e: Exception) {
         Timber.w(e, "IGDB credential test failed")
         false
@@ -128,11 +156,16 @@ class IgdbApi @Inject constructor(
         if (cached != null && cached.expiresAtMs > System.currentTimeMillis()) return cached
 
         return try {
-            val response: IgdbTokenResponse = httpClient.post("$AUTH_BASE/token") {
-                parameter("client_id",     clientId)
-                parameter("client_secret", clientSecret)
-                parameter("grant_type",    "client_credentials")
-            }.body()
+            // Form POST, for the reason spelled out on testCredentials.
+            val response: IgdbTokenResponse =
+            httpClient.submitForm(
+                url = "$AUTH_BASE/token",
+                formParameters = parameters {
+                    append("client_id", clientId)
+                    append("client_secret", clientSecret)
+                    append("grant_type", "client_credentials")
+                },
+            ).body()
             val expiresAt = System.currentTimeMillis() + (response.expiresIn - 60L) * 1_000L
             IgdbToken(response.accessToken, expiresAt).also { cachedToken = it }
         } catch (e: CancellationException) {

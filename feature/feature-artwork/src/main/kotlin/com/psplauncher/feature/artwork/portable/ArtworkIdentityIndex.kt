@@ -61,7 +61,6 @@ data class ArtworkIdentityIndex(
         @SerialName("portable_name") val portableName: String,
         @SerialName("rom_crc32") val romCrc32: String? = null,
         @SerialName("ss_id") val ssId: Long? = null,
-        @SerialName("tgdb_id") val tgdbId: Long? = null,
         @SerialName("igdb_id") val igdbId: Long? = null,
         @SerialName("sgdb_id") val sgdbId: Long? = null,
         // Name-derived and therefore the weakest evidence, kept only as a last resort above the
@@ -73,7 +72,7 @@ data class ArtworkIdentityIndex(
          * ids, then the name-derived key. A consumer takes the first token that names a game it
          * knows (task D.3), so the order here is the precedence.
          */
-        fun tokens(): List<String> = tokensOf(romCrc32, ssId, tgdbId, igdbId, sgdbId, artworkKey)
+        fun tokens(): List<String> = tokensOf(romCrc32, ssId, igdbId, sgdbId, artworkKey)
     }
 
     // Built once per index instance: relink asks for every file in the library, so a linear scan
@@ -127,14 +126,12 @@ data class ArtworkIdentityIndex(
         fun tokensOf(
             romCrc32: String?,
             ssId: Long?,
-            tgdbId: Long?,
             igdbId: Long?,
             sgdbId: Long?,
             artworkKey: String?,
         ): List<String> = buildList {
             romCrc32?.takeIf { it.isNotBlank() }?.let { add("crc:${it.uppercase(Locale.US)}") }
             ssId?.let { add("ss:$it") }
-            tgdbId?.let { add("tgdb:$it") }
             igdbId?.let { add("igdb:$it") }
             sgdbId?.let { add("sgdb:$it") }
             artworkKey?.takeIf { it.isNotBlank() }?.let { add("key:$it") }

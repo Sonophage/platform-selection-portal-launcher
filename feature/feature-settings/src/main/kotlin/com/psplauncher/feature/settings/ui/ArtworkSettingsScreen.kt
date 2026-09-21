@@ -64,7 +64,6 @@ fun ArtworkSettingsScreen(
     // Three of these were also keyed on the stored value, so a store emission could blank the box
     // you were typing in.
     val sgdbKeyDraft = state.drafts.sgdbKey
-    val tgdbKeyDraft = state.drafts.tgdbKey
     val igdbClientIdDraft = state.drafts.igdbClientId
     val igdbClientSecretDraft = state.drafts.igdbClientSecret
     val ssUsernameDraft = state.drafts.ssUsername
@@ -101,7 +100,7 @@ fun ArtworkSettingsScreen(
                 SettingsRow(
                     label    = "Load Credentials File",
                     sublabel = "Fill every artwork and achievement credential from a .properties file " +
-                        "(steamgriddb.apiKey, thegamesdb.apiKey, igdb.*, screenscraper.*)",
+                        "(steamgriddb.apiKey, igdb.*, screenscraper.*)",
                     onClick  = { credentialsFilePicker.launch(arrayOf("*/*")) },
                 )
 
@@ -215,13 +214,11 @@ fun ArtworkSettingsScreen(
 
                 if (state.ssEnabled) {
                     SettingsValueRow(label = "Primary",    value = "ScreenScraper (ROM hash)")
-                    SettingsValueRow(label = "Fallback 1", value = "TheGamesDB")
-                    SettingsValueRow(label = "Fallback 2", value = "IGDB")
-                    SettingsValueRow(label = "Fallback 3", value = "SteamGridDB (artwork)")
-                } else {
-                    SettingsValueRow(label = "Primary",    value = "TheGamesDB")
                     SettingsValueRow(label = "Fallback 1", value = "IGDB")
                     SettingsValueRow(label = "Fallback 2", value = "SteamGridDB (artwork)")
+                } else {
+                    SettingsValueRow(label = "Primary",    value = "IGDB")
+                    SettingsValueRow(label = "Fallback 1", value = "SteamGridDB (artwork)")
                 }
 
                 // ── Art preferences ───────────────────────────────────────────────
@@ -364,38 +361,6 @@ fun ArtworkSettingsScreen(
                     )
                 }
 
-                // ── TheGamesDB API key ────────────────────────────────────────────
-                // Stored encrypted like the SteamGridDB key. Without one TheGamesDB is skipped by the
-                // scraper and not offered in the Artwork Studio.
-                SettingsGroup("TheGamesDB API")
-
-                SettingsTextFieldRow(
-                    label         = if (state.hasTgdbKey) "API Key (saved)" else "API Key",
-                    value         = tgdbKeyDraft,
-                    onValueChange = { viewModel.setDraft(CredentialField.TGDB_KEY, it) },
-                    placeholder   = if (state.hasTgdbKey) "••••••••  (tap to replace)" else "Paste your TheGamesDB key",
-                    isPassword    = true,
-                    helper        = "Request a key from TheGamesDB at thegamesdb.net",
-                )
-
-                if (tgdbKeyDraft.isNotBlank()) {
-                    SettingsRow(
-                        label   = "Save TheGamesDB Key",
-                        onClick = {
-                            viewModel.saveTgdbKey(tgdbKeyDraft)
-                        },
-                    )
-                }
-
-                if (state.hasTgdbKey) {
-                    SettingsRow(
-                        label    = "Remove TheGamesDB Key",
-                        sublabel = "TheGamesDB will be skipped as a source",
-                        onClick  = { viewModel.clearTgdbKey() },
-                    )
-                }
-
-                // ── IGDB credentials (optional) ───────────────────────────────────
                 SettingsGroup("IGDB Credentials (Optional)")
 
                 SettingsTextFieldRow(

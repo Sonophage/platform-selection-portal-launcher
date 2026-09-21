@@ -29,7 +29,6 @@ class StudioSourceAvailabilityTest {
     private val keyed = setOf(
         StudioSource.SCREENSCRAPER,
         StudioSource.STEAMGRIDDB,
-        StudioSource.THEGAMESDB,
         StudioSource.IGDB,
     )
 

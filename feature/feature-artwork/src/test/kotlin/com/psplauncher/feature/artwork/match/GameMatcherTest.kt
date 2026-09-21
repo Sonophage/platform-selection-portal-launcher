@@ -21,7 +21,6 @@ class GameMatcherTest {
         title: String = "Final Fantasy VI Advance",
         platformId: String = "gba",
         ssId: Long? = null,
-        tgdbId: Long? = null,
         igdbId: Long? = null,
         steamGridDbId: Long? = null,
         romCrc32: String? = null,
@@ -32,7 +31,6 @@ class GameMatcherTest {
         title = title,
         platformId = platformId,
         ssId = ssId,
-        tgdbId = tgdbId,
         igdbId = igdbId,
         steamGridDbId = steamGridDbId,
         romCrc32 = romCrc32,
@@ -103,9 +101,12 @@ class GameMatcherTest {
     fun `a saved id is never read across providers`() = runTest {
         val matcher = GameMatcher(FakeEvidence())
 
-        // A TheGamesDB id says nothing about IGDB.
-        assertNull(matcher.resolve(game(tgdbId = 77L), MatchProvider.IGDB))
-        assertEquals("77", matcher.resolve(game(tgdbId = 77L), MatchProvider.THEGAMESDB)?.candidate?.providerGameId)
+        // A SteamGridDB id says nothing about IGDB.
+        assertNull(matcher.resolve(game(steamGridDbId = 77L), MatchProvider.IGDB))
+        assertEquals(
+            "77",
+            matcher.resolve(game(steamGridDbId = 77L), MatchProvider.STEAMGRIDDB)?.candidate?.providerGameId,
+        )
     }
 
     // ── Tier 2: content id ────────────────────────────────────────────────
@@ -296,21 +297,6 @@ class GameMatcherTest {
     }
 
     @Test
-    fun `TheGamesDB resolves the unique exact title among near misses`() = runTest {
-        val evidence = FakeEvidence(
-            byTitle = listOf(
-                candidate(provider = MatchProvider.THEGAMESDB, id = "1", title = "Final Fantasy VI"),
-                candidate(provider = MatchProvider.THEGAMESDB, id = "2", title = "Final Fantasy VI Advance"),
-            ),
-        )
-
-        val match = GameMatcher(evidence).resolve(game(), MatchProvider.THEGAMESDB)
-
-        assertEquals(MatchTier.EXACT_TITLE, match?.tier)
-        assertEquals("THEGAMESDB:2", match?.matchKey)
-    }
-
-    @Test
     fun `an explicit query overrides the game title`() = runTest {
         val evidence = FakeEvidence(byTitle = listOf(candidate(title = "Chrono Trigger")))
         val matcher = GameMatcher(evidence)
@@ -326,7 +312,7 @@ class GameMatcherTest {
     @Test
     fun `match keys are provider-qualified so two providers ids never collide`() = runTest {
         val a = GameMatch(candidate(provider = MatchProvider.IGDB, id = "12"), MatchTier.SAVED_PROVIDER_ID)
-        val b = GameMatch(candidate(provider = MatchProvider.THEGAMESDB, id = "12"), MatchTier.SAVED_PROVIDER_ID)
+        val b = GameMatch(candidate(provider = MatchProvider.SCREENSCRAPER, id = "12"), MatchTier.SAVED_PROVIDER_ID)
 
         assertEquals("IGDB:12", a.matchKey)
         assertTrue(a.matchKey != b.matchKey)

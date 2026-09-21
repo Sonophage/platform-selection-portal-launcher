@@ -60,7 +60,7 @@ fun AboutSettingsScreen(
             SettingsGroup("Credits")
 
             SettingsValueRow(label = "Artwork & Media", value = "ScreenScraper · SteamGridDB")
-            SettingsValueRow(label = "Metadata",        value = "ScreenScraper · TheGamesDB · IGDB")
+            SettingsValueRow(label = "Metadata",        value = "ScreenScraper · IGDB")
             SettingsValueRow(label = "Inspired by",     value = "Sony PSP XMB")
             SettingsValueRow(label = "See also",        value = "Settings ▸ Credits")
 

@@ -19,13 +19,12 @@ class ArtworkIdentityIndexTest {
         portableName: String = "Final Fantasy VI",
         romCrc32: String? = "A1B2C3D4",
         ssId: Long? = 1234,
-        tgdbId: Long? = null,
         igdbId: Long? = null,
         sgdbId: Long? = null,
         artworkKey: String? = "rom/snes/final-fantasy-vi",
     ) = ArtworkIdentityIndex.Entry(
         platformId = platformId, kind = kind, portableName = portableName,
-        romCrc32 = romCrc32, ssId = ssId, tgdbId = tgdbId, igdbId = igdbId, sgdbId = sgdbId,
+        romCrc32 = romCrc32, ssId = ssId, igdbId = igdbId, sgdbId = sgdbId,
         artworkKey = artworkKey,
     )
 
@@ -85,10 +84,29 @@ class ArtworkIdentityIndexTest {
 
     // The serialized names are ArtworkEntryMetadata's, so a v1 metadata.json's identity fields stay
     // readable. Renaming them would strand every library written before this task.
+    //
+    // tgdb_id is no longer in this list: TheGamesDB was removed as a provider, so the field is no
+    // longer written. Nothing is stranded by that, because both readers are built with
+    // ignoreUnknownKeys -- an older library carrying tgdb_id still parses, and the key is ignored.
     @Test fun `serial names match the v1 entry metadata`() {
         val text = ArtworkIdentityIndex.encode(ArtworkIdentityIndex(entries = listOf(entry())))
-        listOf("rom_crc32", "ss_id", "tgdb_id", "igdb_id", "sgdb_id", "platform_id", "portable_name")
+        listOf("rom_crc32", "ss_id", "igdb_id", "sgdb_id", "platform_id", "portable_name")
             .forEach { assertTrue("$it must be the serialized name", text.contains("\"$it\"")) }
+    }
+
+    @Test fun `an older library carrying tgdb_id still parses`() {
+        // The compatibility half of the removal, asserted rather than assumed: ignoreUnknownKeys
+        // is what makes dropping a serialized field safe, and it is easy to drop a field from a
+        // format whose reader is strict and not find out until someone opens an old library.
+        val withRetiredKey = """
+            {"entries":[{"platform_id":"snes","kind":"ICON","portable_name":"ct",
+             "rom_crc32":"FF","ss_id":1,"tgdb_id":2,"igdb_id":3}]}
+        """.trimIndent()
+
+        val parsed = ArtworkIdentityIndex.parse(withRetiredKey)
+
+        assertEquals(1, parsed?.entries?.size)
+        assertEquals(listOf("crc:FF", "ss:1", "igdb:3"), parsed?.entries?.first()?.tokens())
     }
 
     // ── Identity tokens ───────────────────────────────────────────────────────
@@ -107,8 +125,8 @@ class ArtworkIdentityIndexTest {
 
     // CRC is content-derived, so it outranks a scraper id, which outranks the name-derived key.
     @Test fun `tokens come out strongest evidence first`() {
-        val all = entry(romCrc32 = "FF", ssId = 1, tgdbId = 2, igdbId = 3, sgdbId = 4, artworkKey = "k")
-        assertEquals(listOf("crc:FF", "ss:1", "tgdb:2", "igdb:3", "sgdb:4", "key:k"), all.tokens())
+        val all = entry(romCrc32 = "FF", ssId = 1, igdbId = 3, sgdbId = 4, artworkKey = "k")
+        assertEquals(listOf("crc:FF", "ss:1", "igdb:3", "sgdb:4", "key:k"), all.tokens())
     }
 
     @Test fun `crc tokens are case-insensitive on the hex`() {

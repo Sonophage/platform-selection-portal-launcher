@@ -162,7 +162,6 @@ object PcGameImportPlanner {
             storefront = if (takeStorefront) export.storefront else game.storefront,
             storefrontGameId = if (takeStorefront) export.storefrontGameId else game.storefrontGameId,
             ssId = game.ssId ?: export.ssId,
-            tgdbId = game.tgdbId ?: export.tgdbId,
             igdbId = game.igdbId ?: export.igdbId,
             steamGridDbId = game.steamGridDbId ?: export.steamGridDbId,
         )
@@ -184,7 +183,6 @@ object PcGameImportPlanner {
             storefront = if (hasStorefront) export.storefront else null,
             storefrontGameId = if (hasStorefront) export.storefrontGameId else null,
             ssId = export.ssId,
-            tgdbId = export.tgdbId,
             igdbId = export.igdbId,
             steamGridDbId = export.steamGridDbId,
         )
@@ -220,7 +218,6 @@ class PcGameArtworkClaims {
                     kind = item.kind,
                     portableName = item.portableName,
                     ssId = export.ssId,
-                    tgdbId = export.tgdbId,
                     igdbId = export.igdbId,
                     sgdbId = export.steamGridDbId,
                 )
