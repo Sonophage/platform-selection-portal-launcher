@@ -164,6 +164,12 @@ PFP is distributed as a **side-loaded APK** (it is not on the Google Play Store)
 
 1. Download `PSPLauncher-<version>.apk` from
    [Releases](https://github.com/Sonophage/platform-selection-portal-launcher/releases).
+
+   > **1.4.0 currently ships a debug build** (`PSPLauncher-1.4.0-debug.apk`). It installs under
+   > `com.psplauncher.launcher.debug`, so it sits *beside* an existing PSPLauncher with its own
+   > library rather than upgrading it, it is marked debuggable, and it is signed with the Android
+   > SDK's public debug key. A signed release build replaces it when the key is available. Build
+   > it yourself instead: [For Developers](#7-for-developers).
 2. Open the file on your device. Android will ask you to allow installs from your browser or file
    manager the first time — approve it.
 3. Tap **Install**.
