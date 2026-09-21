@@ -37,6 +37,10 @@ class BackupKeyDriftTest {
         // positions with it, so the fresh install has to be allowed to run the fix again;
         // carrying the flag would leave the restored bar with Last Played wherever it was.
         "last_played_placed_v1" to "one-shot position fix that a restore must be able to re-run",
+        // Same shape as the one above, for the Network column's stale "Online" name. A restore
+        // upserts whatever names the archive carried, so it can reintroduce the old one — which
+        // means the fresh install has to be allowed to run the rename again.
+        "network_renamed_v1" to "one-shot name fix that a restore must be able to re-run",
         "data_prep_version" to "migration marker",
         // Points at an extracted directory that is not bundled, so a restored stamp would send
         // observers at files that are not there.

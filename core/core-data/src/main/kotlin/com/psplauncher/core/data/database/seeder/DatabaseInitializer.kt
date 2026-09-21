@@ -19,6 +19,10 @@ private val KEY_THEMES_SEEDED = booleanPreferencesKey("themes_seeded_v1")
 // Game hours later. Flag-guarded rather than condition-guarded so a user who afterwards moves
 // it somewhere else keeps that choice.
 private val KEY_LAST_PLAYED_PLACED = booleanPreferencesKey("last_played_placed_v1")
+// One-shot: the Network column was seeded as "Online" on older installs, and reconciliation never
+// updates a name because a name is user-editable. Flag-guarded so that renaming it yourself
+// afterwards — back to "Online" or to anything else — sticks.
+private val KEY_NETWORK_RENAMED = booleanPreferencesKey("network_renamed_v1")
 
 /** Built-in theme seeded separately from the main DB seed so it can be added to existing installs. */
 private val BUILTIN_CLASSIC_BLUE = ThemeEntity(
@@ -62,6 +66,7 @@ class DatabaseInitializer @Inject constructor(
         // built-in categories so definition changes reach databases seeded by older builds.
         categoryRepository.reconcileBuiltInCategories()
         placeLastPlayed()
+        renameNetworkColumn()
         seedThemes()
         // One-shot v22 follow-up (flag-guarded): the Windows-card consolidation steps that
         // need app logic — spoof-package label checks, duplicate merge, card creation.
@@ -89,6 +94,13 @@ class DatabaseInitializer @Inject constructor(
         if (prefs[KEY_LAST_PLAYED_PLACED] == true) return
         categoryRepository.placeLastPlayedBeforeGames()
         context.pfpDataStore.edit { it[KEY_LAST_PLAYED_PLACED] = true }
+    }
+
+    private suspend fun renameNetworkColumn() {
+        val prefs = context.pfpDataStore.data.first()
+        if (prefs[KEY_NETWORK_RENAMED] == true) return
+        categoryRepository.renameStaleOnlineColumn()
+        context.pfpDataStore.edit { it[KEY_NETWORK_RENAMED] = true }
     }
 
     private suspend fun seedThemes() {

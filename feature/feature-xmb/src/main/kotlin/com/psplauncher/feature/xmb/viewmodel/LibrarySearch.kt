@@ -25,7 +25,8 @@ enum class SearchScope(
     val emptyHint: String,
 ) {
     ALL(
-        "Search", "Games, video, photos and books",
+        // Music was always in the global results; the hint just did not say so.
+        "Search", "Games, music, video, photos and books",
         "Nothing to search yet", "Add a library in Settings, then search from anywhere",
     ),
     GAMES(
@@ -43,6 +44,10 @@ enum class SearchScope(
     BOOKS(
         "Search Books", "Titles, authors and series",
         "No books yet", "Set a root folder in Settings ▸ Media ▸ Books",
+    ),
+    MUSIC(
+        "Search Music", "Titles, artists and albums",
+        "No music yet", "Set a root folder in Settings ▸ Media ▸ Music",
     ),
 }
 

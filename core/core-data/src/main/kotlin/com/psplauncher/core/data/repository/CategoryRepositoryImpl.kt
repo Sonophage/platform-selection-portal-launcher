@@ -163,6 +163,30 @@ class CategoryRepositoryImpl @Inject constructor(
         return true
     }
 
+    /**
+     * Renames the Network column on a database that was seeded while it was still called "Online".
+     *
+     * [BUILT_IN_CATEGORIES] has said "Network" for some time, but reconciliation adds built-ins
+     * with INSERT OR IGNORE and deliberately never touches a name, because a name is user-editable
+     * — this database also has Game renamed to "Emulation", and a blanket name sync would stomp it.
+     * So the stale name has to be corrected by a targeted one-shot instead.
+     *
+     * Guarded on the CURRENT name as well as by the caller's DataStore flag: if the user has
+     * already renamed this column to anything of their own, there is nothing to correct and we
+     * leave it alone. Returns false when there was nothing to do.
+     */
+    suspend fun renameStaleOnlineColumn(): Boolean {
+        val network = categoryDao.getById(NETWORK_CATEGORY_ID) ?: return false
+        if (network.name != STALE_NETWORK_NAME) return false
+        // Read the new name from the one definition rather than writing a second copy of it here,
+        // so this cannot drift from the bar if the column is ever renamed again.
+        val liveName = builtInCategories().firstOrNull { it.id == NETWORK_CATEGORY_ID }?.name
+            ?: return false
+        categoryDao.update(network.copy(name = liveName))
+        Timber.i("Renamed stale '$STALE_NETWORK_NAME' column to '$liveName'")
+        return true
+    }
+
     suspend fun reconcileBuiltInCategories() {
         // Before seeding the live built-ins: an install from an older build, or one that has just
         // restored an older backup, can still be carrying a retired column.
@@ -177,6 +201,11 @@ class CategoryRepositoryImpl @Inject constructor(
     }
 
     companion object {
+        // The Network column's id, and the name it shipped under before it was renamed. The id
+        // is deliberately not "network" spelled twice: PROTECTED_BUILTINS needs it too.
+        const val NETWORK_CATEGORY_ID = "network"
+        const val STALE_NETWORK_NAME = "Online"
+
         // Built-in categories the user may hide/reorder but never delete.
         val PROTECTED_BUILTINS = setOf(
             BuiltInCategory.FAVORITES,
@@ -185,7 +214,7 @@ class CategoryRepositoryImpl @Inject constructor(
             BuiltInCategory.ANDROID,
             BuiltInCategory.APP_DRAWER,
             BuiltInCategory.SETTINGS,
-            "photos", "music", "videos", "network", "app_store",
+            "photos", "music", "videos", NETWORK_CATEGORY_ID, "app_store",
             BuiltInCategory.LIBRARY,
         )
     }

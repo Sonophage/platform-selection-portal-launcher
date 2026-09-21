@@ -2302,11 +2302,25 @@ class XMBViewModel @Inject constructor(
     )
 
     /**
-     * The Search row a library column leads with.
+     * A library column: its own rows, then its scoped Search row.
      *
-     * Scoped, so searching from inside Video looks only at video. The Music column has no such
-     * row: its own "Music" and "Playlist" rows already open a searchable browser, and a second
-     * way to do the same thing on the same column is worse than none.
+     * Five columns have to agree about where that row goes, and until now each one placed it
+     * itself -- which is how Music ended up without one at all. One function decides the position,
+     * so moving it again is one edit and cannot half-land.
+     */
+    private fun libraryColumn(body: List<XMBItem>, scope: SearchScope): List<XMBItem> =
+        body + librarySearchItem(scope)
+
+    /**
+     * The Search row every library column ends with.
+     *
+     * Scoped, so searching from inside Video looks only at video. It TRAILS the column: Select
+     * already opens an all-library search from anywhere, so this row is the narrow second path,
+     * not the thing you came to the column for.
+     *
+     * Music has one too now. It was the lone exception, on the grounds that its "Music" and
+     * "Playlist" rows open a browser that is itself searchable -- which is true, and still left
+     * Music as the only column with no visible way to search it.
      */
     private fun librarySearchItem(scope: SearchScope): XMBItem = XMBItem(
         id       = SEARCH_ITEM_ID,
@@ -2423,7 +2437,10 @@ class XMBViewModel @Inject constructor(
      * for it, is the order a user scans in, and it costs one press fewer to reach Spotify.
      */
     private suspend fun musicRootItems(): List<XMBItem> =
-        musicRootSections() + musicAppItems() + collapseAddRows(musicAddActions())
+        libraryColumn(
+            musicRootSections() + musicAppItems() + collapseAddRows(musicAddActions()),
+            SearchScope.MUSIC,
+        )
 
     /**
      * A column ends in ONE Add row.
@@ -2711,8 +2728,10 @@ class XMBViewModel @Inject constructor(
 
     /** The whole Video root: its sections, then the installed video apps, then Add Video Apps. */
     private suspend fun videoRootItems(): List<XMBItem> =
-        listOf(librarySearchItem(SearchScope.VIDEOS)) +
-            videoRootSections() + videoAppItems() + collapseAddRows(videoAddActions())
+        libraryColumn(
+            videoRootSections() + videoAppItems() + collapseAddRows(videoAddActions()),
+            SearchScope.VIDEOS,
+        )
 
     private fun addVideosItem(): XMBItem = XMBItem(
         id       = ADD_VIDEOS_ITEM_ID,
@@ -3163,14 +3182,20 @@ class XMBViewModel @Inject constructor(
                     )
                 )
             }
-            add(
-                XMBItem(
-                    id       = BOOK_SHELVES_ITEM_ID,
-                    title    = "Shelves",
-                    subtitle = countLabel(shelves.size, "shelf", "shelves"),
-                    type     = XMBItemType.LIBRARY_SHELVES,
+            // Only worth a row once there is a choice to make, by the same rule as Series below.
+            // With a single shelf the row opens a list of one whose only entry holds every book
+            // the Books row already holds, so it is two extra presses to reach the same place --
+            // and it reads as a distinction the library does not actually have.
+            if (shelves.size > 1) {
+                add(
+                    XMBItem(
+                        id       = BOOK_SHELVES_ITEM_ID,
+                        title    = "Shelves",
+                        subtitle = countLabel(shelves.size, "shelf", "shelves"),
+                        type     = XMBItemType.LIBRARY_SHELVES,
+                    )
                 )
-            )
+            }
             // Only worth a row once something declares a series. A library of standalones would
             // otherwise carry a row that opens an empty list.
             val series = _uiState.value.bookSeries
@@ -3219,8 +3244,10 @@ class XMBViewModel @Inject constructor(
      * for launching a reader on its own, and match what Music, Video and Photo already do.
      */
     private suspend fun booksRootItems(): List<XMBItem> =
-        listOf(librarySearchItem(SearchScope.BOOKS)) +
-            booksRootSections() + bookAppItems() + collapseAddRows(booksAddActions())
+        libraryColumn(
+            booksRootSections() + bookAppItems() + collapseAddRows(booksAddActions()),
+            SearchScope.BOOKS,
+        )
 
     private suspend fun bookAppItems(): List<XMBItem> {
         val apps = appCategoryRepository.appsForCategory(LIBRARY_APPS_CATEGORY_ID)
@@ -3440,8 +3467,10 @@ class XMBViewModel @Inject constructor(
 
     /** The whole Photo root: its sections, then the installed photo apps, then Add Photo Apps. */
     private suspend fun photoRootItems(): List<XMBItem> =
-        listOf(librarySearchItem(SearchScope.PHOTOS)) +
-            photoRootSections() + photoAppItems() + collapseAddRows(photoAddActions())
+        libraryColumn(
+            photoRootSections() + photoAppItems() + collapseAddRows(photoAddActions()),
+            SearchScope.PHOTOS,
+        )
 
     private fun addPhotoLibraryItem(): XMBItem = XMBItem(
         id       = ADD_PHOTO_LIBRARY_ITEM_ID,
@@ -3778,9 +3807,12 @@ class XMBViewModel @Inject constructor(
             searchVideos = if (wantsVideos) videoRepository.observeAllVideos().first() else emptyList()
             searchPhotos = if (wantsPhotos) photoRepository.observeAllPhotos().first() else emptyList()
             searchBooks = if (wantsBooks) bookRepository.observeAllBooks().first() else emptyList()
-            // Music rides along on the global search only: the Music column already opens a
-            // searchable browser of its own, so it has no Search row and no scope of its own.
-            searchTracks = if (scope == SearchScope.ALL) musicRepository.observeAllTracks().first() else emptyList()
+            // Music has its own scope now. It used to ride along on the global search only, on the
+            // reasoning that the Music column's browser is already searchable -- which is true and
+            // was still the wrong call: that search is two presses inside a browser you have to
+            // know to open, so Music was the one library column with no visible way to search it.
+            val wantsTracks = scope == SearchScope.ALL || scope == SearchScope.MUSIC
+            searchTracks = if (wantsTracks) musicRepository.observeAllTracks().first() else emptyList()
             _uiState.update { it.copy(search = it.search?.copy(loaded = true)) }
             rebuildSearchRows()
         }
@@ -4078,6 +4110,7 @@ class XMBViewModel @Inject constructor(
     // Handles A/Cross on any Music row. Returns true when [item] is a Music row it owns. Empty-state
     // rows are consumed silently; everything else plays its own select/launch sound.
     private fun handleMusicSelection(item: XMBItem): Boolean = when {
+        item.id == SEARCH_ITEM_ID -> { openSearch(SearchScope.MUSIC); true }
         item.id == ADD_MENU_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openAddMenu(); true }
         item.type == XMBItemType.EMPTY -> true   // not selectable
         item.id == NOW_PLAYING_ITEM_ID -> {
@@ -4756,9 +4789,14 @@ class XMBViewModel @Inject constructor(
                 type     = XMBItemType.MISSING,
             )
         } else null
-        // Search leads the Games root, above All Games. On a 147-game library it is the row you
-        // want first, and the ES-DE reviewer's blocker was that there was no way to reach it.
-        val header = listOfNotNull(librarySearchItem(SearchScope.GAMES), allGamesItem, favoritesItem, missingItem)
+        val header = listOfNotNull(allGamesItem, favoritesItem, missingItem)
+
+        // Search TRAILS this column rather than leading it, via libraryColumn like the other
+        // four. It used to lead, on the reasoning that a 147-game library wants search first. What
+        // that missed is that Select already opens search from anywhere
+        // (GamepadAction.OPEN_SEARCH), so the row is a narrow second path to something that
+        // already has a one-button path -- and it was taking the slot above All Games, which is
+        // where the cursor lands and what you actually came for.
 
         // User collections sit just under All Games / Favorites — like Favorites but user-defined.
         // Only collections assigned to this (the Main Game) category appear here; categoryId
@@ -4787,11 +4825,14 @@ class XMBViewModel @Inject constructor(
 
         // Genuinely no cards at all — the user removed even the seeded Android one.
         if (visibleCards.isEmpty()) {
-            return header + collectionItems + XMBItem(
-                id       = NO_CONSOLES_ITEM_ID,
-                title    = "No consoles configured",
-                subtitle = "Open Library Manager to add a Memory Card",
-                type     = XMBItemType.EMPTY,
+            return libraryColumn(
+                header + collectionItems + XMBItem(
+                    id       = NO_CONSOLES_ITEM_ID,
+                    title    = "No consoles configured",
+                    subtitle = "Open Library Manager to add a Memory Card",
+                    type     = XMBItemType.EMPTY,
+                ),
+                SearchScope.GAMES,
             )
         }
 
@@ -4815,7 +4856,10 @@ class XMBViewModel @Inject constructor(
         // (0 games)" and pointed nowhere at all. Emptiness here is about GAMES, not about whether
         // a card exists, and the answer is the same setup-gap row All Games already shows.
         val gapRow = if (totalGames == 0) setupGapItem() else null
-        return header + collectionItems + cardRows + listOfNotNull(gapRow)
+        return libraryColumn(
+            header + collectionItems + cardRows + listOfNotNull(gapRow),
+            SearchScope.GAMES,
+        )
     }
 
     /**
