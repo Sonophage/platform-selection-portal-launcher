@@ -100,6 +100,11 @@ class ProviderMatchEvidence @Inject constructor(
         query: String,
         platformId: String,
     ): List<GameCandidate> = when (provider) {
+        // Steam has no title endpoint at all: appdetails takes an app id and nothing else. An
+        // empty list is the honest answer, and ProviderCapabilities already keeps Steam out of
+        // `searchable`, so a Change Match picker never asks. This branch exists because the
+        // compiler is right to demand it, not because it can be reached from the UI.
+        MatchProvider.STEAM_STORE -> emptyList()
         MatchProvider.STEAMGRIDDB -> steamGridDb.searchGame(query)
             .onFailure { Timber.d(it, "SGDB search failed for '%s'", query) }
             .getOrDefault(emptyList())

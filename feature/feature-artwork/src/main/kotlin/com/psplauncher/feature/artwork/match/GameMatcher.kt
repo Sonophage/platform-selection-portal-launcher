@@ -182,5 +182,10 @@ class GameMatcher(private val evidence: MatchEvidenceSource) {
         MatchProvider.THEGAMESDB -> game.tgdbId
         MatchProvider.IGDB -> game.igdbId
         MatchProvider.STEAMGRIDDB -> game.steamGridDbId
+        // Steam needs no id column of its own: the app id IS games.storefront_game_id, written by
+        // the PC importer, and it is a String because that is what a storefront pair carries.
+        // Returning null here keeps the saved-id tier honest — Steam is addressed by storefront,
+        // which is a different tier, not by a numeric id this app assigned.
+        MatchProvider.STEAM_STORE -> null
     }?.takeIf { it > 0 }?.toString()
 }

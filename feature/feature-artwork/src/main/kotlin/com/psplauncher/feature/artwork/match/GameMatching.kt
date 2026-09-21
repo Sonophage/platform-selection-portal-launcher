@@ -15,16 +15,20 @@ enum class MatchProvider(val label: String) {
     THEGAMESDB("TheGamesDB"),
     IGDB("IGDB"),
     STEAMGRIDDB("SteamGridDB"),
+    STEAM_STORE("Steam"),
 }
 
 /**
  * What a provider can actually be addressed by, as the tree stands today.
  *
- * [supportsTitleSearch] is true for every provider today — each has a multi-result title endpoint
- * (ScreenScraper's jeuRecherche included). Saved ids and ROM checksums still resolve first, so a
- * title search only runs when nothing stronger stands up. A provider gains a
+ * [supportsTitleSearch] is true for every provider EXCEPT Steam. The other four each have a
+ * multi-result title endpoint (ScreenScraper's jeuRecherche included); Steam's appdetails takes an
+ * app id and nothing else, which is the whole reason it is worth having — it is the one provider
+ * that is told which game this is instead of guessing. Saved ids and ROM checksums still resolve
+ * first, so a title search only runs when nothing stronger stands up. A provider gains a
  * capability by flipping a flag here once its API grows the endpoint — the matcher reads the
- * table, it never hardcodes a provider name.
+ * table, it never hardcodes a provider name, which is what lets a search-less provider join at
+ * all.
  */
 data class ProviderCapability(
     val provider: MatchProvider,
@@ -91,13 +95,26 @@ object ProviderCapabilities {
             suppliesMetadata = false,
             suppliesArtwork = true,
         ),
+        // Steam's own store, addressed by the app id the PC importer already recorded as
+        // games.storefront_game_id. No title search — appdetails has no such endpoint — so Steam
+        // never appears in Change Match, and cannot: there is nothing to choose between. It is the
+        // only provider here that supplies BOTH text and artwork without an API key.
+        ProviderCapability(
+            provider = MatchProvider.STEAM_STORE,
+            addressableBySavedId = false,
+            addressableByRomHash = false,
+            addressableByStorefrontId = true,
+            supportsTitleSearch = false,
+            suppliesMetadata = true,
+            suppliesArtwork = true,
+        ),
     ).associateBy { it.provider }
 
     operator fun get(provider: MatchProvider): ProviderCapability = table.getValue(provider)
 
     val all: List<ProviderCapability> get() = MatchProvider.entries.map { table.getValue(it) }
 
-    /** Providers that can back a Change Match picker — all four today. */
+    /** Providers that can back a Change Match picker — the four with a title endpoint. */
     val searchable: List<MatchProvider> get() = all.filter { it.supportsTitleSearch }.map { it.provider }
 
     /** Providers a metadata preset can be built from. */

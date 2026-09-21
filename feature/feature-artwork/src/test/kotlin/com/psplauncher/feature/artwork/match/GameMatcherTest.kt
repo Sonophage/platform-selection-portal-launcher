@@ -3,6 +3,7 @@ package com.psplauncher.feature.artwork.match
 import com.psplauncher.core.domain.model.Game
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -213,8 +214,47 @@ class GameMatcherTest {
     }
 
     @Test
-    fun `every provider can be searched by title`() {
-        assertEquals(MatchProvider.entries.toList(), ProviderCapabilities.searchable)
+    fun `searchable is the providers that actually have a title endpoint, not all of them`() {
+        // This used to assert every provider was searchable, which was true of the four that have
+        // a title endpoint and stopped being true the moment Steam joined: appdetails takes an app
+        // id and offers no search at all. The property worth pinning was never "all of them" — it
+        // is that the list is DERIVED from the capability table rather than written out, so a
+        // provider that cannot search is excluded automatically instead of being remembered.
+        assertEquals(
+            MatchProvider.entries.filter { ProviderCapabilities[it].supportsTitleSearch },
+            ProviderCapabilities.searchable,
+        )
+    }
+
+    @Test
+    fun `a provider with no title endpoint cannot reach the Change Match picker`() {
+        // The consequence that matters. Change Match exists to let the user choose between
+        // candidates; a provider that can only ever return the one game it was told about has
+        // nothing to offer it, and listing it would be a menu entry that never has a second row.
+        assertFalse(MatchProvider.STEAM_STORE in ProviderCapabilities.searchable)
+        assertFalse(ProviderCapabilities[MatchProvider.STEAM_STORE].supportsTitleSearch)
+    }
+
+    @Test
+    fun `every provider is addressable somehow`() {
+        // The real invariant behind the old test: a provider nothing can address is a provider
+        // that can never be asked anything, which is a wiring mistake rather than a design choice.
+        MatchProvider.entries.forEach { provider ->
+            val c = ProviderCapabilities[provider]
+            assertTrue(
+                "$provider cannot be addressed by anything",
+                c.addressableBySavedId || c.addressableByRomHash ||
+                    c.addressableByStorefrontId || c.supportsTitleSearch,
+            )
+        }
+    }
+
+    @Test
+    fun `every provider supplies something`() {
+        MatchProvider.entries.forEach { provider ->
+            val c = ProviderCapabilities[provider]
+            assertTrue("$provider supplies nothing", c.suppliesMetadata || c.suppliesArtwork)
+        }
     }
 
     /** A Windows install has no ROM to hash, so its ScreenScraper identity can only come from its title. */
