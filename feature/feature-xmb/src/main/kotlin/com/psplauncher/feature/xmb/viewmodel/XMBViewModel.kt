@@ -32,6 +32,7 @@ import com.psplauncher.themekit.CustomizableIcons
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.CategoryType
+import com.psplauncher.core.domain.model.ControllerHintPolicy
 import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameCollection
@@ -568,10 +569,11 @@ data class XMBUiState(
     // overlays are blocking by design, so this needs its own idle flag rather than reusing the XMB
     // context-menu hint (whose blocking-overlay gate would always suppress it).
     val showSettingsHint: Boolean = false,
-    // User setting (Display ▸ Context Menu Hint). When false the idle hint never shows.
-    val contextMenuHintEnabled: Boolean = true,
-    // User-configured idle delay in seconds, clamped to 1..5 and defaulting to the original 2.5s.
-    val contextMenuHintDelaySeconds: Float = 2.5f,
+    // User setting (Display ▸ Button Hints). When false the hints never show.
+    val contextMenuHintEnabled: Boolean = ControllerHintPolicy.DEFAULT_ENABLED,
+    // User-configured pause before the hints appear, clamped by ControllerHintPolicy. Zero, the
+    // default, means they do not hide at all.
+    val contextMenuHintDelaySeconds: Float = ControllerHintPolicy.DEFAULT_DELAY_SECONDS,
     val touchNavButtonMode: com.psplauncher.core.domain.model.TouchNavButtonMode =
         com.psplauncher.core.domain.model.TouchNavButtonMode.AUTO,
     // Swipe sensitivity for the XMB gesture layer (Settings ▸ Display ▸ Touch Sensitivity).
@@ -1173,24 +1175,60 @@ internal fun XMBUiState.withSortMode(cycle: List<XmbSortMode>, mode: XmbSortMode
 }
 
 /**
- * Pure decision: should the idle context-menu hint be visible right now? Top-level so unit tests
- * can exercise it without a ViewModel instance. Gates:
- *  - the most recent input came from a controller (not touch);
+ * Pure decision: should the context-menu hint be visible right now? Top-level so unit tests can
+ * exercise it without a ViewModel instance. Gates:
+ *  - Display ▸ Button Hints is on ([XMBUiState.contextMenuHintEnabled]);
  *  - no blocking overlay, no open context menu ([XMBUiState.hasBlockingOverlay],
  *    [XMBUiState.activeContextMenu]);
  *  - the pill has something true to say — the focused item has a context menu
  *    ([XMBUiState.focusedItemHasContextMenu]) or the current list can sort
  *    ([XMBUiState.canSortCurrentList]);
- *  - the idle delay [idleMs] has elapsed (>= IDLE_HINT_DELAY_MS).
+ *  - the configured delay has elapsed, which by default is zero
+ *    ([ControllerHintPolicy.DEFAULT_DELAY_SECONDS]) so the pill simply stays up.
+ *
+ * It is no longer gated on the last input having come from a controller. That gate made sense
+ * while the pill was a legend: a touch user does not need to be told which face button sorts.
+ * The prompts are tappable now, so the pill is a control, and the gate hid it precisely from the
+ * people who would press it — worse, touching it set the flag that hid it, so it could not be
+ * used twice. The glyph still earns its place on a touch screen, because it says which button
+ * does the same thing next time.
  *
  * Deliberately NOT gated on [XMBUiState.isInSubItem]: drilled-in items (the game flyout, a
  * library's files) have context menus and can sort, so that gate hid the hint exactly where a
- * new user is most likely to need it. The App Drawer button it used to pair with is touch-only
- * and this hint is controller-only, so the two are never really on screen together anyway.
+ * new user is most likely to need it.
  */
+/**
+ * Whether the hints hide themselves on input and wait for a pause, or simply stay up.
+ *
+ * This exists because "always shown" is not just a delay of zero. Both [XMBViewModel.markTouchInput]
+ * and [XMBViewModel.onUserInteraction] eagerly clear the hint flags on every input, deliberately:
+ * while the hints were idle chrome, leaving them up for as much as one poll tick after a press was
+ * a visible lag. With a zero delay that same eagerness turns into a flicker on every single
+ * button press, because the poller puts them straight back 500ms later. So the eager hide is
+ * conditional on there being something to hide for.
+ */
+val XMBUiState.hintsAutoHide: Boolean
+    get() = contextMenuHintDelaySeconds > 0f
+
+/**
+ * The three hint flags recomputed from their own gates, with no pause required.
+ *
+ * With auto-hide off the flags are no longer a timer's output; they are a function of the state
+ * you are in. The idle poller can only raise them on its next tick, which is up to
+ * [XMBViewModel.IDLE_HINT_POLL_MS] away, and that showed up on the device as the bar missing for
+ * half a second after every press. The input markers call this instead, so the flags are right on
+ * the same frame as the input and the poller is left as a backstop.
+ *
+ * Safe to call on a state whose flags are stale: none of the three gates reads a hint flag.
+ */
+internal fun XMBUiState.withHintsShownNow(): XMBUiState = copy(
+    showContextMenuHint = shouldShowContextMenuHint(this, 0L),
+    showAppDrawerHint = shouldShowAppDrawerHint(this, 0L),
+    showSettingsHint = shouldShowSettingsHint(this, 0L),
+)
+
 fun shouldShowContextMenuHint(state: XMBUiState, idleMs: Long): Boolean =
     state.contextMenuHintEnabled &&
-        !state.lastInputWasTouch &&
         !state.hasBlockingOverlay &&
         state.activeContextMenu == null &&
         (state.focusedItemHasContextMenu || state.canSortCurrentList) &&
@@ -1199,7 +1237,7 @@ fun shouldShowContextMenuHint(state: XMBUiState, idleMs: Long): Boolean =
 /**
  * Pure decision: should the App Drawer's contextual controller hint bar be visible right now?
  * Top-level so unit tests can exercise it without a ViewModel instance. Gates:
- *  - the most recent input came from a controller (not touch);
+ *  - Display ▸ Button Hints is on;
  *  - the App Drawer is actually open ([XMBUiState.activeAppDrawerFilter] non-null);
  *  - no context menu is up (one can never sit over the drawer, but the gate stays symmetric with
  *    [shouldShowContextMenuHint]);
@@ -1208,12 +1246,11 @@ fun shouldShowContextMenuHint(state: XMBUiState, idleMs: Long): Boolean =
  * Deliberately separate from [shouldShowContextMenuHint]: the drawer is a blocking overlay
  * ([XMBUiState.hasBlockingOverlay]), so the XMB pill's gate is false whenever the drawer is open —
  * and this gate is true only then. Both share the same idle clock and the
- * contextMenuHintEnabled / contextMenuHintDelaySeconds settings, so Display ▸ Context Menu Hint
+ * contextMenuHintEnabled / contextMenuHintDelaySeconds settings, so Display ▸ Button Hints
  * toggles the drawer hint too.
  */
 fun shouldShowAppDrawerHint(state: XMBUiState, idleMs: Long): Boolean =
     state.contextMenuHintEnabled &&
-        !state.lastInputWasTouch &&
         state.activeAppDrawerFilter != null &&
         state.activeContextMenu == null &&
         idleMs >= (state.contextMenuHintDelaySeconds * 1_000f).toLong()
@@ -1232,7 +1269,6 @@ fun shouldShowAppDrawerHint(state: XMBUiState, idleMs: Long): Boolean =
  */
 fun shouldShowSettingsHint(state: XMBUiState, idleMs: Long): Boolean =
     state.contextMenuHintEnabled &&
-        !state.lastInputWasTouch &&
         state.activeSettingsScreen != null &&
         idleMs >= (state.contextMenuHintDelaySeconds * 1_000f).toLong()
 
@@ -1485,7 +1521,7 @@ class XMBViewModel @Inject constructor(
     private var defaultMusicPlayer: String? = null
 
     // Elapsed-realtime ms of the most recent user input (touch or controller). Drives the idle
-    // context-menu hint: after IDLE_HINT_DELAY_MS with no input, if the focused item has a context
+    // context-menu hint: on unless Display ▸ Button Hints is off or a delay is configured, and
     // menu and touch controls are active, the hint pill fades in. Refreshed by markTouchInput,
     // markControllerInput, and onUserInteraction.
     @Volatile
@@ -5018,6 +5054,22 @@ class XMBViewModel @Inject constructor(
         }
     }
 
+    /**
+     * A tap on an on-screen button prompt, routed exactly as the physical press would be.
+     *
+     * One entry serves every footer in the app, because [dispatchGamepadAction] already hands the
+     * action to whichever surface owns input — the crossbar, a settings screen through
+     * [XMBUiState.pendingSettingsAction], the app drawer. A tapped prompt that took a shortcut
+     * past that would be a second definition of what each button does.
+     *
+     * It reports touch honestly. That used to hide the prompt it was reporting, which is why the
+     * touch gate had to go before this could be wired at all.
+     */
+    fun onPromptTapped(action: GamepadAction) {
+        markTouchInput()
+        dispatchGamepadAction(action)
+    }
+
     private fun collectGamepadActions() {
         viewModelScope.launch {
             gamepadInputHandler.actions.collect { action ->
@@ -7017,7 +7069,10 @@ class XMBViewModel @Inject constructor(
         // One write for both flags: the hints must clear on the SAME frame as the input (see
         // noteInteraction), and a second update() here would cost an extra recomposition.
         _uiState.update {
-            if (it.lastInputWasTouch &&
+            // The hints only come down if they are going to come back on their own.
+            if (!it.hintsAutoHide) {
+                it.copy(lastInputWasTouch = true).withHintsShownNow()
+            } else if (it.lastInputWasTouch &&
                 !it.showContextMenuHint &&
                 !it.showAppDrawerHint &&
                 !it.showSettingsHint
@@ -7050,7 +7105,13 @@ class XMBViewModel @Inject constructor(
     private fun markControllerInput() {
         lastInteractionMs = SystemClock.elapsedRealtime()
         _uiState.update {
-            if (!it.lastInputWasTouch &&
+            // Third of the three input markers, and the one that made the fix look wrong on the
+            // device: the hints only come down if they are going to come back on their own. With
+            // no auto-hide the poller is the only thing that raises the flag again, so clearing
+            // it here left a gap of up to one poll tick after every button press.
+            if (!it.hintsAutoHide) {
+                it.copy(lastInputWasTouch = false).withHintsShownNow()
+            } else if (!it.lastInputWasTouch &&
                 !it.showContextMenuHint &&
                 !it.showAppDrawerHint &&
                 !it.showSettingsHint
@@ -8363,7 +8424,9 @@ class XMBViewModel @Inject constructor(
      */
     fun onUserInteraction() {
         lastInteractionMs = SystemClock.elapsedRealtime()
-        if (_uiState.value.showContextMenuHint ||
+        if (!_uiState.value.hintsAutoHide) {
+            _uiState.update { it.withHintsShownNow() }
+        } else if (_uiState.value.showContextMenuHint ||
             _uiState.value.showAppDrawerHint ||
             _uiState.value.showSettingsHint
         ) {
@@ -8575,9 +8638,11 @@ class XMBViewModel @Inject constructor(
                     .fromName(prefs[KEY_TOUCH_NAV_BUTTON])
                 val sensitivity = com.psplauncher.core.domain.model.TouchSensitivity
                     .fromName(prefs[KEY_TOUCH_SENSITIVITY])
-                val hintEnabled = prefs[KEY_CONTEXT_MENU_HINT] ?: true
+                val hintEnabled = prefs[KEY_CONTEXT_MENU_HINT] ?: ControllerHintPolicy.DEFAULT_ENABLED
                 val hintDelaySeconds =
-                    (prefs[KEY_CONTEXT_MENU_HINT_DELAY_SECONDS] ?: 2.5f).coerceIn(1f, 5f)
+                    ControllerHintPolicy.clampDelay(
+                        prefs[KEY_CONTEXT_MENU_HINT_DELAY_SECONDS] ?: ControllerHintPolicy.DEFAULT_DELAY_SECONDS
+                    )
                 val legibility = com.psplauncher.core.domain.model.IconLegibilityStyle
                     .fromName(prefs[KEY_ICON_LEGIBILITY])
                 val solidUnfocused = prefs[KEY_SOLID_UNFOCUSED_ICONS] ?: false
@@ -8654,7 +8719,6 @@ class XMBViewModel @Inject constructor(
         private val KEY_BAR_TOP_FRACTION  = androidx.datastore.preferences.core.floatPreferencesKey("display_bar_top_fraction")
         // Per-form-factor live layout tunings (scale + horizontal + vertical), one JSON prefs string.
         // Idle context-menu hint: how long to wait before showing, and how often to recheck.
-        internal const val IDLE_HINT_DELAY_MS = 2_500L
         internal const val IDLE_HINT_POLL_MS  = 500L
         private val KEY_XMB_LAYOUT_ADJUST = stringPreferencesKey("display_xmb_layout_adjust")
         private val KEY_SETUP_COMPLETE    = booleanPreferencesKey("library_setup_complete")

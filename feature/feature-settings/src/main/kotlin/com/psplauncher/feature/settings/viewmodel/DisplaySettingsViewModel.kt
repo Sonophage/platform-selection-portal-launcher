@@ -19,6 +19,7 @@ import com.psplauncher.core.data.repository.UiMediaStore
 import com.psplauncher.core.data.wallpaper.WallpaperLuminanceProbe
 import com.psplauncher.core.data.wallpaper.WallpaperLuminanceProbe.clearWallpaperLuma
 import com.psplauncher.core.data.wallpaper.WallpaperLuminanceProbe.setWallpaperLuma
+import com.psplauncher.core.domain.model.ControllerHintPolicy
 import com.psplauncher.core.domain.model.UiMediaKind
 import com.psplauncher.core.domain.model.UiMediaSlot
 import com.psplauncher.core.domain.model.IconLegibilityStyle
@@ -158,7 +159,7 @@ data class DisplaySettingsUiState(
     /** Transient "we adjusted your colour" notice; null when there is nothing to say. */
     val textContrastNotice: String? = null,
     // Show the idle "Options" hint pill over XMB items with a context menu. Default on.
-    val contextMenuHintDelaySeconds: Float = 2.5f,
+    val contextMenuHintDelaySeconds: Float = ControllerHintPolicy.DEFAULT_DELAY_SECONDS,
     val touchSensitivity: TouchSensitivity = TouchSensitivity.NORMAL,
     // Confirm on a game launches it directly (true) or opens Game Detail first (false).
     val directLaunch: Boolean = false,
@@ -166,7 +167,7 @@ data class DisplaySettingsUiState(
     // Absolute path of the looping motion file, when one is set (and its poster exists).
     val motionWallpaperPath: String? = null,
     val wallpaperMessage: String? = null,
-    val contextMenuHintEnabled: Boolean = true,
+    val contextMenuHintEnabled: Boolean = ControllerHintPolicy.DEFAULT_ENABLED,
     val wallpaperImporting: Boolean = false,
     val wallpaperPreviewVisible: Boolean = false,
     // ── Boot Sequence media (Display ▸ Boot Sequence) ────────────────────────
@@ -260,8 +261,10 @@ class DisplaySettingsViewModel @Inject constructor(
             textLegibility       = TextLegibilityStyle.fromName(prefs[KEY_TEXT_LEGIBILITY]),
             textContrastNoticeSuppressed = prefs[KEY_TEXT_NOTICE_SUPPRESSED] ?: false,
             textContrastNotice   = transient.textContrastNotice,
-            contextMenuHintEnabled = prefs[KEY_CONTEXT_MENU_HINT] ?: true,
-            contextMenuHintDelaySeconds = (prefs[KEY_CONTEXT_MENU_HINT_DELAY_SECONDS] ?: 2.5f).coerceIn(1f, 5f),
+            contextMenuHintEnabled = prefs[KEY_CONTEXT_MENU_HINT] ?: ControllerHintPolicy.DEFAULT_ENABLED,
+            contextMenuHintDelaySeconds = ControllerHintPolicy.clampDelay(
+                prefs[KEY_CONTEXT_MENU_HINT_DELAY_SECONDS] ?: ControllerHintPolicy.DEFAULT_DELAY_SECONDS
+            ),
             touchSensitivity     = TouchSensitivity.fromName(prefs[KEY_TOUCH_SENSITIVITY]),
             directLaunch         = prefs[KEY_DIRECT_LAUNCH]   ?: false,
             customWallpaperPath  = prefs[KEY_CUSTOM_WALLPAPER],

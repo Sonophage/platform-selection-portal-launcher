@@ -65,6 +65,10 @@ fun SettingsNavHost(
     // Whether the last input was touch — seeds each screen's cursor visibility.
     lastInputWasTouch: Boolean = false,
     onTouchInteraction: () -> Unit = {},
+    /** Runs a tapped prompt on the scaffold's footer, routed back out to the XMB so a tap and a
+     *  press take the same path: a settings screen receives either through
+     *  [pendingGamepadAction]. */
+    onPromptTapped: ((GamepadAction) -> Unit)? = null,
     onOpenColorSchemePicker: () -> Unit = {},
     onOpenXmbLayoutAdjust: () -> Unit = {},
     onOpenCustomIcons: () -> Unit = {},
@@ -95,6 +99,7 @@ fun SettingsNavHost(
         LocalSettingsPendingAction provides pendingGamepadAction,
         LocalSettingsActionConsumed provides onGamepadActionConsumed,
         LocalSettingsShowControllerHint provides showControllerHint,
+        LocalSettingsPromptAction provides onPromptTapped,
         LocalSettingsLeftBacksOut provides leftBacksOut,
         LocalSettingsLastInputWasTouch provides lastInputWasTouch,
         LocalSettingsHostTouchInput provides onTouchInteraction,

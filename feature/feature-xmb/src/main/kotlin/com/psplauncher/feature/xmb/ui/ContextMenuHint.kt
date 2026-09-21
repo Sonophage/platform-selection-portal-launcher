@@ -45,12 +45,15 @@ fun ContextMenuHint(
     showSort: Boolean = false,
     /** Show the Options half — the focused item has a context menu. */
     showOptions: Boolean = true,
+    /** Runs a tapped prompt. Null leaves the pill a legend (previews, and any caller that has
+     *  no dispatcher to offer). */
+    onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     val items = buildList {
         if (showSort) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Sort"))
         if (showOptions) add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"))
     }
-    ControllerHintBar(items = items, modifier = modifier)
+    ControllerHintBar(items = items, modifier = modifier, onAction = onAction)
 }
 
 // ── Previews ──────────────────────────────────────────────────────────────────

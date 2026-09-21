@@ -81,9 +81,12 @@ fun AppDrawerScreen(
     onGamepadActionConsumed: () -> Unit = {},
     /** Idle-controller gate: when true (and no drawer overlay is open) the hint pill fades in. */
     showControllerHint: Boolean = false,
-    /** Any touch interaction inside the drawer — reported to the XMB input-source tracker so a
-     *  finger tap/browse suppresses the controller hint the same way it does on the XMB. */
+    /** Any touch interaction inside the drawer — reported to the XMB input-source tracker, which
+     *  is what drives the contextual touch-navigation button. */
     onTouchInteraction: () -> Unit = {},
+    /** Runs a tapped hint prompt. Routed back out to the XMB so a tap and a press take the same
+     *  path: the drawer receives its actions through [pendingGamepadAction] either way. */
+    onPromptTapped: ((GamepadAction) -> Unit)? = null,
     viewModel: AppDrawerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -141,6 +144,7 @@ fun AppDrawerScreen(
     }
 
     AppDrawerContent(
+        onPromptTapped = onPromptTapped,
         state = state,
         searchActive = searchActive,
         showControllerHint = showControllerHint,
@@ -205,6 +209,8 @@ internal fun AppDrawerContent(
     onCancelUninstall: () -> Unit,
     onGrantUsageAccess: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Runs a tapped hint prompt; null leaves the pill a legend (the previews pass nothing). */
+    onPromptTapped: ((GamepadAction) -> Unit)? = null,
 ) {
     val searchFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -302,12 +308,15 @@ internal fun AppDrawerContent(
                 }
             }
 
-            // ── Permanent footer: controller hint pill, alpha-faded in/out on the
-            // idle-controller gate. Alpha (not AnimatedVisibility) keeps the bar measured at
-            // its natural height in both states, so the slot never changes size and the grid
-            // never shifts. The pill has no clickables, so a fully transparent bar swallowing
-            // touches is not a concern. Fade-out is symmetric (unlike the XMB's instant cut-out)
-            // but still short; fallback if device testing disagrees is a ~90 ms fade-out.
+            // ── Permanent footer: the hint pill, alpha-faded in/out. Alpha (not
+            // AnimatedVisibility) keeps the bar measured at its natural height in both states,
+            // so the slot never changes size and the grid never shifts.
+            //
+            // The pill DOES have clickables now, which makes a fully transparent bar a real
+            // hazard: it is still laid out at alpha 0 and would accept taps on a control nobody
+            // can see. So the dispatcher is withheld while it is invisible, which leaves the slot
+            // measured and the bar inert. This comment used to say there were no clickables to
+            // worry about; that was true and is the sort of note that stops being true quietly.
             val hintAlpha by animateFloatAsState(
                 targetValue = if (showControllerHint && state.menuApp == null && state.confirmUninstall == null) 1f else 0f,
                 animationSpec = tween(200),
@@ -319,7 +328,10 @@ internal fun AppDrawerContent(
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                AppDrawerHintBar(modifier = Modifier.alpha(hintAlpha))
+                AppDrawerHintBar(
+                    modifier = Modifier.alpha(hintAlpha),
+                    onAction = onPromptTapped?.takeIf { hintAlpha > 0f },
+                )
             }
         }
 

@@ -21,6 +21,8 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
 @Composable
 internal fun AppDrawerHintBar(
     modifier: Modifier = Modifier,
+    /** Runs a tapped prompt through the drawer's own action handler. */
+    onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     ControllerHintBar(
         items = listOf(
@@ -37,5 +39,6 @@ internal fun AppDrawerHintBar(
         // lighter default over the darker XMB backdrop.
         background = Color.Black.copy(alpha = 0.70f),
         modifier = modifier,
+        onAction = onAction,
     )
 }

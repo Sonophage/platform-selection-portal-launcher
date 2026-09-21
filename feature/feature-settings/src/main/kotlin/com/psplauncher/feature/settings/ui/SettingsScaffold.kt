@@ -125,6 +125,15 @@ val LocalSettingsTouchInput = compositionLocalOf<() -> Unit> { {} }
 /** Host-level touch callback used by the fullscreen settings hint gate. */
 val LocalSettingsHostTouchInput = compositionLocalOf<() -> Unit> { {} }
 val LocalSettingsShowControllerHint = compositionLocalOf { false }
+
+/**
+ * Runs a tapped prompt on the settings footer, supplied once by SettingsNavHost.
+ *
+ * Ambient for the same reason [LocalControllerPromptStyle] is: the footer is chrome the scaffold
+ * draws, and threading a dispatcher through every settings screen's signature to reach it would
+ * put the parameter on dozens of screens that never mention the footer.
+ */
+val LocalSettingsPromptAction = compositionLocalOf<((GamepadAction) -> Unit)?> { null }
 /**
  * Settings ▸ Controller ▸ Left Backs Out. When on, D-pad LEFT on a row that has no inline actions
  * leaves the screen instead of doing nothing. Defaults to true, matching the stored preference, so
@@ -374,6 +383,7 @@ val SettingsDefaultHelperItems = listOf(
 @Composable
 private fun SettingsHelperFooter(items: List<ControllerPromptItem>) {
     val showHint = LocalSettingsShowControllerHint.current
+    val onAction = LocalSettingsPromptAction.current
     val alpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (showHint) 1f else 0f,
         animationSpec = androidx.compose.animation.core.tween(200),
@@ -399,6 +409,7 @@ private fun SettingsHelperFooter(items: List<ControllerPromptItem>) {
                 ControllerHintBar(
                     items = items.ifEmpty { SettingsDefaultHelperItems },
                     background = Color.Black.copy(alpha = 0.70f),
+                    onAction = onAction,
                 )
             }
         }

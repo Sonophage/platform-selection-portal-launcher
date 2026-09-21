@@ -4,6 +4,7 @@ import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.CategoryType
 import com.psplauncher.core.domain.model.TouchNavButtonMode
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,8 +17,15 @@ class ContextMenuHintStateTest {
 
     private val gameItem = XMBItem(id = "g1", title = "Game", gameId = 1L)
 
+    /**
+     * Any non-negative idle time satisfies the default delay, which is zero. The tests used to
+     * pass XMBViewModel.IDLE_HINT_DELAY_MS, a 2_500L constant that mirrored the old default and
+     * had already stopped feeding the gate; the gate reads the configured delay off the state.
+     */
+    private val IDLE_MS = 0L
+
     /** A state where the hint is eligible: controller last used, root, game focused, no overlay, idle. */
-    private fun eligibleState(idleMs: Long = XMBViewModel.IDLE_HINT_DELAY_MS) = XMBUiState(
+    private fun eligibleState(idleMs: Long = IDLE_MS) = XMBUiState(
         categories = listOf(Category(BuiltInCategory.GAMES, "Games", "games", type = CategoryType.BUILT_IN, position = 0)),
         selectedCategoryIndex = 0,
         currentItems = listOf(gameItem),
@@ -29,46 +37,103 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `shows hint when idle long enough over a context-menu item after controller input`() {
-        assertTrue(shouldShowContextMenuHint(eligibleState(), XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowContextMenuHint(eligibleState(), IDLE_MS))
     }
 
     @Test
-    fun `does not show before the idle delay elapses`() {
-        assertFalse(shouldShowContextMenuHint(eligibleState(), XMBViewModel.IDLE_HINT_DELAY_MS - 1))
+    fun `the default delay of zero means the hint is up immediately`() {
+        assertTrue(shouldShowContextMenuHint(eligibleState(), 0L))
     }
 
     @Test
-    fun `does not show after touch input`() {
+    fun `still shows after touch input, because the prompts can be tapped`() {
+        // This asserted the opposite while the pill was a legend. The prompts are controls now,
+        // and the touch gate hid them from the only people who would tap them -- and touching one
+        // set the flag that hid it, so it could not be used twice.
         val s = eligibleState().copy(lastInputWasTouch = true)
-        assertFalse(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
-    fun `controller input enables the hint regardless of touch-button mode`() {
+    fun `shows regardless of touch-button mode`() {
         val s = eligibleState().copy(
             lastInputWasTouch = false,
             touchNavButtonMode = TouchNavButtonMode.ALWAYS_HIDE,
         )
-        assertTrue(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
+    }
+
+    @Test
+    fun `hints do not auto-hide at the default delay of zero`() {
+        // The flicker guard. Both markTouchInput and onUserInteraction clear the hint flags on
+        // every input, which was right while the hints waited for a pause. At a zero delay the
+        // poller puts them straight back within IDLE_HINT_POLL_MS, so the eager hide would blink
+        // the bar on every single button press. This property is what makes it conditional.
+        assertFalse(eligibleState().hintsAutoHide)
+    }
+
+    @Test
+    fun `hints auto-hide as soon as any delay is configured`() {
+        assertTrue(eligibleState().copy(contextMenuHintDelaySeconds = 0.5f).hintsAutoHide)
+        assertTrue(eligibleState().copy(contextMenuHintDelaySeconds = 5f).hintsAutoHide)
+    }
+
+    @Test
+    fun `recomputing raises the flag on the spot rather than waiting for the poller`() {
+        // The device showed the bar missing for up to one poll tick after every press, because
+        // the flags were a timer's output and only the timer could raise them.
+        val s = eligibleState().copy(showContextMenuHint = false)
+        assertTrue(s.withHintsShownNow().showContextMenuHint)
+    }
+
+    @Test
+    fun `recomputing is idempotent, because no gate reads a hint flag`() {
+        // If a gate ever consulted one of these flags, recomputing would latch or oscillate.
+        val once = eligibleState().withHintsShownNow()
+        assertEquals(once, once.withHintsShownNow())
+    }
+
+    @Test
+    fun `recomputing lowers a flag whose gate no longer holds`() {
+        val stale = eligibleState().copy(
+            showContextMenuHint = true,
+            activeContextMenu = XMBContextMenu("X", emptyList()),
+        )
+        assertFalse(stale.withHintsShownNow().showContextMenuHint)
+    }
+
+    @Test
+    fun `the setting still switches the hints off entirely`() {
+        // Display ▸ Button Hints. The delay became a preference rather than a fixed pause; this
+        // is the gate that has to keep working, or the setting is decoration.
+        val s = eligibleState().copy(contextMenuHintEnabled = false)
+        assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
+    }
+
+    @Test
+    fun `a configured delay still holds the hint back until the pause has elapsed`() {
+        val s = eligibleState().copy(contextMenuHintDelaySeconds = 2.5f)
+        assertFalse(shouldShowContextMenuHint(s, 2_499L))
+        assertTrue(shouldShowContextMenuHint(s, 2_500L))
     }
 
     @Test
     fun `does not show when a blocking overlay is up`() {
         val s = eligibleState().copy(activeGameId = 1L) // detail screen = blocking overlay
-        assertFalse(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
     fun `does not show when a context menu is already open`() {
         val s = eligibleState().copy(activeContextMenu = XMBContextMenu("X", emptyList()))
-        assertFalse(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
     fun `does not show when the focused item has no context menu and the list cannot sort`() {
         val plain = XMBItem(id = "x", title = "Plain", type = XMBItemType.STANDARD)
         val s = eligibleState().copy(currentItems = listOf(plain))
-        assertFalse(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
@@ -76,7 +141,7 @@ class ContextMenuHintStateTest {
         // Previously suppressed. Drilled-in rows (the game flyout, a library's files) have
         // context menus and sort, so this is where the affordance is least discoverable.
         val s = eligibleState().copy(selectedPlatformId = "psp") // drilled into a memory card
-        assertTrue(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     // ── Sort half of the pill ───────────────────────────────────────────────
@@ -100,7 +165,7 @@ class ContextMenuHintStateTest {
         val s = eligibleState().copy(currentItems = listOf(plain), selectedPlatformId = "psp")
         assertFalse(s.focusedItemHasContextMenu)
         assertTrue(s.canSortCurrentList)
-        assertTrue(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
@@ -109,19 +174,19 @@ class ContextMenuHintStateTest {
         val s = eligibleState().copy(currentItems = listOf(plain))
         assertFalse(s.focusedItemHasContextMenu)
         assertFalse(s.canSortCurrentList)
-        assertFalse(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
     fun `does not show when boot sequence is still playing`() {
         val s = eligibleState().copy(showBootSequence = true)
-        assertFalse(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
     fun `does not show when the context-menu hint setting is disabled`() {
         val s = eligibleState().copy(contextMenuHintEnabled = false)
-        assertFalse(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
@@ -151,12 +216,14 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `drawer hint shows when idle long enough with a controller while the drawer is open`() {
-        assertTrue(shouldShowAppDrawerHint(drawerEligibleState(), XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowAppDrawerHint(drawerEligibleState(), IDLE_MS))
     }
 
     @Test
-    fun `drawer hint does not show before the idle delay elapses`() {
-        assertFalse(shouldShowAppDrawerHint(drawerEligibleState(), XMBViewModel.IDLE_HINT_DELAY_MS - 1))
+    fun `a configured delay still holds the drawer hint back`() {
+        val s = drawerEligibleState().copy(contextMenuHintDelaySeconds = 2.5f)
+        assertFalse(shouldShowAppDrawerHint(s, 2_499L))
+        assertTrue(shouldShowAppDrawerHint(s, 2_500L))
     }
 
     @Test
@@ -164,26 +231,27 @@ class ContextMenuHintStateTest {
         // eligibleState() has no activeAppDrawerFilter, so it exercises the closed-drawer side of
         // the gate while remaining fully eligible for the XMB pill gate (a focused game item).
         val s = eligibleState()
-        assertFalse(shouldShowAppDrawerHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
-        assertTrue(shouldShowContextMenuHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowAppDrawerHint(s, IDLE_MS))
+        assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
-    fun `drawer hint does not show after touch input`() {
+    fun `drawer hint still shows after touch input`() {
+        // Same reversal as the XMB pill: the drawer's prompts are tappable controls now.
         val s = drawerEligibleState().copy(lastInputWasTouch = true)
-        assertFalse(shouldShowAppDrawerHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowAppDrawerHint(s, IDLE_MS))
     }
 
     @Test
     fun `drawer hint does not show when a context menu is open`() {
         val s = drawerEligibleState().copy(activeContextMenu = XMBContextMenu("X", emptyList()))
-        assertFalse(shouldShowAppDrawerHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowAppDrawerHint(s, IDLE_MS))
     }
 
     @Test
     fun `drawer hint stops when the context-menu hint setting is disabled`() {
         val s = drawerEligibleState().copy(contextMenuHintEnabled = false)
-        assertFalse(shouldShowAppDrawerHint(s, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowAppDrawerHint(s, IDLE_MS))
     }
 
     @Test
@@ -196,8 +264,8 @@ class ContextMenuHintStateTest {
     @Test
     fun `drawer open is a blocking overlay so the drawer hint and XMB pill are mutually exclusive`() {
         val open = drawerEligibleState()
-        assertTrue(shouldShowAppDrawerHint(open, XMBViewModel.IDLE_HINT_DELAY_MS))
-        assertFalse(shouldShowContextMenuHint(open, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowAppDrawerHint(open, IDLE_MS))
+        assertFalse(shouldShowContextMenuHint(open, IDLE_MS))
     }
 
     // ── Settings helper-footer hint branch ─────────────────────────────────
@@ -210,20 +278,22 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `settings hint shows after the shared idle delay`() {
-        assertTrue(shouldShowSettingsHint(settingsEligibleState(), XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertTrue(shouldShowSettingsHint(settingsEligibleState(), IDLE_MS))
     }
 
     @Test
-    fun `settings hint does not show before the shared idle delay`() {
-        assertFalse(shouldShowSettingsHint(settingsEligibleState(), XMBViewModel.IDLE_HINT_DELAY_MS - 1))
+    fun `a configured delay still holds the settings hint back`() {
+        val s = settingsEligibleState().copy(contextMenuHintDelaySeconds = 2.5f)
+        assertFalse(shouldShowSettingsHint(s, 2_499L))
+        assertTrue(shouldShowSettingsHint(s, 2_500L))
     }
 
     @Test
-    fun `settings hint does not show after touch input`() {
-        assertFalse(
+    fun `settings hint still shows after touch input`() {
+        assertTrue(
             shouldShowSettingsHint(
                 settingsEligibleState().copy(lastInputWasTouch = true),
-                XMBViewModel.IDLE_HINT_DELAY_MS,
+                IDLE_MS,
             )
         )
     }
@@ -236,7 +306,7 @@ class ContextMenuHintStateTest {
         assertTrue(
             shouldShowSettingsHint(
                 settingsEligibleState("settings_display"),
-                XMBViewModel.IDLE_HINT_DELAY_MS,
+                IDLE_MS,
             )
         )
     }
@@ -246,7 +316,7 @@ class ContextMenuHintStateTest {
         assertTrue(
             shouldShowSettingsHint(
                 settingsEligibleState("settings_about"),
-                XMBViewModel.IDLE_HINT_DELAY_MS,
+                IDLE_MS,
             )
         )
     }
@@ -256,7 +326,7 @@ class ContextMenuHintStateTest {
         assertFalse(
             shouldShowSettingsHint(
                 settingsEligibleState().copy(activeSettingsScreen = null),
-                XMBViewModel.IDLE_HINT_DELAY_MS,
+                IDLE_MS,
             )
         )
     }
@@ -264,7 +334,7 @@ class ContextMenuHintStateTest {
     @Test
     fun `settings hint respects the shared setting and configured delay`() {
         val disabled = settingsEligibleState().copy(contextMenuHintEnabled = false)
-        assertFalse(shouldShowSettingsHint(disabled, XMBViewModel.IDLE_HINT_DELAY_MS))
+        assertFalse(shouldShowSettingsHint(disabled, IDLE_MS))
 
         val delayed = settingsEligibleState().copy(contextMenuHintDelaySeconds = 4.5f)
         assertFalse(shouldShowSettingsHint(delayed, 4_499))

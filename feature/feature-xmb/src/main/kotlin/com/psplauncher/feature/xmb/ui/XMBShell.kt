@@ -196,6 +196,7 @@ fun XMBShellContainer(
         onDismissSaveAsTheme = viewModel::dismissSaveThemeNameDialog,
         onThemeShareConsumed = viewModel::onThemeShareConsumed,
         onSettingsActionConsumed = viewModel::consumeSettingsAction,
+        onPromptTapped = viewModel::onPromptTapped,
         onCloseAppDrawer = viewModel::onCloseAppDrawer,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
         onCloseGameDetail = viewModel::onCloseGameDetail,
@@ -310,6 +311,8 @@ fun XMBShell(
     onDismissSaveAsTheme: () -> Unit = {},
     onThemeShareConsumed: () -> Unit = {},
     onSettingsActionConsumed: () -> Unit = {},
+    /** Runs a tapped hint prompt, through the same dispatcher a pad press uses. */
+    onPromptTapped: (com.psplauncher.core.domain.model.GamepadAction) -> Unit = {},
     onCloseAppDrawer: () -> Unit = {},
     onDrawerActionConsumed: () -> Unit = {},
     onCloseGameDetail: () -> Unit = {},
@@ -925,11 +928,12 @@ fun XMBShell(
                 }
             }
 
-            // Idle hint pill: [ X Sort   Y Options ], with the controller-style glyphs, fading
-            // in after the user has been idle. Controller-only — touch input suppresses it.
-            // Driven by uiState.showContextMenuHint (set by XMBViewModel's idle timer); each half
-            // appears only where that action really does something, so the pill shrinks to just
-            // Options on an unsortable list and to just Sort on an item with no context menu.
+            // Button hint pill: [ X Sort   Y Options ], with the controller-style glyphs, and
+            // TAPPABLE — a tap runs the action through the same dispatcher the pad uses. Up by
+            // default rather than after an idle pause (Display ▸ Button Hints, and its delay,
+            // still govern both). Driven by uiState.showContextMenuHint; each half appears only
+            // where that action really does something, so the pill shrinks to just Options on an
+            // unsortable list and to just Sort on an item with no context menu.
             //
             // It shows while drilled in too (the game flyout, a library's files) — those rows have
             // context menus and sort, and are where the affordance is least discoverable.
@@ -949,6 +953,7 @@ fun XMBShell(
                 ContextMenuHint(
                     showSort = uiState.canSortCurrentList,
                     showOptions = uiState.focusedItemHasContextMenu,
+                    onAction = onPromptTapped,
                     modifier = Modifier.padding(
                         bottom = if (drawerButtonVisible) 76.dp else 24.dp,
                         end = 20.dp,
@@ -975,6 +980,7 @@ fun XMBShell(
                         onBack = onCloseSettingsScreen,
                         pendingGamepadAction = uiState.pendingSettingsAction,
                         onGamepadActionConsumed = onSettingsActionConsumed,
+                        onPromptTapped = onPromptTapped,
                         showControllerHint = uiState.showSettingsHint,
                         leftBacksOut = uiState.leftBacksOut,
                         lastInputWasTouch = uiState.lastInputWasTouch,
@@ -1019,11 +1025,13 @@ fun XMBShell(
                     onBack = onCloseAppDrawer,
                     pendingGamepadAction = uiState.pendingDrawerAction,
                     onGamepadActionConsumed = onDrawerActionConsumed,
-                    // The drawer renders its own idle controller hint pill (same fade system as
-                    // the XMB's ContextMenuHint — see shouldShowAppDrawerHint).
+                    // The drawer renders its own hint pill (same system as the XMB's
+                    // ContextMenuHint — see shouldShowAppDrawerHint), and its prompts are
+                    // tappable through the same dispatcher a pad press uses.
                     showControllerHint = uiState.showAppDrawerHint,
-                    // Drawer touches are reported to the shared input-source tracker so a finger
-                    // tap/browse suppresses that hint exactly like touch on the XMB does.
+                    onPromptTapped = onPromptTapped,
+                    // Drawer touches are reported to the shared input-source tracker, which is
+                    // what drives the contextual touch-navigation button.
                     onTouchInteraction = onTouchInput,
                     modifier = Modifier.fillMaxSize(),
                 )

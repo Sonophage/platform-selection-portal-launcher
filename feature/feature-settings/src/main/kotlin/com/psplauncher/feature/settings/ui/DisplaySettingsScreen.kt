@@ -1,5 +1,6 @@
 package com.psplauncher.feature.settings.ui
 
+import com.psplauncher.core.domain.model.ControllerHintPolicy
 import com.psplauncher.core.domain.model.TextLegibilityStyle
 import com.psplauncher.core.domain.model.IconLegibilityStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -513,19 +514,22 @@ fun DisplaySettingsScreen(
                 )
 
                 SettingsToggleRow(
-                    label    = "Context Menu Hint",
-                    sublabel = "Show the idle “Options” pill over XMB items with a context menu",
+                    label    = "Button Hints",
+                    sublabel = "Show the on-screen button prompts, and let them be tapped",
                     checked  = state.contextMenuHintEnabled,
                     onToggle = { viewModel.setContextMenuHintEnabled(it) },
                 )
 
                 SettingsSliderRow(
                     label     = "Hint Delay",
-                    sublabel  = "Show after ${formatHintDelay(state.contextMenuHintDelaySeconds)} of inactivity (1–5 seconds)",
+                    // The range and its ends come from the policy rather than being spelled out
+                    // here, because prose that names numbers is the copy that goes stale first.
+                    sublabel  = "Always shown at ${formatHintDelay(ControllerHintPolicy.MIN_DELAY_SECONDS)}, " +
+                        "or hide until a pause of up to ${formatHintDelay(ControllerHintPolicy.MAX_DELAY_SECONDS)}",
                     value     = state.contextMenuHintDelaySeconds,
                     onValueChange = viewModel::setContextMenuHintDelaySeconds,
-                    valueRange = 1f..5f,
-                    steps     = 7,
+                    valueRange = ControllerHintPolicy.DELAY_RANGE,
+                    steps     = ControllerHintPolicy.DELAY_STEPS,
                     enabled  = state.contextMenuHintEnabled,
                     valueFormatter = { formatHintDelay(it) },
                 )
@@ -726,8 +730,13 @@ private fun PspConfirmOption(label: String, focused: Boolean, onClick: () -> Uni
     }
 }
 
-private fun formatHintDelay(seconds: Float): String =
-    if (seconds % 1f == 0f) "${seconds.toInt()}s" else "${seconds}s"
+private fun formatHintDelay(seconds: Float): String = when {
+    // Zero is not "0s of inactivity", it is the auto-hide being off, and the slider's own value
+    // label is the only place that says so.
+    seconds <= 0f -> "Always"
+    seconds % 1f == 0f -> "${seconds.toInt()}s"
+    else -> "${seconds}s"
+}
 
 /**
  * Whether [this] media row currently has a custom assignment — what gates the reset shortcut and
