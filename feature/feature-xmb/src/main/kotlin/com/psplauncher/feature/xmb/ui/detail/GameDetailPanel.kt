@@ -1,8 +1,12 @@
 package com.psplauncher.feature.xmb.ui.detail
 
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,6 +81,13 @@ private fun DetailPanelPage.icon(): ImageVector = when (this) {
  * with the Play legend a few rows down. A soft capsule behind the current label, and nothing at
  * all behind the others, reads as a tab row.
  */
+/** The same drop shadow the crossbar's row labels wear, for text drawn straight onto artwork. */
+private val PanelTextShadow = Shadow(
+    color = Color.Black.copy(alpha = 0.75f),
+    offset = Offset(0f, 2f),
+    blurRadius = 5f,
+)
+
 private val StripTabShape = RoundedCornerShape(percent = 50)
 private val StripTabGap: Dp = 6.dp
 private val StripShoulderSize: Dp = 13.dp
@@ -94,9 +105,9 @@ private val PanelCardShape = RoundedCornerShape(14.dp)
  * system, so a user on an Xbox pad sees LB and RB: this row must not be the one place in the shell
  * that hard-codes a button name.
  *
- * Drawn even at one page: it is what says the shoulders do anything here, and hiding it at one
- * page would make them look dead on exactly the games with the least artwork -- the ones most
- * worth going to look for a scrape on.
+ * Drawn at one page: it is what says the shoulders do anything here, and hiding it there would
+ * make them look dead on exactly the games with the least artwork -- the ones most worth going
+ * to look for a scrape on. At ZERO it is not drawn; see the guard below.
  */
 @Composable
 fun DetailPanelStrip(
@@ -105,6 +116,10 @@ fun DetailPanelStrip(
     modifier: Modifier = Modifier,
     onPageTapped: ((DetailPanelPage) -> Unit)? = null,
 ) {
+    // Nothing at all with nothing to walk. Drawn at ONE page -- that is what says the shoulders
+    // do anything here -- but at zero the row is two shoulder glyphs around a gap, which promises
+    // a walk that goes nowhere. The home shelf reaches zero because it drops the logo tab.
+    if (pages.isEmpty()) return
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(StripTabGap),
@@ -181,6 +196,8 @@ fun GameDetailPanel(
      */
     focusedMediaId: String? = null,
     onMediaTapped: ((DetailMedia) -> Unit)? = null,
+    /** Draw the logo page at half height. The home shelf does; a detail screen does not. */
+    halfHeightLogo: Boolean = false,
 ) {
     // The strip is NOT drawn here. It lives in the host's chrome, under the top bar, so the whole
     // of this region belongs to the page — which is the difference between a box front you can
@@ -191,7 +208,7 @@ fun GameDetailPanel(
             // is open (a scrape filling in box art, the cursor moving to a game with less art)
             // cannot leave the body drawing something the strip is no longer offering.
             when (resolvePanelPage(page, content.pages)) {
-                DetailPanelPage.LOGO -> LogoPage(content, titleFallback)
+                DetailPanelPage.LOGO -> LogoPage(content, titleFallback, halfHeightLogo)
                 DetailPanelPage.BOX_ART -> BoxArtPage(content)
                 DetailPanelPage.VIDEO -> VideoPage(content)
                 DetailPanelPage.GALLERY -> GalleryPage(content, focusedMediaId, onMediaTapped)
@@ -208,11 +225,17 @@ fun GameDetailPanel(
             Spacer(Modifier.height(8.dp))
             Text(
                 text = "TIME PLAYED: ${played.uppercase()}",
-                color = LocalPfpTextColors.current.secondary,
+                // White, with the crossbar's own shadow, NOT the theme's secondary. This line
+                // sits on whatever artwork the item brought, and the theme is re-tinted from
+                // that same artwork -- so a themed secondary is a colour drawn FROM the picture
+                // it has to be legible against. On a bright frame it came out grey on gold and
+                // could not be read at all.
+                color = Color.White.copy(alpha = 0.92f),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                style = LocalTextStyle.current.copy(shadow = PanelTextShadow),
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )
         }
@@ -229,7 +252,7 @@ fun GameDetailPanel(
  * The drill-down has no such list, so there it is the only thing naming the game.
  */
 @Composable
-private fun LogoPage(content: DetailPanelContent, titleFallback: Boolean) {
+private fun LogoPage(content: DetailPanelContent, titleFallback: Boolean, halfHeight: Boolean = false) {
     val logo = content.logoUri
     if (logo != null) {
         AsyncImage(
@@ -237,7 +260,13 @@ private fun LogoPage(content: DetailPanelContent, titleFallback: Boolean) {
             contentDescription = content.title,
             // Fit, never Crop: a trimmed logo is a wordmark with a letter missing.
             contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize().padding(8.dp),
+            // Half the page on the home shelf: at full height a wordmark filled the screen and
+            // left the tabs and the content with nothing but the bottom third, which is the
+            // opposite of a page whose subject is the artwork BEHIND it.
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (halfHeight) Modifier.fillMaxHeight(0.5f) else Modifier.fillMaxHeight())
+                .padding(8.dp),
         )
     } else if (titleFallback) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

@@ -1,5 +1,8 @@
 package com.psplauncher.feature.xmb.ui
 
+import com.psplauncher.core.ui.theme.LocalPFPColors
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.fadeOut
@@ -151,6 +154,7 @@ fun LastPlayedPage(
                         page = page,
                         // No row label anywhere on this page, so a logo-less game is named here.
                         titleFallback = true,
+                        halfHeightLogo = true,
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                     // The tabs sit UNDER what they are switching, centred, between the title and
@@ -160,28 +164,14 @@ fun LastPlayedPage(
                     // read as chrome belonging to the status bar above it.
                     Spacer(Modifier.height(10.dp))
                     DetailPanelStrip(
-                        pages = content.pages,
+                        // LOGO is not offered here. On a detail screen it is the resting state
+                        // you walk back to; here the logo is the page's headline, drawn above
+                        // this row whichever tab is current, so a tab for it would be a tab that
+                        // changes nothing you can see.
+                        pages = content.pages.filterNot { it == DetailPanelPage.LOGO },
                         current = page,
                         onPageTapped = onPageTapped,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
-                    )
-                    // Where the RECENT badge used to be. The badge said what the column already
-                    // says; this does something. Never focused — the cursor lives in the card
-                    // column, and A on a card already fires this — so it reads as the label for
-                    // the button you are holding rather than as a control to reach.
-                    Spacer(Modifier.height(12.dp))
-                    PfpDetailLaunchButton(
-                        label = if (directLaunch) "Play" else "Details",
-                        icon = if (directLaunch) Icons.Filled.PlayArrow else Icons.Filled.Info,
-                        focused = false,
-                        // Compact, because on this page it names the button in your hand rather
-                        // than being a control to reach. At full size it was the loudest thing on
-                        // a page whose subject is the artwork behind it.
-                        compact = true,
-                        onClick = { onCardTapped(selectedIndex) },
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .width(118.dp),
                     )
                 } else {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -196,42 +186,86 @@ fun LastPlayedPage(
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        Text(
-            // What is focused, and -- when something is part-watched -- how much of it is left.
-            // The bar on the card says there IS a resume point; this says what it costs.
-            text = listOfNotNull(focused?.title, focused?.progressLabel).joinToString("  ·  ")
-                .ifBlank { if (filter == RecentFilter.ALL) "Last Played" else "${filter.label} — nothing yet" },
-            color = LocalPfpTextColors.current.primary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            // The hero art is the backdrop here, and it can be bright. Same shadow the crossbar's
-            // row labels wear over the same kind of image.
-            style = TextStyle(shadow = XmbTextShadow),
-        )
-        Spacer(Modifier.height(8.dp))
-        // Every filter on one line, the active one lit. It used to name only the CURRENT filter,
-        // which says what you are looking at but not what else there is or which way X goes --
-        // so cycling was a guess until the label changed. A whole row costs one line and answers
-        // both at a glance, the way the app drawer's tab strip does.
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            RecentFilter.entries.forEach { entry ->
-                val active = entry == filter
-                Text(
-                    text = entry.label,
-                    color = if (active) LocalPfpTextColors.current.primary
-                            else LocalPfpTextColors.current.secondary.copy(alpha = 0.55f),
-                    fontSize = 13.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    style = TextStyle(shadow = XmbTextShadow),
-                )
-            }
-        }
-        Spacer(Modifier.height(14.dp))
+        // The title used to be repeated here, under the artwork that already says it in letters
+        // ten times the size, with the filter names under that again. Both are gone: the filters
+        // now sit in the centre of the top bar (see RecentFilterRow, placed by XMBShell) and the
+        // title is the artwork.
+        // Clears the corner pill. The tabs sit at the foot of the content column, and the pill
+        // is drawn over this page by the shell -- without this the two overlap and the shoulders
+        // come out from behind "Filter".
+        Spacer(Modifier.height(44.dp))
     }
 }
+
+/**
+ * The media filter, for the centre of the top bar.
+ *
+ * Lives here rather than in the strip because the strip knows nothing about recents and should
+ * not learn: it is handed a slot and this fills it.
+ *
+ * Every filter named, the active one lit. Naming only the CURRENT one says what you are looking
+ * at but not what else there is or which way X goes, so cycling was a guess until the label
+ * changed.
+ */
+@Composable
+fun RecentFilterRow(filter: RecentFilter, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RecentFilter.entries.forEach { entry ->
+            val active = entry == filter
+            Text(
+                text = entry.label,
+                // White either way, dimmed rather than recoloured. These sit over whatever
+                // artwork the focused item brought, and the theme is re-tinted from that same
+                // artwork -- a themed colour here is drawn FROM the picture it must be read
+                // against, which on a gold frame came out gold on gold.
+                color = Color.White.copy(alpha = if (active) 1f else 0.45f),
+                // Chrome-sized, like everything else in this band.
+                fontSize = 8.sp,
+                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                style = TextStyle(shadow = XmbTextShadow),
+            )
+        }
+    }
+}
+
+/**
+ * The launch spine: a full-height bar down the edge, in the focused item's own colour.
+ *
+ * It replaces a Play pill that sat in the middle of the page. A pill there was a control in the
+ * one place the cursor never goes, competing with the artwork for the centre; a spine is chrome
+ * at the edge that says the same thing by being the colour of the thing you would launch.
+ *
+ * The colour is the AMBIENT accent, not a parameter. On this page the palette is already
+ * re-tinted from the focused item's artwork -- it is why the whole screen goes red on one row
+ * and olive on the next -- so reading the theme gets the item's colour for free and cannot
+ * disagree with the page it sits on. A second derivation would be a second answer to the same
+ * question.
+ *
+ * It fades at both ends rather than running flat edge to edge: a solid bar reads as a border on
+ * the window, and this belongs to the item rather than to the screen.
+ */
+@Composable
+fun LaunchSpine(modifier: Modifier = Modifier) {
+    val accent = LocalPFPColors.current.accentColor
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .width(SpineWidth)
+            .background(
+                Brush.verticalGradient(
+                    0.00f to accent.copy(alpha = 0.00f),
+                    0.50f to accent.copy(alpha = 0.90f),
+                    1.00f to accent.copy(alpha = 0.00f),
+                )
+            ),
+    )
+}
+
+private val SpineWidth = 4.dp
 
 @Composable
 private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {

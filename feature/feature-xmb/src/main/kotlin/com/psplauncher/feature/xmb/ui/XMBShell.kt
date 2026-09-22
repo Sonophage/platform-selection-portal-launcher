@@ -1062,8 +1062,22 @@ fun XMBShell(
                 sortLabel = uiState.sortLabel,
                 showSortButton = uiState.resolvedShowTouchButton,
                 onSortTapped = onXmbSortTapped,
+                // The home shelf's media filter rides in the middle of the bar. Only there: it
+                // is the only column X filters, and a row of media names over the crossbar would
+                // be naming something that column does not have.
+                centre = if (uiState.onLastPlayedHome) {
+                    { RecentFilterRow(uiState.recentFilter, Modifier.align(Alignment.Center)) }
+                } else null,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
+
+            // The launch spine, down the right edge, in the focused item's own colour. Outside
+            // the shelf's own Column so it runs the full height of the screen rather than the
+            // height of the content: a spine that stopped at the filter row would be a rule, not
+            // an edge.
+            if (uiState.onLastPlayedHome) {
+                LaunchSpine(modifier = Modifier.align(Alignment.CenterEnd))
+            }
             } // end: XMB foreground hidden while music browser is open
 
             // Button hint pill: [ X Sort   Y Options ], with the controller-style glyphs, and
@@ -1105,12 +1119,10 @@ fun XMBShell(
                     showOptions = uiState.showContextMenuHint && uiState.focusedItemHasContextMenu,
                     showRootActions = rootActionsVisible,
                     onAction = onPromptTapped,
-                    // One corner, one inset. The 68dp lift existed only to clear the buttons that
-                    // are now rows in this pill.
-                    modifier = Modifier.padding(
-                        bottom = ControllerHintEdgeGap,
-                        end = ControllerHintEdgeGap,
-                    ),
+                    // Flush to the bottom edge, inset only from the right. A pill floating a
+                    // few dp clear of the edge reads as a thing lying ON the page; sitting on
+                    // the edge it reads as the page's own footer, which is what it is.
+                    modifier = Modifier.padding(end = ControllerHintEdgeGap),
                 )
             }
 

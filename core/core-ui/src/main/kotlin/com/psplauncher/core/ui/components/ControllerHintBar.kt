@@ -47,9 +47,9 @@ val ControllerHintEdgeGap = 5.dp
 fun ControllerHintBar(
     items: List<ControllerPromptItem>,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(10.dp),
+    shape: Shape = RoundedCornerShape(6.dp),
     background: Color = Color.Black.copy(alpha = 0.5f),
-    arrangement: Arrangement.Horizontal = Arrangement.spacedBy(16.dp),
+    arrangement: Arrangement.Horizontal = Arrangement.spacedBy(9.dp),
     /** Forwarded to [ControllerPromptBar]: non-null makes the single-action prompts tappable. */
     onAction: ((GamepadAction) -> Unit)? = null,
 ) {
@@ -65,10 +65,10 @@ fun ControllerHintBar(
             // Tight to the glyphs. The pill's height is its content's now that the prompts no
             // longer reserve a 48dp touch target (see ControllerPromptBar), so this padding is
             // the only thing between the text and the fill's edge.
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 5.dp, vertical = 2.dp),
         labelColor = Color.White,
         labelStyle = TextStyle(
-            fontSize = 14.sp,
+            fontSize = 8.sp,
             fontWeight = FontWeight.SemiBold,
             shadow = Shadow(
                 color = Color.Black.copy(alpha = 0.75f),
@@ -76,7 +76,7 @@ fun ControllerHintBar(
                 blurRadius = 4f,
             ),
         ),
-        glyphSize = 20.dp,
+        glyphSize = 11.dp,
         arrangement = arrangement,
     )
 }

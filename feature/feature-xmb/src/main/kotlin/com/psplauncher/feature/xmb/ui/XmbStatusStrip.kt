@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -111,6 +112,15 @@ fun XmbPspStatusStrip(
     showSortButton: Boolean = false,
     onSortTapped: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /**
+     * What sits in the middle of the bar, centred on the SCREEN.
+     *
+     * The home shelf's media filter lives here. It used to sit at the bottom-left under the
+     * artwork, where it was one more thing stacked in a corner that already had the title and
+     * the cards; a set of names you step through belongs with the clock and the battery, in the
+     * band that is chrome rather than content.
+     */
+    centre: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var batteryLevel   by remember { mutableIntStateOf(0) }
@@ -144,13 +154,21 @@ fun XmbPspStatusStrip(
         }
     }
 
-    Row(
+    // Three slots, not two. The centre one is where the home shelf puts its filter names, so the
+    // bar is a Box with left/centre/right rather than a SpaceBetween row: SpaceBetween would
+    // centre the middle child between its neighbours, which moves every time the clock's width
+    // or the icon set changes, and a row of tab names that drifts is worse than one that is off
+    // centre by design.
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .height(StripHeight)
             .padding(horizontal = 20.dp),
+    ) {
+    Row(
+        modifier = Modifier.align(Alignment.CenterStart),
         verticalAlignment    = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         // ── Left: date  ┊  time  [bg task badge] ──────────────────────────
         Row(
@@ -183,21 +201,25 @@ fun XmbPspStatusStrip(
             }
         }
 
+        }
+        centre?.invoke(this)
+
         // ── Right: [controller] [BT] [WiFi] [Signal] [Battery] ─────────────
         // Every status icon except battery is conditional: shown only when that hardware is
         // present/active (controller connected, Bluetooth on, Wi-Fi connected, cellular service),
         // and Wi-Fi/Signal reflect live strength. Battery is always shown.
         val sys = rememberSystemStatus()
         Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
             verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (sys.controllerConnected) {
                 Icon(
                     imageVector        = Icons.Filled.SportsEsports,
                     contentDescription = "Controller connected",
                     tint               = StripMuted,
-                    modifier           = Modifier.size(15.dp),
+                    modifier           = Modifier.size(StripIconSize),
                 )
             }
             if (sys.bluetoothOn) {
@@ -333,8 +355,9 @@ private fun StripSeparator() {
  * rather than private because the panel strip is placed directly beneath it, and a second copy of
  * 28 in the shell is a gap that drifts the first time this changes.
  */
-internal val StripHeight   = 28.dp
-private val StripFontSize = 12.sp
+internal val StripHeight   = 18.dp
+private val StripFontSize = 8.sp
+private val StripIconSize  = 10.dp
 private val LowBatteryTint = Color(0xFFFF6B6B)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
