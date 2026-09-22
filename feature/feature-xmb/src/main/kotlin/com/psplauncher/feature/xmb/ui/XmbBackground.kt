@@ -58,10 +58,13 @@ private const val TAU = 6.2831853f
  * single definition of "the device is busy or conserving" that both the shader and the decoder
  * obey) and passed down; callers that render only a wave (boot) can ignore it entirely.
  *
- * The wave itself is the authentic PSP XMB "heavenly" flow: a soft, luminous ribbon low on the
- * screen built from several summed sine waves, with a glowing crest and a scatter of sparkles over
- * a monthly-tinted vertical gradient. On API 33+ it's a single AGSL fragment shader; older devices
- * get a Canvas fallback (glowing stroked ribbons) that keeps the same silhouette.
+ * The wave itself is the PlayStation 3 XMB wave over a theme-tinted vertical gradient: overlapping
+ * sheets of light with a bright edge where the surface turns, and a drifting sparkle layer. On
+ * API 33+ it is a single AGSL fragment shader; older devices get a Canvas fallback that keeps the
+ * silhouette but has neither the edge highlight nor the sparkles.
+ *
+ * That last sentence used to promise sparkles on both paths and nothing drew them anywhere, which
+ * is the kind of comment that is worse than none: it is authoritative and it is touching the code.
  */
 @Composable
 fun XmbBackground(
@@ -291,6 +294,37 @@ float waveHeight(float x, float z, float t, float amp) {
     return (y - total) * amp;
 }
 
+// A cheap stable hash. Two layers of these are the PS3's additive point-sprite sparkles; this
+// file's header has claimed "a scatter of sparkles" for some time while nothing drew any, which
+// is why they were impossible to see.
+float hash21(float2 p) {
+    p = fract(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+float sparkles(float2 uv, float t) {
+    float acc = 0.0;
+    // Two scales, so they do not read as one grid. Each drifts at its own rate along the wave.
+    for (int layer = 0; layer < 2; layer++) {
+        float fl = float(layer);
+        float scale = 26.0 + fl * 17.0;
+        float2 sp = uv * float2(scale, scale * 0.45);
+        sp.x += t * (0.05 + fl * 0.03);
+        float2 cell = floor(sp);
+        float2 f = fract(sp) - 0.5;
+        float h = hash21(cell + fl * 31.7);
+        if (h > 0.90) {
+            float2 jitter = float2(hash21(cell + 5.1), hash21(cell + 9.3)) - 0.5;
+            float d = length(f - jitter * 0.6);
+            // Each one keeps its own rate and phase off its hash, so they do not blink together.
+            float twinkle = 0.45 + 0.55 * sin(t * (1.1 + h * 2.4) + h * 40.0);
+            acc += smoothstep(0.17, 0.0, d) * twinkle;
+        }
+    }
+    return acc;
+}
+
 half4 main(float2 fragCoord) {
     float2 uv = fragCoord / iResolution;
     // x in clip space, matching theirs; y measured down the screen as this file's gradient is.
@@ -323,6 +357,11 @@ half4 main(float2 fragCoord) {
 
         acc += (body + line) * (1.0 - f * 0.35);
     }
+
+    // Sparkles ride the wave rather than the whole screen: a band around where the sheets sit,
+    // or they read as dust on the glass instead of as part of the wave.
+    float band = exp(-pow((uv.y - 0.70) * 2.4, 2.0));
+    acc += sparkles(uv, t) * band * 0.42;
 
     acc = clamp(acc * alphaScale, 0.0, 0.62);
     return half4(1.0, 1.0, 1.0, 1.0) * acc;   // premultiplied white -> SrcOver lightens the gradient

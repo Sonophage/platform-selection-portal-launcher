@@ -22,6 +22,7 @@ enum class XmbColorScheme {
     AQUA_TEAL,
     MIDNIGHT_NAVY,
     CHARCOAL,
+    BLACK,
 }
 
 /** A fully-resolved color palette for the XMB. Colors are ARGB longs (0xAARRGGBB). */
@@ -46,6 +47,7 @@ fun XmbColorScheme.displayLabel(): String = when (this) {
     XmbColorScheme.AQUA_TEAL     -> "Aqua Teal"
     XmbColorScheme.MIDNIGHT_NAVY -> "Midnight Navy"
     XmbColorScheme.CHARCOAL      -> "Charcoal"
+    XmbColorScheme.BLACK         -> "Black"
 }
 
 /**
@@ -66,6 +68,11 @@ fun XmbColorScheme.resolve(month: Int): XmbPalette {
         XmbColorScheme.AQUA_TEAL     -> 0xFF2EC4B6L
         XmbColorScheme.MIDNIGHT_NAVY -> 0xFF23477EL
         XmbColorScheme.CHARCOAL      -> 0xFF4A505AL
+        // A true neutral black. Charcoal and Midnight Navy are both blue-leaning greys — 4A505A
+        // and 23477E — so the darkest thing on offer still read as blue. This one has no hue at
+        // all: lightBackgroundAnchors darkens it to pure black at the top and lifts it to a
+        // neutral grey at the wave, which is what makes the wave itself the only colour on screen.
+        XmbColorScheme.BLACK         -> 0xFF000000L
     }
     return XmbPalette(
         waveColor        = wave,
