@@ -332,6 +332,7 @@ half4 main(float2 fragCoord) {
     float t  = iTime;
 
     float acc = 0.0;
+    float crestY = 0.70;   // replaced by the front sheet's crest below
     for (int i = 0; i < 4; i++) {
         float f = float(i) / 3.0;
         float z = f * 2.0 - 1.0;
@@ -343,6 +344,8 @@ half4 main(float2 fragCoord) {
         float sy   = seat + h;
 
         float d = uv.y - sy;
+        // The front sheet is the one the sparkles ride.
+        if (i == 0) { crestY = sy; }
 
         // Slope as a stand-in for the surface normal turning edge-on.
         float e  = 0.02;
@@ -358,10 +361,13 @@ half4 main(float2 fragCoord) {
         acc += (body + line) * (1.0 - f * 0.35);
     }
 
-    // Sparkles ride the wave rather than the whole screen: a band around where the sheets sit,
-    // or they read as dust on the glass instead of as part of the wave.
-    float band = exp(-pow((uv.y - 0.70) * 2.4, 2.0));
-    acc += sparkles(uv, t) * band * 0.42;
+    // Sparkles belong to the band, not to the screen. Centred on the FRONT SHEET'S crest rather
+    // than a fixed height, so they travel with the wave instead of sitting in a stripe the wave
+    // moves through, and falling off sharply enough that they are dense on the band and gone a
+    // little way out. Spread wide and even, they read as dust on the glass.
+    float dBand = uv.y - crestY;
+    float band = exp(-pow(dBand * 6.5, 2.0));
+    acc += sparkles(uv, t) * band * 0.62;
 
     acc = clamp(acc * alphaScale, 0.0, 0.62);
     return half4(1.0, 1.0, 1.0, 1.0) * acc;   // premultiplied white -> SrcOver lightens the gradient
