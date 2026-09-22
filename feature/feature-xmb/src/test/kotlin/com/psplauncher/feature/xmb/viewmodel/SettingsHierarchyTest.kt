@@ -1,6 +1,7 @@
 package com.psplauncher.feature.xmb.viewmodel
 
 import com.psplauncher.core.domain.model.SettingsSectionId
+import com.psplauncher.core.domain.model.SETTINGS_ROOT_SCREEN_ID
 import com.psplauncher.core.domain.model.settingsEntriesIn
 import com.psplauncher.core.domain.model.settingsRailRows
 import com.psplauncher.feature.settings.ui.SETTINGS_SCREEN_ROUTES
@@ -39,18 +40,31 @@ class SettingsHierarchyTest {
         )
     }
 
-    @Test fun `the settings row opens a screen that exists and is first in the rail`() {
-        // The row hands activeSettingsScreen the catalog's first entry. Two things have to hold
-        // or the one press that now reaches settings goes nowhere: the id must resolve to a
-        // route, and it must be the rail's first screen, so arriving puts the cursor at the top
-        // of the tree rather than halfway down it.
-        val opensId = com.psplauncher.core.domain.model.SETTINGS_CATALOG.first().id
+    @Test fun `the settings row opens the root, and the root is reachable and railless`() {
+        // This asserted the row opened SETTINGS_CATALOG.first() and that it was the rail's first
+        // screen. Both were true and neither is any more: the row opens the section list, and it
+        // kept passing after the change because it only ever asked the catalog about itself —
+        // never what the row actually does. A test decoupled from the behaviour it names.
+        val opensId = SETTINGS_ROOT_SCREEN_ID
         assertTrue("The settings row opens $opensId, which has no route", opensId in SETTINGS_SCREEN_ROUTES)
+        // Deliberately outside the catalog: that is what gives the root an empty rail without a
+        // special case, and it is the one property the rest of the settings tree depends on.
         assertEquals(
-            "The settings row must land on the rail's first screen",
-            opensId,
-            settingsRailRows(opensId).first().id,
+            "The root must not be one of the catalog's screens",
+            null,
+            com.psplauncher.core.domain.model.settingsEntryFor(opensId),
         )
+        assertTrue("The root must have no rail", settingsRailRows(opensId).isEmpty())
+    }
+
+    @Test fun `every section on the root list opens a real screen`() {
+        // The root is now the only way in, so a section whose first screen has no route is a dead
+        // row on the first page of Settings.
+        SettingsSectionId.entries.forEach { section ->
+            val opens = settingsEntriesIn(section).firstOrNull()?.id
+            assertTrue("$section has no screen to open", opens != null)
+            assertTrue("$section opens $opens, which has no route", opens in SETTINGS_SCREEN_ROUTES)
+        }
     }
 
     @Test fun `every crossbar row carries a title and a subtitle`() {

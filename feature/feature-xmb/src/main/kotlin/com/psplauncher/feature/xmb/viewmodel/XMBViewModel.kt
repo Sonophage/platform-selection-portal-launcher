@@ -7726,11 +7726,12 @@ class XMBViewModel @Inject constructor(
                 }.onFailure { Timber.w(it, "Could not open device settings") }
             }
             OPEN_SETTINGS_ITEM_ID -> {
-                // Lands on the catalog's first screen, which is also the first row of the rail,
-                // so the tree is on screen and the cursor is at the top of it.
-                val first = com.psplauncher.core.domain.model.SETTINGS_CATALOG.first().id
-                Timber.d("Opening settings: $first")
-                _uiState.update { it.copy(activeSettingsScreen = first) }
+                // The root list of sections. It used to open the catalog's first screen
+                // directly, which worked while the rail carried the whole tree; the rail is one
+                // section now, so landing inside a section would hide the other six.
+                val root = com.psplauncher.core.domain.model.SETTINGS_ROOT_SCREEN_ID
+                Timber.d("Opening settings: $root")
+                _uiState.update { it.copy(activeSettingsScreen = root) }
             }
             else -> when (category?.id) {
                 BuiltInCategory.SETTINGS -> {
@@ -8080,12 +8081,40 @@ class XMBViewModel @Inject constructor(
      * from a CompositionLocal that anything in a settings screen could call.
      */
     fun onOpenSettingsScreen(screenId: String) {
-        if (com.psplauncher.core.domain.model.settingsEntryFor(screenId) == null) {
+        // The root is not in the catalog by design (see SETTINGS_ROOT_SCREEN_ID), so it has to be
+        // allowed past a guard whose whole job is to reject ids that are not.
+        if (screenId != com.psplauncher.core.domain.model.SETTINGS_ROOT_SCREEN_ID &&
+            com.psplauncher.core.domain.model.settingsEntryFor(screenId) == null
+        ) {
             Timber.w("Settings rail asked for a screen outside the catalog: %s", screenId)
             return
         }
         Timber.d("Settings rail -> %s", screenId)
         _uiState.update { it.copy(activeSettingsScreen = screenId) }
+    }
+
+    /**
+     * Back from a settings screen: to the root list, or out of Settings when already there.
+     *
+     * Settings is two levels now — the sections, then a section's screens — and Back has to mean
+     * "up one" at the first level rather than "leave". Without this the root would be a page you
+     * could only ever pass through on the way in.
+     */
+    fun onSettingsBack() {
+        val current = _uiState.value.activeSettingsScreen
+        if (current != null &&
+            current != com.psplauncher.core.domain.model.SETTINGS_ROOT_SCREEN_ID &&
+            com.psplauncher.core.domain.model.settingsEntryFor(current) != null
+        ) {
+            _uiState.update {
+                it.copy(
+                    activeSettingsScreen = com.psplauncher.core.domain.model.SETTINGS_ROOT_SCREEN_ID,
+                    pendingSettingsAction = null,
+                )
+            }
+            return
+        }
+        onCloseSettingsScreen()
     }
 
     fun onCloseSettingsScreen() {

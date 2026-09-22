@@ -10,7 +10,10 @@ import com.psplauncher.core.domain.model.GamepadAction
 // Every screen route SettingsNavHost resolves. Kept beside the `when` (whose branches are string
 // literals) so the settings-hierarchy tests can verify that every L2 row id and every legacy
 // direct-caller id resolves here. New screens MUST be added to both this set and the `when`.
+import com.psplauncher.core.domain.model.SETTINGS_ROOT_SCREEN_ID
+
 val SETTINGS_SCREEN_ROUTES: Set<String> = setOf(
+    SETTINGS_ROOT_SCREEN_ID,
     "settings_overview",
     "settings_initial_setup",
     "settings_initial_setup_first",
@@ -118,6 +121,11 @@ fun SettingsNavHost(
                 firstRun = true,
                 onOpenLibraryManager = onOpenLibraryManager,
                 onGoToLibrary = onGoToLibrary,
+                modifier = modifier,
+            )
+            SETTINGS_ROOT_SCREEN_ID -> SettingsRootScreen(
+                onOpenSection = onOpenScreen,
+                onBack = onBack,
                 modifier = modifier,
             )
             "settings_library"    -> LibraryManagerScreen(onBack = onBack, onAddAndroidApps = onAddAndroidApps, modifier = modifier)

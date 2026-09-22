@@ -103,6 +103,15 @@ val SETTINGS_CATALOG: List<SettingsEntry> = listOf(
     SettingsEntry("settings_credits", "Credits", "Artwork & attributions", SettingsSectionId.SYSTEM),
 )
 
+/**
+ * Where Settings opens: the list of sections, not one of them.
+ *
+ * Deliberately NOT in [SETTINGS_CATALOG]. It is not a screen you navigate to from a sibling, it is
+ * the page the siblings hang off — and keeping it out is what gives it an empty rail without a
+ * special case, since [settingsRailRows] returns nothing for an id the catalog does not know.
+ */
+const val SETTINGS_ROOT_SCREEN_ID = "settings_root"
+
 /** The screens of one section, in order. */
 fun settingsEntriesIn(section: SettingsSectionId): List<SettingsEntry> =
     SETTINGS_CATALOG.filter { it.section == section }

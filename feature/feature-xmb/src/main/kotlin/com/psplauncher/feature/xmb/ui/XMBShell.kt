@@ -188,7 +188,9 @@ fun XMBShellContainer(
         onUserInteraction = viewModel::onUserInteraction,
         onBootComplete = viewModel::onBootSequenceComplete,
         onSettingsLongPress = onSettingsLongPress,
-        onCloseSettingsScreen = viewModel::onCloseSettingsScreen,
+        // Up one level: a section's screen backs out to the root list, the root backs out of
+        // Settings. onCloseSettingsScreen is still what actually leaves.
+        onCloseSettingsScreen = viewModel::onSettingsBack,
         onOpenSettingsScreen = viewModel::onOpenSettingsScreen,
         onOpenXmbLayoutAdjust = viewModel::openXmbLayoutAdjust,
         onOpenCustomIcons = viewModel::openCustomIcons,
