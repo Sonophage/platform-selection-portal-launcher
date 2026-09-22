@@ -44,9 +44,13 @@ import com.psplauncher.feature.xmb.viewmodel.MusicTrackPickerState
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
-private val PickerText = Color.White
 // Resolved per theme rather than fixed: on a pale scheme a light label on a light
 // wallpaper is unreadable, and every one of these was light. See PFPTheme.
+//
+// PickerText was left as Color.White when PickerSubtext was converted, so this screen drew its
+// track titles in white on its own theme-coloured gradient while the line under them was
+// correct. Half of a pair, with the comment explaining the bug sitting right beside it.
+private val PickerText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
 private val PickerSubtext: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val PickerCheck = Color(0xFF7CE5A2)
 private val CoverPlaceholder = Color(0xFF1B1B27)
@@ -94,7 +98,7 @@ fun MusicTrackPicker(
                         ControllerPromptItem(GamepadAction.HOME, "Add"),
                         ControllerPromptItem(GamepadAction.BACK, "Cancel"),
                     ),
-                    style = ControllerHintStyle.OVERLAY,
+                    style = ControllerHintStyle.INLINE,
                 )
             }
 

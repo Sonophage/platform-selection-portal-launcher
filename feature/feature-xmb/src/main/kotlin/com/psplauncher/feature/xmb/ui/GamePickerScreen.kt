@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,7 +33,13 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
 import com.psplauncher.core.ui.theme.menuCursor
+
+// Resolved per theme rather than fixed: this screen draws the theme's own background gradient,
+// so a fixed white label is unreadable the moment the user picks a pale scheme. Same reason
+// MusicTrackPicker and the INLINE hint style resolve theirs. See PFPTheme.
+private val PickerText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
 
 @Composable
 fun GamePickerScreen(
@@ -117,7 +124,7 @@ fun GamePickerScreen(
                 text = "Add Games to Category",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = PickerText,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -142,7 +149,7 @@ fun GamePickerScreen(
                     ControllerPromptItem(GamepadAction.HOME, "Add"),
                     ControllerPromptItem(GamepadAction.BACK, "Cancel"),
                 ),
-                style = ControllerHintStyle.OVERLAY,
+                style = ControllerHintStyle.INLINE,
             )
         }
 
@@ -188,7 +195,7 @@ fun GamePickerScreen(
                         text = "Collections",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = PickerText,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
@@ -224,14 +231,14 @@ fun GamePickerScreen(
                 onClick = cancelAndClear,
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Cancel", color = Color.White)
+                Text("Cancel", color = PickerText)
             }
 
             TextButton(
                 onClick = confirmAndClear,
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Add (${state.selectedGameIds.size + state.selectedCollectionIds.size})", color = Color.White)
+                Text("Add (${state.selectedGameIds.size + state.selectedCollectionIds.size})", color = PickerText)
             }
         }
     }
@@ -269,12 +276,12 @@ private fun PlatformGroupHeader(
         Text(
             text = "${group.selectedCount}/${group.games.size}",
             fontSize = 12.sp,
-            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.7f),
+            color = if (isSelected) PickerText else LocalPfpTextColors.current.inactive,
             modifier = Modifier.padding(end = 8.dp),
         )
 
         TextButton(onClick = onToggleExpanded) {
-            Text(if (isExpanded) "▼" else "▶", fontSize = 12.sp, color = Color.White)
+            Text(if (isExpanded) "▼" else "▶", fontSize = 12.sp, color = PickerText)
         }
     }
 }
