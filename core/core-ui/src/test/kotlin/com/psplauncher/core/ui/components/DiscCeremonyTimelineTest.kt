@@ -74,4 +74,32 @@ class DiscCeremonyTimelineTest {
             DiscCeremony.TotalMs in 3_000..4_000,
         )
     }
+
+    // ── The tail ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `the disc is gone before the room starts opening`() {
+        // The hold. Everything between these two is black on purpose: the launched app takes the
+        // screen somewhere in here, and black is the only thing that can be under a hand-off
+        // without being the wrong thing. Overlapping them would put a fading disc on top of a
+        // reveal, which is the flicker this tail exists to remove.
+        assertTrue(
+            "the disc must finish leaving before the room opens",
+            DiscCeremony.RoomOpensFraction >= DiscCeremony.DiscGoneFraction,
+        )
+    }
+
+    @Test
+    fun `the tail starts at the hand-off and ends with the animation`() {
+        assertTrue(DiscCeremony.DiscGoneFraction > DiscCeremony.FadeOutFraction)
+        assertTrue(DiscCeremony.RoomOpensFraction < 1f)
+    }
+
+    @Test
+    fun `the room is still fully dark when the hand-off fires`() {
+        // The whole point of moving the hand-off to the end of the spin. If the room had begun
+        // opening by now the app would appear over a half-lit XMB instead of over black.
+        assertEquals(DiscCeremony.FadeOutFraction, DiscCeremony.HandOffFraction, 1e-6f)
+        assertTrue(DiscCeremony.HandOffFraction < DiscCeremony.RoomOpensFraction)
+    }
 }

@@ -86,14 +86,22 @@ fun DiscLaunchCeremony(
     val rise = phase(now, 0f, DiscCeremony.FadeInFraction)
     val sink = phase(now, DiscCeremony.FadeInFraction, DiscCeremony.SinkEndFraction)
     val spin = phase(now, DiscCeremony.SinkEndFraction, DiscCeremony.FadeOutFraction)
-    val leave = phase(now, DiscCeremony.FadeOutFraction, 1f)
+    // Two movements, not one. The DISC leaves early; the ROOM stays dark until the very end.
+    //
+    // The whole tail runs after the hand-off, with another app cold-starting under it. Opening the
+    // vignette here used to reveal the XMB -- because the thing that was launched has not taken
+    // the screen yet -- and then the app cut in over that. Black is what should be under a
+    // hand-off, so black is what the tail holds; the reveal only happens if nothing ever arrived,
+    // and it is still a slow open rather than a cut so a failed launch does not flash.
+    val discLeave = phase(now, DiscCeremony.FadeOutFraction, DiscCeremony.DiscGoneFraction)
+    val roomLeave = phase(now, DiscCeremony.RoomOpensFraction, 1f)
 
     val riseEase = LinearOutSlowInEasing.transform(rise)
     val sinkEase = FastOutSlowInEasing.transform(sink)
     // The vignette runs across the sink AND the spin as one movement, so the room keeps closing in
     // the whole time the disc is seated rather than stopping the moment it lands.
     val closeEase = FastOutSlowInEasing.transform(phase(now, DiscCeremony.FadeInFraction, DiscCeremony.FadeOutFraction))
-    val leaveEase = FastOutSlowInEasing.transform(leave)
+    val leaveEase = FastOutSlowInEasing.transform(roomLeave)
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize(),
@@ -148,7 +156,7 @@ fun DiscLaunchCeremony(
             modifier = Modifier
                 .size(discSize)
                 .graphicsLayer {
-                    alpha = riseEase * (1f - leave)
+                    alpha = riseEase * (1f - discLeave)
                     val grow = DiscCeremony.EntryScale + (1f - DiscCeremony.EntryScale) * riseEase
                     val shrink = 1f - (1f - DiscCeremony.RestScale) * sinkEase
                     scaleX = grow * shrink
@@ -160,7 +168,7 @@ fun DiscLaunchCeremony(
                     // downward does not look completely rigid.
                     rotationZ = sinkEase * DiscCeremony.SinkDegrees +
                         spin * spin * DiscCeremony.SpinUpDegrees +
-                        leave * DiscCeremony.SpinOutDegrees
+                        discLeave * DiscCeremony.SpinOutDegrees
                     translationY = driftPx * sinkEase
                     // BlendMode.Clear needs its own layer, or it punches through the whole screen
                     // instead of through the disc.
@@ -270,6 +278,18 @@ object DiscCeremony {
 
     /** Start of the fade, which is also when the caller is released — they are the same instant. */
     val FadeOutFraction = HandOffMs.toFloat() / TotalMs
+
+    /**
+     * How much of the tail the disc takes to leave, and when the room starts opening again.
+     *
+     * The gap between them is a deliberate hold on black: the launched app usually takes the
+     * screen somewhere in here, and black is the only thing that can be under a hand-off without
+     * being the wrong thing. Only a launch that never arrives gets as far as the open.
+     */
+    private const val DiscLeaveShare = 0.55f
+    private const val RoomOpensShare = 0.65f
+    val DiscGoneFraction = FadeOutFraction + (1f - FadeOutFraction) * DiscLeaveShare
+    val RoomOpensFraction = FadeOutFraction + (1f - FadeOutFraction) * RoomOpensShare
 
     val FadeInFraction = FadeInMs.toFloat() / TotalMs
     val HandOffFraction = FadeOutFraction
