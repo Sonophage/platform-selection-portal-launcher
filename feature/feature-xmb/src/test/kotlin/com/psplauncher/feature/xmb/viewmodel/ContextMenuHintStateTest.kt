@@ -41,6 +41,32 @@ class ContextMenuHintStateTest {
     }
 
     @Test
+    fun `an empty home shelf still shows the pill, because X is how you leave it`() {
+        // The regression this exists to stop. Filtering the home shelf to a medium with nothing
+        // in it removes the focused item, which removes both the context menu and any sort — so
+        // a gate that asked only those two hid the pill at the exact moment the user needed to
+        // be told that X is what puts the shelf back. The press always worked; nothing said so.
+        val emptyHome = XMBUiState(
+            categories = listOf(
+                Category(
+                    BuiltInCategory.RECENTLY_PLAYED, "Last Played", "recent",
+                    type = CategoryType.BUILT_IN, position = 0,
+                ),
+            ),
+            selectedCategoryIndex = 0,
+            currentItems = emptyList(),
+            lastInputWasTouch = false,
+            showBootSequence = false,
+            recentFilter = RecentFilter.MUSIC,
+        )
+
+        assertFalse("nothing is focused, so there is no context menu", emptyHome.focusedItemHasContextMenu)
+        assertFalse("Last Played does not sort", emptyHome.canSortCurrentList)
+        assertTrue("but X still filters, so the pill has something true to say", emptyHome.canFilterRecents)
+        assertTrue(shouldShowContextMenuHint(emptyHome, IDLE_MS))
+    }
+
+    @Test
     fun `the default delay of zero means the hint is up immediately`() {
         assertTrue(shouldShowContextMenuHint(eligibleState(), 0L))
     }

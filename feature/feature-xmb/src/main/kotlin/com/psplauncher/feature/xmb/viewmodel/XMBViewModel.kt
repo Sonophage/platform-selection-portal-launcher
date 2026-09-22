@@ -772,6 +772,8 @@ data class XMBUiState(
      *
      * Read [effectivePanelPage], never these two directly.
      */
+    /** Which media the home shelf is showing. Cycled with X — see RecentFilter. */
+    val recentFilter: RecentFilter = RecentFilter.ALL,
     val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
     val panelPageGameId: Long? = null,
     val librarySetupComplete: Boolean = false,
@@ -844,8 +846,20 @@ data class XMBUiState(
      * Gated on a real game WITH backdrop art: the region has always needed something behind it,
      * and a panel floating on the bare wallpaper reads as a stray card.
      */
+    /**
+     * The row the hover panel is describing, or null when the panel should not be drawn.
+     *
+     * The isRealGame half is a CROSSBAR rule, not a panel rule: a panel floating over a folder
+     * row or a playlist in a normal column reads as a stray card. The home page is the opposite
+     * case — the hero IS the page, and a track, a book and a film each deserve one as much as a
+     * game does, so there the only question is whether the row has art to draw.
+     *
+     * One property with one explicit condition rather than two properties that would drift.
+     */
     val hoverPanelItem: XMBItem?
-        get() = focusedItem?.takeIf { it.isRealGame && it.backdropArt.isNotEmpty() }
+        get() = focusedItem?.takeIf {
+            (it.isRealGame || onLastPlayedHome) && it.backdropArt.isNotEmpty()
+        }
 
     /**
      * What the hover panel is showing, INCLUDING which pages it offers.
@@ -894,6 +908,10 @@ data class XMBUiState(
      * offering Pages on a game with nothing but its logo would be a prompt for a press that
      * does nothing.
      */
+    /** True iff an X press would cycle the home shelf's media filter rather than sort a list. */
+    val canFilterRecents: Boolean
+        get() = onLastPlayedHome
+
     val hoverPanelHasPages: Boolean
         get() = (hoverPanelContent?.pages?.size ?: 0) > 1
 
@@ -1307,7 +1325,12 @@ fun shouldShowContextMenuHint(state: XMBUiState, idleMs: Long): Boolean =
     state.contextMenuHintEnabled &&
         !state.hasBlockingOverlay &&
         state.activeContextMenu == null &&
-        (state.focusedItemHasContextMenu || state.canSortCurrentList) &&
+        // Every capability the pill can advertise has to be listed here, or the press works and
+        // nothing on screen says so. canFilterRecents is the reason this is a list and not a
+        // pair: filtering the home shelf down to a medium you have none of empties it, which
+        // removes the focused item AND the context menu, so without this the one control that
+        // gets you back out would disappear at exactly the moment you need it.
+        (state.focusedItemHasContextMenu || state.canSortCurrentList || state.canFilterRecents) &&
         idleMs >= (state.contextMenuHintDelaySeconds * 1_000f).toLong()
 
 /**
@@ -2127,11 +2150,37 @@ class XMBViewModel @Inject constructor(
                     // Hidden games follow ALL_GAMES: hiding a game from All Games is how a user
                     // says "I do not want to see this", and honouring it everywhere except the one
                     // shelf that resurfaces whatever they last opened would be a poor joke.
+                    //
+                    // Four libraries, not one. Each keeps its own recency column and each is read
+                    // through its own flow; mergeRecents does the interleaving and the filtering,
+                    // and is pure so the ordering can be proven without a device.
+                    //
+                    // The rows are built by the SAME mappers the Music, Library and Video columns
+                    // use, so selecting one launches it, its context menu works, and it looks like
+                    // itself — none of that needed a second code path.
                     var keepCursor = keepCursorOnRow
-                    gameRepository.observeRecentlyPlayed(RECENTLY_PLAYED_LIMIT).collect { games ->
-                        val visible = games.notHiddenAt(HideLocationType.ALL_GAMES)
-                        val items = if (visible.isEmpty()) listOf(emptyRecentlyPlayedItem())
-                                    else visible.toXmbItems()
+                    combine(
+                        gameRepository.observeRecentlyPlayed(RECENTLY_PLAYED_LIMIT),
+                        musicRepository.observeRecentlyPlayedTracks(RECENTLY_PLAYED_LIMIT),
+                        bookRepository.observeRecentlyOpenedBooks(RECENTLY_PLAYED_LIMIT),
+                        videoRepository.observeRecentlyWatched(),
+                        _uiState.map { it.recentFilter }.distinctUntilChanged(),
+                    ) { games, tracks, books, videos, filter ->
+                        val visibleGames = games.notHiddenAt(HideLocationType.ALL_GAMES)
+                        mergeRecents(
+                            games  = visibleGames.map { it.lastPlayedAt ?: 0L }.zip(visibleGames.toXmbItems()),
+                            music  = tracks.map { it.lastPlayedAt ?: 0L }.zip(tracks.toMusicItems()),
+                            books  = books.map { it.lastOpenedAt ?: 0L }.zip(bookItems(books)),
+                            videos = videos.map { it.lastWatchedAt ?: 0L }.zip(videos.toVideoItems()),
+                            filter = filter,
+                            limit  = RECENTLY_PLAYED_LIMIT,
+                        )
+                    }.collect { items ->
+                        // No placeholder row. Every other column needs one because the crossbar
+                        // has to draw something; this column IS the home page, which owns its own
+                        // empty state. A fake row here became the "focused item", so the footer
+                        // read "Music: Nothing played yet" — a placeholder being reported as
+                        // though the user had played it. Seen on the device.
                         publishGameItems(items, keepCursor)
                         keepCursor = true
                     }
@@ -4622,6 +4671,18 @@ class XMBViewModel @Inject constructor(
         cycleSort()
     }
 
+    /**
+     * Steps the home shelf to the next medium, wrapping past Video back to All.
+     *
+     * Only the state changes: the column's flow already has the filter as one of its combined
+     * sources, so the list rebuilds itself through the same merge rather than a second path. The
+     * cursor goes back to the top because the row it was on usually is not in the new list.
+     */
+    private fun cycleRecentFilter() {
+        menuSound.play(MenuSound.SCROLL)
+        _uiState.update { it.copy(recentFilter = it.recentFilter.next(), selectedItemIndex = 0) }
+    }
+
     private fun cycleSort() {
         // The fullscreen music browser sorts its own track views (not the playlists list).
         _uiState.value.musicBrowser?.let { browser ->
@@ -4857,13 +4918,6 @@ class XMBViewModel @Inject constructor(
      * established install starts empty too: last_played_at was never written before 90fe587f, so
      * the shelf fills up as games are played rather than arriving full.
      */
-    private fun emptyRecentlyPlayedItem(): XMBItem = XMBItem(
-        id       = EMPTY_CATEGORY_ITEM_ID,
-        title    = "Nothing played yet",
-        subtitle = "Games you play show up here, most recent first",
-        type     = XMBItemType.EMPTY,
-    )
-
     private fun emptyCategoryItem(category: Category): XMBItem {
         val (message, subtitle) = if (category.isGamingCategory) {
             "No games assigned." to "Add games to this category."
@@ -5639,7 +5693,11 @@ class XMBViewModel @Inject constructor(
             GamepadAction.HOME          -> Unit
             // Cycle the sort order of the current list (PSP-style). Whichever face button
             // the user's X/Y layout assigns to sort dispatches this.
-            GamepadAction.CHANGE_SORT -> cycleSort()
+            // X is free on the home page — activeSortModes declines Last Played because its
+            // order IS its meaning — so it cycles which media the shelf shows instead. One
+            // button, and which job it does is decided by which list is on screen.
+            GamepadAction.CHANGE_SORT ->
+                if (state.onLastPlayedHome) cycleRecentFilter() else cycleSort()
             // Searches everything, from anywhere on the home screen. The per-library Search rows
             // are the same overlay with a narrower scope.
             GamepadAction.OPEN_SEARCH -> openSearch(SearchScope.ALL)

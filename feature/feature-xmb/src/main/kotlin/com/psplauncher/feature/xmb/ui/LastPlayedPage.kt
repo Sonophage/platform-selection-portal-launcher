@@ -45,6 +45,7 @@ import com.psplauncher.feature.xmb.ui.detail.DetailPanelContent
 import com.psplauncher.feature.xmb.ui.detail.DetailPanelPage
 import com.psplauncher.feature.xmb.ui.detail.DetailPanelStrip
 import com.psplauncher.feature.xmb.ui.detail.GameDetailPanel
+import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 
 // ── The home page ────────────────────────────────────────────────────────────
@@ -80,6 +81,8 @@ fun LastPlayedPage(
      * doing the other.
      */
     directLaunch: Boolean,
+    /** Which media the shelf is showing. Named on screen because X cycles it blind otherwise. */
+    filter: RecentFilter,
     onPageTapped: (DetailPanelPage) -> Unit,
     onCardTapped: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -148,7 +151,8 @@ fun LastPlayedPage(
                 } else {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "Nothing played yet.",
+                            text = if (filter == RecentFilter.ALL) "Nothing played yet."
+                                   else "No recent ${filter.label.lowercase()}.",
                             color = LocalPfpTextColors.current.secondary,
                             fontSize = 15.sp,
                         )
@@ -159,7 +163,11 @@ fun LastPlayedPage(
 
         Spacer(Modifier.height(12.dp))
         Text(
-            text = focused?.let { "Last Played: ${it.title}" } ?: "Last Played",
+            // The filter is named here rather than only in the pill: the pill says which button
+            // changes it, this says what it is currently set to, and a shelf that has gone empty
+            // because you filtered it needs to say so or it reads as a bug.
+            text = focused?.let { "${filter.label}: ${it.title}" }
+                ?: if (filter == RecentFilter.ALL) "Last Played" else "${filter.label} — nothing yet",
             color = LocalPfpTextColors.current.primary,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,

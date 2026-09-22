@@ -50,6 +50,8 @@ fun ContextMenuHint(
     showPages: Boolean = false,
     /** Show the Sort half — the current list responds to CHANGE_SORT. */
     showSort: Boolean = false,
+    /** Show the Filter half — X cycles the home shelf's media instead of sorting. */
+    showFilter: Boolean = false,
     /** Show the Options half — the focused item has a context menu. */
     showOptions: Boolean = true,
     /** Runs a tapped prompt. Null leaves the pill a legend (previews, and any caller that has
@@ -63,7 +65,10 @@ fun ContextMenuHint(
                 "Pages",
             ),
         )
-        if (showSort) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Sort"))
+        // Sort and Filter are the same button doing two jobs, so they are mutually exclusive
+        // by construction rather than by both callers remembering to be careful.
+        if (showFilter) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Filter"))
+        else if (showSort) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Sort"))
         if (showOptions) add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"))
     }
     ControllerHintBar(items = items, modifier = modifier, onAction = onAction)

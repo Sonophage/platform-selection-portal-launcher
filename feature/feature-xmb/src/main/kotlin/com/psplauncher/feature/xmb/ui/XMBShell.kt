@@ -685,6 +685,7 @@ fun XMBShell(
                     page = uiState.effectivePanelPage,
                     listState = recentsListState,
                     directLaunch = uiState.directLaunch,
+                    filter = uiState.recentFilter,
                     onPageTapped = onPanelPageTapped,
                     onCardTapped = onItemTap,
                     modifier = Modifier
@@ -1079,6 +1080,7 @@ fun XMBShell(
                 ContextMenuHint(
                     showPages = uiState.hoverPanelHasPages,
                     showSort = uiState.canSortCurrentList,
+                    showFilter = uiState.canFilterRecents,
                     showOptions = uiState.focusedItemHasContextMenu,
                     onAction = onPromptTapped,
                     // Bottom right, close in. The larger bottom inset is only to clear the App
