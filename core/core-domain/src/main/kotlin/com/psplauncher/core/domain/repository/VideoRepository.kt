@@ -43,6 +43,8 @@ interface VideoRepository {
     fun observeFavorites(): Flow<List<Video>>
     fun observeRecentlyWatched(limit: Int = 30): Flow<List<Video>>
     suspend fun setFavorite(id: String, favorite: Boolean)
+    /** Takes the video off the recents shelf. The resume position is deliberately kept. */
+    suspend fun clearLastWatched(id: String)
 
     // ── Playlists ───────────────────────────────────────────────────────────────
     fun observePlaylists(): Flow<List<VideoPlaylist>>

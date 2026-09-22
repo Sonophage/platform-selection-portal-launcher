@@ -138,6 +138,9 @@ class VideoRepositoryImpl @Inject constructor(
     override suspend fun setFavorite(id: String, favorite: Boolean) =
         videoDao.setFavorite(id, favorite)
 
+
+    override suspend fun clearLastWatched(id: String) = videoDao.clearLastWatched(id)
+
     // ── Playlists ───────────────────────────────────────────────────────────────
 
     override fun observePlaylists(): Flow<List<VideoPlaylist>> =

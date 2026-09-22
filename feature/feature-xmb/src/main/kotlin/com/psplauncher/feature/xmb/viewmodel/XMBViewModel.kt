@@ -1147,8 +1147,37 @@ internal fun List<MusicTrack>.trackSorted(mode: XmbSortMode): List<MusicTrack> =
  * returns false on mismatch; those guards are reproduced here as category-id checks so this never
  * calls the side-effectful openers.
  */
+/**
+ * The library this row BELONGS to, from its own type — not from where the cursor happens to be.
+ *
+ * Search needed this first: its results span every library, so "which column owns this?" could
+ * never be answered by the current category. The Last Played shelf now has the same shape — a
+ * music track, a book and a film sitting in a column that is none of those — and asking the
+ * cursor there gave the wrong answer, which is why Y did nothing on those rows.
+ *
+ * Null for rows that belong to no library in particular (apps, folders, action rows); callers
+ * fall back to the current category for those, which is the old behaviour exactly.
+ */
+internal fun XMBItem.owningCategory(): String? = when (type) {
+    XMBItemType.VIDEO_FILE -> BuiltInCategory.VIDEO
+    XMBItemType.PHOTO_FILE -> BuiltInCategory.PHOTO
+    XMBItemType.LIBRARY_BOOK -> BuiltInCategory.LIBRARY
+    XMBItemType.MUSIC_TRACK -> BuiltInCategory.MUSIC
+    else -> if (gameId != null) BuiltInCategory.GAMES else null
+}
+
+/**
+ * The category a context menu for this row should be built from: the row's own library when it
+ * has one, otherwise wherever the cursor is.
+ *
+ * One function so hasContextMenu below and the three open*ContextMenu openers cannot disagree —
+ * the pill promising a menu the press then refuses is the exact failure this pair produces.
+ */
+internal fun XMBItem.menuHostCategory(currentCategoryId: String?): String? =
+    owningCategory() ?: currentCategoryId
+
 fun XMBItem.hasContextMenu(state: XMBUiState): Boolean {
-    val categoryId = state.categories.getOrNull(state.selectedCategoryIndex)?.id
+    val categoryId = menuHostCategory(state.categories.getOrNull(state.selectedCategoryIndex)?.id)
     return when {
         // Music tracks / Now Playing / playlists / music-apps.
         categoryId == BuiltInCategory.MUSIC && (
@@ -3214,7 +3243,8 @@ class XMBViewModel @Inject constructor(
     // (a video file, a library card, a playlist row, or a video-app row), so the generic
     // Y/long-press handler can stop.
     private fun openVideoContextMenu(item: XMBItem): Boolean {
-        if (currentCategory()?.id != BuiltInCategory.VIDEO) return false
+        // The ROW's library, not the cursor's — see XMBItem.menuHostCategory.
+        if (item.menuHostCategory(currentCategory()?.id) != BuiltInCategory.VIDEO) return false
         return when {
             item.type == XMBItemType.VIDEO_FILE && item.id.startsWith("vid_") -> {
                 openVideoFileContextMenu(item.id.removePrefix("vid_"), item.title); true
@@ -3245,6 +3275,9 @@ class XMBViewModel @Inject constructor(
                 add(XMBContextMenuItem("video_add_playlist", "Add to Playlist"))
                 if (inPlaylist) add(XMBContextMenuItem("video_remove_playlist", "Remove from this Playlist", isDestructive = true))
                 add(XMBContextMenuItem("video_details", "Details"))
+                if (video.lastWatchedAt != null) {
+                    add(XMBContextMenuItem("video_remove_recent", "Remove from Recent"))
+                }
                 add(XMBContextMenuItem("video_remove", "Remove From Library", isDestructive = true))
             }
             _uiState.update { it.copy(activeContextMenu = XMBContextMenu(title, items, videoFileId = videoId)) }
@@ -3263,6 +3296,10 @@ class XMBViewModel @Inject constructor(
             "video_remove_playlist" -> (_uiState.value.videoNav as? VideoNav.Playlist)?.let { nav ->
                 appAction { videoRepository.removeVideoFromPlaylist(nav.id, videoId) }
             }
+            // Clears the watch stamp only. resume_position_ms stays, so a part-watched film taken
+            // off the shelf still resumes where it was if you open it again — the shelf asks
+            // "when", the position asks "where", and they are not the same question.
+            "video_remove_recent" -> appAction { videoRepository.clearLastWatched(videoId) }
             "video_remove" -> appAction { videoRepository.removeVideo(videoId) }
         }
     }
@@ -3817,7 +3854,8 @@ class XMBViewModel @Inject constructor(
     // Opens the △ options menu for a Photo row. Returns true when [item] is a photo row it owns
     // (a photo file or an Album card), so the generic menus don't also fire.
     private fun openPhotoContextMenu(item: XMBItem): Boolean {
-        if (currentCategory()?.id != BuiltInCategory.PHOTO) return false
+        // The ROW's library, not the cursor's — see XMBItem.menuHostCategory.
+        if (item.menuHostCategory(currentCategory()?.id) != BuiltInCategory.PHOTO) return false
         return when {
             item.type == XMBItemType.PHOTO_FILE && item.id.startsWith("pho_") -> {
                 openPhotoFileContextMenu(item.id.removePrefix("pho_"), item.title); true
@@ -4121,13 +4159,7 @@ class XMBViewModel @Inject constructor(
     }
 
     /** The column a result belongs to, which is where the cursor is put before opening it. */
-    private fun searchRowCategory(row: XMBItem): String? = when (row.type) {
-        XMBItemType.VIDEO_FILE -> BuiltInCategory.VIDEO
-        XMBItemType.PHOTO_FILE -> BuiltInCategory.PHOTO
-        XMBItemType.LIBRARY_BOOK -> BuiltInCategory.LIBRARY
-        XMBItemType.MUSIC_TRACK -> BuiltInCategory.MUSIC
-        else -> if (row.gameId != null) BuiltInCategory.GAMES else null
-    }
+    private fun searchRowCategory(row: XMBItem): String? = row.owningCategory()
 
     private fun selectCategoryById(categoryId: String) {
         val index = _uiState.value.categories.indexOfFirst { it.id == categoryId }
@@ -4422,23 +4454,33 @@ class XMBViewModel @Inject constructor(
         // Inside a playlist (inline or browser), offer "Remove from this Playlist"; the playlist id
         // rides on the menu so the action knows which playlist.
         val playlistId = currentPlaylistContextId()
-        val items = buildList {
-            add(XMBContextMenuItem("play", "Play"))
-            add(XMBContextMenuItem("play_background", "Play in Background"))
-            add(XMBContextMenuItem("add_to_playlist", "Add to Playlist"))
-            if (playlistId != null) {
-                add(XMBContextMenuItem("remove_from_playlist", "Remove from this Playlist", isDestructive = true))
+        // The track is read for one reason: whether it carries a play stamp, which decides
+        // whether "Remove from Recent" is offered. The video menu already opens this way.
+        val trackId = item.id.removePrefix("mt_")
+        viewModelScope.launch {
+            val onShelf = runCatching { musicRepository.getTrack(trackId) }
+                .getOrNull()?.lastPlayedAt != null
+            val items = buildList {
+                add(XMBContextMenuItem("play", "Play"))
+                add(XMBContextMenuItem("play_background", "Play in Background"))
+                add(XMBContextMenuItem("add_to_playlist", "Add to Playlist"))
+                if (playlistId != null) {
+                    add(XMBContextMenuItem("remove_from_playlist", "Remove from this Playlist", isDestructive = true))
+                }
+                // Only for a track actually on the recents shelf, so the entry never appears on
+                // one that has never been played. Same rule as the game menu's copy.
+                if (onShelf) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent"))
+                add(XMBContextMenuItem("remove_track", "Remove From Library", isDestructive = true))
             }
-            add(XMBContextMenuItem("remove_track", "Remove From Library", isDestructive = true))
+            _uiState.update { it.copy(
+                activeContextMenu = XMBContextMenu(
+                    title        = item.title,
+                    items        = items,
+                    musicTrackId = trackId,
+                    playlistId   = playlistId,
+                )
+            )}
         }
-        _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title        = item.title,
-                items        = items,
-                musicTrackId = item.id.removePrefix("mt_"),
-                playlistId   = playlistId,
-            )
-        )}
     }
 
     // Options menu for a playlist row: open / rename / add tracks / delete.
@@ -4479,7 +4521,8 @@ class XMBViewModel @Inject constructor(
     // it owns (track / playlist / music-app), so the generic Y handler can stop. The Now Playing
     // row is consumed without a menu (its options live in the full player).
     private fun openMusicContextMenu(item: XMBItem): Boolean {
-        if (currentCategory()?.id != BuiltInCategory.MUSIC) return false
+        // The ROW's library, not the cursor's — see XMBItem.menuHostCategory.
+        if (item.menuHostCategory(currentCategory()?.id) != BuiltInCategory.MUSIC) return false
         return when {
             item.id == NOW_PLAYING_ITEM_ID -> { openNowPlayingContextMenu(); true }
             item.type == XMBItemType.MUSIC_TRACK -> { openMusicTrackContextMenu(item); true }
@@ -4632,6 +4675,9 @@ class XMBViewModel @Inject constructor(
             "remove_from_playlist" -> if (playlistId != null) {
                 appAction { musicRepository.removeTrackFromPlaylist(playlistId, trackId) }
             }
+            // No explicit reload: observeRecentlyPlayedTracks is a Room Flow and invalidates
+            // itself on the write, the same as the game path.
+            "remove_from_recent" -> appAction { musicRepository.clearTrackLastPlayed(trackId) }
             "remove_track" -> appAction {
                 val track = musicRepository.getTrack(trackId) ?: return@appAction
                 removeSingleTrack(track.folderId, trackId)

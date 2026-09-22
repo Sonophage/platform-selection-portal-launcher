@@ -96,9 +96,27 @@ class ContextMenuPredicateTest {
     }
 
     @Test
-    fun `music track in the wrong category has no context menu`() {
-        val item = XMBItem(id = "tr1", title = "Track", type = XMBItemType.MUSIC_TRACK)
-        assertFalse(item.hasContextMenu(state(BuiltInCategory.GAMES, item)))
+    fun `a music track carries its menu into any column`() {
+        // This asserted the opposite: that a track outside the Music column had no menu. That was
+        // true of the old rule, which asked where the CURSOR was, and it is what made Y do nothing
+        // on the music and book rows of the Last Played shelf — a column that is none of the
+        // media libraries by definition. A track is a track wherever it is listed, and Search has
+        // always shown them outside Music too.
+        val item = XMBItem(id = "mt_1", title = "Track", type = XMBItemType.MUSIC_TRACK)
+
+        assertTrue(item.hasContextMenu(state(BuiltInCategory.MUSIC, item)))
+        assertTrue(item.hasContextMenu(state(BuiltInCategory.RECENTLY_PLAYED, item)))
+        assertTrue(item.hasContextMenu(state(BuiltInCategory.GAMES, item)))
+    }
+
+    @Test
+    fun `a row that belongs to no library still answers to the column it is in`() {
+        // The other half, and the reason owningCategory returns null rather than guessing: a plain
+        // row has no library of its own, so it falls back to the current category exactly as
+        // before. Without this the change would have handed every anonymous row a media menu.
+        val plain = XMBItem(id = "row_1", title = "Something", type = XMBItemType.STANDARD)
+
+        assertFalse(plain.hasContextMenu(state(BuiltInCategory.RECENTLY_PLAYED, plain)))
     }
 
 }
