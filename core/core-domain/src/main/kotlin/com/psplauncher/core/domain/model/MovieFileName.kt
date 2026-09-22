@@ -26,6 +26,12 @@ object MovieFileName {
 
     private val YEAR = Regex("""^(19|20)\d{2}$""")
 
+    /** The title alone, without the year — what a search wants as its query. */
+    fun bareTitleOf(fileName: String): String = parse(fileName).first
+
+    /** The release year, or null when the name carries none. */
+    fun yearOf(fileName: String): Int? = parse(fileName).second
+
     /**
      * The readable title for [fileName], as "Title (Year)" when a year is found.
      *
@@ -34,15 +40,24 @@ object MovieFileName {
      * truncated by a guess.
      */
     fun titleOf(fileName: String): String {
+        val (title, year) = parse(fileName)
+        return if (year != null) "$title ($year)" else title
+    }
+
+    /**
+     * Title and year in one pass, so the three public entry points cannot disagree about where
+     * the title ends — which they would the moment one of them was tuned and the others were not.
+     */
+    private fun parse(fileName: String): Pair<String, Int?> {
         val stem = fileName.substringBeforeLast('.', fileName).trim()
-        if (stem.isEmpty()) return fileName
+        if (stem.isEmpty()) return fileName to null
 
         // Dots and underscores are separators in these names; a release group trails after a dash
         // at the very end and goes with the junk it sits in.
         val tokens = stem.replace('.', ' ').replace('_', ' ').split(' ')
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-        if (tokens.isEmpty()) return fileName
+        if (tokens.isEmpty()) return fileName to null
 
         // The LAST year, not the first. "Blade Runner 2049 2017 1080p" has two, and the first one
         // is part of the title — taking the first would call the film "Blade Runner" and date it
@@ -57,9 +72,9 @@ object MovieFileName {
         }
 
         val title = tokens.take(cut).joinToString(" ").trim(' ', '-', '–', ':')
-        if (title.isEmpty()) return fileName
+        if (title.isEmpty()) return fileName to null
 
-        val year = tokens.getOrNull(yearIndex)?.takeIf { yearIndex > 0 }
-        return if (year != null) "$title ($year)" else title
+        val year = tokens.getOrNull(yearIndex)?.takeIf { yearIndex > 0 }?.toIntOrNull()
+        return title to year
     }
 }

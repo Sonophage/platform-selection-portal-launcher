@@ -39,6 +39,11 @@ data class VideoSettingsUiState(
     val defaultPlayer: String? = null,
     val availablePlayers: List<VideoPlayerApp> = emptyList(),
     val showPlayerPicker: Boolean = false,
+    // ── TMDB posters ──────────────────────────────────────────────────────────
+    val hasTmdbKey: Boolean = false,
+    val tmdbKeyDraft: String = "",
+    val matchingPosters: Boolean = false,
+    val posterMessage: String? = null,
 ) {
     val hasRoots: Boolean get() = roots.isNotEmpty()
 
@@ -62,6 +67,8 @@ class VideoSettingsViewModel @Inject constructor(
     private val videoScanner: VideoScanner,
     private val intentResolver: VideoIntentResolver,
     private val mediaRootRepository: MediaRootRepository,
+    private val tmdbKeyProvider: com.psplauncher.feature.artwork.api.TmdbApiKeyProvider,
+    private val posterFetcher: com.psplauncher.feature.artwork.api.VideoPosterFetcher,
 ) : ViewModel() {
 
     private val notifier = BackgroundTaskNotifier(context)
@@ -69,6 +76,12 @@ class VideoSettingsViewModel @Inject constructor(
     val uiState: StateFlow<VideoSettingsUiState> = _ui
 
     init {
+        viewModelScope.launch {
+            tmdbKeyProvider.keyFlow.collect { key ->
+                _ui.update { it.copy(hasTmdbKey = !key.isNullOrBlank()) }
+            }
+        }
+
         viewModelScope.launch {
             // distinctUntilChanged: the backing DataStore is app-wide; without it every unrelated
             // preference write would re-run the persisted-grant snapshot below.
@@ -189,4 +202,55 @@ class VideoSettingsViewModel @Inject constructor(
             ?.takeIf { it.isNotBlank() }
             ?: Uri.parse(treeUri).lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':')
             ?: "Videos"
+
+    // ── TMDB posters ──────────────────────────────────────────────────────────
+
+    fun setTmdbKeyDraft(v: String) = _ui.update { it.copy(tmdbKeyDraft = v) }
+
+    fun saveTmdbKey() {
+        val key = _ui.value.tmdbKeyDraft.trim()
+        if (key.isEmpty()) return
+        viewModelScope.launch {
+            val protection = tmdbKeyProvider.saveKey(key)
+            _ui.update {
+                it.copy(
+                    tmdbKeyDraft = "",
+                    // Says so when the Keystore could not seal it, rather than implying it was
+                    // stored encrypted when it was not — the same thing SecretProtection exists
+                    // to make visible for the other credentials.
+                    posterMessage = if (protection == com.psplauncher.core.common.security.SecretProtection.PROTECTED) "Key saved"
+                    else "Key saved, but it could not be encrypted on this device",
+                )
+            }
+        }
+    }
+
+    fun clearTmdbKey() {
+        viewModelScope.launch {
+            tmdbKeyProvider.clearKey()
+            _ui.update { it.copy(posterMessage = "Key removed") }
+        }
+    }
+
+    /** Matches every film that has no poster yet. [refresh] re-matches the ones that do. */
+    fun fetchPosters(refresh: Boolean = false) {
+        if (_ui.value.matchingPosters) return
+        viewModelScope.launch {
+            _ui.update { it.copy(matchingPosters = true, posterMessage = null) }
+            val result = runCatching { posterFetcher.run(refreshExisting = refresh) }.getOrNull()
+            _ui.update {
+                it.copy(
+                    matchingPosters = false,
+                    posterMessage = result?.message() ?: "Could not reach TMDB",
+                )
+            }
+        }
+    }
+
+    fun clearPosters() {
+        viewModelScope.launch {
+            posterFetcher.clearAll()
+            _ui.update { it.copy(posterMessage = "Posters cleared") }
+        }
+    }
 }

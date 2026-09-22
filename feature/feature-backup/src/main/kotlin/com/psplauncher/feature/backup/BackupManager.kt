@@ -580,6 +580,7 @@ open class BackupManager @Inject constructor(
             stringPreferencesKey("artwork_library_uuid"),
             // Scraper credentials
             stringPreferencesKey("sgdb_api_key"),
+            stringPreferencesKey("tmdb_api_key"),
             stringPreferencesKey("igdb_client_id"),
             stringPreferencesKey("igdb_client_secret"),
             stringPreferencesKey("ss_username"),
@@ -594,6 +595,9 @@ open class BackupManager @Inject constructor(
         // identifier stored in plaintext, so it restores normally and is intentionally absent here.
         private val ENCRYPTED_CREDENTIAL_KEYS = setOf(
             "sgdb_api_key",
+            // Sealed the same way and dropped on restore the same way: a key encrypted against the
+            // source device's Keystore is a dead string here, and the user re-pastes it.
+            "tmdb_api_key",
             "igdb_client_secret",
             "ss_password",   // ss_username is a public handle and restores normally
         )

@@ -26,6 +26,8 @@ data class Video(
     val thumbnailUri: String? = null,
     /** file:// or content:// uri of a user-chosen custom thumbnail; takes priority when set. */
     val customThumbnailUri: String? = null,
+    /** A poster matched from TMDB, or null. See effectiveThumbnailUri for how it ranks. */
+    val posterUri: String? = null,
     /** Last playback position in ms; 0 = start / fully watched-and-reset. */
     val resumePositionMs: Long = 0,
     val lastWatchedAt: Long? = null,
@@ -40,7 +42,18 @@ data class Video(
     val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: MovieFileName.titleOf(displayName)
 
     /** The thumbnail to show: user custom art first, then the generated frame grab. */
-    val effectiveThumbnailUri: String? get() = customThumbnailUri?.takeIf { it.isNotBlank() } ?: thumbnailUri
+    /**
+     * The art to draw, best first: the user's own choice, then a matched poster, then the
+     * scanner's frame grab.
+     *
+     * The poster sits in the middle deliberately. A frame grab from a film is usually a dark
+     * still of nothing in particular — the owner's library showed Dune as an unlit face — and a
+     * poster is what a film looks like. But a picture the user chose outranks anything matched
+     * for them.
+     */
+    val effectiveThumbnailUri: String? get() = customThumbnailUri?.takeIf { it.isNotBlank() }
+        ?: posterUri?.takeIf { it.isNotBlank() }
+        ?: thumbnailUri
 
     /** "1920×1080"-style label, or null when resolution is unknown. */
     val resolutionLabel: String? get() =

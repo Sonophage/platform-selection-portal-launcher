@@ -68,7 +68,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
  * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
  * version bump cannot leave the test still asserting against the old number.
  */
-const val PFP_DATABASE_VERSION = 49
+const val PFP_DATABASE_VERSION = 50
 
 @Database(
     entities = [
@@ -1392,6 +1392,19 @@ abstract class PFPDatabase : RoomDatabase() {
         }
 
         /**
+         * A poster slot for videos, filled from TMDB.
+         *
+         * Separate from thumbnail_uri, which the scanner owns and rewrites: a poster stored there
+         * would be wiped by the next rescan, taking the frame grab with it. Two columns means both
+         * survive and Video.effectiveThumbnailUri decides which is shown.
+         */
+        val MIGRATION_49_50 = object : Migration(49, 50) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE videos ADD COLUMN poster_uri TEXT")
+            }
+        }
+
+        /**
          * Recency for music and books, so the Last Played shelf can hold all four media.
          *
          * Games and videos already carried their own stamp (`last_played_at`, `last_watched_at`).
@@ -1480,6 +1493,7 @@ abstract class PFPDatabase : RoomDatabase() {
             MIGRATION_46_47,
             MIGRATION_47_48,
             MIGRATION_48_49,
+            MIGRATION_49_50,
         )
 
     }

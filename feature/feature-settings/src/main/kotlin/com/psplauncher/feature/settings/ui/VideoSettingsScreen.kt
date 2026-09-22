@@ -60,6 +60,10 @@ fun VideoSettingsScreen(
         onRemoveRoot = { viewModel.removeRoot(it.treeUri) },
         onRescan = viewModel::rescan,
         onOpenPlayerPicker = viewModel::openPlayerPicker,
+        onTmdbKeyDraft = viewModel::setTmdbKeyDraft,
+        onSaveTmdbKey = viewModel::saveTmdbKey,
+        onFetchPosters = { refresh -> viewModel.fetchPosters(refresh) },
+        onClearPosters = viewModel::clearPosters,
         onDismissPlayerPicker = viewModel::dismissPlayerPicker,
         onChoosePlayer = viewModel::chooseDefaultPlayer,
         onDismissMessage = viewModel::dismissMessage,
@@ -76,6 +80,10 @@ fun VideoSettingsContent(
     onRemoveRoot: (RootFolderRow) -> Unit,
     onRescan: () -> Unit,
     onOpenPlayerPicker: () -> Unit,
+    onTmdbKeyDraft: (String) -> Unit = {},
+    onSaveTmdbKey: () -> Unit = {},
+    onFetchPosters: (Boolean) -> Unit = {},
+    onClearPosters: () -> Unit = {},
     onDismissPlayerPicker: () -> Unit,
     onChoosePlayer: (String?) -> Unit,
     onDismissMessage: () -> Unit,
@@ -122,6 +130,55 @@ fun VideoSettingsContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 48.dp, vertical = 4.dp),
+                )
+            }
+
+            // ── Posters ───────────────────────────────────────────────────────
+            //
+            // The scanner's thumbnail is a frame grabbed out of the file, which for a film is
+            // usually a dark still of nothing. TMDB matches on the title and year the filename
+            // already carries (see MovieFileName) and gives each one its poster.
+            SettingsGroup("Posters")
+
+            SettingsTextFieldRow(
+                label         = if (state.hasTmdbKey) "TMDB API Key (saved)" else "TMDB API Key",
+                value         = state.tmdbKeyDraft,
+                onValueChange = onTmdbKeyDraft,
+                placeholder   = if (state.hasTmdbKey) "••••••••  (tap to replace)" else "Paste your TMDB key",
+                isPassword    = true,
+                helper        = "Get a free key at themoviedb.org/settings/api",
+            )
+
+            if (state.tmdbKeyDraft.isNotBlank()) {
+                SettingsRow(label = "Save TMDB Key", onClick = onSaveTmdbKey)
+            }
+
+            if (state.hasTmdbKey) {
+                SettingsRow(
+                    label    = "Match Posters",
+                    sublabel = when {
+                        state.matchingPosters      -> "Matching…"
+                        state.posterMessage != null -> state.posterMessage
+                        else -> "Find a poster for every film that does not have one"
+                    },
+                    focusKey = "video_match_posters",
+                    onClick  = if (state.matchingPosters) null else ({ onFetchPosters(false) }),
+                )
+                SettingsRow(
+                    label    = "Re-match All Posters",
+                    sublabel = "Match again, including films that already have one",
+                    onClick  = if (state.matchingPosters) null else ({ onFetchPosters(true) }),
+                )
+                SettingsRow(
+                    label    = "Clear Posters",
+                    sublabel = "Go back to the thumbnails taken from the files",
+                    onClick  = if (state.matchingPosters) null else ({ onClearPosters() }),
+                )
+            } else {
+                SettingsRow(
+                    label    = "Match Posters",
+                    sublabel = "Add a TMDB key above first",
+                    onClick  = null,
                 )
             }
 

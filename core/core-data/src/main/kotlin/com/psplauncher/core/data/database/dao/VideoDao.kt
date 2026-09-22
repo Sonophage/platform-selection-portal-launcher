@@ -14,6 +14,7 @@ data class VideoWatchStamp(
     val id: String,
     @ColumnInfo(name = "last_watched_at") val lastWatchedAt: Long?,
     @ColumnInfo(name = "resume_position_ms") val resumePositionMs: Long,
+    @ColumnInfo(name = "poster_uri") val posterUri: String?,
 )
 
 @Dao
@@ -97,8 +98,9 @@ interface VideoDao {
     // Replaces a single library's videos atomically; other libraries are never touched.
     @Transaction
     @Query(
-        "SELECT id, last_watched_at, resume_position_ms FROM videos " +
-            "WHERE library_id = :libraryId AND (last_watched_at IS NOT NULL OR resume_position_ms > 0)"
+        "SELECT id, last_watched_at, resume_position_ms, poster_uri FROM videos " +
+            "WHERE library_id = :libraryId AND (last_watched_at IS NOT NULL " +
+            "OR resume_position_ms > 0 OR poster_uri IS NOT NULL)"
     )
     suspend fun watchStampsForLibrary(libraryId: String): List<VideoWatchStamp>
 
@@ -124,10 +126,20 @@ interface VideoDao {
                 v.copy(
                     lastWatchedAt = v.lastWatchedAt ?: prior.lastWatchedAt,
                     resumePositionMs = if (v.resumePositionMs > 0) v.resumePositionMs else prior.resumePositionMs,
+                    // The scanner never supplies one, so this is always the stored value coming
+                    // back. Without it a rescan silently unmatches every film.
+                    posterUri = v.posterUri ?: prior.posterUri,
                 )
             },
         )
     }
+
+    /** Every video, for the poster matcher to walk. A one-shot read, not a flow. */
+    @Query("SELECT * FROM videos")
+    suspend fun getAllOnce(): List<VideoEntity>
+
+    @Query("UPDATE videos SET poster_uri = :posterUri WHERE id = :id")
+    suspend fun setPosterUri(id: String, posterUri: String?)
 
     /** Drops the video off the recents shelf. Resume position is left alone — see clearLastWatched. */
     @Query("UPDATE videos SET last_watched_at = NULL WHERE id = :id")

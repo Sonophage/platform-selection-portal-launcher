@@ -69,6 +69,17 @@ data class VideoEntity(
     @ColumnInfo(name = "custom_thumbnail_uri")
     val customThumbnailUri: String? = null,
 
+    /**
+     * A poster fetched from TMDB, or null when none has been matched.
+     *
+     * Its own column rather than overwriting [thumbnailUri]: that one is the scanner's frame grab
+     * and the scanner owns it, so a poster written there would be destroyed by the next rescan
+     * and the frame grab lost for good. Kept separately, both survive and the user can still
+     * override either with [customThumbnailUri].
+     */
+    @ColumnInfo(name = "poster_uri")
+    val posterUri: String? = null,
+
     @ColumnInfo(name = "resume_position_ms")
     val resumePositionMs: Long = 0,
 
@@ -97,6 +108,7 @@ fun VideoEntity.toDomain() = Video(
     relativePath       = relativePath,
     thumbnailUri       = thumbnailUri,
     customThumbnailUri = customThumbnailUri,
+    posterUri = posterUri,
     resumePositionMs   = resumePositionMs,
     lastWatchedAt      = lastWatchedAt,
     isFavorite         = isFavorite,
@@ -120,6 +132,7 @@ fun Video.toEntity() = VideoEntity(
     relativePath       = relativePath,
     thumbnailUri       = thumbnailUri,
     customThumbnailUri = customThumbnailUri,
+    posterUri = posterUri,
     resumePositionMs   = resumePositionMs,
     lastWatchedAt      = lastWatchedAt,
     isFavorite         = isFavorite,

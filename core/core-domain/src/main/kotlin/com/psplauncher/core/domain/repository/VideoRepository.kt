@@ -45,6 +45,12 @@ interface VideoRepository {
     suspend fun setFavorite(id: String, favorite: Boolean)
     /** Takes the video off the recents shelf. The resume position is deliberately kept. */
     suspend fun clearLastWatched(id: String)
+    
+    /** Every video, for the poster matcher to walk. */
+    suspend fun getAllVideos(): List<Video>
+    
+    /** Records a matched poster, or clears it with null. Never touches the scanner's thumbnail. */
+    suspend fun setPosterUri(id: String, posterUri: String?)
 
     // ── Playlists ───────────────────────────────────────────────────────────────
     fun observePlaylists(): Flow<List<VideoPlaylist>>

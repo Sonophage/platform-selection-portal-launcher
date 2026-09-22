@@ -141,6 +141,14 @@ class VideoRepositoryImpl @Inject constructor(
 
     override suspend fun clearLastWatched(id: String) = videoDao.clearLastWatched(id)
 
+
+
+    override suspend fun getAllVideos(): List<Video> = videoDao.getAllOnce().map { it.toDomain() }
+
+
+
+    override suspend fun setPosterUri(id: String, posterUri: String?) = videoDao.setPosterUri(id, posterUri)
+
     // ── Playlists ───────────────────────────────────────────────────────────────
 
     override fun observePlaylists(): Flow<List<VideoPlaylist>> =
