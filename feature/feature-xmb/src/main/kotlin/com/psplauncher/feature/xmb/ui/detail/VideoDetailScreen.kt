@@ -313,15 +313,14 @@ fun VideoDetailScreen(
             )
         }
 
-        // Themed launch overlay — shown while handing off to an external player; fades in, and is
-        // dropped when PFP regains focus (or after the safety timeout).
-        androidx.compose.animation.AnimatedVisibility(
-            visible = state.externalLaunch != null,
-            enter = androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.fadeOut(),
-        ) {
-            state.externalLaunch?.let { launch -> ExternalLaunchOverlay(launch) }
-        }
+        // The hand-off to an external player used to draw a themed card here — a thumbnail, a
+        // spinner and "Launching…". The launch disc replaced it: one ceremony for every kind of
+        // media, drawn by the XMB shell, which sits above this screen. Two would have been worse
+        // than redundant, because the disc fades out to reveal what is behind it and what was
+        // behind it was the spinner rather than the player.
+        //
+        // state.externalLaunch stays: it is still the "we handed off" flag that onReturnedFromExternal
+        // reads. It simply no longer draws anything.
 
         // Fullscreen player overlay.
         if (state.playing) {
@@ -335,34 +334,6 @@ fun VideoDetailScreen(
                 onGamepadActionConsumed = onGamepadActionConsumed,
                 modifier = Modifier.fillMaxSize(),
             )
-        }
-    }
-}
-
-@Composable
-private fun ExternalLaunchOverlay(launch: com.psplauncher.feature.xmb.ui.detail.ExternalLaunch) {
-    val colors = com.psplauncher.core.ui.theme.LocalPFPColors.current
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(colors.backgroundTop, colors.backgroundBottom))),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (launch.thumbnailUri != null) {
-                AsyncImage(
-                    model = launch.thumbnailUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(width = 240.dp, height = 135.dp).clip(RoundedCornerShape(12.dp)),
-                )
-                Spacer(Modifier.height(20.dp))
-            }
-            CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp)
-            Spacer(Modifier.height(16.dp))
-            Text("Launching…", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(launch.playerLabel, color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp)
         }
     }
 }

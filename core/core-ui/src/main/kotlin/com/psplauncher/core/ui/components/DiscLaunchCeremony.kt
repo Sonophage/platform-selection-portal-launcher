@@ -84,19 +84,18 @@ fun DiscLaunchCeremony(
 
     val now = t.value
     val rise = phase(now, 0f, DiscCeremony.FadeInFraction)
-    val sink = phase(now, DiscCeremony.FadeInFraction, DiscCeremony.HandOffFraction)
-    val spin = phase(now, DiscCeremony.HandOffFraction, DiscCeremony.FadeOutFraction)
+    val sink = phase(now, DiscCeremony.FadeInFraction, DiscCeremony.SinkEndFraction)
+    val spin = phase(now, DiscCeremony.SinkEndFraction, DiscCeremony.FadeOutFraction)
     val leave = phase(now, DiscCeremony.FadeOutFraction, 1f)
 
     val riseEase = LinearOutSlowInEasing.transform(rise)
     val sinkEase = FastOutSlowInEasing.transform(sink)
+    // The vignette runs across the sink AND the spin as one movement, so the room keeps closing in
+    // the whole time the disc is seated rather than stopping the moment it lands.
+    val closeEase = FastOutSlowInEasing.transform(phase(now, DiscCeremony.FadeInFraction, DiscCeremony.FadeOutFraction))
 
     BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            // The room dims as the disc is drawn in, so the launcher has receded by the time the
-            // disc is spinning and the app is loading behind it.
-            .background(Color.Black.copy(alpha = sinkEase * DiscCeremony.MaxDim * (1f - leave))),
+        modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
         val discSize = minOf(maxWidth, maxHeight) * DiscCeremony.SizeFraction
@@ -105,6 +104,38 @@ fun DiscLaunchCeremony(
         val driftPx = with(androidx.compose.ui.platform.LocalDensity.current) {
             (maxHeight.toPx() * (DiscCeremony.RestHeightFraction - 0.5f))
         }
+
+        // The room closes in like an iris rather than dimming flat: a black ring whose clear
+        // centre shrinks around the disc and follows it down. Held black through the fade-out
+        // instead of lifting with it — an app's window is not necessarily up yet when the disc
+        // starts fading, and lifting the vignette would flash the launcher before it arrives.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    val centre = Offset(size.width / 2f, size.height / 2f + driftPx * sinkEase)
+                    val radius = (DiscCeremony.VignetteOpenRadius -
+                        (DiscCeremony.VignetteOpenRadius - DiscCeremony.VignetteClosedRadius) * closeEase)
+                        .coerceAtLeast(0.05f) * size.minDimension
+                    // The centre only fills in at the very end, so the disc spins in clear air and
+                    // the screen is fully black by the time the overlay is taken away.
+                    val inner = ((closeEase - DiscCeremony.VignetteFillFrom) /
+                        (1f - DiscCeremony.VignetteFillFrom)).coerceIn(0f, 1f)
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colorStops = arrayOf(
+                                0.00f to Color.Black.copy(alpha = inner * DiscCeremony.MaxDim),
+                                0.62f to Color.Black.copy(
+                                    alpha = maxOf(inner, closeEase * 0.40f) * DiscCeremony.MaxDim,
+                                ),
+                                1.00f to Color.Black.copy(alpha = closeEase * DiscCeremony.MaxDim),
+                            ),
+                            center = centre,
+                            radius = radius,
+                        ),
+                    )
+                }
+        )
 
         Box(
             modifier = Modifier
@@ -203,29 +234,37 @@ private fun phase(now: Float, from: Float, to: Float): Float =
  */
 object DiscCeremony {
     /** Centre stage: the disc fades up and settles at full size. */
-    const val FadeInMs = 800
+    const val FadeInMs = 850
 
     /** It is drawn downward until its centre reaches the bottom edge — half in, half out. */
-    const val SinkMs = 850
+    const val SinkMs = 950
 
-    /**
-     * Seated at the bottom, spinning up slow to fast. THIS is the phase the app opens under: the
-     * hand-off fires as it begins, so the cold start and the spin happen at the same time rather
-     * than one after the other.
-     */
-    const val SpinMs = 1000
+    /** Seated at the bottom, spinning up slow to fast, in a room that is still closing in. */
+    const val SpinMs = 1250
 
-    /** It fades out to reveal the app that has been loading behind it. */
-    const val FadeOutMs = 550
+    /** It fades out, and the app takes the screen. */
+    const val FadeOutMs = 650
 
     const val TotalMs = FadeInMs + SinkMs + SpinMs + FadeOutMs
 
-    /** The moment the caller should actually start the thing — the top of the spin. */
-    const val HandOffMs = FadeInMs + SinkMs
+    /**
+     * The moment the caller should actually start the thing — AFTER the spin, as the fade begins.
+     *
+     * It used to fire at the top of the spin, on the theory that the app would load behind the
+     * disc. It does not: an activity's window takes the screen the moment it is ready, so the
+     * launcher and everything drawn on it were replaced mid-spin and the spin was never seen at
+     * all. The overlap that is actually available is the fade, which is why this sits here.
+     */
+    const val HandOffMs = FadeInMs + SinkMs + SpinMs
+
+    /** Start of the spin: the disc has arrived and is about to be spun up. */
+    val SinkEndFraction = (FadeInMs + SinkMs).toFloat() / TotalMs
+
+    /** Start of the fade, which is also when the caller is released — they are the same instant. */
+    val FadeOutFraction = HandOffMs.toFloat() / TotalMs
 
     val FadeInFraction = FadeInMs.toFloat() / TotalMs
-    val HandOffFraction = HandOffMs.toFloat() / TotalMs
-    val FadeOutFraction = (HandOffMs + SpinMs).toFloat() / TotalMs
+    val HandOffFraction = FadeOutFraction
 
     /** Disc diameter, against the screen's short edge. */
     const val SizeFraction = 0.72f
@@ -252,5 +291,12 @@ object DiscCeremony {
     const val SpinOutDegrees = 780f
 
     /** How dark the room gets behind the disc. */
-    const val MaxDim = 0.90f
+    const val MaxDim = 0.96f
+
+    /** The iris, as a fraction of the screen's short edge: wide open, then closed around the disc. */
+    const val VignetteOpenRadius = 1.30f
+    const val VignetteClosedRadius = 0.42f
+
+    /** How far into the close the clear centre starts filling in, so it ends on solid black. */
+    const val VignetteFillFrom = 0.72f
 }

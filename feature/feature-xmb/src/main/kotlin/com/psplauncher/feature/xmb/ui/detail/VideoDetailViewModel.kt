@@ -99,6 +99,7 @@ class VideoDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val videoRepository: VideoRepository,
     private val intentResolver: com.psplauncher.core.data.video.VideoIntentResolver,
+    private val mediaLaunchGate: com.psplauncher.feature.launcher.MediaLaunchGate,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VideoDetailUiState())
@@ -285,6 +286,11 @@ class VideoDetailViewModel @Inject constructor(
             }
             // Best-effort: record that it was opened now so it appears under Recently Watched.
             markWatchedExternally(video)
+            // The disc, exactly as a book or a track gets one — drawn by the XMB shell, which sits
+            // above this screen. It suspends until the disc begins fading, so the player's cold
+            // start happens under the fade. Validation is already done above: a film that cannot
+            // open never shows a ceremony, the same rule the game path follows.
+            mediaLaunchGate.awaitHandOff(video.effectiveThumbnailUri)
             val err = if (ask) intentResolver.launchChooser(video) else intentResolver.launch(video, pref)
             if (err != null) _uiState.update { it.copy(externalLaunch = null, launchError = err) }
         }

@@ -1691,6 +1691,7 @@ class XMBViewModel @Inject constructor(
     private val pfpThemeStore: PfpThemeStore,
     private val uiMediaStore: com.psplauncher.core.data.repository.UiMediaStore,
     private val gameBootGate: com.psplauncher.feature.launcher.GameBootGate,
+    private val mediaLaunchGate: com.psplauncher.feature.launcher.MediaLaunchGate,
     // The preview plays its own audio: the gate owns playback for a real launch, and a preview
     // must never touch the gate. Same singleton player, so the two can never sound different.
     private val uiMediaAudioPlayer: com.psplauncher.core.ui.media.UiMediaAudioPlayer,
@@ -1765,6 +1766,7 @@ class XMBViewModel @Inject constructor(
         observeGamepadMappings()
         observeBootPreferences()
         observeGameBoot()
+        observeMediaLaunch()
         observeMusic()
         observeVideo()
         observePhoto()
@@ -7457,8 +7459,17 @@ class XMBViewModel @Inject constructor(
      * submenu must do exactly what it does when pressed in the column, and the only way to
      * guarantee that is for there to be one dispatcher.
      */
+    /**
+     * Hands [item] to the library that owns it, and returns true when that library handled it.
+     *
+     * Asks the ROW what it is before asking where the cursor is — [menuHostCategory], the same
+     * predicate the context menus use. Keyed on the cursor alone this returned false for every
+     * track, book and video on the Last Played shelf, because that column is none of the media
+     * libraries by definition: A did nothing on exactly the rows Y had already been fixed for.
+     * One side of the pair was guarded and the other was not.
+     */
     private fun dispatchCategorySelection(item: XMBItem): Boolean =
-        when (currentCategory()?.id) {
+        when (item.menuHostCategory(currentCategory()?.id)) {
             BuiltInCategory.MUSIC   -> handleMusicSelection(item)
             BuiltInCategory.VIDEO   -> handleVideoSelection(item)
             BuiltInCategory.PHOTO   -> handlePhotoSelection(item)
@@ -8572,39 +8583,24 @@ class XMBViewModel @Inject constructor(
     // plays" or "the launch is silent by decision" — a disc on top of either answer contradicts
     // the one the user gave.
 
-    @Volatile
-    private var discHandOff: CompletableDeferred<Unit>? = null
-
-    /**
-     * Puts the disc up and suspends until it is ready to hand over — which is when it BEGINS
-     * fading out, not when it disappears. The caller starts the thing at that point, so the app's
-     * cold start happens under the last of the animation instead of after it.
-     *
-     * Bounded, and a timeout PROCEEDS: a stuck overlay costs the user a moment, never their film.
-     * The overlay clears itself through [onDiscCeremonyFinished] once it has faded.
-     */
-    private suspend fun awaitDiscHandOff(art: String?) {
-        val handOff = CompletableDeferred<Unit>()
-        discHandOff = handOff
-        _uiState.update { it.copy(discCeremony = DiscCeremonyState(art)) }
-        try {
-            withTimeout(DISC_CEREMONY_TIMEOUT_MS) { handOff.await() }
-        } catch (_: TimeoutCancellationException) {
-            Timber.w("Launch disc watchdog fired after ${DISC_CEREMONY_TIMEOUT_MS}ms — opening anyway")
-            _uiState.update { it.copy(discCeremony = null) }
+    // The state is the GATE's now, mirrored here so the shell reads one ui state as it does for
+    // everything else. Video Detail raises discs too, and the shell draws above it, so the request
+    // cannot live in this ViewModel's private field any more.
+    private fun observeMediaLaunch() {
+        viewModelScope.launch {
+            mediaLaunchGate.active.collect { request ->
+                _uiState.update { it.copy(discCeremony = request?.let { r -> DiscCeremonyState(r.art) }) }
+            }
         }
     }
 
+    private suspend fun awaitDiscHandOff(art: String?) = mediaLaunchGate.awaitHandOff(art)
+
     /** The disc has started fading out: whatever was waiting on it may now open. */
-    fun onDiscCeremonyHandOff() {
-        discHandOff?.complete(Unit)
-        discHandOff = null
-    }
+    fun onDiscCeremonyHandOff() = mediaLaunchGate.onHandOff()
 
     /** The disc has finished fading and should come off the screen. */
-    fun onDiscCeremonyFinished() {
-        _uiState.update { it.copy(discCeremony = null) }
-    }
+    fun onDiscCeremonyFinished() = mediaLaunchGate.onDismissed()
 
     // ── GameBoot ──────────────────────────────────────────────────────────────
 
@@ -9156,15 +9152,6 @@ class XMBViewModel @Inject constructor(
     // ── Static data ───────────────────────────────────────────────────────────
 
     companion object {
-        /**
-         * How long the launch disc may hold a launch before it is opened anyway.
-         *
-         * Generous against DiscCeremony's own ~2s timeline, because it is a watchdog and not a
-         * schedule: it exists for the case where the overlay never reports back at all (a
-         * composition torn down mid-animation), not to police a slow frame.
-         */
-        private const val DISC_CEREMONY_TIMEOUT_MS = 6_000L
-
         private val KEY_WAVE_STYLE        = stringPreferencesKey("display_wave_style")
         // Must match DisplaySettingsViewModel — both read/write these wave power-throttle prefs.
         private val KEY_RESPECT_BATTERY   = booleanPreferencesKey("display_battery_saver")

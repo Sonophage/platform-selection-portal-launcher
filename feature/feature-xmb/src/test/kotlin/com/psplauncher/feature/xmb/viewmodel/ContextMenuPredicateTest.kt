@@ -3,6 +3,7 @@ package com.psplauncher.feature.xmb.viewmodel
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.CategoryType
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -107,6 +108,30 @@ class ContextMenuPredicateTest {
         assertTrue(item.hasContextMenu(state(BuiltInCategory.MUSIC, item)))
         assertTrue(item.hasContextMenu(state(BuiltInCategory.RECENTLY_PLAYED, item)))
         assertTrue(item.hasContextMenu(state(BuiltInCategory.GAMES, item)))
+    }
+
+    @Test
+    fun `A and Y route a media row to the same library`() {
+        // dispatchCategorySelection asked where the CURSOR was while hasContextMenu asked what the
+        // ROW was, so on the Last Played shelf -- a column that is none of the media libraries --
+        // Y opened a menu and A did nothing at all. Books, music and video were all dead to the
+        // confirm button there. Both now read menuHostCategory, and this is the pair: whatever a
+        // row's menu is built from is what its activation is dispatched to.
+        val cursor = BuiltInCategory.RECENTLY_PLAYED
+        val cases = mapOf(
+            BuiltInCategory.LIBRARY to XMBItem(id = "book_1", title = "A Book", type = XMBItemType.LIBRARY_BOOK),
+            BuiltInCategory.MUSIC to XMBItem(id = "mt_1", title = "A Track", type = XMBItemType.MUSIC_TRACK),
+            BuiltInCategory.VIDEO to XMBItem(id = "vid_1", title = "A Film", type = XMBItemType.VIDEO_FILE),
+            BuiltInCategory.PHOTO to XMBItem(id = "pho_1", title = "A Photo", type = XMBItemType.PHOTO_FILE),
+        )
+        for ((expected, item) in cases) {
+            assertEquals(
+                "${item.type} must dispatch to its own library from any column",
+                expected,
+                item.menuHostCategory(cursor),
+            )
+            assertTrue("${item.type} must also still offer its menu", item.hasContextMenu(state(cursor, item)))
+        }
     }
 
     @Test
