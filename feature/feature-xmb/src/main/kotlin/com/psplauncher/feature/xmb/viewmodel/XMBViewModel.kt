@@ -2632,55 +2632,6 @@ class XMBViewModel @Inject constructor(
         _uiState.update { it.copy(currentItems = items, selectedItemIndex = restored) }
     }
 
-    // Music root: the static items (Now Playing, when something is playing; Playlist; Music Apps)
-    // followed by the single "All Music" memory-card item. The root folder is managed in Settings →
-    // Music; a getting-started "Add Music Folder" row shows until a root has been added and scanned
-    // (keyed off the scan completing, not the track count), then drops away.
-    /**
-     * The Music root's own sections, without the app rows.
-     *
-     * Separate from [musicRootItems] because the flyout's sibling column wants only the drillable
-     * sections, while the published list also carries the installed music apps. Publishing this
-     * one by mistake would silently drop the apps, which is why it is named for what it is.
-     */
-    private fun musicRootSections(): List<XMBItem> {
-        val folders = _uiState.value.musicFolders
-        val totalTracks = folders.sumOf { it.trackCount }
-        val hasScannedFolder = folders.any { it.lastScannedAt != null }
-        return buildList {
-            // Now Playing — only when a track is loaded; clicking returns to the active song.
-            _uiState.value.musicPlayback.track?.let { track ->
-                add(
-                    XMBItem(
-                        id       = NOW_PLAYING_ITEM_ID,
-                        title    = track.displayTitle,
-                        subtitle = listOfNotNull("Now Playing", track.artist).joinToString("  ·  "),
-                        coverUri = track.artUri,
-                        type     = XMBItemType.MUSIC_TRACK,   // renders the album-cover leading tile
-                    )
-                )
-            }
-            add(
-                XMBItem(
-                    id       = PLAYLISTS_ITEM_ID,
-                    title    = "Playlist",
-                    subtitle = "Build and play your own track lists",
-                    type     = XMBItemType.PLAYLIST,
-                )
-            )
-            // All scanned music collapses into one memory-card item (like All Games). Uses the
-            // physical-media "_default.png" memory-card art rather than the blank console fallback.
-            add(
-                XMBItem(
-                    id       = ALL_MUSIC_ITEM_ID,
-                    title    = "Music",
-                    subtitle = countLabel(totalTracks, "track", "tracks"),
-                    coverUri = MEMORY_CARD_ASSET_URI,
-                    type     = XMBItemType.MEMORY_CARD,
-                )
-            )
-        }
-    }
 
     /**
      * Every "Add ..." this category offers right now, in the order they belong in.
@@ -2704,30 +2655,10 @@ class XMBViewModel @Inject constructor(
      */
     private suspend fun musicRootItems(): List<XMBItem> =
         libraryColumn(
-            musicRootSections() + musicAppItems() + collapseAddRows(musicAddActions()),
+            _uiState.value.musicRootSections() + musicAppItems() + collapseAddRows(musicAddActions()),
             SearchScope.MUSIC,
         )
 
-    /**
-     * A column ends in ONE Add row.
-     *
-     * A media column can offer two of them at once -- point the library at a folder, and pick
-     * apps to show -- and two adjacent rows both starting with "Add" is a menu pretending to be a
-     * list. With more than one, they collapse into a single "Add" row that opens the rest as a
-     * submenu, which is one more press only for the case that was ambiguous anyway. With one,
-     * that row is shown as itself: wrapping a single choice in a menu would be pure ceremony.
-     */
-    private fun collapseAddRows(rows: List<XMBItem>): List<XMBItem> = when {
-        rows.size <= 1 -> rows
-        else -> listOf(
-            XMBItem(
-                id       = ADD_MENU_ITEM_ID,
-                title    = "Add",
-                subtitle = rows.joinToString("  ·  ") { it.title.removePrefix("Add ") },
-                type     = XMBItemType.ADD_ACTION,
-            )
-        )
-    }
 
     /** The Add submenu's entries for whichever column the cursor is in, or empty elsewhere. */
     private fun currentAddActions(): List<XMBItem> = when (currentCategory()?.id) {
@@ -2942,45 +2873,6 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    // Video root: browse rows first (Collections, Video Libraries), then the Video Apps counterpart
-    // directly above the "Videos" memory card (second-to-bottom). The root folder is managed in
-    // Settings → Video; a getting-started "Add Videos" row shows until a root has been added and
-    // scanned (keyed off the scan completing, not the video count), then drops away.
-    /** The Video root's own sections, without the app rows (see [musicRootSections]). */
-    private fun videoRootSections(): List<XMBItem> {
-        val libraries = _uiState.value.videoLibraries
-        val totalVideos = libraries.sumOf { it.videoCount }
-        val hasScannedLibrary = libraries.any { it.lastScannedAt != null }
-        return buildList {
-            // The three curated views collapse into one "Collections" entry (drills into
-            // Recently Watched / Favorites / Playlists) to keep the Video root uncluttered.
-            add(
-                XMBItem(
-                    id       = VIDEO_COLLECTIONS_ITEM_ID,
-                    title    = "Collections",
-                    subtitle = "Recently Watched, Favorites & Playlists",
-                    type     = XMBItemType.VIDEO_COLLECTIONS,
-                )
-            )
-            add(
-                XMBItem(
-                    id       = VIDEO_LIBRARIES_ITEM_ID,
-                    title    = "Video Libraries",
-                    subtitle = countLabel(libraries.size, "library", "libraries"),
-                    type     = XMBItemType.VIDEO_LIBRARY,
-                )
-            )
-            add(
-                XMBItem(
-                    id       = ALL_VIDEOS_ITEM_ID,
-                    title    = "Videos",
-                    subtitle = countLabel(totalVideos, "video", "videos"),
-                    coverUri = MEMORY_CARD_ASSET_URI,
-                    type     = XMBItemType.MEMORY_CARD,
-                )
-            )
-        }
-    }
 
     /** Every "Add ..." the Video column offers (see [musicAddActions]). */
     private fun videoAddActions(): List<XMBItem> = buildList {
@@ -2991,7 +2883,7 @@ class XMBViewModel @Inject constructor(
     /** The whole Video root: its sections, then the installed video apps, then Add Video Apps. */
     private suspend fun videoRootItems(): List<XMBItem> =
         libraryColumn(
-            videoRootSections() + videoAppItems() + collapseAddRows(videoAddActions()),
+            _uiState.value.videoRootSections() + videoAppItems() + collapseAddRows(videoAddActions()),
             SearchScope.VIDEOS,
         )
 
@@ -3421,63 +3313,6 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    /** The Library root's own sections, without the app rows (see [musicRootSections]). */
-    private fun booksRootSections(): List<XMBItem> {
-        val shelves = _uiState.value.bookLibraries
-        val totalBooks = shelves.sumOf { it.bookCount }
-        val reader = _uiState.value.defaultReader
-        return buildList {
-            // The reader, first, so the app you read in is one press away whether or not you are
-            // opening something from the library. Hidden when no reader is set, since there is
-            // nothing to open: the picker lives in Settings.
-            if (reader != null) {
-                add(
-                    XMBItem(
-                        id       = OPEN_READER_ITEM_ID,
-                        title    = _uiState.value.defaultReaderLabel ?: "Open Reader",
-                        subtitle = "Open your reader",
-                        type     = XMBItemType.LIBRARY_READER,
-                    )
-                )
-            }
-            // Only worth a row once there is a choice to make, by the same rule as Series below.
-            // With a single shelf the row opens a list of one whose only entry holds every book
-            // the Books row already holds, so it is two extra presses to reach the same place --
-            // and it reads as a distinction the library does not actually have.
-            if (shelves.size > 1) {
-                add(
-                    XMBItem(
-                        id       = BOOK_SHELVES_ITEM_ID,
-                        title    = "Shelves",
-                        subtitle = countLabel(shelves.size, "shelf", "shelves"),
-                        type     = XMBItemType.LIBRARY_SHELVES,
-                    )
-                )
-            }
-            // Only worth a row once something declares a series. A library of standalones would
-            // otherwise carry a row that opens an empty list.
-            val series = _uiState.value.bookSeries
-            if (series.isNotEmpty()) {
-                add(
-                    XMBItem(
-                        id       = BOOK_SERIES_ITEM_ID,
-                        title    = "Series",
-                        subtitle = countLabel(series.size, "series", "series"),
-                        type     = XMBItemType.LIBRARY_SERIES,
-                    )
-                )
-            }
-            add(
-                XMBItem(
-                    id       = ALL_BOOKS_ITEM_ID,
-                    title    = "Books",
-                    subtitle = countLabel(totalBooks, "book", "books"),
-                    coverUri = MEMORY_CARD_ASSET_URI,
-                    type     = XMBItemType.MEMORY_CARD,
-                )
-            )
-        }
-    }
 
     /** Every "Add ..." the Library column offers (see [musicAddActions]). */
     private fun booksAddActions(): List<XMBItem> = buildList {
@@ -3503,7 +3338,7 @@ class XMBViewModel @Inject constructor(
      */
     private suspend fun booksRootItems(): List<XMBItem> =
         libraryColumn(
-            booksRootSections() + bookAppItems() + collapseAddRows(booksAddActions()),
+            _uiState.value.booksRootSections() + bookAppItems() + collapseAddRows(booksAddActions()),
             SearchScope.BOOKS,
         )
 
@@ -3686,45 +3521,6 @@ class XMBViewModel @Inject constructor(
         }.onFailure { Timber.w(it, "Could not launch a camera app") }
     }
 
-    // Photo root, PSP-style: Camera (when a camera app exists) and Albums first, then the Photo Apps
-    // counterpart directly above the "Photos" memory card (second-to-bottom), with the "Add Photo
-    // Library" row last — it disappears once a library has been scanned (further libraries are added
-    // from Settings → Photo).
-    /** The Photo root's own sections, without the app rows (see [musicRootSections]). */
-    private fun photoRootSections(): List<XMBItem> {
-        val libraries = _uiState.value.photoLibraries
-        val totalPhotos = libraries.sumOf { it.photoCount }
-        val hasScannedLibrary = libraries.any { it.lastScannedAt != null }
-        return buildList {
-            if (cameraAvailable) {
-                add(
-                    XMBItem(
-                        id       = CAMERA_ITEM_ID,
-                        title    = "Camera",
-                        subtitle = "Open the camera",
-                        type     = XMBItemType.CAMERA,
-                    )
-                )
-            }
-            add(
-                XMBItem(
-                    id       = PHOTO_ALBUMS_ITEM_ID,
-                    title    = "Albums",
-                    subtitle = countLabel(libraries.size, "album", "albums"),
-                    type     = XMBItemType.PHOTO_ALBUMS,
-                )
-            )
-            add(
-                XMBItem(
-                    id       = ALL_PHOTOS_ITEM_ID,
-                    title    = "Photos",
-                    subtitle = countLabel(totalPhotos, "photo", "photos"),
-                    coverUri = MEMORY_CARD_ASSET_URI,
-                    type     = XMBItemType.MEMORY_CARD,
-                )
-            )
-        }
-    }
 
     /** Every "Add ..." the Photo column offers (see [musicAddActions]). */
     private fun photoAddActions(): List<XMBItem> = buildList {
@@ -3735,7 +3531,7 @@ class XMBViewModel @Inject constructor(
     /** The whole Photo root: its sections, then the installed photo apps, then Add Photo Apps. */
     private suspend fun photoRootItems(): List<XMBItem> =
         libraryColumn(
-            photoRootSections() + photoAppItems() + collapseAddRows(photoAddActions()),
+            _uiState.value.photoRootSections(cameraAvailable) + photoAppItems() + collapseAddRows(photoAddActions()),
             SearchScope.PHOTOS,
         )
 
@@ -4936,7 +4732,7 @@ class XMBViewModel @Inject constructor(
                 val pls = musicPlaylistSiblings()
                 if (pls.isNotEmpty()) return pls to pls.indexOfFirst { it.playlistId == nav.id }.coerceAtLeast(0)
             }
-            val sibs = musicRootSections().filter {
+            val sibs = _uiState.value.musicRootSections().filter {
                 it.type == XMBItemType.PLAYLIST || it.type == XMBItemType.MEMORY_CARD
             }
             val idx = sibs.indexOfFirst { sib ->
@@ -4975,7 +4771,7 @@ class XMBViewModel @Inject constructor(
                 return sibs to idx
             }
             // Root sections: All Videos / Collections / Video Libraries.
-            val sibs = videoRootSections().filter {
+            val sibs = _uiState.value.videoRootSections().filter {
                 it.type == XMBItemType.MEMORY_CARD || it.type == XMBItemType.VIDEO_COLLECTIONS ||
                     it.type == XMBItemType.VIDEO_LIBRARY
             }
@@ -4997,7 +4793,7 @@ class XMBViewModel @Inject constructor(
                 val albums = photoAlbumSiblings()
                 if (albums.isNotEmpty()) return albums to albums.indexOfFirst { it.id == "plib_${nav.id}" }.coerceAtLeast(0)
             }
-            val sibs = photoRootSections().filter {
+            val sibs = _uiState.value.photoRootSections(cameraAvailable).filter {
                 it.type == XMBItemType.MEMORY_CARD || it.type == XMBItemType.PHOTO_ALBUMS
             }
             val idx = sibs.indexOfFirst { sib ->
@@ -9179,9 +8975,9 @@ class XMBViewModel @Inject constructor(
 
         // Music category synthetic rows / drill ids.
         private const val ADD_MUSIC_FOLDER_ITEM_ID = "add_music_folder"
-        private const val ALL_MUSIC_ITEM_ID = "all_music"
+        internal const val ALL_MUSIC_ITEM_ID = "all_music"
         internal const val NOW_PLAYING_ITEM_ID = "now_playing"
-        private const val PLAYLISTS_ITEM_ID = "playlists"
+        internal const val PLAYLISTS_ITEM_ID = "playlists"
         private const val ADD_MUSIC_APPS_ITEM_ID = "add_music_apps"
         private const val CREATE_PLAYLIST_ITEM_ID = "create_playlist"
         private const val ADD_TRACKS_ITEM_ID = "add_tracks"
@@ -9192,25 +8988,25 @@ class XMBViewModel @Inject constructor(
         // category, so there is nothing hidden for users to tamper with in Category settings.
         internal const val MUSIC_APPS_CATEGORY_ID = "music"
         // Video root item ids.
-        private const val ALL_VIDEOS_ITEM_ID = "all_videos"
-        private const val VIDEO_COLLECTIONS_ITEM_ID = "video_collections"
+        internal const val ALL_VIDEOS_ITEM_ID = "all_videos"
+        internal const val VIDEO_COLLECTIONS_ITEM_ID = "video_collections"
         private const val RECENTLY_WATCHED_ITEM_ID = "recently_watched"
         private const val FAVORITE_VIDEOS_ITEM_ID = "favorite_videos"
         private const val VIDEO_PLAYLISTS_ITEM_ID = "video_playlists"
         private const val CREATE_VIDEO_PLAYLIST_ITEM_ID = "create_video_playlist"
-        private const val VIDEO_LIBRARIES_ITEM_ID = "video_libraries"
+        internal const val VIDEO_LIBRARIES_ITEM_ID = "video_libraries"
         private const val ADD_VIDEOS_ITEM_ID = "add_videos"
         private const val ADD_VIDEO_APPS_ITEM_ID = "add_video_apps"
         internal const val VIDEO_APPS_CATEGORY_ID = "videos"
         // Photo root item ids.
-        private const val ALL_PHOTOS_ITEM_ID = "all_photos"
-        private const val CAMERA_ITEM_ID = "photo_camera"
+        internal const val ALL_PHOTOS_ITEM_ID = "all_photos"
+        internal const val CAMERA_ITEM_ID = "photo_camera"
         private const val ADD_PHOTO_LIBRARY_ITEM_ID = "add_photo_library"
-        private const val PHOTO_ALBUMS_ITEM_ID = "photo_albums"
-        private const val OPEN_READER_ITEM_ID = "library_open_reader"
-        private const val BOOK_SHELVES_ITEM_ID = "library_shelves"
-        private const val BOOK_SERIES_ITEM_ID = "library_series"
-        private const val ALL_BOOKS_ITEM_ID = "all_books"
+        internal const val PHOTO_ALBUMS_ITEM_ID = "photo_albums"
+        internal const val OPEN_READER_ITEM_ID = "library_open_reader"
+        internal const val BOOK_SHELVES_ITEM_ID = "library_shelves"
+        internal const val BOOK_SERIES_ITEM_ID = "library_series"
+        internal const val ALL_BOOKS_ITEM_ID = "all_books"
         private const val ADD_BOOK_FOLDER_ITEM_ID = "add_book_folder"
         private const val ADD_LIBRARY_APPS_ITEM_ID = "add_library_apps"
         // How far back Last Played reaches. A "what was I doing" shelf, not an archive: past
