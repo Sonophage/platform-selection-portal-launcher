@@ -121,6 +121,14 @@ private fun XmbPalette.toPFPColors() = PFPColors(
 data class XMBContextMenu(
     val title: String,
     val items: List<XMBContextMenuItem>,
+    /**
+     * The rows behind "More…", if this menu was long enough to need one.
+     *
+     * Carried on the menu rather than rebuilt when More is pressed: rebuilding would mean
+     * re-running a builder whose inputs (the row, the disc count, the hide location) are gone
+     * by then, and the two lists could disagree about what the menu contained.
+     */
+    val overflow: List<XMBContextMenuItem> = emptyList(),
     val selectedIndex: Int = 0,
     // Identifies the source of the menu (platform card, game, or app)
     val platformId: String? = null,
@@ -173,6 +181,14 @@ data class XMBContextMenuItem(
     val isDestructive: Boolean = false,
     // Renders a checkmark (e.g. collections the game already belongs to).
     val checked: Boolean = false,
+    /**
+     * Starts a new group, drawn as a heading ABOVE this row.
+     *
+     * A property of the first row rather than a row of its own, so the cursor cannot land on a
+     * heading and nothing downstream has to know to skip it. A fourteen-row game menu was one
+     * undifferentiated column where "Remove from Library" sat two rows under "Icon Display".
+     */
+    val heading: String? = null,
 )
 
 // Drives the shared text-input dialog. Creating a collection is the default; the optional
@@ -5872,11 +5888,13 @@ class XMBViewModel @Inject constructor(
             onRecentShelf = onRecentShelf,
             hideLocation = currentHideLocation(),
         )
+        val (visible, overflow) = items.splitForOverflow()
 
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
                 title       = item.title,
-                items       = items,
+                items       = items.withOverflowRow(),
+                overflow    = overflow,
                 gameId      = item.gameId,
                 packageName = item.packageName,
                 shortcutId  = item.shortcutId,
@@ -5919,11 +5937,13 @@ class XMBViewModel @Inject constructor(
         val pkg = item.packageName ?: return
         val categoryId = categoryIdOverride ?: currentCategory()?.id
         val items = appContextMenuItems(_uiState.value, categoryId)
+        val (_, overflow) = items.splitForOverflow()
 
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
                 title           = item.title,
-                items           = items,
+                items           = items.withOverflowRow(),
+                overflow        = overflow,
                 gameId          = item.gameId,
                 packageName     = pkg,
                 categoryContext = categoryId,
@@ -6004,6 +6024,21 @@ class XMBViewModel @Inject constructor(
     private fun activateContextMenuItem() {
         val menu   = _uiState.value.activeContextMenu ?: return
         val itemId = menu.items.getOrNull(menu.selectedIndex)?.id ?: return
+
+        // ── More… ────────────────────────────────────────────────────────────────
+        // Swaps the menu's rows for the ones it was holding back, keeping every context field so
+        // the actions behind More dispatch exactly as they would have in the full menu.
+        if (itemId == MENU_MORE_ITEM_ID) {
+            menuSound.play(MenuSound.SELECT)
+            _uiState.update { it.copy(
+                activeContextMenu = menu.copy(
+                    items = menu.overflow,
+                    overflow = emptyList(),
+                    selectedIndex = 0,
+                ),
+            )}
+            return
+        }
 
         // ── Gaming category picker submenu — move or add game to another category ──
         if (itemId.startsWith("cat_") && menu.gameId != null && menu.categoryContext != null && menu.pendingAppAction != null) {
@@ -6227,6 +6262,12 @@ class XMBViewModel @Inject constructor(
                 "game_details"           -> _uiState.update {
                     it.copy(activeGameId = menu.gameId, activeGameAutoLaunch = false)
                 }
+                // Offered only when direct launch is off (see gameContextMenuItems), and it
+                // takes the SAME path confirm would take with direct launch on -- a true XMB
+                // hand-off, no Game Detail composed, cursor left on this entity when the
+                // emulator closes. Two ways to start a game that started it differently would
+                // be worse than not offering the second one.
+                "play"                   -> menu.gameId?.let { launchGameDirectly(it) }
                 "choose_disc"             -> openDiscPickerMenu(menu.gameId)
                 "export_game"            -> exportGameFromMenu(menu.gameId)
                 "edit_app"               -> openAppDetail(menu.gameId, menu.packageName ?: return)

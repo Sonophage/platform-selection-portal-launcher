@@ -28,11 +28,13 @@ class ContextMenusTest {
         selectedCategoryIndex: Int = 0,
         selectedCollectionId: Long? = null,
         selectedPlatformId: String? = null,
+        directLaunch: Boolean = false,
     ) = XMBUiState(
         categories = categories,
         selectedCategoryIndex = selectedCategoryIndex,
         selectedCollectionId = selectedCollectionId,
         selectedPlatformId = selectedPlatformId,
+        directLaunch = directLaunch,
     )
 
     private fun game(
@@ -336,5 +338,111 @@ class ContextMenusTest {
         }
         val app = ids(appContextMenuItems(state(), "retro"))
         assertEquals(app.distinct(), app)
+    }
+
+    // ── Play ──────────────────────────────────────────────────────────────
+
+    @Test
+    fun `play is offered only when direct launch is off`() {
+        // With direct launch ON, confirm already starts the game: a Play row would be a second
+        // way to do what the button under your thumb does. With it OFF, confirm opens Game
+        // Detail, and this menu is the only way to start a game straight from the list.
+        assertTrue("play" in ids(gameContextMenuItems(game(), state(directLaunch = false), 1, false, null)))
+        assertFalse("play" in ids(gameContextMenuItems(game(), state(directLaunch = true), 1, false, null)))
+    }
+
+    @Test
+    fun `view game details is offered either way`() {
+        // The pair to the test above, and the reason Play is not simply "the first row always".
+        // Detail is the edit surface -- artwork, title, notes, emulator -- and it has to be
+        // reachable in both modes, including the one where confirm never opens it.
+        listOf(true, false).forEach { direct ->
+            assertTrue(
+                "direct=$direct",
+                "game_details" in ids(gameContextMenuItems(game(), state(directLaunch = direct), 1, false, null)),
+            )
+        }
+    }
+
+    // ── Groups ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `a heading belongs to a row, and every group has exactly one`() {
+        // Headings ride on the first row of their group rather than being rows of their own, so
+        // the cursor can never land on one. Two rows claiming the same heading would draw it
+        // twice with a row between.
+        val items = gameContextMenuItems(game(), state(), 2, true, null)
+        val headings = items.mapNotNull { it.heading }
+        assertEquals("a heading is repeated", headings.distinct(), headings)
+        assertTrue("no groups at all", headings.isNotEmpty())
+        assertFalse("the first row starts a group", items.first().heading != null)
+    }
+
+    @Test
+    fun `the category group's heading survives whichever of its rows exists`() {
+        // Which rows the group has depends on the category, so the heading cannot be hard-coded
+        // onto one of them -- it would disappear with that row. Main Game offers only "Add to
+        // Category"; a custom category offers Move/Remove/Pin and not Add.
+        val main = category(BuiltInCategory.GAMES, gaming = true)
+        val shooters = category("shooters", gaming = true)
+        // THREE categories, not two: Main Game is never a move target, so a custom category
+        // needs another custom one to have any destination at all -- and with no destination
+        // there is no Move row for the heading to be on.
+        val all = listOf(main, shooters, category("rpgs", gaming = true))
+
+        val fromMain = gameContextMenuItems(game(), state(all, 0), 1, false, null)
+        assertEquals("Category", fromMain.first { it.id == "add_category" }.heading)
+
+        val fromCustom = gameContextMenuItems(game(), state(all, 1), 1, false, null)
+        assertEquals("Category", fromCustom.first { it.id == "move_category" }.heading)
+        assertEquals(null, fromCustom.first { it.id == "remove_category" }.heading)
+    }
+
+    // ── Overflow ──────────────────────────────────────────────────────────
+
+    private fun rows(n: Int, headingsAt: Set<Int> = emptySet()) =
+        (0 until n).map { XMBContextMenuItem("r$it", "Row $it", heading = "G$it".takeIf { _ -> it in headingsAt }) }
+
+    @Test
+    fun `a menu that fits is not collapsed`() {
+        // A "More" row holding one action is a worse menu than one extra row.
+        val short = rows(CONTEXT_MENU_MAX_ROWS)
+        assertEquals(short to emptyList<XMBContextMenuItem>(), short.splitForOverflow())
+        assertEquals(short, short.withOverflowRow())
+    }
+
+    @Test
+    fun `More costs a row of the budget, so the panel never grows`() {
+        val long = rows(20)
+        assertEquals(CONTEXT_MENU_MAX_ROWS, long.withOverflowRow().size)
+        assertEquals(MENU_MORE_ITEM_ID, long.withOverflowRow().last().id)
+    }
+
+    @Test
+    fun `the split lands on a group boundary, so no heading is stranded`() {
+        // The failure this prevents: splitting mid-group leaves a heading in the visible menu
+        // with half its rows, and the other half under More with no heading at all.
+        val items = rows(20, headingsAt = setOf(3, 6, 11))
+        val (visible, overflow) = items.splitForOverflow()
+        assertEquals(6, visible.size)              // the last boundary at or before 8
+        assertEquals("r6", overflow.first().id)    // the tail starts ON the boundary
+        assertEquals(items.size, visible.size + overflow.size)
+    }
+
+    @Test
+    fun `with no boundary to use, it splits on the budget rather than not at all`() {
+        // A long first group. Splitting mid-group is worse than a menu the panel has to scroll,
+        // and the submenu's own title covers the missing heading.
+        val (visible, overflow) = rows(20).splitForOverflow()
+        assertEquals(CONTEXT_MENU_MAX_ROWS - 1, visible.size)
+        assertEquals(20 - (CONTEXT_MENU_MAX_ROWS - 1), overflow.size)
+    }
+
+    @Test
+    fun `nothing is lost between the visible menu and More`() {
+        // The whole point: every action the builder produced is still reachable, once.
+        val items = gameContextMenuItems(game(), state(), 3, true, null)
+        val (visible, overflow) = items.splitForOverflow()
+        assertEquals(ids(items), ids(visible) + ids(overflow))
     }
 }

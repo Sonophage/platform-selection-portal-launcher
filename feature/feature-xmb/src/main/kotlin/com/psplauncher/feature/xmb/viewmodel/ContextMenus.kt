@@ -74,6 +74,11 @@ internal fun gameContextMenuItems(
         // straight into the game. Launch/title/note/scrape actions all live in Game Detail — the
         // menu stays navigational.
         add(XMBContextMenuItem("game_details", "View Game Details"))
+        // Play appears only when direct launch is OFF. With it on, confirm already launches the
+        // game and this row would be a second way to do what the button under your thumb does.
+        // With it off, confirm opens Game Detail, and the menu is the only place a game can be
+        // started from the list.
+        if (!state.directLaunch) add(XMBContextMenuItem("play", "Play"))
         // Multi-disc sets: pick which disc to boot — the only way to reach a non-primary disc when
         // direct launch skips Game Detail's picker. Launches the chosen disc.
         if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))
@@ -89,6 +94,7 @@ internal fun gameContextMenuItems(
             XMBContextMenuItem(
                 id = if (item.isFavorite) "unfavorite" else "favorite",
                 label = if (item.isFavorite) "Remove from Favorites" else "Add to Favorites",
+                heading = "Library",
             ),
         )
         if (onRecentShelf) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent"))
@@ -104,16 +110,22 @@ internal fun gameContextMenuItems(
             val hasOtherCustomCategory = state.categories.any {
                 it.isGamingCategory && it.id != BuiltInCategory.GAMES && it.id != currentCat.id
             }
+            // First row of the group carries the heading, whichever one it turns out to be:
+            // which rows exist depends on the category, and a heading hard-coded onto one of
+            // them would vanish with it.
+            var head: String? = "Category"
+            fun headOnce(): String? = head.also { head = null }
             if (currentCat.id == BuiltInCategory.GAMES) {
-                if (hasOtherCustomCategory) add(XMBContextMenuItem("add_category", "Add to Category"))
+                if (hasOtherCustomCategory) add(XMBContextMenuItem("add_category", "Add to Category", heading = headOnce()))
             } else {
-                if (hasOtherCustomCategory) add(XMBContextMenuItem("move_category", "Move to Category"))
-                add(XMBContextMenuItem("remove_category", "Remove from Category"))
+                if (hasOtherCustomCategory) add(XMBContextMenuItem("move_category", "Move to Category", heading = headOnce()))
+                add(XMBContextMenuItem("remove_category", "Remove from Category", heading = headOnce()))
                 val pinned = item.subtitle == "Pinned"
                 add(
                     XMBContextMenuItem(
                         if (pinned) "unpin_category" else "pin_category",
                         if (pinned) "Unpin" else "Pin",
+                        heading = headOnce(),
                     ),
                 )
             }
@@ -121,25 +133,31 @@ internal fun gameContextMenuItems(
 
         // Emulator choice only applies to ROM-backed games; package-backed gaming apps launch via
         // their package/shortcut handle.
-        if (!item.isAndroidApp) add(XMBContextMenuItem("change_emulator", "Change Emulator"))
-        add(XMBContextMenuItem("icon_display", "Icon Display"))
-        add(XMBContextMenuItem("file_location", "View File Location"))
+        var thisGame: String? = "This Game"
+        fun gameHead(): String? = thisGame.also { thisGame = null }
+        if (!item.isAndroidApp) add(XMBContextMenuItem("change_emulator", "Change Emulator", heading = gameHead()))
+        add(XMBContextMenuItem("icon_display", "Icon Display", heading = gameHead()))
+        add(XMBContextMenuItem("file_location", "View File Location", heading = gameHead()))
         // Per-location hide for the spot this game is shown in (recoverable in Hidden Items).
-        hideLocation?.let { (_, _, label) -> add(XMBContextMenuItem("hide_here", "Hide from $label")) }
+        var removeHead: String? = "Remove"
+        fun removeHead(): String? = removeHead.also { removeHead = null }
+        hideLocation?.let { (_, _, label) ->
+            add(XMBContextMenuItem("hide_here", "Hide from $label", heading = removeHead()))
+        }
         if (inMissingBucket) {
             // The only destructive action anywhere in the missing-ROM flow. Mechanically identical
             // to "Remove from Library" (delete row, file untouched), but labelled for what it means
             // here: this bucket is the entry's last visible trace, so removing it ends the line
             // rather than dropping it from one view. Everything else is recoverable by putting the
             // file back.
-            add(XMBContextMenuItem("remove_missing", "Remove permanently", isDestructive = true))
+            add(XMBContextMenuItem("remove_missing", "Remove permanently", isDestructive = true, heading = removeHead()))
         } else if (item.platformId == PlatformIds.ANDROID && item.packageName != null && !inCollection) {
-            add(XMBContextMenuItem("unmark_game", "Unmark as Game"))
+            add(XMBContextMenuItem("unmark_game", "Unmark as Game", heading = removeHead()))
             add(XMBContextMenuItem("remove_app", "Remove from Library", isDestructive = true))
         } else if (!inCollection) {
             // Every other game gets full delete too (confirmed first). Deleting a scanned ROM entry
             // leaves the file untouched — the next scan re-discovers it.
-            add(XMBContextMenuItem("remove_game", "Remove from Library", isDestructive = true))
+            add(XMBContextMenuItem("remove_game", "Remove from Library", isDestructive = true, heading = removeHead()))
         }
     }
 }
@@ -161,9 +179,9 @@ internal fun appContextMenuItems(
     // Shortcut actions — these materialize a launch shortcut (a games-table row referencing the
     // app by package) so it can live in Favorites / Collections without duplicating the app's
     // metadata. Works for every Android app, GameHub included.
-    add(XMBContextMenuItem("favorite", "Add to Favorites"))
+    add(XMBContextMenuItem("favorite", "Add to Favorites", heading = "Library"))
     add(XMBContextMenuItem("add_to_collection", "Add to Collection"))
-    add(XMBContextMenuItem("move", "Move to Category"))
+    add(XMBContextMenuItem("move", "Move to Category", heading = "Category"))
     add(XMBContextMenuItem("add", "Add to Category"))
     if (categoryId != null) {
         add(XMBContextMenuItem("remove", "Remove from Category"))
@@ -171,7 +189,7 @@ internal fun appContextMenuItems(
         // Per-location hide (recoverable in Settings ▸ Hidden Items).
         add(XMBContextMenuItem("hide_from_category", "Hide from ${state.categoryDisplayNameOf(categoryId)}"))
     }
-    add(XMBContextMenuItem("hide_everywhere", "Hide Everywhere"))
+    add(XMBContextMenuItem("hide_everywhere", "Hide Everywhere", heading = "Remove"))
     add(XMBContextMenuItem("rename", "Rename Shortcut"))
 }
 
@@ -342,4 +360,48 @@ internal fun collectionRowContextMenuItems(
     )
     add(XMBContextMenuItem("manage_collections", "Manage Collections"))
     add(XMBContextMenuItem("delete_collection", "Delete Collection", isDestructive = true))
+}
+
+// ── Overflow ──────────────────────────────────────────────────────────────────
+
+/**
+ * How many rows a context menu shows before the rest go behind "More".
+ *
+ * Nine, because the panel holds about that many without scrolling on this screen, and a menu you
+ * have to scroll is one where the last action is invisible until you go looking for it. The
+ * game menu reaches fourteen.
+ */
+internal const val CONTEXT_MENU_MAX_ROWS = 9
+
+/** The row that opens the overflow. Its id is what the ViewModel matches to swap the lists. */
+internal const val MENU_MORE_ITEM_ID = "menu_more"
+
+/**
+ * Split a menu into what it shows and what goes behind "More".
+ *
+ * Splits on a GROUP boundary wherever one is available inside the budget, so a heading never
+ * ends up stranded above the More row with its rows on the other side of it. With no boundary
+ * to use -- a long first group -- it splits on the budget and the tail simply starts without a
+ * heading, which the submenu's own title covers.
+ *
+ * Returns the whole menu and an empty tail when it already fits: a "More" row holding one
+ * action is a worse menu than one extra row.
+ */
+internal fun List<XMBContextMenuItem>.splitForOverflow(
+    limit: Int = CONTEXT_MENU_MAX_ROWS,
+): Pair<List<XMBContextMenuItem>, List<XMBContextMenuItem>> {
+    if (size <= limit) return this to emptyList()
+    // One row of the budget is spent on "More" itself.
+    val room = limit - 1
+    val boundary = (room downTo 1).firstOrNull { this[it].heading != null } ?: room
+    return take(boundary) to drop(boundary)
+}
+
+/** [splitForOverflow]'s visible half, with the More row appended when there is a tail. */
+internal fun List<XMBContextMenuItem>.withOverflowRow(
+    limit: Int = CONTEXT_MENU_MAX_ROWS,
+): List<XMBContextMenuItem> {
+    val (visible, overflow) = splitForOverflow(limit)
+    return if (overflow.isEmpty()) visible
+    else visible + XMBContextMenuItem(MENU_MORE_ITEM_ID, "More…")
 }

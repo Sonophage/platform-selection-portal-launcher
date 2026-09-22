@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +53,9 @@ data class PspMenuRow(
     val isDestructive: Boolean = false,
     // Marks a current membership/selection (e.g. collections the item already belongs to).
     val checked: Boolean = false,
+    // Group heading drawn above this row. Not a row itself: the cursor never lands on it, and
+    // the index the caller gets back is still the index into this list.
+    val heading: String? = null,
 )
 
 private val PanelWidth = 300.dp
@@ -140,6 +144,24 @@ fun PspContextMenuOverlay(
                 modifier = Modifier.padding(top = 10.dp),
             ) {
                 itemsIndexed(rows) { index, row ->
+                    // The heading is drawn INSIDE the row's item, above it: it belongs to this
+                    // row, and a separate list item would be one the cursor index has to skip.
+                    row.heading?.let { heading ->
+                        Text(
+                            text = heading,
+                            color = colors.textSecondary.copy(alpha = 0.75f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 1.sp,
+                            style = LocalTextStyle.current.copy(shadow = TextDropShadow),
+                            modifier = Modifier.padding(
+                                start = 20.dp,
+                                end = 20.dp,
+                                top = if (index == 0) 0.dp else 12.dp,
+                                bottom = 4.dp,
+                            ),
+                        )
+                    }
                     PspContextMenuRow(
                         row        = row,
                         isSelected = index == selectedIndex,
