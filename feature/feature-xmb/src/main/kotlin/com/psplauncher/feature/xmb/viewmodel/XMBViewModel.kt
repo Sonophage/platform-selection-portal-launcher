@@ -697,6 +697,10 @@ data class XMBUiState(
     val videoNav: VideoNav = VideoNav.Root,
     val videoLibraries: List<com.psplauncher.core.domain.model.VideoLibrary> = emptyList(),
     val activeVideoId: String? = null,
+    // Play as soon as the detail page has the film, instead of sitting on its Play button. Only
+    // search sets it: everywhere else the detail page IS the destination, and only search is a
+    // place you went to reach one specific thing. Mirrors [activeGameAutoLaunch].
+    val activeVideoAutoPlay: Boolean = false,
     val pendingVideoDetailAction: GamepadAction? = null,
 
     // ── Photo ─────────────────────────────────────────────────────────────
@@ -3184,7 +3188,7 @@ class XMBViewModel @Inject constructor(
     private fun closeVideoView() = openVideoView(VideoNav.Root)
 
     fun onCloseVideoDetail() {
-        _uiState.update { it.copy(activeVideoId = null, pendingVideoDetailAction = null) }
+        _uiState.update { it.copy(activeVideoId = null, activeVideoAutoPlay = false, pendingVideoDetailAction = null) }
     }
 
     fun consumeVideoDetailAction() {
@@ -4109,6 +4113,11 @@ class XMBViewModel @Inject constructor(
      * The crossbar is moved to the owning column first, so backing out of the thing you opened
      * leaves you where it came from rather than wherever you happened to be standing when you
      * started searching.
+     *
+     * Playable results PLAY. A search is not browsing -- you typed the name of one thing, so
+     * landing on its detail page and having to press A again is a second confirmation of a choice
+     * already made. Tracks always did this; games and films now do too. Books and photos do not,
+     * because their "detail page" IS the reader and the viewer.
      */
     fun onSearchActivatedAt(index: Int) {
         val state = _uiState.value.search ?: return
@@ -4119,11 +4128,12 @@ class XMBViewModel @Inject constructor(
         closeSearch()
         selectCategoryById(categoryId)
         when (row.type) {
-            XMBItemType.VIDEO_FILE -> _uiState.update { it.copy(activeVideoId = row.id.removePrefix("vid_")) }
+            XMBItemType.VIDEO_FILE ->
+                _uiState.update { it.copy(activeVideoId = row.id.removePrefix("vid_"), activeVideoAutoPlay = true) }
             XMBItemType.PHOTO_FILE -> openSearchedPhoto(row)
             XMBItemType.LIBRARY_BOOK -> openBook(row.id.removePrefix("book_"))
             XMBItemType.MUSIC_TRACK -> openSearchedTrack(row)
-            else -> row.gameId?.let { id -> _uiState.update { s -> s.copy(activeGameId = id, activeGameAutoLaunch = false) } }
+            else -> row.gameId?.let { id -> _uiState.update { s -> s.copy(activeGameId = id, activeGameAutoLaunch = true) } }
         }
     }
 

@@ -99,6 +99,10 @@ fun VideoDetailScreen(
     // button; any touch on the screen reports back via [onTouchInput].
     showTouchControls: Boolean = true,
     onTouchInput: () -> Unit = {},
+    // Direct-play mode (from search): fire the page's own primary action as soon as THIS film has
+    // loaded, instead of waiting on a second A press. The page still opens underneath and is what
+    // you come back to. Mirrors GameDetailScreen's autoLaunch.
+    autoPlay: Boolean = false,
     modifier: Modifier = Modifier,
     viewModel: VideoDetailViewModel = hiltViewModel(),
 ) {
@@ -109,6 +113,19 @@ fun VideoDetailScreen(
     ) { uri -> if (uri != null) viewModel.onThumbnailPicked(uri) }
 
     LaunchedEffect(videoId) { viewModel.loadVideo(videoId) }
+    // Keyed on the LOADED film's id, not on a loaded flag: the ViewModel is retained across
+    // open/close, so on reopen it still holds the previous film and a boolean key fires the
+    // effect against that stale row -- which is how the game path once launched the wrong ROM.
+    //
+    // The primary action rather than play(0): the page decides whether the first button is Play
+    // or Resume, and a half-watched film that restarted from zero because search took a different
+    // route would be a second answer to a question the page already answers.
+    if (autoPlay) {
+        val loadedVideoId = state.video?.id
+        LaunchedEffect(loadedVideoId) {
+            if (loadedVideoId == videoId) state.primaryActions.firstOrNull()?.let(viewModel::activate)
+        }
+    }
     // Reset `closed` after handling it: the ViewModel is retained across open/close, so a stale
     // closed=true would otherwise instantly re-close the detail the next time it's opened (needing
     // a second tap).

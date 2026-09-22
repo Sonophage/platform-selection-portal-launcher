@@ -65,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import androidx.compose.foundation.layout.Arrangement
+import com.psplauncher.core.ui.notification.SystemToastHost
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpMessageOverlay
@@ -296,6 +297,11 @@ fun XMBShellContainer(
         onMusicPlayerBack = viewModel::closeMusicPlayer,
         onOpenAndroidLibraryPicker = viewModel::openAndroidLibraryPicker,
     )
+
+    // Above every screen the shell draws, below the launch ceremony. A scan that finishes while
+    // a disc is spinning has nothing useful to say to someone who is already on their way into a
+    // game, and the ceremony is the one thing on this screen that is a hand-off rather than a view.
+    SystemToastHost()
 
     uiState.discCeremony?.let { ceremony ->
         DiscLaunchCeremony(
@@ -1466,6 +1472,7 @@ fun XMBShell(
                 VideoDetailScreen(
                     videoId = videoId,
                     onBack = onCloseVideoDetail,
+                    autoPlay = uiState.activeVideoAutoPlay,
                     pendingGamepadAction = uiState.pendingVideoDetailAction,
                     onGamepadActionConsumed = onVideoDetailActionConsumed,
                     showTouchControls = uiState.resolvedShowTouchButton,

@@ -10,8 +10,13 @@ import android.os.Build
 
 /**
  * Surfaces background work (ROM scans, music scans, artwork fetches, etc.) as Android system
- * notifications instead of an in-app tray. Each task is keyed by its string id so progress
- * updates replace the same notification rather than stacking.
+ * notifications. Each task is keyed by its string id so progress updates replace the same
+ * notification rather than stacking.
+ *
+ * Outcomes -- and only outcomes -- also go to [SystemToasts], which draws them as a pill inside
+ * the launcher. Progress does not: a scan calls [running] on every file, and a toast per file is
+ * not a notification, it is a flicker. This is the single place both surfaces are fed from, so a
+ * scan cannot end up telling the system one thing and the screen another.
  *
  * Lives in core-ui so any feature module (xmb, settings, …) can report background progress the
  * same way.
@@ -48,6 +53,10 @@ class BackgroundTaskNotifier(private val context: Context) {
 
     /** Mark a task finished — dismissible, no progress bar. */
     fun complete(id: String, label: String, message: String?) {
+        // Before the system notification, not after, and deliberately outside canPost(): the
+        // in-app pill is the surface the user actually sees while the launcher is in front, and
+        // it must not disappear because POST_NOTIFICATIONS was never granted.
+        SystemToasts.post(label, message, ToastKind.SUCCESS)
         val builder = base(label)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setOngoing(false)
@@ -59,6 +68,7 @@ class BackgroundTaskNotifier(private val context: Context) {
 
     /** Mark a task failed — dismissible, shows the error text. */
     fun failed(id: String, label: String, message: String) {
+        SystemToasts.post(label, message, ToastKind.ERROR)
         val builder = base(label)
             .setSmallIcon(android.R.drawable.stat_notify_error)
             .setOngoing(false)
