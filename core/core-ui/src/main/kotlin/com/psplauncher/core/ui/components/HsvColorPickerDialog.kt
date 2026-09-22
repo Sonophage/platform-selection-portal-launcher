@@ -276,7 +276,10 @@ fun ColorSwatchRow(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 48.dp, vertical = 10.dp),
+            // 8dp, matching a settings row's inner padding: the row's own 40dp inset now comes
+            // from the focus plate around it, and 48dp here on top of that pushed the last
+            // swatch off the right edge.
+            .padding(horizontal = 8.dp, vertical = 10.dp),
     ) {
         PfpColorChoices.forEachIndexed { index, (label, argb) ->
             ColorSwatch(

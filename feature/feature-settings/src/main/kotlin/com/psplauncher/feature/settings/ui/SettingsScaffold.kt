@@ -361,6 +361,28 @@ private val SettingsRowSelectedEdgeBrush: Brush
         listOf(SETTINGS_ROW_SELECTED_EDGE_START, SETTINGS_ROW_SELECTED_EDGE_END),
     )
 
+/**
+ * The focused row's plate: the one definition of what "the cursor is here" looks like.
+ *
+ * Pulled out of [SettingsRow] when the Icon Color swatch strip -- a focusable row that is not a
+ * SettingsRow -- turned out to draw no plate at all. Controller focus DID reach it; there was
+ * simply nothing to see, and since the cursor lands on the first swatch, which is also the
+ * selected one, nothing on screen changed when it arrived. It read as an unreachable row.
+ *
+ * Anything focusable that is not a SettingsRow uses this rather than copying the three
+ * modifiers, so the plate can only ever look like one thing.
+ */
+internal fun Modifier.settingsSelectedPlate(selected: Boolean): Modifier = this
+    .clip(SETTINGS_ROW_SHAPE)
+    .background(
+        color = if (selected) SETTINGS_ROW_SELECTED_FILL else Color.Transparent,
+        shape = SETTINGS_ROW_SHAPE,
+    )
+    .then(
+        if (selected) Modifier.border(1.dp, SettingsRowSelectedEdgeBrush, SETTINGS_ROW_SHAPE)
+        else Modifier
+    )
+
 /** One choice offered by a [SettingsPickerRow]. */
 data class SettingsPickerOption(val label: String, val help: String? = null)
 
@@ -1679,15 +1701,7 @@ fun SettingsRow(
             // The plate is COLOURLESS on purpose. A themed one turned every focused row into a
             // bar of the wallpaper's hue, which is the habit this screen has been unlearning.
             .padding(horizontal = 40.dp)
-            .clip(SETTINGS_ROW_SHAPE)
-            .background(
-                color = if (rowSelected) SETTINGS_ROW_SELECTED_FILL else Color.Transparent,
-                shape = SETTINGS_ROW_SHAPE,
-            )
-            .then(
-                if (rowSelected) Modifier.border(1.dp, SettingsRowSelectedEdgeBrush, SETTINGS_ROW_SHAPE)
-                else Modifier
-            )
+            .settingsSelectedPlate(rowSelected)
             .focusable()
             // 18dp was set when every row carried a second line of helper text and needed the
             // air. With the helper moved to the foot of the screen the rows are one line, and at

@@ -441,6 +441,11 @@ private fun FocusableStrip(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            // The same plate every focused row wears. Without it the cursor arriving here was
+            // invisible: the strip's own highlight is a ring on one swatch, and the swatch it
+            // lands on is the selected one, which already had a ring.
+            .padding(horizontal = 40.dp)
+            .settingsSelectedPlate(isFocused)
             .focusRequester(fr)
             .onGloballyPositioned {
                 rowPositions?.put(fr, it.localToRoot(Offset.Zero).y)
