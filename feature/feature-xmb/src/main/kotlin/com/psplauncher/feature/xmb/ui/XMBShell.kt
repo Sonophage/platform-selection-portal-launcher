@@ -1065,31 +1065,6 @@ fun XMBShell(
             )
             } // end: XMB foreground hidden while music browser is open
 
-            // Bottom-right App Drawer affordance. Shown only at the XMB root — while drilled into a
-            // sub-item it's hidden entirely (going back is done by the left-edge swipe or by tapping
-            // the active memory-card icon under the caticon, so no Back button is needed here).
-            // Also hidden whenever an overlay/dialog is up. Visibility follows the last input source
-            // (Auto) or the user's override, and fades in/out so picking up a controller cleanly
-            // hides the touch-only affordance.
-            AnimatedVisibility(
-                visible = uiState.resolvedShowTouchButton && !uiState.hasBlockingOverlay && !uiState.isInSubItem,
-                enter = fadeIn(tween(180)),
-                exit = fadeOut(tween(220)),
-                modifier = Modifier.align(Alignment.BottomEnd),
-            ) {
-                // Search sits beside the drawer rather than replacing it: both are things you
-                // reach for with a thumb, and on a controller the same two are BACK at the root
-                // and the Select button. They share the visibility rule for that reason.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 24.dp, end = 20.dp),
-                ) {
-                    SearchTouchButton(onClick = onOpenSearch)
-                    Spacer(Modifier.width(12.dp))
-                    AppDrawerButton(onClick = onOpenAppDrawer)
-                }
-            }
-
             // Button hint pill: [ X Sort   Y Options ], with the controller-style glyphs, and
             // TAPPABLE — a tap runs the action through the same dispatcher the pad uses. Up by
             // default rather than after an idle pause (Display ▸ Button Hints, and its delay,
@@ -1100,12 +1075,23 @@ fun XMBShell(
             // It shows while drilled in too (the game flyout, a library's files) — those rows have
             // context menus and sort, and are where the affordance is least discoverable.
             //
-            // Sits in the App Drawer button's slot when that button is hidden, and stacks above it
-            // when both are up, so the two affordances never overlap.
-            val drawerButtonVisible =
-                uiState.resolvedShowTouchButton && !uiState.hasBlockingOverlay && !uiState.isInSubItem
+            // It is also the only thing in this corner now. Search and the App Drawer used to be
+            // two large square buttons beneath it, which pushed the pill up 68dp so the two would
+            // not overlap -- two rows of controls in one corner, saying the same kind of thing at
+            // two different sizes. They are prompts in this row now, on the same terms as Filter
+            // and Options: same size, same look, named by the button that does them.
+            //
+            // NOT gated on touch mode, unlike the buttons they replace. A footer that grows two
+            // prompts when you put the controller down is the opposite of uniform, and on a pad
+            // these two are real bindings a user should be told about: Search is Select at the
+            // root and Apps is Back at the root. The buttons could be touch-only because they
+            // were touch-only affordances; a named prompt is for both hands.
+            val rootActionsVisible = !uiState.hasBlockingOverlay && !uiState.isInSubItem
             AnimatedVisibility(
-                visible = uiState.showContextMenuHint &&
+                // Shown when EITHER half has something to say: the root actions are a touch
+                // affordance with their own visibility rule, and hiding them behind the hint's
+                // rule would have taken Search and Apps off screen with the hint.
+                visible = (uiState.showContextMenuHint || rootActionsVisible) &&
                     uiState.activeContextMenu == null &&
                     !uiState.hasBlockingOverlay,
                 enter = fadeIn(tween(200)),
@@ -1113,16 +1099,16 @@ fun XMBShell(
                 modifier = Modifier.align(Alignment.BottomEnd),
             ) {
                 ContextMenuHint(
-                    showPages = uiState.hoverPanelHasPages,
-                    showSort = uiState.canSortCurrentList,
-                    showFilter = uiState.canFilterRecents,
-                    showOptions = uiState.focusedItemHasContextMenu,
+                    showPages = uiState.showContextMenuHint && uiState.hoverPanelHasPages,
+                    showSort = uiState.showContextMenuHint && uiState.canSortCurrentList,
+                    showFilter = uiState.showContextMenuHint && uiState.canFilterRecents,
+                    showOptions = uiState.showContextMenuHint && uiState.focusedItemHasContextMenu,
+                    showRootActions = rootActionsVisible,
                     onAction = onPromptTapped,
-                    // Bottom right, close in. The larger bottom inset is only to clear the App
-                    // Drawer button when that is up; with it hidden the pill sits at the shared
-                    // edge gap, so the corner reads the same wherever you are.
+                    // One corner, one inset. The 68dp lift existed only to clear the buttons that
+                    // are now rows in this pill.
                     modifier = Modifier.padding(
-                        bottom = if (drawerButtonVisible) 68.dp else ControllerHintEdgeGap,
+                        bottom = ControllerHintEdgeGap,
                         end = ControllerHintEdgeGap,
                     ),
                 )
@@ -1584,84 +1570,6 @@ private fun CollectionNameDialog(
         confirmLabel = confirmLabel,
     )
 }
-
-/**
- * Bottom-corner touch button that opens library search — a magnifier drawn on a Canvas, for the
- * same reason the drawer's grid is: no icon-library dependency, and a drawn glyph does not change
- * shape with whichever font the device falls back to.
- *
- * Controller users press Select instead, which is why this appears only when touch is the last
- * input source (or the user has forced the touch affordances on).
- */
-@Composable
-private fun SearchTouchButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    XmbTouchButton(onClick = onClick, modifier = modifier) {
-        Canvas(modifier = Modifier.size(26.dp)) {
-            val stroke = size.minDimension * 0.10f
-            val radius = size.minDimension * 0.30f
-            val centre = androidx.compose.ui.geometry.Offset(size.width * 0.42f, size.height * 0.42f)
-            drawCircle(
-                color = androidx.compose.ui.graphics.Color.White,
-                radius = radius,
-                center = centre,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
-            )
-            // The handle, running out of the glass at 45 degrees.
-            val from = androidx.compose.ui.geometry.Offset(
-                centre.x + radius * 0.72f,
-                centre.y + radius * 0.72f,
-            )
-            drawLine(
-                color = androidx.compose.ui.graphics.Color.White,
-                start = from,
-                end = androidx.compose.ui.geometry.Offset(size.width * 0.88f, size.height * 0.88f),
-                strokeWidth = stroke,
-                cap = androidx.compose.ui.graphics.StrokeCap.Round,
-            )
-        }
-    }
-}
-
-/** Bottom-corner touch button that opens the app drawer — a 2×2 grid glyph drawn on a Canvas
- *  (no icon-library dependency). Controller users reach the drawer with BACK at the root instead. */
-@Composable
-private fun AppDrawerButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // Delegates the frame to the shared themed touch button; only the 2×2 grid glyph is local.
-    XmbTouchButton(onClick = onClick, modifier = modifier) {
-        Canvas(modifier = Modifier.size(26.dp)) {
-            val cell = size.minDimension * 0.38f
-            val gap = size.minDimension - 2 * cell
-            val radius = CornerRadius(cell * 0.28f, cell * 0.28f)
-            val shadowOffset = size.minDimension * 0.06f
-            for (row in 0..1) {
-                for (col in 0..1) {
-                    val x = col * (cell + gap)
-                    val y = row * (cell + gap)
-                    // Soft dark shadow cell behind, then the bright glyph cell on top.
-                    drawRoundRect(
-                        color = Color(0x99000000),
-                        topLeft = Offset(x + shadowOffset, y + shadowOffset),
-                        size = Size(cell, cell),
-                        cornerRadius = radius,
-                    )
-                    drawRoundRect(
-                        color = Color.White,
-                        topLeft = Offset(x, y),
-                        size = Size(cell, cell),
-                        cornerRadius = radius,
-                    )
-                }
-            }
-        }
-    }
-}
-
 
 @Composable
 private fun InfoDialog(

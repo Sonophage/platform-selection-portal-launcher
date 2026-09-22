@@ -54,6 +54,15 @@ fun ContextMenuHint(
     showFilter: Boolean = false,
     /** Show the Options half — the focused item has a context menu. */
     showOptions: Boolean = true,
+    /**
+     * Show Search and Apps — the two things that used to be big square buttons in this corner.
+     *
+     * They sat UNDER this pill and pushed it up 68dp to avoid overlapping, which is two rows of
+     * controls in one corner saying the same kind of thing in two sizes. As prompts they are the
+     * same row, the same size, and named by the button that does them: Search is Select at the
+     * root, Apps is Back at the root.
+     */
+    showRootActions: Boolean = false,
     /** Runs a tapped prompt. Null leaves the pill a legend (previews, and any caller that has
      *  no dispatcher to offer). */
     onAction: ((GamepadAction) -> Unit)? = null,
@@ -70,6 +79,12 @@ fun ContextMenuHint(
         if (showFilter) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Filter"))
         else if (showSort) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Sort"))
         if (showOptions) add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"))
+        if (showRootActions) {
+            add(ControllerPromptItem(GamepadAction.OPEN_SEARCH, "Search"))
+            // Back opens the drawer at the root — that IS what the button did, and a prompt that
+            // named a different button would be teaching the wrong thing to a controller user.
+            add(ControllerPromptItem(GamepadAction.BACK, "Apps"))
+        }
     }
     ControllerHintBar(items = items, modifier = modifier, onAction = onAction)
 }
