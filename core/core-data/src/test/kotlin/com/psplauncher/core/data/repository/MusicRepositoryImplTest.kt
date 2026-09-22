@@ -3,6 +3,7 @@ package com.psplauncher.core.data.repository
 import android.content.Context
 import com.psplauncher.core.data.database.dao.MusicFolderDao
 import com.psplauncher.core.data.database.dao.MusicTrackDao
+import com.psplauncher.core.data.database.dao.TrackPlayStamp
 import com.psplauncher.core.data.database.dao.PlaylistDao
 import com.psplauncher.core.data.database.dao.PlaylistWithCount
 import com.psplauncher.core.data.database.entity.MusicFolderEntity
@@ -136,7 +137,27 @@ private class FakeMusicTrackDao : MusicTrackDao {
         tracks.forEach { byFolder.getOrPut(it.folderId) { mutableListOf() }.add(it) }
     }
     override suspend fun deleteForFolder(folderId: String) { byFolder[folderId]?.clear() }
-    // replaceForFolder is a default interface method (deleteForFolder + insertAll) — inherited.
+    // The recency column this fake has to answer for. The real preservation-across-rescan
+    // behaviour is proven against a real database in RescanKeepsRecencyTest, not here.
+    override suspend fun playStampsForFolder(folderId: String) =
+        byFolder[folderId].orEmpty()
+            .filter { it.lastPlayedAt != null }
+            .map { TrackPlayStamp(it.id, it.lastPlayedAt) }
+    override suspend fun markPlayed(id: String, playedAt: Long) = mutate(id) { it.copy(lastPlayedAt = playedAt) }
+    override suspend fun clearLastPlayed(id: String) = mutate(id) { it.copy(lastPlayedAt = null) }
+    override fun observeRecentlyPlayed(limit: Int): Flow<List<MusicTrackEntity>> = flowOf(
+        byFolder.values.flatten()
+            .filter { it.lastPlayedAt != null }
+            .sortedByDescending { it.lastPlayedAt }
+            .take(limit)
+    )
+    private fun mutate(id: String, f: (MusicTrackEntity) -> MusicTrackEntity) {
+        byFolder.values.forEach { list ->
+            val i = list.indexOfFirst { it.id == id }
+            if (i >= 0) list[i] = f(list[i])
+        }
+    }
+    // replaceForFolder is a default interface method (stamps + deleteForFolder + insertAll) — inherited.
 }
 
 private class FakePlaylistDao(private val trackDao: FakeMusicTrackDao) : PlaylistDao {

@@ -23,7 +23,9 @@ import com.psplauncher.core.domain.model.Book
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("library_id"), Index("uri")],
+    // last_opened_at is indexed because the recents query orders by it over a column that
+    // is null for every book not yet read.
+    indices = [Index("library_id"), Index("uri"), Index("last_opened_at")],
 )
 data class BookEntity(
     @PrimaryKey
@@ -68,6 +70,16 @@ data class BookEntity(
 
     @ColumnInfo(name = "date_added")
     val dateAdded: Long? = null,
+
+    /**
+     * When this book was last opened in the reader, or null if it never has been.
+     *
+     * NOT [lastModified] (the file's mtime) and NOT [dateAdded] (when the scan first saw it):
+     * both answer "when did this file appear", and a shelf built on either would rank a library
+     * copied in one go by nothing more useful than copy order.
+     */
+    @ColumnInfo(name = "last_opened_at")
+    val lastOpenedAt: Long? = null,
 )
 
 fun BookEntity.toDomain() = Book(
@@ -85,6 +97,7 @@ fun BookEntity.toDomain() = Book(
     mimeType     = mimeType,
     relativePath = relativePath,
     dateAdded    = dateAdded,
+    lastOpenedAt = lastOpenedAt,
 )
 
 fun Book.toEntity() = BookEntity(
@@ -102,4 +115,5 @@ fun Book.toEntity() = BookEntity(
     mimeType     = mimeType,
     relativePath = relativePath,
     dateAdded    = dateAdded,
+    lastOpenedAt = lastOpenedAt,
 )

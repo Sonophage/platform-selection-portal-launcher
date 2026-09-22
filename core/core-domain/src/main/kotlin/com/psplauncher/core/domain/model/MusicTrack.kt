@@ -20,6 +20,8 @@ data class MusicTrack(
     val relativePath: String? = null,
     /** file:// uri of cached album art extracted during scan, or null when none was embedded. */
     val artUri: String? = null,
+    /** When this track was last played here, or null if never. Not the file's mtime — see the entity. */
+    val lastPlayedAt: Long? = null,
 ) {
     /** Best label for display: real title when scanned, else the file name. */
     val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: displayName

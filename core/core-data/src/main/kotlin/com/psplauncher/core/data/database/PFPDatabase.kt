@@ -68,7 +68,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
  * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
  * version bump cannot leave the test still asserting against the old number.
  */
-const val PFP_DATABASE_VERSION = 48
+const val PFP_DATABASE_VERSION = 49
 
 @Database(
     entities = [
@@ -1392,6 +1392,35 @@ abstract class PFPDatabase : RoomDatabase() {
         }
 
         /**
+         * Recency for music and books, so the Last Played shelf can hold all four media.
+         *
+         * Games and videos already carried their own stamp (`last_played_at`, `last_watched_at`).
+         * Tracks and books carried only `last_modified` — the file's mtime — and `date_added`,
+         * which is when the scan first saw the file. Both answer "when did this arrive", so a
+         * library copied across in one go would have every item claim the same recency and the
+         * shelf would rank by copy order while looking perfectly plausible. That is why these are
+         * new columns and not a reused proxy.
+         *
+         * NULL for every existing row on purpose: nothing has been played through the launcher
+         * yet as far as these columns know, so the shelf shows music and books only once they
+         * have actually been opened. Backfilling from mtime would be the same lie in one step.
+         */
+        val MIGRATION_48_49 = object : Migration(48, 49) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE music_tracks ADD COLUMN last_played_at INTEGER")
+                db.execSQL("ALTER TABLE books ADD COLUMN last_opened_at INTEGER")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_music_tracks_last_played_at " +
+                        "ON music_tracks(last_played_at)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_books_last_opened_at " +
+                        "ON books(last_opened_at)"
+                )
+            }
+        }
+
+        /**
          * Every migration, in order, as ONE list.
          *
          * DatabaseModule used to hand-type all of these into `addMigrations(...)`, which made the
@@ -1450,6 +1479,7 @@ abstract class PFPDatabase : RoomDatabase() {
             MIGRATION_45_46,
             MIGRATION_46_47,
             MIGRATION_47_48,
+            MIGRATION_48_49,
         )
 
     }

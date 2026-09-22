@@ -1,5 +1,6 @@
 package com.psplauncher.core.data.database.dao
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -7,6 +8,13 @@ import androidx.room.Query
 import androidx.room.Transaction
 import com.psplauncher.core.data.database.entity.VideoEntity
 import kotlinx.coroutines.flow.Flow
+
+/** One row's watch state, read back before a scan replaces it. See [VideoDao.replaceForLibrary]. */
+data class VideoWatchStamp(
+    val id: String,
+    @ColumnInfo(name = "last_watched_at") val lastWatchedAt: Long?,
+    @ColumnInfo(name = "resume_position_ms") val resumePositionMs: Long,
+)
 
 @Dao
 interface VideoDao {
@@ -88,8 +96,40 @@ interface VideoDao {
 
     // Replaces a single library's videos atomically; other libraries are never touched.
     @Transaction
+    @Query(
+        "SELECT id, last_watched_at, resume_position_ms FROM videos " +
+            "WHERE library_id = :libraryId AND (last_watched_at IS NOT NULL OR resume_position_ms > 0)"
+    )
+    suspend fun watchStampsForLibrary(libraryId: String): List<VideoWatchStamp>
+
+    /**
+     * Replaces a single library's videos atomically; other libraries are never touched.
+     *
+     * Watch state survives the replace. This deletes and re-inserts from a scan that reads only
+     * the filesystem, so before this guard a rescan silently cleared both last_watched_at and
+     * resume_position_ms — Recently Watched emptied itself and every part-watched film went back
+     * to the start, with nothing on screen to say why. Found while giving music and books the
+     * same column; the fault was already here.
+     *
+     * Restored by id, which VideoScanner keeps stable by carrying `prior?.id` forward. A row the
+     * scan supplies its own values for keeps them.
+     */
+    @Transaction
     suspend fun replaceForLibrary(libraryId: String, videos: List<VideoEntity>) {
+        val stamps = watchStampsForLibrary(libraryId).associateBy { it.id }
         deleteForLibrary(libraryId)
-        if (videos.isNotEmpty()) insertAll(videos)
+        if (videos.isNotEmpty()) insertAll(
+            videos.map { v ->
+                val prior = stamps[v.id] ?: return@map v
+                v.copy(
+                    lastWatchedAt = v.lastWatchedAt ?: prior.lastWatchedAt,
+                    resumePositionMs = if (v.resumePositionMs > 0) v.resumePositionMs else prior.resumePositionMs,
+                )
+            },
+        )
     }
+
+    /** Drops the video off the recents shelf. Resume position is left alone — see clearLastWatched. */
+    @Query("UPDATE videos SET last_watched_at = NULL WHERE id = :id")
+    suspend fun clearLastWatched(id: String)
 }

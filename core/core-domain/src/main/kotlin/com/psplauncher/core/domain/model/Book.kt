@@ -26,6 +26,8 @@ data class Book(
     val mimeType: String? = null,
     val relativePath: String? = null,
     val dateAdded: Long? = null,
+    /** When this book was last opened here, or null if never. Not the file's mtime — see the entity. */
+    val lastOpenedAt: Long? = null,
 ) {
     /** What the list shows: the parsed title once there is one, else the file name. */
     val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: displayName

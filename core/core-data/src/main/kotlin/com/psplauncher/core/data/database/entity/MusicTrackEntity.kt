@@ -21,7 +21,9 @@ import com.psplauncher.core.domain.model.MusicTrack
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("folder_id")],
+    // last_played_at is indexed for the same reason games.last_played_at is: the recents
+    // query is ORDER BY it DESC over a table that is mostly nulls.
+    indices = [Index("folder_id"), Index("last_played_at")],
 )
 data class MusicTrackEntity(
     @PrimaryKey
@@ -59,6 +61,16 @@ data class MusicTrackEntity(
 
     @ColumnInfo(name = "art_uri")
     val artUri: String? = null,
+
+    /**
+     * When this track was last played through the launcher, or null if it never has been.
+     *
+     * NOT [lastModified], which is the file's mtime — when the bytes were written, not when they
+     * were listened to. A library copied in one go would have every track claim the same recency,
+     * which is why the recents shelf needed a column of its own rather than a proxy.
+     */
+    @ColumnInfo(name = "last_played_at")
+    val lastPlayedAt: Long? = null,
 )
 
 fun MusicTrackEntity.toDomain() = MusicTrack(
@@ -76,6 +88,7 @@ fun MusicTrackEntity.toDomain() = MusicTrack(
     trackNumber  = trackNumber,
     relativePath = relativePath,
     artUri       = artUri,
+    lastPlayedAt = lastPlayedAt,
 )
 
 fun MusicTrack.toEntity() = MusicTrackEntity(
@@ -93,4 +106,5 @@ fun MusicTrack.toEntity() = MusicTrackEntity(
     trackNumber  = trackNumber,
     relativePath = relativePath,
     artUri       = artUri,
+    lastPlayedAt = lastPlayedAt,
 )
