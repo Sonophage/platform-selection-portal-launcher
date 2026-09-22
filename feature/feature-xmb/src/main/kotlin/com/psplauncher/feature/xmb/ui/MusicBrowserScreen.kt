@@ -82,7 +82,6 @@ fun MusicBrowserScreen(
     // Show the touch header pills only when the last input was touch (AUTO), matching the XMB's
     // contextual App Drawer button. Controller users rely on the prompt bar below, which names
     // the actions and lets the shared resolver draw whichever buttons their pad binds them to.
-    showTouchControls: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -135,21 +134,8 @@ fun MusicBrowserScreen(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                if (showTouchControls) {
-                    // Sort applies to track views only (the ViewModel ignores it for playlists and
-                    // for the Artists/Albums lists, so the pill is hidden there). The label arrives
-                    // already reading "Sort: Title" -- the same string the XMB status bar shows --
-                    // so the pill prints it as it is rather than prefixing it a second time.
-                    state.sortLabel?.let { label ->
-                        HeaderPill(onClick = onSortTapped) {
-                            Text(label, color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        }
-                        Spacer(Modifier.width(10.dp))
-                    }
-                    HeaderPill(onClick = onOptionsTapped) {
-                        Text("Options", color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
+                // The Sort and Options pills used to live here. They said the same two things the
+                // footer already says, twice the size, in a second place -- see the footer below.
             }
 
             Spacer(Modifier.height(14.dp))
@@ -188,36 +174,37 @@ fun MusicBrowserScreen(
             }
 
             Spacer(Modifier.height(8.dp))
+            // One footer, and it is the touch surface too.
+            //
+            // This screen used to carry big Sort and Options pills in its header saying exactly
+            // what two of these prompts say. Two controls for one action, one of them large
+            // enough to crowd the header -- and a touch user had no reason to think the small
+            // legend at the bottom was pressable, because it was not.
+            //
+            // It is now. The prompts fire the same actions through the same dispatcher the pad
+            // uses, so there is one place each action lives and one look for all of them.
             PfpControllerHints(
                 items = listOfNotNull(
                     ControllerPromptItem(GamepadAction.SELECT, "Open"),
-                    // Sort is a no-op on playlist views — the ViewModel ignores it and the touch
-                    // pill above is hidden there, so the prompt goes too rather than promising it.
-                    state.sortLabel?.let { ControllerPromptItem(GamepadAction.CHANGE_SORT, "Sort") },
+                    // Sort is a no-op on playlist and group views — the ViewModel ignores it
+                    // there — so the prompt goes rather than promising something. The label
+                    // carries the current mode, which is what the pill was for.
+                    state.sortLabel?.let { ControllerPromptItem(GamepadAction.CHANGE_SORT, it) },
                     ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                     ControllerPromptItem(GamepadAction.BACK, "Back"),
                 ),
                 style = ControllerHintStyle.INLINE,
+                onAction = { action ->
+                    when (action) {
+                        GamepadAction.CHANGE_SORT -> onSortTapped()
+                        GamepadAction.OPEN_CONTEXT_MENU -> onOptionsTapped()
+                        GamepadAction.BACK -> onBack()
+                        else -> Unit
+                    }
+                },
             )
         }
     }
-}
-
-// The header's shared pill treatment (Back / Sort / Options): translucent chip, touch-first.
-@Composable
-private fun HeaderPill(
-    onClick: () -> Unit,
-    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0x1FFFFFFF))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        content = content,
-    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

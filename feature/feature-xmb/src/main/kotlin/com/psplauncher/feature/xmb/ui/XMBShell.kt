@@ -1227,7 +1227,6 @@ fun XMBShell(
                     onBack = onMusicBrowserBack,
                     onSortTapped = onMusicBrowserSortTapped,
                     onOptionsTapped = onMusicBrowserOptionsTapped,
-                    showTouchControls = uiState.resolvedShowTouchButton,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -1481,7 +1480,6 @@ fun XMBShell(
                     onBack = onClosePhotoViewer,
                     pendingGamepadAction = uiState.pendingPhotoViewerAction,
                     onGamepadActionConsumed = onPhotoViewerActionConsumed,
-                    showTouchControls = uiState.resolvedShowTouchButton,
                     onTouchInput = onTouchInput,
                     modifier = Modifier.fillMaxSize(),
                 )

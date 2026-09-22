@@ -54,7 +54,6 @@ import com.psplauncher.core.ui.detail.PfpOverlayTitle
 import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
-import com.psplauncher.core.ui.components.XmbHeaderPill
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.xmb.ui.DetailContextMenu
 import com.psplauncher.feature.xmb.ui.DetailMenuRow
@@ -76,7 +75,6 @@ private val PanelBg = Color(0xF0101018)
 
 // Header pills float over the photo itself, so they need a real scrim: the default 12% white
 // pill fill disappears on bright images (Prev/Next were unreadable on light photos).
-private val MediaPillBg = Color(0x99000000)
 
 /**
  * PSP-style fullscreen photo viewer: just the image on black, all UI hidden until toggled.
@@ -95,7 +93,6 @@ fun PhotoViewerScreen(
     onGamepadActionConsumed: () -> Unit = {},
     // Touch header pills shown only when the last input was touch (AUTO), like the XMB App Drawer
     // button; a tap on the photo reports back via [onTouchInput] (and toggles the controls layer).
-    showTouchControls: Boolean = true,
     onTouchInput: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: PhotoViewerViewModel = hiltViewModel(),
@@ -211,62 +208,32 @@ fun PhotoViewerScreen(
                     .padding(horizontal = 24.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
+                // One footer, and it is the touch surface. Four large pills used to float over
+                // the photo saying Back, Options, Prev and Next -- the same four things this row
+                // already named, over the picture the screen exists to show.
+                //
+                // Prev and Next are two prompts rather than one "Prev / Next": a prompt naming
+                // two actions cannot be tapped (it has no single action to fire), and paging by
+                // touch is the whole reason those pills were added.
                 PfpControllerHints(
                     items = listOf(
-                        ControllerPromptItem(
-                            listOf(GamepadAction.PREV_CATEGORY, GamepadAction.NEXT_CATEGORY),
-                            "Prev / Next",
-                        ),
+                        ControllerPromptItem(GamepadAction.PREV_CATEGORY, "Prev"),
+                        ControllerPromptItem(GamepadAction.NEXT_CATEGORY, "Next"),
                         ControllerPromptItem(GamepadAction.SELECT, "Hide Controls"),
                         ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                         ControllerPromptItem(GamepadAction.BACK, "Back"),
                     ),
                     style = ControllerHintStyle.OVERLAY,
+                    onAction = { action ->
+                        onTouchInput()
+                        when (action) {
+                            GamepadAction.PREV_CATEGORY -> viewModel.step(-1)
+                            GamepadAction.NEXT_CATEGORY -> viewModel.step(+1)
+                            GamepadAction.OPEN_CONTEXT_MENU -> viewModel.openOptions()
+                            else -> viewModel.handleGamepadAction(action)
+                        }
+                    },
                 )
-            }
-            // Header pills matching the detail screens: Back top-left, Options top-right — the
-            // touch counterparts of B and Y. Shown while the controls layer is visible AND the last
-            // input was touch (a controller press hides them, like the XMB App Drawer button).
-            if (showTouchControls) {
-                XmbHeaderPill(
-                    label = "Back",
-                    leadingGlyph = "◀",
-                    onClick = { viewModel.handleGamepadAction(GamepadAction.BACK) },
-                    background = MediaPillBg,
-                    modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
-                )
-                XmbHeaderPill(
-                    label = "Options",
-                    onClick = viewModel::openOptions,
-                    background = MediaPillBg,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
-                )
-                // Touch prev/next — the counterparts of L1/R1, as header pills matching Back /
-                // Options, centred on each side. Dimmed and inert at the ends. Part of the controls
-                // layer, so a tap on the photo hides them with everything else. Only shown with >1 photo.
-                if (state.photos.size > 1) {
-                    val hasPrev = state.index > 0
-                    val hasNext = state.index < state.photos.size - 1
-                    XmbHeaderPill(
-                        label = "Prev",
-                        leadingGlyph = "‹",
-                        onClick = { if (hasPrev) { onTouchInput(); viewModel.step(-1) } },
-                        background = MediaPillBg,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 16.dp)
-                            .alpha(if (hasPrev) 1f else 0.35f),
-                    )
-                    XmbHeaderPill(
-                        label = "Next  ›",
-                        onClick = { if (hasNext) { onTouchInput(); viewModel.step(+1) } },
-                        background = MediaPillBg,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 16.dp)
-                            .alpha(if (hasNext) 1f else 0.35f),
-                    )
-                }
             }
         }
 
