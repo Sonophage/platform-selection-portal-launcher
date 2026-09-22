@@ -4849,7 +4849,6 @@ class XMBViewModel @Inject constructor(
             // arms they used to have could not fire.
             val msg = when (category.id) {
                 "network"   -> "No browser apps found."
-                "app_store" -> "No app stores found."
                 else        -> "No apps assigned."
             }
             msg to "Install some apps to get started."

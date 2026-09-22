@@ -10,7 +10,6 @@ object AppCategoryIds {
     const val MUSIC     = "music"
     const val VIDEO     = "videos"
     const val NETWORK   = "network"
-    const val APP_STORE = "app_store"
 }
 
 // Produces the DEFAULT category placement for an installed app. This is only a starting
@@ -52,8 +51,6 @@ class AppClassifier @Inject constructor() {
         val l = label.lowercase()
         return when {
             l.contains("browser")                      -> AppCategoryIds.NETWORK
-            l.contains("app store") || l.contains("appstore") ||
-                l.contains("app manager")              -> AppCategoryIds.APP_STORE
             else                                       -> null
         }
     }
@@ -93,21 +90,6 @@ class AppClassifier @Inject constructor() {
                 "com.nvidia.geforcenow",            // GeForce NOW
                 "com.microsoft.xcloud",             // Xbox Cloud Gaming
                 "com.parsecgaming.parsec",          // Parsec
-            ),
-            AppCategoryIds.APP_STORE to listOf(
-                "com.android.vending",                 // Google Play Store
-                "com.aurora.store",                    // Aurora Store
-                "com.apkpure.aegon",                   // APKPure
-                "org.fdroid.fdroid",                   // F-Droid
-                "com.machiav3lli.fdroid",              // Neo Store
-                "com.looker.droidify",                 // Droid-ify
-                "crocodile.obtainium",                 // Obtainium
-                "com.amazon.venezia",                  // Amazon Appstore
-                "cm.aptoide.pt",                       // Aptoide
-                "com.sec.android.app.samsungapps",     // Galaxy Store
-                "com.huawei.appmarket",                // AppGallery
-                "com.xiaomi.market",                   // GetApps
-                "com.qooapp.qoohelper",                // QooApp
             ),
             AppCategoryIds.MUSIC to listOf(
                 "com.spotify.music", "com.google.android.apps.youtube.music",

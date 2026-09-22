@@ -57,7 +57,12 @@ object BuiltInCategory {
      * the same job `UiMediaStore.pruneOrphans()` does for retired media slots. As with those keys,
      * a retired id is deliberately NOT reused.
      */
-    val RETIRED_IDS = setOf("social", "achievements")
+    //
+    // "app_store" is the odd one here: it is not a leftover from an older build but a column the
+    // owner asked to remove. It held one row — Play Store — so a whole column bought one app that
+    // the App Drawer already lists. Retiring it rather than hiding it means the sweep also takes
+    // the app assignments that hung off it, on his install and on any restored backup.
+    val RETIRED_IDS = setOf("social", "achievements", "app_store")
 }
 
 /**
@@ -100,6 +105,5 @@ val BUILT_IN_CATEGORIES: List<Category> = listOf(
     Category(id = BuiltInCategory.RECENTLY_PLAYED, name = "Last Played", iconKey = "ic_recent", type = CategoryType.BUILT_IN, position = 4),
     Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 5, isGamingCategory = true),
     Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 6),
-    Category(id = "app_store",              name = "App Store", iconKey = "ic_appstore", type = CategoryType.BUILT_IN, position = 7),
     Category(id = BuiltInCategory.LIBRARY,  name = "Library",   iconKey = "ic_library",  type = CategoryType.BUILT_IN, position = 9),
 )

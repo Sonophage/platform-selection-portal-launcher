@@ -18,7 +18,6 @@ object PreviewData {
         Category("videos",                 "Video",    "ic_videos",   type = CategoryType.BUILT_IN, position = 3),
         Category(BuiltInCategory.GAMES,    "Game",     "ic_games",    type = CategoryType.BUILT_IN, position = 4),
         Category("network",                "Network",  "ic_network",  type = CategoryType.BUILT_IN, position = 5),
-        Category("app_store",              "App Store", "ic_appstore", type = CategoryType.BUILT_IN, position = 6),
     )
 
     val ps2Games = listOf(

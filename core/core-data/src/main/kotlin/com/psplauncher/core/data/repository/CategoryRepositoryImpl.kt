@@ -214,7 +214,7 @@ class CategoryRepositoryImpl @Inject constructor(
             BuiltInCategory.ANDROID,
             BuiltInCategory.APP_DRAWER,
             BuiltInCategory.SETTINGS,
-            "photos", "music", "videos", NETWORK_CATEGORY_ID, "app_store",
+            "photos", "music", "videos", NETWORK_CATEGORY_ID,
             BuiltInCategory.LIBRARY,
         )
     }
