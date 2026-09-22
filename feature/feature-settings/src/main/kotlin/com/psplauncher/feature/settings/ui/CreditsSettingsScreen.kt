@@ -161,6 +161,17 @@ fun CreditsSettingsScreen(
 
 
             Spacer(Modifier.height(16.dp))
+            SettingsGroup("Typeface")
+            CreditParagraph(
+                "The launcher is set in Inter, a humanist sans drawn for screens by Rasmus " +
+                    "Andersson. It stands in for the PlayStation interface's own SST, which " +
+                    "Monotype drew for Sony and which is not licensed for bundling here."
+            )
+            CreditLine("Typeface", "Inter — rsms.me/inter")
+            CreditLine("Author", "Rasmus Andersson & the Inter Project Authors")
+            CreditLine("License", "SIL Open Font License 1.1")
+
+            Spacer(Modifier.height(16.dp))
             SettingsGroup("Design Influence")
             CreditParagraph(
                 "Several screens were designed by studying NeoStation: the Last Played home page, " +

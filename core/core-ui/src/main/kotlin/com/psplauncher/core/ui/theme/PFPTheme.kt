@@ -165,7 +165,13 @@ fun PFPTheme(
         // it here is the one line that reaches the long tail of call sites without touching them.
         LocalContentColor provides textColors.primary,
     ) {
-        MaterialTheme(colorScheme = PfpDarkColorScheme, content = content)
+        // Typography is supplied here for the same reason LocalContentColor is: it reaches every
+        // Text() that does not name a family, which is all of them. See PfpType.
+        MaterialTheme(
+            colorScheme = PfpDarkColorScheme,
+            typography = pfpTypography(),
+            content = content,
+        )
     }
 }
 

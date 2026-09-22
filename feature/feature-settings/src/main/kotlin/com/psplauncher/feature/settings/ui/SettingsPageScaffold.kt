@@ -103,9 +103,13 @@ private fun SettingsPageTitle(title: String) {
         color = Color.White,
         fontSize = 30.sp,
         fontWeight = FontWeight.Normal,
+        // Tight under the title. The old breadcrumb header was a band with an eyebrow, a chevron
+        // and a rule, and the space it needed is still what the content was starting below — so
+        // the first row sat about a hundred pixels lower than the reference's does. One line of
+        // title needs one line of room.
         modifier = Modifier
             .fillMaxWidth()
             .focusProperties { canFocus = false }
-            .padding(start = 40.dp, end = 40.dp, top = 18.dp, bottom = 10.dp),
+            .padding(start = 40.dp, end = 40.dp, top = 10.dp, bottom = 0.dp),
     )
 }

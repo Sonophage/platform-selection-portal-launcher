@@ -336,8 +336,30 @@ val LocalSettingsHelp = compositionLocalOf { mutableStateOf<String?>(null) }
 
 // The focused row's plate: a neutral lift, no hue. See SettingsRow for why it is colourless.
 private val SETTINGS_ROW_SHAPE = RoundedCornerShape(10.dp)
-private val SETTINGS_ROW_SELECTED_FILL = Color.White.copy(alpha = 0.10f)
-private val SETTINGS_ROW_SELECTED_EDGE = Color.White.copy(alpha = 0.22f)
+/**
+ * The focused row's fill — almost nothing, on purpose.
+ *
+ * Measured off the PS5 reference rather than chosen: inside the focused row's outline the image
+ * reads 30-45 luminance against 25-37 just outside it. Five points. There is no glass there, and
+ * 0.10 white was reading as a lit panel instead of a cursor.
+ */
+private val SETTINGS_ROW_SELECTED_FILL = Color.White.copy(alpha = 0.035f)
+
+/**
+ * The focused row's outline, dim on the left and bright on the right.
+ *
+ * Also measured: the same border in that capture peaks at 114 on its left edge and 125 on its
+ * right, about 2px either side. A single flat colour is what made ours look heavier than the
+ * reference — the weight is in the gradient, not in the thickness.
+ */
+private val SETTINGS_ROW_SELECTED_EDGE_START = Color.White.copy(alpha = 0.16f)
+private val SETTINGS_ROW_SELECTED_EDGE_END = Color.White.copy(alpha = 0.38f)
+
+/** The outline as a left-to-right brush. */
+private val SettingsRowSelectedEdgeBrush: Brush
+    get() = Brush.horizontalGradient(
+        listOf(SETTINGS_ROW_SELECTED_EDGE_START, SETTINGS_ROW_SELECTED_EDGE_END),
+    )
 
 /** One choice offered by a [SettingsPickerRow]. */
 data class SettingsPickerOption(val label: String, val help: String? = null)
@@ -1351,7 +1373,7 @@ private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
                 // Opaque: this list sits ON the settings list, so the rows underneath must not
                 // read through the options the way they did through the full-screen panel.
                 .background(Color(0xF21A1A22), SETTINGS_ROW_SHAPE)
-                .border(1.dp, SETTINGS_ROW_SELECTED_EDGE, SETTINGS_ROW_SHAPE)
+                .border(1.dp, SettingsRowSelectedEdgeBrush, SETTINGS_ROW_SHAPE)
                 .padding(PICKER_PADDING),
         ) {
             picker.options.forEachIndexed { index, option ->
@@ -1367,7 +1389,7 @@ private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
                         )
                         .then(
                             if (focused) {
-                                Modifier.border(1.dp, SETTINGS_ROW_SELECTED_EDGE, SETTINGS_ROW_SHAPE)
+                                Modifier.border(1.dp, SettingsRowSelectedEdgeBrush, SETTINGS_ROW_SHAPE)
                             } else {
                                 Modifier
                             }
@@ -1468,7 +1490,7 @@ private fun SettingsSectionRail(
                     )
                     .then(
                         if (isCursor) {
-                            Modifier.border(1.dp, SETTINGS_ROW_SELECTED_EDGE, SETTINGS_ROW_SHAPE)
+                            Modifier.border(1.dp, SettingsRowSelectedEdgeBrush, SETTINGS_ROW_SHAPE)
                         } else {
                             Modifier
                         }
@@ -1663,7 +1685,7 @@ fun SettingsRow(
                 shape = SETTINGS_ROW_SHAPE,
             )
             .then(
-                if (rowSelected) Modifier.border(1.dp, SETTINGS_ROW_SELECTED_EDGE, SETTINGS_ROW_SHAPE)
+                if (rowSelected) Modifier.border(1.dp, SettingsRowSelectedEdgeBrush, SETTINGS_ROW_SHAPE)
                 else Modifier
             )
             .focusable()
