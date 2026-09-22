@@ -1,5 +1,7 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
@@ -3265,11 +3267,7 @@ class XMBViewModel @Inject constructor(
 
     // Long-press options for a video playlist row: open / rename / delete.
     private fun openVideoPlaylistContextMenu(playlistId: Long, name: String) {
-        val items = listOf(
-            XMBContextMenuItem("open_video_playlist", "Open"),
-            XMBContextMenuItem("rename_video_playlist", "Rename Playlist"),
-            XMBContextMenuItem("delete_video_playlist", "Delete Playlist", isDestructive = true),
-        )
+        val items = videoPlaylistContextMenuItems()
         _uiState.update { it.copy(activeContextMenu = XMBContextMenu(name, items, videoPlaylistId = playlistId)) }
     }
 
@@ -3302,18 +3300,12 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch {
             val video = videoRepository.getVideo(videoId) ?: return@launch
             val inPlaylist = _uiState.value.videoNav is VideoNav.Playlist
-            val items = buildList {
-                add(XMBContextMenuItem("video_play", "Play"))
-                if (video.resumePositionMs > 0) add(XMBContextMenuItem("video_resume", "Resume"))
-                add(XMBContextMenuItem("video_favorite", if (video.isFavorite) "Remove from Favorites" else "Add to Favorites"))
-                add(XMBContextMenuItem("video_add_playlist", "Add to Playlist"))
-                if (inPlaylist) add(XMBContextMenuItem("video_remove_playlist", "Remove from this Playlist", isDestructive = true))
-                add(XMBContextMenuItem("video_details", "Details"))
-                if (video.lastWatchedAt != null) {
-                    add(XMBContextMenuItem("video_remove_recent", "Remove from Recent"))
-                }
-                add(XMBContextMenuItem("video_remove", "Remove From Library", isDestructive = true))
-            }
+            val items = videoFileContextMenuItems(
+                isFavorite = video.isFavorite,
+                resumePositionMs = video.resumePositionMs,
+                hasWatchStamp = video.lastWatchedAt != null,
+                inPlaylist = inPlaylist,
+            )
             _uiState.update { it.copy(activeContextMenu = XMBContextMenu(title, items, videoFileId = videoId)) }
         }
     }
@@ -3361,10 +3353,7 @@ class XMBViewModel @Inject constructor(
 
     // Options for a video library card: open, scan, or manage in Settings.
     private fun openVideoLibraryContextMenu(libraryId: String, name: String) {
-        val items = listOf(
-            XMBContextMenuItem("video_lib_open", "Open"),
-            XMBContextMenuItem("video_lib_manage", "Manage in Settings"),
-        )
+        val items = videoLibraryContextMenuItems()
         _uiState.update { it.copy(activeContextMenu = XMBContextMenu(name, items, videoLibraryId = libraryId)) }
     }
 
@@ -3910,11 +3899,7 @@ class XMBViewModel @Inject constructor(
             // stamp decides whether Remove from Recent is offered at all.
             val onShelf = runCatching { bookRepository.getBook(bookId) }
                 .getOrNull()?.lastOpenedAt != null
-            val items = buildList {
-                add(XMBContextMenuItem("book_open", "Read"))
-                if (onShelf) add(XMBContextMenuItem("book_remove_recent", "Remove from Recent"))
-                add(XMBContextMenuItem("book_remove", "Remove From Library", isDestructive = true))
-            }
+            val items = bookContextMenuItems(hasOpenStamp = onShelf)
             _uiState.update {
                 it.copy(activeContextMenu = XMBContextMenu(item.title, items, bookFileId = bookId))
             }
@@ -3952,11 +3937,7 @@ class XMBViewModel @Inject constructor(
     // Options for a single photo row. Viewing-related options (zoom, rotate, wallpaper) live in
     // the fullscreen viewer's own Options menu; the list row only opens/removes.
     private fun openPhotoFileContextMenu(photoId: String, title: String) {
-        val items = listOf(
-            XMBContextMenuItem("photo_open", "Open"),
-            XMBContextMenuItem("photo_set_wallpaper", "Set as Launcher Wallpaper"),
-            XMBContextMenuItem("photo_remove", "Remove From Library", isDestructive = true),
-        )
+        val items = photoFileContextMenuItems()
         _uiState.update { it.copy(activeContextMenu = XMBContextMenu(title, items, photoFileId = photoId)) }
     }
 
@@ -3971,11 +3952,7 @@ class XMBViewModel @Inject constructor(
 
     // Options for an Album card: open, scan, or manage (rename / change folder / remove) in Settings.
     private fun openPhotoLibraryContextMenu(libraryId: String, name: String) {
-        val items = listOf(
-            XMBContextMenuItem("photo_lib_open", "Open"),
-            XMBContextMenuItem("photo_lib_scan", "Scan Album"),
-            XMBContextMenuItem("photo_lib_manage", "Manage in Settings"),
-        )
+        val items = photoLibraryContextMenuItems()
         _uiState.update { it.copy(activeContextMenu = XMBContextMenu(name, items, photoLibraryId = libraryId)) }
     }
 
@@ -4532,10 +4509,7 @@ class XMBViewModel @Inject constructor(
             it.copy(
                 activeContextMenu = XMBContextMenu(
                     title = playback.track.displayTitle,
-                    items = listOf(
-                        XMBContextMenuItem("music_playpause", if (playback.isPlaying) "Pause" else "Resume"),
-                        XMBContextMenuItem("music_close", "Stop and Close"),
-                    ),
+                    items = nowPlayingContextMenuItems(playback.isPlaying),
                     musicTrackId = MUSIC_PLAYER_MENU_MARKER,
                 )
             )
@@ -4560,18 +4534,7 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch {
             val onShelf = runCatching { musicRepository.getTrack(trackId) }
                 .getOrNull()?.lastPlayedAt != null
-            val items = buildList {
-                add(XMBContextMenuItem("play", "Play"))
-                add(XMBContextMenuItem("play_background", "Play in Background"))
-                add(XMBContextMenuItem("add_to_playlist", "Add to Playlist"))
-                if (playlistId != null) {
-                    add(XMBContextMenuItem("remove_from_playlist", "Remove from this Playlist", isDestructive = true))
-                }
-                // Only for a track actually on the recents shelf, so the entry never appears on
-                // one that has never been played. Same rule as the game menu's copy.
-                if (onShelf) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent"))
-                add(XMBContextMenuItem("remove_track", "Remove From Library", isDestructive = true))
-            }
+            val items = musicTrackContextMenuItems(playlistId = playlistId, hasPlayStamp = onShelf)
             _uiState.update { it.copy(
                 activeContextMenu = XMBContextMenu(
                     title        = item.title,
@@ -4585,12 +4548,7 @@ class XMBViewModel @Inject constructor(
 
     // Options menu for a playlist row: open / rename / add tracks / delete.
     private fun openPlaylistRowContextMenu(playlistId: Long, name: String) {
-        val items = listOf(
-            XMBContextMenuItem("open_playlist", "Open"),
-            XMBContextMenuItem("add_tracks", "Add Tracks"),
-            XMBContextMenuItem("rename_playlist", "Rename Playlist"),
-            XMBContextMenuItem("delete_playlist", "Delete Playlist", isDestructive = true),
-        )
+        val items = playlistRowContextMenuItems()
         _uiState.update { it.copy(activeContextMenu = XMBContextMenu(name, items, playlistId = playlistId)) }
     }
 
@@ -5923,25 +5881,11 @@ class XMBViewModel @Inject constructor(
 
     private fun openPlatformContextMenu(platformId: String) {
         val card = enabledCards.firstOrNull { it.platformId == platformId } ?: return
-        val isAndroid = platformId == ANDROID_PLATFORM_ID
-        val items = buildList {
-            // Android libraries pick installed apps; consoles scan ROM folders.
-            if (isAndroid) add(XMBContextMenuItem("find_games", "Find Games"))
-            else           add(XMBContextMenuItem("scan_roms",  "Scan This Console"))
-            // The Windows card is import-driven — surface its Import PC Games section here too.
-            if (platformId == "windows") add(XMBContextMenuItem("import_pc_games", "Import PC Games"))
-            add(XMBContextMenuItem("update_metadata",        "Update Metadata"))
-            add(XMBContextMenuItem("scrape_missing_artwork", "Scrape Missing Artwork"))
-            // Icon display for THIS console only. Games on other Memory Cards are untouched;
-            // "Use Global Setting" here clears the console's override.
-            add(XMBContextMenuItem("icon_display_platform", "Icon Display (${platformIconDisplayLabel(platformId)})"))
-            if (card.pinned) add(XMBContextMenuItem("unpin", "Unpin"))
-            else             add(XMBContextMenuItem("pin",   "Pin To Top"))
-            add(XMBContextMenuItem("library_manager",  "Open in Library Manager"))
-            add(XMBContextMenuItem("hide",             "Hide From Games"))
-            // The Windows Memory Card is managed by the PC import system and cannot be removed.
-            if (platformId != "windows") add(XMBContextMenuItem("remove", "Remove Memory Card", isDestructive = true))
-        }
+        val items = platformContextMenuItems(
+            platformId = platformId,
+            pinned = card.pinned,
+            iconDisplayLabel = platformIconDisplayLabel(platformId),
+        )
 
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
@@ -5957,12 +5901,7 @@ class XMBViewModel @Inject constructor(
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
                 title      = "All Games",
-                items      = listOf(
-                    // Scanning (missing-ROM pass, full re-scan) lives in the Library settings.
-                    XMBContextMenuItem("library_manager", "Manage Library"),
-                    XMBContextMenuItem("import_pc_games", "Import PC Games"),
-                    XMBContextMenuItem("icon_display_global", "Icon Display (${it.iconDisplayMode.label})"),
-                ),
+                items      = allGamesContextMenuItems(it.iconDisplayMode.label),
                 isAllGames = true,
             )
         )}
@@ -6114,17 +6053,10 @@ class XMBViewModel @Inject constructor(
         // Move is only meaningful when there's another category of the same kind to move into
         // (game collections move between gaming categories, app collections between app ones).
         val hasOtherCategory = collectionMoveTargets(collection.categoryId).isNotEmpty()
-        val items = buildList {
-            add(XMBContextMenuItem("open_collection",   "Open"))
-            add(XMBContextMenuItem("rename_collection", "Rename Collection"))
-            if (hasOtherCategory) add(XMBContextMenuItem("move_collection_category", "Move to Category"))
-            add(XMBContextMenuItem(
-                if (collection.isPinned) "unpin_collection" else "pin_collection",
-                if (collection.isPinned) "Unpin" else "Pin",
-            ))
-            add(XMBContextMenuItem("manage_collections", "Manage Collections"))
-            add(XMBContextMenuItem("delete_collection",  "Delete Collection", isDestructive = true))
-        }
+        val items = collectionRowContextMenuItems(
+            isPinned = collection.isPinned,
+            hasOtherCategory = hasOtherCategory,
+        )
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
                 title           = collection.name,
@@ -9243,7 +9175,6 @@ class XMBViewModel @Inject constructor(
         // library, so they use this id instead of "android" to stay out of observeByPlatform.
         private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
         // Virtual card holding PC-launcher game imports (harvest / folder scan / add-by-ID).
-        internal const val WINDOWS_PLATFORM_ID = "windows"
 
         // Music category synthetic rows / drill ids.
         private const val ADD_MUSIC_FOLDER_ITEM_ID = "add_music_folder"

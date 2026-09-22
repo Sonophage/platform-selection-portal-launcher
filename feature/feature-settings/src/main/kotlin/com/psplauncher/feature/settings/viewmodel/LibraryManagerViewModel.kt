@@ -1,5 +1,7 @@
 package com.psplauncher.feature.settings.viewmodel
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -42,7 +44,6 @@ const val ADD_CONSOLE_FOCUS_KEY = "add_console"
 
 // Platform whose library is built from installed apps (picker) rather than a ROM folder.
 private const val ANDROID_PLATFORM_ID = "android"
-private const val WINDOWS_PLATFORM_ID = "windows"
 private const val PSVITA_PLATFORM_ID = "psvita"
 
 private const val INVALID_GAME_ID_MESSAGE =

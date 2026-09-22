@@ -1,5 +1,7 @@
 package com.psplauncher.feature.settings.pc
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import com.psplauncher.core.data.database.entity.ArtworkRecordEntity
 import com.psplauncher.core.data.model.StorefrontIdentity
 import com.psplauncher.core.domain.model.Game
@@ -7,7 +9,6 @@ import com.psplauncher.core.domain.model.GameContentType
 import com.psplauncher.feature.artwork.portable.ArtworkIdentityIndex
 import com.psplauncher.feature.launcher.PcLauncherCatalog
 
-private const val WINDOWS_PLATFORM_ID = "windows"
 
 /** The keys a Windows game is recognised by, shared by Export Manual Games and the import. */
 internal object WindowsGameKeys {

@@ -185,7 +185,8 @@ class WindowsLibrarySetup @Inject constructor(
     }
 
     companion object {
-        const val PLATFORM_ID = "windows"
+        /** The one definition lives in core-domain; this is the name this class's callers use. */
+        const val PLATFORM_ID = com.psplauncher.core.domain.model.PlatformIds.WINDOWS
         const val DISPLAY_NAME = "Windows Memory Card"
         // The card's default name before the rename — existing installs migrate in [ensure].
         private const val LEGACY_DISPLAY_NAME = "Windows Games"

@@ -3,6 +3,7 @@ package com.psplauncher.feature.xmb.viewmodel
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.HideLocationType
+import com.psplauncher.core.domain.model.PlatformIds
 
 /**
  * What every context menu contains, as pure functions of the state that was on screen when it
@@ -76,7 +77,7 @@ internal fun gameContextMenuItems(
         // Multi-disc sets: pick which disc to boot — the only way to reach a non-primary disc when
         // direct launch skips Game Detail's picker. Launches the chosen disc.
         if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))
-        if (item.platformId == XMBViewModel.WINDOWS_PLATFORM_ID) {
+        if (item.platformId == PlatformIds.WINDOWS) {
             // Writes this game's .pfpgame file so a fresh install can bring it back with its
             // artwork. Offered on every PC game; the exporter explains a refusal.
             add(XMBContextMenuItem("export_game", "Export Game"))
@@ -172,4 +173,173 @@ internal fun appContextMenuItems(
     }
     add(XMBContextMenuItem("hide_everywhere", "Hide Everywhere"))
     add(XMBContextMenuItem("rename", "Rename Shortcut"))
+}
+
+// ── Video ─────────────────────────────────────────────────────────────────────
+
+/**
+ * A single video file's options.
+ *
+ * Takes the [com.psplauncher.core.domain.model.Video] rather than an id because three of its rows
+ * are decided by the record: a resume point, a favourite flag, and a watch stamp. The ViewModel
+ * fetches it first for exactly that reason.
+ */
+internal fun videoFileContextMenuItems(
+    isFavorite: Boolean,
+    resumePositionMs: Long,
+    hasWatchStamp: Boolean,
+    inPlaylist: Boolean,
+): List<XMBContextMenuItem> = buildList {
+    add(XMBContextMenuItem("video_play", "Play"))
+    if (resumePositionMs > 0) add(XMBContextMenuItem("video_resume", "Resume"))
+    add(XMBContextMenuItem("video_favorite", if (isFavorite) "Remove from Favorites" else "Add to Favorites"))
+    add(XMBContextMenuItem("video_add_playlist", "Add to Playlist"))
+    if (inPlaylist) {
+        add(XMBContextMenuItem("video_remove_playlist", "Remove from this Playlist", isDestructive = true))
+    }
+    add(XMBContextMenuItem("video_details", "Details"))
+    // Only for a video that has actually been watched, so the row never appears on one that has
+    // never been opened. Same rule as the game, book and track menus.
+    if (hasWatchStamp) add(XMBContextMenuItem("video_remove_recent", "Remove from Recent"))
+    add(XMBContextMenuItem("video_remove", "Remove From Library", isDestructive = true))
+}
+
+/** A video library card: open, or go and manage it. */
+internal fun videoLibraryContextMenuItems(): List<XMBContextMenuItem> = listOf(
+    XMBContextMenuItem("video_lib_open", "Open"),
+    XMBContextMenuItem("video_lib_manage", "Manage in Settings"),
+)
+
+/** A video playlist row. */
+internal fun videoPlaylistContextMenuItems(): List<XMBContextMenuItem> = listOf(
+    XMBContextMenuItem("open_video_playlist", "Open"),
+    XMBContextMenuItem("rename_video_playlist", "Rename Playlist"),
+    XMBContextMenuItem("delete_video_playlist", "Delete Playlist", isDestructive = true),
+)
+
+// ── Photo ─────────────────────────────────────────────────────────────────────
+
+/**
+ * A photo row.
+ *
+ * Viewing actions (zoom, rotate) live in the fullscreen viewer's own menu; the list row only opens,
+ * sets a wallpaper, or removes.
+ */
+internal fun photoFileContextMenuItems(): List<XMBContextMenuItem> = listOf(
+    XMBContextMenuItem("photo_open", "Open"),
+    XMBContextMenuItem("photo_set_wallpaper", "Set as Launcher Wallpaper"),
+    XMBContextMenuItem("photo_remove", "Remove From Library", isDestructive = true),
+)
+
+/** An album card. */
+internal fun photoLibraryContextMenuItems(): List<XMBContextMenuItem> = listOf(
+    XMBContextMenuItem("photo_lib_open", "Open"),
+    XMBContextMenuItem("photo_lib_scan", "Scan Album"),
+    XMBContextMenuItem("photo_lib_manage", "Manage in Settings"),
+)
+
+// ── Books ─────────────────────────────────────────────────────────────────────
+
+/** A book. [hasOpenStamp] is what decides whether it is on the recents shelf to be taken off. */
+internal fun bookContextMenuItems(hasOpenStamp: Boolean): List<XMBContextMenuItem> = buildList {
+    add(XMBContextMenuItem("book_open", "Read"))
+    if (hasOpenStamp) add(XMBContextMenuItem("book_remove_recent", "Remove from Recent"))
+    add(XMBContextMenuItem("book_remove", "Remove From Library", isDestructive = true))
+}
+
+// ── Music ─────────────────────────────────────────────────────────────────────
+
+/**
+ * A track. [playlistId] non-null means the track is being seen from inside a playlist, which is
+ * the only place it can be removed from one.
+ */
+internal fun musicTrackContextMenuItems(
+    playlistId: Long?,
+    hasPlayStamp: Boolean,
+): List<XMBContextMenuItem> = buildList {
+    add(XMBContextMenuItem("play", "Play"))
+    add(XMBContextMenuItem("play_background", "Play in Background"))
+    add(XMBContextMenuItem("add_to_playlist", "Add to Playlist"))
+    if (playlistId != null) {
+        add(XMBContextMenuItem("remove_from_playlist", "Remove from this Playlist", isDestructive = true))
+    }
+    if (hasPlayStamp) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent"))
+    add(XMBContextMenuItem("remove_track", "Remove From Library", isDestructive = true))
+}
+
+/** A music playlist row. */
+internal fun playlistRowContextMenuItems(): List<XMBContextMenuItem> = listOf(
+    XMBContextMenuItem("open_playlist", "Open"),
+    XMBContextMenuItem("add_tracks", "Add Tracks"),
+    XMBContextMenuItem("rename_playlist", "Rename Playlist"),
+    XMBContextMenuItem("delete_playlist", "Delete Playlist", isDestructive = true),
+)
+
+/** The player's own menu, while something is playing. */
+internal fun nowPlayingContextMenuItems(isPlaying: Boolean): List<XMBContextMenuItem> = listOf(
+    XMBContextMenuItem("music_playpause", if (isPlaying) "Pause" else "Resume"),
+    XMBContextMenuItem("music_close", "Stop and Close"),
+)
+
+// ── Cards ─────────────────────────────────────────────────────────────────────
+
+/**
+ * A Memory Card's options.
+ *
+ * [iconDisplayLabel] is rendered into a row label, so it is passed already resolved — the card's
+ * own override or the global mode it is following, which is a ViewModel lookup.
+ */
+internal fun platformContextMenuItems(
+    platformId: String,
+    pinned: Boolean,
+    iconDisplayLabel: String,
+): List<XMBContextMenuItem> = buildList {
+    // Android libraries pick installed apps; consoles scan ROM folders.
+    if (platformId == XMBViewModel.ANDROID_PLATFORM_ID) add(XMBContextMenuItem("find_games", "Find Games"))
+    else add(XMBContextMenuItem("scan_roms", "Scan This Console"))
+    // The Windows card is import-driven — surface its Import PC Games section here too.
+    if (platformId == PlatformIds.WINDOWS) {
+        add(XMBContextMenuItem("import_pc_games", "Import PC Games"))
+    }
+    add(XMBContextMenuItem("update_metadata", "Update Metadata"))
+    add(XMBContextMenuItem("scrape_missing_artwork", "Scrape Missing Artwork"))
+    // Icon display for THIS console only. Games on other Memory Cards are untouched; "Use Global
+    // Setting" here clears the console's override.
+    add(XMBContextMenuItem("icon_display_platform", "Icon Display ($iconDisplayLabel)"))
+    if (pinned) add(XMBContextMenuItem("unpin", "Unpin")) else add(XMBContextMenuItem("pin", "Pin To Top"))
+    add(XMBContextMenuItem("library_manager", "Open in Library Manager"))
+    add(XMBContextMenuItem("hide", "Hide From Games"))
+    // The Windows Memory Card is managed by the PC import system and cannot be removed.
+    if (platformId != PlatformIds.WINDOWS) {
+        add(XMBContextMenuItem("remove", "Remove Memory Card", isDestructive = true))
+    }
+}
+
+/** The All Games card is not a real Memory Card, so it gets its own slim menu. */
+internal fun allGamesContextMenuItems(iconDisplayLabel: String): List<XMBContextMenuItem> = listOf(
+    // Scanning (missing-ROM pass, full re-scan) lives in the Library settings.
+    XMBContextMenuItem("library_manager", "Manage Library"),
+    XMBContextMenuItem("import_pc_games", "Import PC Games"),
+    XMBContextMenuItem("icon_display_global", "Icon Display ($iconDisplayLabel)"),
+)
+
+/**
+ * A collection row. [hasOtherCategory] is whether anywhere valid exists to move it to — game
+ * collections move between gaming categories, app collections between app ones.
+ */
+internal fun collectionRowContextMenuItems(
+    isPinned: Boolean,
+    hasOtherCategory: Boolean,
+): List<XMBContextMenuItem> = buildList {
+    add(XMBContextMenuItem("open_collection", "Open"))
+    add(XMBContextMenuItem("rename_collection", "Rename Collection"))
+    if (hasOtherCategory) add(XMBContextMenuItem("move_collection_category", "Move to Category"))
+    add(
+        XMBContextMenuItem(
+            if (isPinned) "unpin_collection" else "pin_collection",
+            if (isPinned) "Unpin" else "Pin",
+        ),
+    )
+    add(XMBContextMenuItem("manage_collections", "Manage Collections"))
+    add(XMBContextMenuItem("delete_collection", "Delete Collection", isDestructive = true))
 }

@@ -4,6 +4,7 @@ import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.CategoryType
 import com.psplauncher.core.domain.model.HideLocationType
+import com.psplauncher.core.domain.model.PlatformIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -224,6 +225,94 @@ class ContextMenusTest {
         val s = state()
         assertEquals("Music Apps", s.categoryDisplayNameOf(XMBViewModel.MUSIC_APPS_CATEGORY_ID))
         assertEquals("Video Apps", s.categoryDisplayNameOf(XMBViewModel.VIDEO_APPS_CATEGORY_ID))
+    }
+
+    // ── The media menus ───────────────────────────────────────────────────
+
+    @Test
+    fun `recent removal is offered only where there is a stamp to clear`() {
+        // Four media, one rule: a row that has never been opened is not on the shelf, so offering
+        // to take it off is a row that does nothing. Each menu implements this separately, which
+        // is exactly why it is worth asserting together.
+        assertFalse("book_remove_recent" in ids(bookContextMenuItems(hasOpenStamp = false)))
+        assertTrue("book_remove_recent" in ids(bookContextMenuItems(hasOpenStamp = true)))
+
+        assertFalse("remove_from_recent" in ids(musicTrackContextMenuItems(null, hasPlayStamp = false)))
+        assertTrue("remove_from_recent" in ids(musicTrackContextMenuItems(null, hasPlayStamp = true)))
+
+        assertFalse(
+            "video_remove_recent" in
+                ids(videoFileContextMenuItems(false, 0L, hasWatchStamp = false, inPlaylist = false)),
+        )
+        assertTrue(
+            "video_remove_recent" in
+                ids(videoFileContextMenuItems(false, 0L, hasWatchStamp = true, inPlaylist = false)),
+        )
+    }
+
+    @Test
+    fun `resume appears only when there is somewhere to resume to`() {
+        assertFalse("video_resume" in ids(videoFileContextMenuItems(false, 0L, false, false)))
+        assertTrue("video_resume" in ids(videoFileContextMenuItems(false, 90_000L, false, false)))
+    }
+
+    @Test
+    fun `removing from a playlist is offered only from inside one`() {
+        assertFalse("video_remove_playlist" in ids(videoFileContextMenuItems(false, 0L, false, inPlaylist = false)))
+        assertTrue("video_remove_playlist" in ids(videoFileContextMenuItems(false, 0L, false, inPlaylist = true)))
+
+        assertFalse("remove_from_playlist" in ids(musicTrackContextMenuItems(playlistId = null, hasPlayStamp = false)))
+        assertTrue("remove_from_playlist" in ids(musicTrackContextMenuItems(playlistId = 3L, hasPlayStamp = false)))
+    }
+
+    @Test
+    fun `the now playing menu says what the button will do, not what is happening`() {
+        assertEquals("Pause", nowPlayingContextMenuItems(isPlaying = true).first().label)
+        assertEquals("Resume", nowPlayingContextMenuItems(isPlaying = false).first().label)
+    }
+
+    // ── Cards ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun `the windows card cannot be removed and offers its importer`() {
+        // It is managed by the PC import system: removing the card would orphan every imported
+        // game, and the import section is the only way to put more in it.
+        val windows = ids(platformContextMenuItems(PlatformIds.WINDOWS, false, "Global: Icon"))
+        assertTrue("import_pc_games" in windows)
+        assertFalse("remove" in windows)
+
+        val console = ids(platformContextMenuItems("psp", false, "Global: Icon"))
+        assertFalse("import_pc_games" in console)
+        assertTrue("remove" in console)
+    }
+
+    @Test
+    fun `android libraries find apps where consoles scan folders`() {
+        val android = ids(platformContextMenuItems(XMBViewModel.ANDROID_PLATFORM_ID, false, "Global: Icon"))
+        assertTrue("find_games" in android)
+        assertFalse("scan_roms" in android)
+
+        val console = ids(platformContextMenuItems("psp", false, "Global: Icon"))
+        assertTrue("scan_roms" in console)
+        assertFalse("find_games" in console)
+    }
+
+    @Test
+    fun `pin flips to unpin on a pinned card`() {
+        assertTrue("pin" in ids(platformContextMenuItems("psp", pinned = false, "Global: Icon")))
+        assertTrue("unpin" in ids(platformContextMenuItems("psp", pinned = true, "Global: Icon")))
+    }
+
+    @Test
+    fun `a collection can only be moved when somewhere valid exists`() {
+        assertFalse(
+            "move_collection_category" in
+                ids(collectionRowContextMenuItems(isPinned = false, hasOtherCategory = false)),
+        )
+        assertTrue(
+            "move_collection_category" in
+                ids(collectionRowContextMenuItems(isPinned = false, hasOtherCategory = true)),
+        )
     }
 
     // ── No duplicates anywhere ────────────────────────────────────────────

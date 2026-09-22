@@ -1,5 +1,7 @@
 package com.psplauncher.feature.xmb.ui.detail
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -339,7 +341,6 @@ private const val EDIT_SECTION = "Edit"
 private const val PLAY_SECTION = "Play"
 private const val FILE_SECTION = "File"
 
-private const val WINDOWS_PLATFORM_ID = "windows"
 
 /**
  * The picker id that means "no per-game override". Same string the XMB context menu writes

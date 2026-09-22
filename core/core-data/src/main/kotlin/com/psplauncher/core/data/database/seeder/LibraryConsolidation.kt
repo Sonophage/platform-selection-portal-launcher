@@ -1,5 +1,7 @@
 package com.psplauncher.core.data.database.seeder
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -18,7 +20,6 @@ import javax.inject.Singleton
 
 private val KEY_LIBRARY_CONSOLIDATED_V22 = booleanPreferencesKey("library_consolidated_v22")
 
-private const val WINDOWS_PLATFORM_ID = "windows"
 private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
 
 // GameHub-family spoof packages: these are the genuine package names of real apps (AnTuTu, PUBG

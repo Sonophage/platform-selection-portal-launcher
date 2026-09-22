@@ -1,5 +1,7 @@
 package com.psplauncher.feature.launcher
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
@@ -227,7 +229,6 @@ class PcShortcutImporter @Inject constructor(
     }
 
     private companion object {
-        const val WINDOWS_PLATFORM_ID = "windows"
 
         // GameNative encodes the store appid in its shortcut ids: game_<appid>.
         val GAME_NATIVE_ID = Regex("""game_(\d{1,12})""")

@@ -1,5 +1,7 @@
 package com.psplauncher.feature.settings.pc
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import com.psplauncher.core.data.model.IntentUriExtras
 import com.psplauncher.core.data.model.StorefrontIdentity
 import com.psplauncher.core.domain.model.Game
@@ -23,7 +25,6 @@ data class ManualGameExportSelection(
  */
 object ManualGameExportSelector {
 
-    private const val WINDOWS_PLATFORM_ID = "windows"
 
     /**
      * @param windowsGames the library's Windows games.

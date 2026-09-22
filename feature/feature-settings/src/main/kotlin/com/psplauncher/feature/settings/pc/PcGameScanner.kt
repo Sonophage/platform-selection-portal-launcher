@@ -1,5 +1,7 @@
 package com.psplauncher.feature.settings.pc
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -436,6 +438,5 @@ class PcGameScanner @Inject constructor(
     }
 
     private companion object {
-        const val WINDOWS_PLATFORM_ID = "windows"
     }
 }

@@ -1,5 +1,7 @@
 package com.psplauncher.feature.settings.pc
 
+import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
+
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -299,7 +301,6 @@ class PcGameExporter @Inject constructor(
     }
 
     private companion object {
-        const val WINDOWS_PLATFORM_ID = "windows"
         const val MIME_BINARY = "application/octet-stream"
     }
 }
