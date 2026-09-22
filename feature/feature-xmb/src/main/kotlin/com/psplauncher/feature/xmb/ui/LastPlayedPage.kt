@@ -120,19 +120,24 @@ fun LastPlayedPage(
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 Spacer(Modifier.height(10.dp))
                 if (content != null) {
-                    DetailPanelStrip(
-                        pages = content.pages,
-                        current = page,
-                        onPageTapped = onPageTapped,
-                        modifier = Modifier.align(Alignment.End),
-                    )
-                    Spacer(Modifier.height(8.dp))
                     GameDetailPanel(
                         content = content,
                         page = page,
                         // No row label anywhere on this page, so a logo-less game is named here.
                         titleFallback = true,
                         modifier = Modifier.fillMaxWidth().weight(1f),
+                    )
+                    // The tabs sit UNDER what they are switching, centred, between the title and
+                    // the Play legend -- the order the reference stacks them in. They used to be
+                    // pinned to the top-right corner, which put the row that says "there is more
+                    // to see" as far from the thing it changes as the page allows, and made it
+                    // read as chrome belonging to the status bar above it.
+                    Spacer(Modifier.height(10.dp))
+                    DetailPanelStrip(
+                        pages = content.pages,
+                        current = page,
+                        onPageTapped = onPageTapped,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
                     // Where the RECENT badge used to be. The badge said what the column already
                     // says; this does something. Never focused — the cursor lives in the card
