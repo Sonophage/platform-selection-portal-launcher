@@ -24,7 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -277,7 +277,7 @@ private fun BrowserLeading(row: XMBItem) {
         }
         row.type == XMBItemType.PLAYLIST -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Filled.QueueMusic, contentDescription = null, tint = SecondaryText, modifier = Modifier.size(30.dp))
+                Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = SecondaryText, modifier = Modifier.size(30.dp))
             }
         }
         else -> {

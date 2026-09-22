@@ -39,9 +39,6 @@ enum class VideoDetailAction(val label: String) {
 // One playlist choice in the "Add to Playlist" picker; checked = the video is already a member.
 data class VideoPlaylistOption(val id: Long, val name: String, val checked: Boolean)
 
-// Shown while an external player is being launched (themed overlay), until PFP regains focus.
-data class ExternalLaunch(val thumbnailUri: String?, val playerLabel: String)
-
 data class VideoDetailUiState(
     val video: Video? = null,
     val siblings: List<Video> = emptyList(),
@@ -67,7 +64,16 @@ data class VideoDetailUiState(
     val playing: Boolean = false,
     val playStartPositionMs: Long = 0,
     // External-player hand-off: overlay while launching, and a hard error dialog on failure.
-    val externalLaunch: ExternalLaunch? = null,
+    /**
+     * True from the moment a film is handed to an external player until PFP has the screen again.
+     *
+     * A data class carrying the thumbnail and the player's name, because it used to drive a themed
+     * "Launching…" card. The launch disc replaced that card and nothing read either field any more
+     * — including the PackageManager lookup that produced the name, which was work done on every
+     * launch for a string with no reader. What is left is the one thing it is still for: input is
+     * swallowed while it is true, and the return path knows a hand-off happened.
+     */
+    val handedOffToPlayer: Boolean = false,
     val launchError: String? = null,
     val closed: Boolean = false,
 ) {
@@ -124,7 +130,7 @@ class VideoDetailViewModel @Inject constructor(
     fun handleGamepadAction(action: GamepadAction) {
         val s = _uiState.value
         // The launch overlay swallows input; a launch error dialog dismisses on A/B.
-        if (s.externalLaunch != null) return
+        if (s.handedOffToPlayer) return
         if (s.launchError != null) {
             if (action == GamepadAction.SELECT || action == GamepadAction.BACK) dismissLaunchError()
             return
@@ -280,10 +286,7 @@ class VideoDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(showOptions = false, launchError = err) }
                 return@launch
             }
-            val label = if (ask) "an external player" else (intentResolver.playerLabel(pref) ?: "external player")
-            _uiState.update {
-                it.copy(showOptions = false, externalLaunch = ExternalLaunch(video.effectiveThumbnailUri, label))
-            }
+            _uiState.update { it.copy(showOptions = false, handedOffToPlayer = true) }
             // Best-effort: record that it was opened now so it appears under Recently Watched.
             markWatchedExternally(video)
             // The disc, exactly as a book or a track gets one — drawn by the XMB shell, which sits
@@ -292,15 +295,15 @@ class VideoDetailViewModel @Inject constructor(
             // open never shows a ceremony, the same rule the game path follows.
             mediaLaunchGate.awaitHandOff(video.effectiveThumbnailUri)
             val err = if (ask) intentResolver.launchChooser(video) else intentResolver.launch(video, pref)
-            if (err != null) _uiState.update { it.copy(externalLaunch = null, launchError = err) }
+            if (err != null) _uiState.update { it.copy(handedOffToPlayer = false, launchError = err) }
         }
     }
 
     // Called when PFP regains focus after an external launch: drop the overlay and refresh just this
     // video's metadata (resume / last-watched) — no library rescan, no focus/scroll reset.
     fun onReturnedFromExternal() {
-        if (_uiState.value.externalLaunch == null) return
-        _uiState.update { it.copy(externalLaunch = null) }
+        if (!_uiState.value.handedOffToPlayer) return
+        _uiState.update { it.copy(handedOffToPlayer = false) }
         val id = _uiState.value.video?.id ?: return
         viewModelScope.launch {
             val fresh = videoRepository.getVideo(id)
@@ -309,7 +312,7 @@ class VideoDetailViewModel @Inject constructor(
     }
 
     // Defensive: if the hand-off never backgrounded us (rare), clear the overlay so it can't stick.
-    fun clearExternalOverlay() = _uiState.update { it.copy(externalLaunch = null) }
+    fun clearExternalOverlay() = _uiState.update { it.copy(handedOffToPlayer = false) }
 
     fun dismissLaunchError() = _uiState.update { it.copy(launchError = null) }
 

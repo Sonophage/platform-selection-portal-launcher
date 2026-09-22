@@ -3,11 +3,15 @@ package com.psplauncher.core.domain.model
 /**
  * The settings tree, in one place, as plain data.
  *
- * Two modules need it and neither may depend on the other: feature-xmb builds the crossbar's
- * Settings column from it, and feature-settings draws the section rail down the left of every
- * settings screen from it. Before this existed the tree lived in XMBViewModel, so the rail would
- * have had to carry a second copy — a list and its mirror, where only the original is ever
- * updated.
+ * Two modules need it and neither may depend on the other: feature-settings draws the section rail
+ * down the left of every settings screen from it, and feature-xmb reads it to decide where the
+ * crossbar's Settings row lands and which section a screen belongs to. Before this existed the
+ * tree lived in XMBViewModel, so the rail would have had to carry a second copy — a list and its
+ * mirror, where only the original is ever updated.
+ *
+ * The crossbar column itself is NOT built from this any more. It is two fixed rows
+ * (XMBViewModel.SETTINGS_ROOT_ITEMS): Settings, which opens [SETTINGS_CATALOG].first(), and
+ * Android Settings, which is not one of these screens at all.
  *
  * Deliberately Kotlin data and not a resource or a database: the tree is code, it changes when
  * screens are added, and the compiler is the thing that should notice.
@@ -16,6 +20,14 @@ enum class SettingsSectionId(
     /** The crossbar row's own id. Distinct from every screen id: the two are routed differently. */
     val id: String,
     val title: String,
+    /**
+     * What the section covers.
+     *
+     * Currently unrendered: the rail draws [title] alone. Kept because it is the description a
+     * search or a subtitled rail would need, and because writing it once per section is how it
+     * stays honest — but nothing displays it today, so treat it as documentation until something
+     * does.
+     */
     val subtitle: String,
 ) {
     // FIRST in the enum, because settingsRailRows walks the enum: this is the rail's top group,
@@ -30,7 +42,11 @@ enum class SettingsSectionId(
     SYSTEM("settings_section_system", "System", "About, logs, backup, setup & credits"),
 }
 
-/** One settings screen: what opens it, what it is called, and which section it belongs to. */
+/**
+ * One settings screen: what opens it, what it is called, and which section it belongs to.
+ *
+ * [subtitle] has no reader today — see [SettingsSectionId.subtitle].
+ */
 data class SettingsEntry(
     val id: String,
     val title: String,

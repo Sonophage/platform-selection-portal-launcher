@@ -139,8 +139,8 @@ fun VideoDetailScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     // Defensive timeout: if the hand-off never backgrounded us, don't let the overlay stick.
-    LaunchedEffect(state.externalLaunch) {
-        if (state.externalLaunch != null) {
+    LaunchedEffect(state.handedOffToPlayer) {
+        if (state.handedOffToPlayer) {
             kotlinx.coroutines.delay(8000)
             viewModel.clearExternalOverlay()
         }
@@ -319,8 +319,8 @@ fun VideoDetailScreen(
         // than redundant, because the disc fades out to reveal what is behind it and what was
         // behind it was the spinner rather than the player.
         //
-        // state.externalLaunch stays: it is still the "we handed off" flag that onReturnedFromExternal
-        // reads. It simply no longer draws anything.
+        // state.handedOffToPlayer stays: it is still the "we handed off" flag that
+        // onReturnedFromExternal reads. It simply no longer draws anything.
 
         // Fullscreen player overlay.
         if (state.playing) {

@@ -5879,11 +5879,16 @@ class XMBViewModel @Inject constructor(
             // Searches everything, from anywhere on the home screen. The per-library Search rows
             // are the same overlay with a narrower scope.
             GamepadAction.OPEN_SEARCH -> openSearch(SearchScope.ALL)
-            // CHANGE_SORT is deliberately NOT repeated here. It is handled above, and Kotlin takes
-            // the first matching branch, so a second mention was dead — and the kind of dead that
-            // bites, because the next person to change sort behaviour has two places to find and
-            // only one that runs.
-            GamepadAction.OPEN_CONTEXT_MENU -> Unit
+            // CHANGE_SORT and OPEN_CONTEXT_MENU are deliberately NOT repeated here. Both are
+            // handled above, and Kotlin takes the first matching branch, so a second mention is
+            // dead — and the kind of dead that bites, because the next person to change one of
+            // them has two places to find and only one that runs.
+            //
+            // OPEN_CONTEXT_MENU was in fact still repeated below this very comment, as `-> Unit`,
+            // for as long as the comment has existed: an unreachable branch that read as "the
+            // context menu does nothing at the crossbar root" while the real handler thirty lines
+            // up opened it. The compiler had been saying so the whole time — `Duplicate branch
+            // condition in 'when'` — which is the argument for reading the warnings.
             // The shoulders were dead on the crossbar root. They now walk the hover panel in the
             // logo region. No conflict to resolve: nothing else on this screen claimed them.
             GamepadAction.PREV_CATEGORY -> stepHoverPanelPage(-1)

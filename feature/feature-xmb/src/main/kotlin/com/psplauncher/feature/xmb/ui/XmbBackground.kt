@@ -99,12 +99,12 @@ fun XmbBackground(
     Box(modifier.fillMaxSize()) {
         when {
             motionPlaying -> MotionWallpaperBackground(
-                posterPath = customWallpaperPath!!,
-                motionPath = motionWallpaperPath!!,
+                posterPath = customWallpaperPath,
+                motionPath = motionWallpaperPath,
                 decision = motionDecision,
                 modifier = Modifier.fillMaxSize(),
             )
-            hasWallpaper -> WallpaperBackground(customWallpaperPath!!, Modifier.fillMaxSize())
+            hasWallpaper -> WallpaperBackground(customWallpaperPath, Modifier.fillMaxSize())
             else -> WaveBackground(waveStyle, Modifier.fillMaxSize())
         }
 

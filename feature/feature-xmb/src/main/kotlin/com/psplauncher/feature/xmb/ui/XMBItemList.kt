@@ -44,7 +44,7 @@ import androidx.compose.material.icons.filled.ImportContacts
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Headset
-import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Link
@@ -58,7 +58,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCode2
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
@@ -334,7 +334,7 @@ private fun SiblingIcon(item: XMBItem, selected: Boolean, solidUnfocusedIcons: B
         // Missing takes the vector path rather than console art: there is no sysicon for it, and
         // the console fallback is the blank sysicon_default. Same "?" glyph the Untracked row in
         // both meaning "we know about this entry but can't account for it".
-        XMBItemType.MISSING         -> Icons.Filled.HelpOutline
+        XMBItemType.MISSING         -> Icons.AutoMirrored.Filled.HelpOutline
         XMBItemType.VIDEO_FOLDER    -> Icons.Filled.Folder
         XMBItemType.VIDEO_LIBRARY   -> Icons.Filled.VideoLibrary
         XMBItemType.VIDEO_RECENT      -> Icons.Filled.History
@@ -344,7 +344,7 @@ private fun SiblingIcon(item: XMBItem, selected: Boolean, solidUnfocusedIcons: B
         XMBItemType.PHOTO_ALBUMS    -> Icons.Filled.PhotoLibrary
         XMBItemType.SEARCH          -> Icons.Filled.Search
         // The video "Playlists" section row (PLAYLIST type with no playlistId) uses a playlist glyph.
-        XMBItemType.PLAYLIST        -> Icons.Filled.QueueMusic
+        XMBItemType.PLAYLIST        -> Icons.AutoMirrored.Filled.QueueMusic
         else                        -> null
     }
     Box(
@@ -776,7 +776,7 @@ private fun XmbItemLeadingIcon(
             ) {
                 ThemedGlyph(
                     slotKey = itemSlotKeyFor(item.type) ?: "",
-                    defaultVector = Icons.Filled.QueueMusic,
+                    defaultVector = Icons.AutoMirrored.Filled.QueueMusic,
                     contentDescription = null,
                     tint = iconTint,
                     modifier = Modifier.size(48.dp),
@@ -983,7 +983,7 @@ private fun XmbItemLeadingIcon(
                 ) {
                     ThemedGlyph(
                         itemSlotKeyFor(item.type) ?: "",
-                        Icons.Filled.HelpOutline,
+                        Icons.AutoMirrored.Filled.HelpOutline,
                         null,
                         iconTint,
                         Modifier.size(LEADING_ICON_SIZE),
