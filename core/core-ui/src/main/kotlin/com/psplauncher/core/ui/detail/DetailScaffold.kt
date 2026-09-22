@@ -86,6 +86,15 @@ internal val DetailFocusEdge: Color @Composable @ReadOnlyComposable get() = deta
 /** Resting fill: glass, so the page's colour reads through every button equally. */
 val DetailButtonRest = Color.White.copy(alpha = 0.13f)
 
+/**
+ * The resting fill for a COMPACT launch button — a sixth of the ordinary one.
+ *
+ * It is enough to hold the shape against artwork and not enough to read as a control. The
+ * compact form is used where the button is a legend for the pad, so a plate as solid as a real
+ * button's is the wrong promise.
+ */
+val DetailButtonRestCompact = Color.White.copy(alpha = 0.06f)
+
 /** Focused fill. Not pure white: pure white blooms against a dark page. */
 val DetailButtonFocusFill = Color(0xFFEDEDED)
 

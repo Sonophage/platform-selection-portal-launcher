@@ -74,9 +74,20 @@ fun PfpDetailLaunchButton(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = if (compact) 38.dp else 58.dp)
+            .defaultMinSize(minHeight = if (compact) 32.dp else 58.dp)
             .clip(shape)
-            .background(if (focused) DetailButtonFocusFill else fill)
+            // Compact resting state is nearly nothing. This form is a legend, and a legend with
+            // a solid plate behind it is a button -- which is exactly what it must not look like
+            // on a page where the cursor is somewhere else entirely. Enough tint to sit on
+            // artwork, not enough to be reached for. A caller that passes its own [fill] still
+            // gets it, compact or not.
+            .background(
+                when {
+                    focused -> DetailButtonFocusFill
+                    compact && fill == DetailButtonRest -> DetailButtonRestCompact
+                    else -> fill
+                }
+            )
             // The cursor's bright edge, AFTER the fill so it draws on top of it.
             //
             // The inverted fill alone is unmistakable on artwork, which is where this button was
@@ -93,8 +104,8 @@ fun PfpDetailLaunchButton(
             )
             .clickable(role = Role.Button, onClick = onClick)
             .padding(
-                vertical = if (compact) 8.dp else 15.dp,
-                horizontal = if (compact) 16.dp else 26.dp,
+                vertical = if (compact) 6.dp else 15.dp,
+                horizontal = if (compact) 12.dp else 26.dp,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {

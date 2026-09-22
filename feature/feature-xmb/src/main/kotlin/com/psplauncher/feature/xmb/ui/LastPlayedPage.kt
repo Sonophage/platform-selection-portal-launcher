@@ -150,7 +150,7 @@ fun LastPlayedPage(
                         onClick = { onCardTapped(selectedIndex) },
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
-                            .width(150.dp),
+                            .width(118.dp),
                     )
                 } else {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
