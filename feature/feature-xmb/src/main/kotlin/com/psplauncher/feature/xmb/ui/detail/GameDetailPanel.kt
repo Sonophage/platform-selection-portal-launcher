@@ -70,7 +70,15 @@ private fun DetailPanelPage.icon(): ImageVector = when (this) {
     DetailPanelPage.INFO -> Icons.Filled.Info
 }
 
-private val StripTabShape = RoundedCornerShape(4.dp)
+/**
+ * A pill, not a rounded rectangle.
+ *
+ * At 4dp with the padding it had, a tab read as a small BUTTON -- a box with a fill, competing
+ * with the Play legend a few rows down. A capsule with almost nothing in it reads as a tab: the
+ * outline is the whole shape, and the current one is said by a slightly brighter edge rather than
+ * by a panel.
+ */
+private val StripTabShape = RoundedCornerShape(percent = 50)
 private val StripTabGap: Dp = 6.dp
 private val StripShoulderSize: Dp = 13.dp
 private val PanelCardShape = RoundedCornerShape(14.dp)
@@ -116,20 +124,23 @@ fun DetailPanelStrip(
                     // Selected is a filled capsule; the rest are outlines. One fill and several
                     // outlines says "you are here" without a second colour, which is what keeps
                     // the row readable over artwork it does not control.
+                    // Very light, or nothing. The selected tab's fill is a hint that it is
+                    // filled at all; what actually says "you are here" is the brighter edge and
+                    // the brighter label.
                     .background(
-                        if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent,
+                        if (selected) Color.White.copy(alpha = 0.07f) else Color.Transparent,
                         StripTabShape,
                     )
                     .border(
                         1.dp,
-                        Color.White.copy(alpha = if (selected) 0.55f else 0.22f),
+                        Color.White.copy(alpha = if (selected) 0.45f else 0.18f),
                         StripTabShape,
                     )
                     .then(
                         if (onPageTapped != null) Modifier.clickable { onPageTapped(page) }
                         else Modifier
                     )
-                    .padding(horizontal = 10.dp, vertical = 3.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
