@@ -51,7 +51,7 @@ class StartupDataPrep @Inject constructor(
             // (BackupManager.remapWallpaper) while data_prep_version is NOT restored, so the
             // marker still matches this install and gating on it would skip the one event most
             // likely to have invalidated the survey.
-            healWallpaperLuma()
+            healWallpaperSurvey()
         }.onFailure { Timber.e(it, "Startup data prep failed") }
 
         if (alreadyPrepped) return
@@ -102,19 +102,26 @@ class StartupDataPrep @Inject constructor(
      * Runs on every cold start, so the happy path is deliberately cheap: a valid survey costs one
      * parse to confirm and writes nothing. Only an actually-unusable one pays for a decode.
      */
-    private suspend fun healWallpaperLuma() {
+    private suspend fun healWallpaperSurvey() {
         val prefs = context.pfpDataStore.data.first()
         val wallpaper = prefs[KEY_CUSTOM_WALLPAPER]
-        val stored = prefs[WallpaperLuminanceProbe.KEY_WALLPAPER_LUMA]
+        val storedLuma = prefs[WallpaperLuminanceProbe.KEY_WALLPAPER_LUMA]
+        val storedAccent = prefs[WallpaperLuminanceProbe.KEY_WALLPAPER_ACCENT]
 
         if (wallpaper == null) {
-            if (stored != null) context.pfpDataStore.edit { it.clearWallpaperLuma() }
+            if (storedLuma != null || storedAccent != null) {
+                context.pfpDataStore.edit { it.clearWallpaperLuma() }
+            }
             return
         }
-        if (WallpaperLuminanceProbe.describes(stored, wallpaper)) return
+        // BOTH facts, not just the luma. An install that had a wallpaper before the accent existed
+        // has a perfectly good luma map and no accent at all, and checking only the luma would
+        // return here and never derive one — the wave would go untinted forever on exactly the
+        // devices that already had a wallpaper.
+        if (WallpaperLuminanceProbe.describes(storedLuma, wallpaper) && storedAccent != null) return
 
         val fresh = WallpaperLuminanceProbe.survey(wallpaper)
-        if (fresh == stored) return
+        if (fresh?.luma == storedLuma && fresh?.accentArgb == storedAccent) return
         context.pfpDataStore.edit { it.setWallpaperLuma(fresh) }
     }
 

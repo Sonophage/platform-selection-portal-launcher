@@ -81,6 +81,15 @@ fun XmbBackground(
      * on is choosing to pay for the wave again on top of the wallpaper.
      */
     waveOverWallpaper: Boolean = false,
+    /**
+     * The accent derived from the wallpaper, used to tint the wave drawn over it.
+     *
+     * Over the theme gradient the wave is pure white on purpose — the colour comes from the
+     * gradient beneath. Over a photograph there is no gradient to colour it, so a white wave sits
+     * on the picture looking like it belongs to a different screen. Tinting it with the picture's
+     * own accent is what makes it read as part of the wallpaper.
+     */
+    wallpaperAccent: Long? = null,
     modifier: Modifier = Modifier,
 ) {
     val hasWallpaper = customWallpaperPath != null
@@ -106,7 +115,7 @@ fun XmbBackground(
         // the theme gradient as its base, which would hide the picture entirely, so this draws
         // the wave alone over whatever is behind it.
         if (hasWallpaper && waveOverWallpaper) {
-            WaveOverlay(waveStyle, Modifier.fillMaxSize())
+            WaveOverlay(waveStyle, wallpaperAccent, Modifier.fillMaxSize())
         }
     }
 }
@@ -118,9 +127,21 @@ fun XmbBackground(
  * frame clock, same style handling — because two wave renderers would be two things to keep in
  * step and only one of them would ever get fixed.
  */
+/**
+ * Lifts a wallpaper accent into a colour the wave can be made of.
+ *
+ * A saturated accent straight off a photograph turns the wave into a solid block of that colour.
+ * The wave is LIGHT: it takes the hue of what it came from without becoming it, so the accent is
+ * mixed most of the way to white and only the cast survives.
+ */
+private fun waveTintFrom(accentArgb: Long): Color =
+    lerp(Color(accentArgb or 0xFF000000L), Color.White, 0.62f)
+
 @Composable
-private fun WaveOverlay(waveStyle: WaveStyle, modifier: Modifier) {
-    Box(modifier) { WaveLayers(waveStyle) }
+private fun WaveOverlay(waveStyle: WaveStyle, accentArgb: Long?, modifier: Modifier) {
+    Box(modifier) {
+        WaveLayers(waveStyle, accentArgb?.let(::waveTintFrom) ?: Color.White)
+    }
 }
 
 /**
@@ -203,7 +224,7 @@ private fun WallpaperBackground(
  * only one of them would ever get the next fix.
  */
 @Composable
-private fun WaveLayers(waveStyle: WaveStyle) {
+private fun WaveLayers(waveStyle: WaveStyle, tint: Color = Color.White) {
     val alphaScale = if (waveStyle.reduced) 0.5f else 1f
     val ampScale   = if (waveStyle.reduced) 0.65f else 1f
 
@@ -227,15 +248,15 @@ private fun WaveLayers(waveStyle: WaveStyle) {
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ShaderWave(time, alphaScale, ampScale)
+        ShaderWave(time, alphaScale, ampScale, tint)
     } else {
-        FallbackWave(time, alphaScale, ampScale)
+        FallbackWave(time, alphaScale, ampScale, tint)
     }
     // Soft off-centre light bloom — the same gentle highlight the XMB has near the crossbar.
     Canvas(modifier = Modifier.fillMaxSize()) {
         drawRect(
             brush = Brush.radialGradient(
-                colors = listOf(Color.White.copy(alpha = 0.10f), Color.Transparent),
+                colors = listOf(tint.copy(alpha = 0.10f), Color.Transparent),
                 center = center.copy(x = size.width * 0.48f, y = size.height * 0.30f),
                 radius = size.minDimension * 0.62f,
             )
@@ -300,6 +321,9 @@ uniform float2 iResolution;
 uniform float  iTime;
 uniform float  ampScale;
 uniform float  alphaScale;
+// White over the theme gradient, the wallpaper's accent when drawn over a wallpaper. The wave is
+// emitted premultiplied, so this multiplies the colour and leaves the coverage alone.
+uniform float3 waveTint;
 
 // Reverse-engineered defaults from the source project's spline-settings.js. Named as they are
 // there so the two can be compared without translating.
@@ -522,7 +546,7 @@ half4 main(float2 fragCoord) {
     acc += sparkles(uv, t) * band * 0.80;
 
     acc = clamp(acc * alphaScale, 0.0, 0.62);
-    return half4(1.0, 1.0, 1.0, 1.0) * acc;   // premultiplied white -> SrcOver lightens the gradient
+    return half4(half3(waveTint), 1.0) * acc;   // premultiplied -> SrcOver lightens what is behind
 }
 """
 
@@ -546,14 +570,15 @@ private fun rememberWaveShader(): RuntimeShader? = remember {
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
-private fun ShaderWave(time: Float, alphaScale: Float, ampScale: Float) {
-    val shader = rememberWaveShader() ?: return FallbackWave(time, alphaScale, ampScale)
+private fun ShaderWave(time: Float, alphaScale: Float, ampScale: Float, tint: Color) {
+    val shader = rememberWaveShader() ?: return FallbackWave(time, alphaScale, ampScale, tint)
     val brush = remember(shader) { ShaderBrush(shader) }
     Canvas(modifier = Modifier.fillMaxSize()) {
         shader.setFloatUniform("iResolution", size.width, size.height)
         shader.setFloatUniform("iTime", time)   // reading `time` here drives the per-frame redraw
         shader.setFloatUniform("ampScale", ampScale)
         shader.setFloatUniform("alphaScale", alphaScale)
+        shader.setFloatUniform("waveTint", tint.red, tint.green, tint.blue)
         drawRect(brush = brush)
     }
 }
@@ -561,17 +586,17 @@ private fun ShaderWave(time: Float, alphaScale: Float, ampScale: Float) {
 // ── Canvas fallback (API < 33) ───────────────────────────────────────────────
 // Same soft folds approximated with low-alpha white fills (the sheet) + faint crest strokes.
 @Composable
-private fun FallbackWave(time: Float, alphaScale: Float, ampScale: Float) {
+private fun FallbackWave(time: Float, alphaScale: Float, ampScale: Float, tint: Color) {
     val amp = 0.05f * ampScale
     Canvas(modifier = Modifier.fillMaxSize()) {
-        drawFold(time, base01 = 0.63f, amp01 = amp * 0.9f, freq = 0.80f, phase = 1.7f, drift = -0.38f, sheet = 0.090f * alphaScale, edge = 0.125f * alphaScale)
-        drawFold(time, base01 = 0.75f, amp01 = amp * 1.2f, freq = 0.42f, phase = 3.1f, drift = 0.30f,  sheet = 0.105f * alphaScale, edge = 0.145f * alphaScale)
+        drawFold(time, base01 = 0.63f, amp01 = amp * 0.9f, freq = 0.80f, phase = 1.7f, drift = -0.38f, sheet = 0.090f * alphaScale, edge = 0.125f * alphaScale, tint = tint)
+        drawFold(time, base01 = 0.75f, amp01 = amp * 1.2f, freq = 0.42f, phase = 3.1f, drift = 0.30f,  sheet = 0.105f * alphaScale, edge = 0.145f * alphaScale, tint = tint)
     }
 }
 
 private fun DrawScope.drawFold(
     t: Float, base01: Float, amp01: Float, freq: Float, phase: Float, drift: Float,
-    sheet: Float, edge: Float,
+    sheet: Float, edge: Float, tint: Color,
 ) {
     val w = size.width
     val h = size.height
@@ -591,7 +616,7 @@ private fun DrawScope.drawFold(
 
     // Sheet: a flat, faint white wash from the crest down — stacking the folds brightens the lower
     // screen like the reference. Crest: two soft white strokes for the gentle fold highlight.
-    drawPath(fillPath, color = Color.White.copy(alpha = sheet))
-    drawPath(crestPath, color = Color.White.copy(alpha = edge * 0.5f), style = Stroke(width = h * 0.022f))
-    drawPath(crestPath, color = Color.White.copy(alpha = edge), style = Stroke(width = h * 0.006f))
+    drawPath(fillPath, color = tint.copy(alpha = sheet))
+    drawPath(crestPath, color = tint.copy(alpha = edge * 0.5f), style = Stroke(width = h * 0.022f))
+    drawPath(crestPath, color = tint.copy(alpha = edge), style = Stroke(width = h * 0.006f))
 }

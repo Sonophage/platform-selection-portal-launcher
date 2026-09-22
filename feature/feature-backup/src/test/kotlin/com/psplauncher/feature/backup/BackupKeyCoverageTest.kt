@@ -136,7 +136,7 @@ class BackupKeyCoverageTest {
         // stale the first time it is read. StartupDataPrep recomputes it from the restored
         // wallpaper on the next cold start, which is both cheaper and correct — carrying it would
         // be dead weight that is discarded on arrival.
-        val derivedCaches = listOf("display_wallpaper_luma")
+        val derivedCaches = listOf("display_wallpaper_luma", "wallpaper_accent")
 
         (migrationMarkers + danglingStamp + sessionState + derivedCaches).forEach { key ->
             assertTrue(

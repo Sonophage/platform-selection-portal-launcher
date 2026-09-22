@@ -48,6 +48,10 @@ class BackupKeyDriftTest {
         // Derived on arrival. The luminance survey embeds the absolute path it was computed from,
         // so a restored copy names the SOURCE device and is rejected as stale on first read.
         "display_wallpaper_luma" to "recomputed by StartupDataPrep from the restored wallpaper",
+        // Travels with the luma for the same reason and by the same route: both are read off the
+        // wallpaper image in one decode, and StartupDataPrep re-derives the pair whenever what is
+        // stored does not describe the wallpaper that is actually there.
+        "wallpaper_accent" to "recomputed by StartupDataPrep from the restored wallpaper",
         // SAF grants do not survive a reinstall; the URI without its grant is a dead string, and
         // the backup screen tells the user to re-link these roots.
         "retroarch_documents_tree_uri" to "SAF grant cannot be restored",

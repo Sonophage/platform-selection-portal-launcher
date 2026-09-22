@@ -593,6 +593,11 @@ data class XMBUiState(
     val respectBatterySaver: Boolean = true,
     /** Draw the wave over a custom wallpaper rather than letting the wallpaper replace it. */
     val waveOverWallpaper: Boolean = false,
+    /**
+     * The accent derived from the current wallpaper, or null when there is no wallpaper or it
+     * could not be read. Tints the wave when it is drawn over that wallpaper — see XmbBackground.
+     */
+    val wallpaperAccent: Long? = null,
     val thermalThrottleAware: Boolean = true,
     val customWallpaperPath: String? = null,
     // Looping motion wallpaper (MP4/WebM/GIF) behind the XMB. Only meaningful together with
@@ -8912,7 +8917,18 @@ class XMBViewModel @Inject constructor(
                 // the invalid state as "no motion" — never trying to recover it.
                 val motionPath = prefs[KEY_MOTION_WALLPAPER]
                     ?.takeIf { validPath != null && java.io.File(it).exists() }
-                _uiState.update { it.copy(customWallpaperPath = validPath, motionWallpaperPath = motionPath) }
+                // Only meaningful alongside a wallpaper that is actually there. Reading it
+                // independently would leave the previous picture's colour tinting the wave after
+                // its file had gone.
+                val accent = prefs[com.psplauncher.core.data.wallpaper.WallpaperLuminanceProbe.KEY_WALLPAPER_ACCENT]
+                    ?.takeIf { validPath != null }
+                _uiState.update {
+                    it.copy(
+                        customWallpaperPath = validPath,
+                        motionWallpaperPath = motionPath,
+                        wallpaperAccent = accent,
+                    )
+                }
             }
         }
     }

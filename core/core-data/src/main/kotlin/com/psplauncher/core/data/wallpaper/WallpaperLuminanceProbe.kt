@@ -2,7 +2,9 @@ package com.psplauncher.core.data.wallpaper
 
 import android.graphics.BitmapFactory
 import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.psplauncher.themekit.AccentDeriver
 import com.psplauncher.themekit.BmpImage
 import com.psplauncher.themekit.WallpaperLuminanceMap
 import java.io.File
@@ -33,6 +35,8 @@ object WallpaperLuminanceProbe {
      */
     val KEY_WALLPAPER_LUMA = stringPreferencesKey("display_wallpaper_luma")
 
+    val KEY_WALLPAPER_ACCENT = longPreferencesKey("wallpaper_accent")
+
     /**
      * Longest edge we decode to. The survey is 12x3 bands of averages — resolution beyond this
      * buys nothing, and the downscale is what keeps the whole probe in single-digit milliseconds.
@@ -49,7 +53,7 @@ object WallpaperLuminanceProbe {
      * A `null` return is not an error worth surfacing. The wallpaper still applies; the XMB simply
      * falls back to its unconditioned protection until something recomputes the map.
      */
-    fun survey(path: String): String? = runCatching {
+    fun survey(path: String): WallpaperSurvey? = runCatching {
         if (!File(path).isFile) return null
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -73,8 +77,24 @@ object WallpaperLuminanceProbe {
         decoded.recycle()
         if (width <= 0 || height <= 0) return null
 
-        WallpaperLuminanceMap.compute(BmpImage(width, height, pixels), path).toJson()
+        val image = BmpImage(width, height, pixels)
+        WallpaperSurvey(
+            luma = WallpaperLuminanceMap.compute(image, path).toJson(),
+            // Derived from the SAME decode as the luma. Two passes would be two bitmaps and, worse,
+            // two facts that could end up describing different pictures — which is exactly what
+            // this module exists to prevent for the luma map already.
+            accentArgb = AccentDeriver.deriveAccent(image)?.toUInt()?.toLong(),
+        )
     }.getOrNull()
+
+    /**
+     * Everything read off the wallpaper image in one decode.
+     *
+     * One type, written by one helper, because these describe the same picture and must never
+     * come to describe two: a luma map from the current wallpaper beside an accent from the
+     * previous one would tint the wave for a picture that is no longer on screen.
+     */
+    data class WallpaperSurvey(val luma: String?, val accentArgb: Long?)
 
     /**
      * Whether [json] is a readable survey **of the wallpaper at [path]**.
@@ -94,12 +114,16 @@ object WallpaperLuminanceProbe {
      * conservative default", while a map describing the *previous* wallpaper would have the XMB
      * confidently sizing protection against the wrong picture.
      */
-    fun MutablePreferences.setWallpaperLuma(json: String?) {
+    fun MutablePreferences.setWallpaperLuma(survey: WallpaperSurvey?) {
+        val json = survey?.luma
         if (json != null) this[KEY_WALLPAPER_LUMA] = json else this.remove(KEY_WALLPAPER_LUMA)
+        val accent = survey?.accentArgb
+        if (accent != null) this[KEY_WALLPAPER_ACCENT] = accent else this.remove(KEY_WALLPAPER_ACCENT)
     }
 
     /** Drop the survey. Pair this with every site that clears the wallpaper itself. */
     fun MutablePreferences.clearWallpaperLuma() {
         this.remove(KEY_WALLPAPER_LUMA)
+        this.remove(KEY_WALLPAPER_ACCENT)
     }
 }

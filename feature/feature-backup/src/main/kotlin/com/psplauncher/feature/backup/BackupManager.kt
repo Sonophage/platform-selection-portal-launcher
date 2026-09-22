@@ -609,6 +609,7 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("display_boot_on_resume"),
             booleanPreferencesKey("display_thermal_aware"),
             booleanPreferencesKey("display_battery_saver"),
+            booleanPreferencesKey("display_wave_over_wallpaper"),
             booleanPreferencesKey("interface_context_menu_hint"),
             // Font colour opt-outs — see the string list above for why these are spelled out.
             booleanPreferencesKey("display_text_color_exact"),
