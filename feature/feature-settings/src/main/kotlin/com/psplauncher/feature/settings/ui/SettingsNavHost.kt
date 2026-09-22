@@ -18,7 +18,6 @@ val SETTINGS_SCREEN_ROUTES: Set<String> = setOf(
     "settings_initial_setup",
     "settings_initial_setup_first",
     "settings_library",
-    "settings_windows_games",
     "settings_import_pc",
     "settings_music",
     "settings_video",
@@ -129,12 +128,6 @@ fun SettingsNavHost(
                 modifier = modifier,
             )
             "settings_library"    -> LibraryManagerScreen(onBack = onBack, onAddAndroidApps = onAddAndroidApps, modifier = modifier)
-            "settings_windows_games" -> LibraryManagerScreen(
-                onBack = onBack,
-                onAddAndroidApps = onAddAndroidApps,
-                startAtWindowsCard = true,
-                modifier = modifier,
-            )
             // Library Manager opened straight into its Import PC Games section (games context menu).
             "settings_import_pc"  -> LibraryManagerScreen(onBack = onBack, onAddAndroidApps = onAddAndroidApps, startInImportPc = true, modifier = modifier)
             "settings_music"      -> MusicSettingsScreen(onBack = onBack, modifier = modifier)

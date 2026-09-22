@@ -120,24 +120,26 @@ class LibraryManagerViewModelTest {
     }
 
     @Test
-    fun `closing Windows Games opened from XMB resets the shared state`() = runTest(dispatcher) {
+    fun `backing out of the Windows card returns to the list and leaves nothing behind`() = runTest(dispatcher) {
         val job = collectState()
 
-        // Opening Windows Games from the XMB puts the activity-scoped ViewModel into the
-        // Windows card detail.
-        vm.openWindowsGamesRoot()
+        // Windows is a card in the list like any other now — Settings used to carry a second,
+        // separate "Windows Games" row that opened this same detail directly, and it showed an
+        // empty screen until a PC game had been imported.
+        vm.openCardDetail("windows")
         advanceUntilIdle()
         assertEquals(LibraryStep.CARD_DETAIL, vm.uiState.value.step)
         assertEquals("windows", vm.uiState.value.detailPlatformId)
-        assertTrue(vm.uiState.value.windowsGamesOpenedFromXmb)
 
-        // Backing out closes the screen — it must not leak the detail into the next open
-        // (Library Manager would otherwise pop up the Windows Memory Card detail again).
-        assertFalse(vm.onBack())
+        // Back is consumed by the screen (true) rather than closing Settings, and clears the
+        // detail: this ViewModel is activity-scoped, so a leaked detailPlatformId would pop the
+        // Windows card up again on the next Library Manager open.
+        assertTrue(vm.onBack())
         advanceUntilIdle()
         assertEquals(LibraryStep.LIST, vm.uiState.value.step)
         assertNull(vm.uiState.value.detailPlatformId)
-        assertFalse(vm.uiState.value.windowsGamesOpenedFromXmb)
+        // ...but the row keeps focus, so returning lands on the card you just left.
+        assertEquals("windows", vm.uiState.value.returnFocusKey)
 
         job.cancel()
     }

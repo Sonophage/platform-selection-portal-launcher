@@ -84,7 +84,8 @@ class SettingsHierarchyTest {
 
     @Test fun `each section exposes its screens in the planned order`() {
         assertEquals(
-            listOf("settings_library", "settings_windows_games", "settings_collections", "settings_artwork", "settings_artwork_sources", "settings_app_visibility"),
+            // Windows is a card inside Library Manager, not a row beside it.
+            listOf("settings_library", "settings_collections", "settings_artwork", "settings_artwork_sources", "settings_app_visibility"),
             settingsEntriesIn(SettingsSectionId.LIBRARY).map { it.id },
         )
         assertEquals(
@@ -107,11 +108,12 @@ class SettingsHierarchyTest {
             settingsEntriesIn(SettingsSectionId.APPEARANCE).map { it.id },
         )
         assertEquals(
-            listOf("settings_audio", "settings_categories", "settings_controller", "settings_touch"),
+            listOf("settings_audio", "settings_categories", "settings_controller", "settings_touch", "settings_performance"),
             settingsEntriesIn(SettingsSectionId.INTERFACE).map { it.id },
         )
         assertEquals(
-            listOf("settings_about", "settings_logs", "settings_backup", "settings_performance", "settings_initial_setup", "settings_credits"),
+            // The wizard leads: it is the only screen here you open because something is NOT set up.
+            listOf("settings_initial_setup", "settings_about", "settings_logs", "settings_backup", "settings_credits"),
             settingsEntriesIn(SettingsSectionId.SYSTEM).map { it.id },
         )
     }

@@ -3094,10 +3094,6 @@ class XMBViewModel @Inject constructor(
     // of snapping to the first item.
     private val viewCursor = mutableMapOf<String, Int>()
 
-    // Remembered cursor position per category (keyed by category id), so switching categories and
-    // returning restores the item you were on instead of the first.
-    private val categoryCursor = mutableMapOf<String, Int>()
-
     // Stable key for whatever list [s] currently shows.
     private fun viewCursorKey(s: XMBUiState): String {
         val catId = s.categories.getOrNull(s.selectedCategoryIndex)?.id ?: "none"
@@ -7084,17 +7080,17 @@ class XMBViewModel @Inject constructor(
 
     fun onCategorySelected(index: Int) {
         if (index != _uiState.value.selectedCategoryIndex) menuSound.play(MenuSound.SYSTEM_BROWSE)
-        val prev = _uiState.value
-        // Remember each category's cursor so moving away and back restores your spot instead of
-        // snapping to the first item. Left/Right is locked while drilled in, so the saved index is
-        // always a root-level list position for that category.
-        prev.categories.getOrNull(prev.selectedCategoryIndex)?.id?.let { categoryCursor[it] = prev.selectedItemIndex }
-        val category = prev.categories.getOrNull(index)
-        val restore = category?.id?.let { categoryCursor[it] } ?: 0
+        val category = _uiState.value.categories.getOrNull(index)
+        // Landing on a category always lands on its FIRST row. This used to remember where you
+        // were in each column and put you back, which reads as the bar being out of step with
+        // itself: the crossbar is a horizontal list of columns, and sweeping across it left a
+        // trail of columns each scrolled to a different depth with no way to see it coming. The
+        // drill cursor ([viewCursor]) is a different thing and stays -- going INTO a folder and
+        // back out should land where you left off, because that is one column, not seven.
         // activeAppDrawerFilter is cleared as an invariant: landing on a category always shows the
         // plain XMB (the drawer can't normally be open here, but this keeps the contextual button
         // state correct no matter which path selected the category).
-        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = restore, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, activeAppDrawerFilter = null) }
+        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = 0, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, activeAppDrawerFilter = null) }
         tintWaveForCategory(category)
         loadItemsForCategory(category)
     }

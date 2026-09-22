@@ -124,8 +124,6 @@ data class LibraryManagerUiState(
     val message: String? = null,
     // Row to restore focus to when returning to the LIST from a child screen.
     val returnFocusKey: String? = null,
-    // True when this manager was opened directly from the XMB Windows Games item.
-    val windowsGamesOpenedFromXmb: Boolean = false,
 ) {
     val detailCard: LibraryCardRow? get() = cards.firstOrNull { it.platformId == detailPlatformId }
 }
@@ -229,26 +227,13 @@ class LibraryManagerViewModel @Inject constructor(
 
     // ── Navigation ──────────────────────────────────────────────────────────────
 
-    /** Opens the Windows Games landing screen; its first row is the Windows Memory Card. */
-    fun openWindowsGamesRoot() {
-        _scratch.update {
-            it.copy(
-                step = LibraryStep.CARD_DETAIL,
-                detailPlatformId = WINDOWS_PLATFORM_ID,
-                returnFocusKey = null,
-                windowsGamesOpenedFromXmb = true,
-            )
-        }
-    }
-
     // Returns true if the back press was consumed internally (sub-screen → list).
     fun onBack(): Boolean {
         val current = _scratch.value
         val step = current.step
         if (step == LibraryStep.LIST) return false
-        // Windows Games is a standalone settings screen. Its Import screen must return to the
-        // Windows Memory Card detail, not the Library root; the following Back then returns to
-        // the Settings ▸ Library flyout with Windows Games selected.
+        // The Import screen returns to the Windows Memory Card detail, not the Library root:
+        // it is reached from that card, and dropping two levels on one Back would lose the place.
         if (step == LibraryStep.IMPORT_PC) {
            _scratch.update {
                 it.copy(
@@ -258,18 +243,6 @@ class LibraryManagerViewModel @Inject constructor(
                 )
             }
             return true
-        }
-        if (
-            step == LibraryStep.CARD_DETAIL &&
-                current.detailPlatformId == WINDOWS_PLATFORM_ID &&
-                current.windowsGamesOpenedFromXmb
-        ) {
-            // The standalone Windows Games screen is closing (the caller dismisses the overlay).
-            // Clear the transient sub-screen state: this ViewModel is activity-scoped, so without
-            // the reset the stale Windows card detail would pop up again on the next Library
-            // Manager open.
-            resetToList()
-            return false
         }
         if (step == LibraryStep.CARD_DETAIL && current.detailPlatformId == WINDOWS_PLATFORM_ID) {
             _scratch.update {
@@ -305,7 +278,6 @@ class LibraryManagerViewModel @Inject constructor(
                 pcGames = emptyList(),
                 renameTargetPlatformId = null,
                 awaitingRomRootSetup   = false,
-                windowsGamesOpenedFromXmb = false,
             )
         }
     }

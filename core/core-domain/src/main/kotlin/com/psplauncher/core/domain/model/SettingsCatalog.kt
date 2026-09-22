@@ -69,7 +69,6 @@ val SETTINGS_CATALOG: List<SettingsEntry> = listOf(
     SettingsEntry("settings_overview", "Overview", "Library, artwork & build", SettingsSectionId.OVERVIEW),
 
     SettingsEntry("settings_library", "Library Manager", "ROM sources & scanning", SettingsSectionId.LIBRARY),
-    SettingsEntry("settings_windows_games", "Windows Games", "PC games, launchers & imports", SettingsSectionId.LIBRARY),
     SettingsEntry("settings_collections", "Collections", "Create & manage game collections", SettingsSectionId.LIBRARY),
     SettingsEntry("settings_artwork", "Artwork", "Your art, scraping & cache", SettingsSectionId.LIBRARY),
     SettingsEntry("settings_artwork_sources", "Scraping Sources", "Source priority & service accounts", SettingsSectionId.LIBRARY),
@@ -89,17 +88,17 @@ val SETTINGS_CATALOG: List<SettingsEntry> = listOf(
     SettingsEntry("settings_categories", "Categories", "Manage XMB categories", SettingsSectionId.INTERFACE),
     SettingsEntry("settings_controller", "Controller", "Button mapping", SettingsSectionId.INTERFACE),
     SettingsEntry("settings_touch", "Touch", "On-screen button, swipe & hints", SettingsSectionId.INTERFACE),
+    SettingsEntry("settings_performance", "Performance", "Thermal, battery saver & direct launch", SettingsSectionId.INTERFACE),
 
     SettingsEntry("settings_music", "Music", "Music folders & default player", SettingsSectionId.MEDIA),
     SettingsEntry("settings_video", "Video", "Video libraries, scanning & playback", SettingsSectionId.MEDIA),
     SettingsEntry("settings_photo", "Photo", "Photo libraries & scanning", SettingsSectionId.MEDIA),
     SettingsEntry("settings_books", "Books", "Book folders & reader", SettingsSectionId.MEDIA),
 
+    SettingsEntry("settings_initial_setup", "Setup Wizard", "Guided folder & account setup", SettingsSectionId.SYSTEM),
     SettingsEntry("settings_about", "About", "PSPLauncher", SettingsSectionId.SYSTEM),
     SettingsEntry("settings_logs", "Logs", "Debug & error log viewer", SettingsSectionId.SYSTEM),
     SettingsEntry("settings_backup", "Backup & Restore", "Export & import", SettingsSectionId.SYSTEM),
-    SettingsEntry("settings_performance", "Performance", "Thermal, battery saver & direct launch", SettingsSectionId.SYSTEM),
-    SettingsEntry("settings_initial_setup", "Setup Wizard", "Guided folder & account setup", SettingsSectionId.SYSTEM),
     SettingsEntry("settings_credits", "Credits", "Artwork & attributions", SettingsSectionId.SYSTEM),
 )
 

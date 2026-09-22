@@ -51,18 +51,14 @@ fun LibraryManagerScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onAddAndroidApps: () -> Unit = {},
-    // Open directly into the standalone Windows Games screen.
+    // Open straight into Import PC Games (the games context menu's "Import PC Games" action).
     startInImportPc: Boolean = false,
-    startAtWindowsCard: Boolean = false,
     viewModel: LibraryManagerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(startInImportPc, startAtWindowsCard) {
-        when {
-            startInImportPc -> viewModel.openImportPcGames()
-            startAtWindowsCard -> viewModel.openWindowsGamesRoot()
-        }
+    LaunchedEffect(startInImportPc) {
+        if (startInImportPc) viewModel.openImportPcGames()
     }
 
     // Picker for ES-DE folder setup: creates the system-folder structure under the
