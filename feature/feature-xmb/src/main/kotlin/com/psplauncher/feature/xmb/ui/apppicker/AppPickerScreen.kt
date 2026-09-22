@@ -386,7 +386,13 @@ private val TILE_BORDER = 1.dp
 // Chrome room around the artwork: outer border + 2dp gap + inner hairline on each side.
 private val FRAME_ROOM = 8.dp
 
-// ── Adaptive row sizing (mirrors AppDrawerGridItem.adaptiveArtworkSize) ───────
+// ── Adaptive row sizing ──────────────────────────────────────────────────────
+//
+// This used to mirror AppDrawerGridItem.adaptiveArtworkSize, and that tile is gone: the App
+// Drawer draws the shared PfpMediaCard at a fixed 2:3 now, so nothing adapts there and the sizing
+// it needed went with it. The picker still shrinks its own artwork, because the picker still has
+// the problem the drawer stopped having — a square icon grid that must fit three rows on a short
+// viewport. Self-contained now, mirroring nothing.
 //
 // The picker guarantees three full rows are visible with nothing clipped: on a short viewport
 // the artwork shrinks from its 72dp resting size toward the 48dp floor so a row always fits
@@ -431,8 +437,9 @@ private fun AppPickerTile(
             .padding(vertical = 4.dp),
     ) {
         Box(modifier = Modifier.size(artworkSize + FRAME_ROOM)) {
-            // ── Focus layer (AppDrawerGridItem geometry, alpha-driven only — no scale,
-            // no bounce, no elevation, so tile geometry never shifts) ──
+            // ── Focus layer: alpha-driven only — no scale, no bounce, no elevation, so tile
+            // geometry never shifts. (The geometry came from AppDrawerGridItem, which no longer
+            // exists; it lives on here and nowhere else.) ──
             Box(
                 Modifier
                     .matchParentSize()

@@ -217,3 +217,44 @@ Committed, suite green, no behaviour change:
   section lookup instead. I nearly "fixed" a different claim on the strength of a `grep | head -20`
   that had silently truncated the evidence; the untruncated grep is what caught it.
 - **The unread `subtitle` fields are now documented as unread**, rather than looking load-bearing.
+
+---
+
+## Part 5 — Build hygiene
+
+A `--rerun-tasks` compile of the whole repo emits **10 warnings**. That is low, but tonight is the
+argument for driving it to zero: the unreachable `OPEN_CONTEXT_MENU` branch had been printing
+`Duplicate branch condition in 'when'` on every single build, next to a comment warning about that
+exact failure mode, and nobody saw it. Warning noise is where the next one hides.
+
+What the 10 are:
+
+- **6 third-party deprecations** — Media3 in `MusicPlaybackService`, two `PackageManager` calls in
+  `InstalledAppRepository`, four coroutine `animateTo` overloads in `VideoSnapTranscoder`. Each is
+  a real migration with real behaviour to re-check, and I will not do those blind.
+- **2 benign** — `{ _, _ -> Unit }` and `.map { Unit }` in the two category repositories. Kotlin
+  flags the bare `Unit` literal; the code is correct and clear. Changing working code for a
+  stylistic warning is churn, so I left it.
+- **1 unnecessary safe call** in `MetadataRepository.kt:180` — a `?.` on something non-null.
+  Harmless, mildly misleading.
+- **1 fixed tonight** — the duplicate branch.
+
+**Decision 12:**
+
+1. **Fix the 2 benign and the 1 safe call**, leave the deprecations, and treat "zero warnings that
+   are ours" as the bar. *(Recommended.)*
+2. Do the six deprecation migrations too, with the device back, as one focused pass.
+3. Leave all ten.
+
+### One thing I found and deliberately did not delete
+
+`app/build.gradle.kts` declares `ENABLE_PERF_OVERLAY` in both build types — `true` for debug,
+`false` for release. **Nothing reads it.** It has been there since the initial commit on
+2026-06-18, so it is three months dead.
+
+It reads like an intent marker for a performance overlay you meant to build, and deleting someone's
+intention while they sleep to save one generated boolean is a bad trade. So it is still there.
+
+1. Drop the flag.
+2. **Keep it** — the perf overlay is still on the list. *(No recommendation; only you know.)*
+3. Build the perf overlay.
