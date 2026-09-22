@@ -8,6 +8,7 @@ import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.ALL_VIDEOS_I
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.BOOK_SERIES_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.BOOK_SHELVES_ITEM_ID
 import com.psplauncher.core.domain.model.MusicTrack
+import com.psplauncher.core.domain.model.primaryArtist
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.CAMERA_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.MEMORY_CARD_ASSET_URI
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.MUSIC_ALBUMS_ITEM_ID
@@ -285,9 +286,17 @@ data class MusicGroup(
  */
 internal fun String?.musicGroupKey(): String = this?.trim()?.lowercase().orEmpty()
 
-/** Every artist in a set of tracks, alphabetical, each carrying the first cover it can find. */
+/**
+ * Every artist in a set of tracks, alphabetical, each carrying the first cover it can find.
+ *
+ * Grouped on [primaryArtist], not on `artist`. The `artist` tag holds whatever the file was
+ * written with, which across a real library is the whole credit line -- so grouping on it listed
+ * credit COMBINATIONS, with one performer in a dozen rows and no row for the performer alone.
+ * The album artist names one act; it falls back to the credit line for a file that carries none,
+ * which is right for a single and no worse than before for anything else.
+ */
 internal fun List<MusicTrack>.artistGroups(): List<MusicGroup> =
-    musicGroups({ it.artist }, "Unknown Artist") { tracks ->
+    musicGroups({ it.primaryArtist }, "Unknown Artist") { tracks ->
         countLabel(tracks.size, "track", "tracks")
     }
 
@@ -301,7 +310,7 @@ internal fun List<MusicTrack>.artistGroups(): List<MusicGroup> =
  */
 internal fun List<MusicTrack>.albumGroups(): List<MusicGroup> =
     musicGroups({ it.album }, "Unknown Album") { tracks ->
-        val artists = tracks.mapNotNull { it.artist?.trim()?.ifBlank { null } }.distinct()
+        val artists = tracks.mapNotNull { it.primaryArtist?.trim()?.ifBlank { null } }.distinct()
         listOfNotNull(
             when (artists.size) {
                 0    -> null

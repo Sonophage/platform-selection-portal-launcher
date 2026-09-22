@@ -41,6 +41,10 @@ data class MusicTrackEntity(
     val artist: String? = null,
     val album: String? = null,
 
+    /** The album's own artist, when the file carries one. See MusicTrack.albumArtist. */
+    @ColumnInfo(name = "album_artist")
+    val albumArtist: String? = null,
+
     @ColumnInfo(name = "duration_ms")
     val durationMs: Long? = null,
 
@@ -81,6 +85,7 @@ fun MusicTrackEntity.toDomain() = MusicTrack(
     title        = title,
     artist       = artist,
     album        = album,
+    albumArtist  = albumArtist,
     durationMs   = durationMs,
     mimeType     = mimeType,
     sizeBytes    = sizeBytes,
@@ -99,6 +104,7 @@ fun MusicTrack.toEntity() = MusicTrackEntity(
     title        = title,
     artist       = artist,
     album        = album,
+    albumArtist  = albumArtist,
     durationMs   = durationMs,
     mimeType     = mimeType,
     sizeBytes    = sizeBytes,

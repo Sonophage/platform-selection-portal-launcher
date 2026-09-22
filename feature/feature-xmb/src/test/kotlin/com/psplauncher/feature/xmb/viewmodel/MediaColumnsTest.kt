@@ -175,10 +175,11 @@ class MediaColumnsTest {
 
     private fun track(
         id: String, title: String, artist: String? = null, album: String? = null,
-        artUri: String? = null,
+        artUri: String? = null, albumArtist: String? = null,
     ) = MusicTrack(
         id = id, folderId = "f1", uri = "content://$id", displayName = "$id.mp3",
         title = title, artist = artist, album = album, artUri = artUri,
+        albumArtist = albumArtist,
     )
 
     @Test
@@ -362,5 +363,61 @@ class MediaColumnsTest {
         assertEquals("1 hr left", videoProgressLabel(60 * 60_000L, 120 * 60_000L))
         assertEquals("1 hr 30 min left", videoProgressLabel(30 * 60_000L, 120 * 60_000L))
         assertEquals("Almost finished", videoProgressLabel(119 * 60_000L + 59_000L, 120 * 60_000L))
+    }
+
+    // ── Album artist ──────────────────────────────────────────────────────
+
+    @Test
+    fun `artists group on the album artist, not the credit line`() {
+        // The whole reason album_artist exists. These are real values off the device: the artist
+        // tag is the full credit, so grouping on it gave a row per COMBINATION and no row for
+        // Kendrick alone.
+        val groups = listOf(
+            track("1", "Bloody Waters", artist = "Ab-Soul, Anderson .Paak, James Blake",
+                  albumArtist = "Kendrick Lamar", album = "Black Panther"),
+            track("2", "King's Dead", artist = "Jay Rock, Kendrick Lamar, Future",
+                  albumArtist = "Kendrick Lamar", album = "Black Panther"),
+        ).artistGroups()
+        assertEquals(listOf("Kendrick Lamar"), groups.map { it.name })
+        assertEquals(2, groups.single().trackCount)
+    }
+
+    @Test
+    fun `a file with no album artist keeps grouping by what it does have`() {
+        // Every track scanned before album_artist existed has null there, and the column is NOT
+        // backfilled. Falling back keeps that library exactly as it was rather than collapsing
+        // all of it into one "Unknown Artist" row until a rescan.
+        val groups = listOf(
+            track("1", "Zoo Station", artist = "U2"),
+            track("2", "One", artist = "U2"),
+        ).artistGroups()
+        assertEquals(listOf("U2"), groups.map { it.name })
+        assertEquals(2, groups.single().trackCount)
+    }
+
+    @Test
+    fun `a blank album artist is no album artist`() {
+        // Tag writers leave empty strings behind. Treating "" as a name gives a nameless row that
+        // sorts first and swallows every file written by that tool.
+        val groups = listOf(track("1", "Song", artist = "Real Band", albumArtist = "   ")).artistGroups()
+        assertEquals(listOf("Real Band"), groups.map { it.name })
+    }
+
+    @Test
+    fun `an album is Various Artists only when its ACTS differ, not its credits`() {
+        // A compilation is many acts. A record where every track credits a different guest is
+        // still one act's record, and calling it Various Artists would be wrong about the thing
+        // the row is standing for.
+        val oneAct = listOf(
+            track("1", "A", artist = "Kendrick Lamar, SZA", albumArtist = "Kendrick Lamar", album = "Black Panther"),
+            track("2", "B", artist = "Kendrick Lamar, Future", albumArtist = "Kendrick Lamar", album = "Black Panther"),
+        ).albumGroups()
+        assertEquals("Kendrick Lamar  ·  2 tracks", oneAct.single().subtitle)
+
+        val manyActs = listOf(
+            track("1", "A", artist = "Artist A", albumArtist = "Artist A", album = "Now 42"),
+            track("2", "B", artist = "Artist B", albumArtist = "Artist B", album = "Now 42"),
+        ).albumGroups()
+        assertEquals("Various Artists  ·  2 tracks", manyActs.single().subtitle)
     }
 }

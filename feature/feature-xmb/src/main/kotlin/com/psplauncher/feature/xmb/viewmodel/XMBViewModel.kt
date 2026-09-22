@@ -1,6 +1,8 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.domain.model.PlatformIds
 import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
+import com.psplauncher.core.domain.model.primaryArtist
 
 import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
 
@@ -3863,7 +3865,7 @@ class XMBViewModel @Inject constructor(
                         browserRawTracks = tracks; rebuildBrowserGroupRows()
                     }
                 is MusicBrowserView.Artist -> musicRepository.observeAllTracks().collect { tracks ->
-                    browserRawTracks = tracks.filter { it.artist.musicGroupKey() == view.key }
+                    browserRawTracks = tracks.filter { it.primaryArtist.musicGroupKey() == view.key }
                     rebuildBrowserTrackRows()
                 }
                 is MusicBrowserView.Album -> musicRepository.observeAllTracks().collect { tracks ->

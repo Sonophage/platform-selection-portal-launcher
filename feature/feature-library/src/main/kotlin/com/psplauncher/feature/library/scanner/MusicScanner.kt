@@ -165,6 +165,7 @@ class MusicScanner @Inject constructor(
             title = meta?.title,
             artist = meta?.artist,
             album = meta?.album,
+            albumArtist = meta?.albumArtist,
             durationMs = meta?.durationMs,
             mimeType = mime ?: meta?.mimeType,
             sizeBytes = sizeBytes,
@@ -178,6 +179,7 @@ class MusicScanner @Inject constructor(
     private data class TrackMeta(
         val title: String?,
         val artist: String?,
+        val albumArtist: String?,
         val album: String?,
         val durationMs: Long?,
         val trackNumber: Int?,
@@ -194,6 +196,10 @@ class MusicScanner @Inject constructor(
             TrackMeta(
                 title = mmr.str(MediaMetadataRetriever.METADATA_KEY_TITLE),
                 artist = mmr.str(MediaMetadataRetriever.METADATA_KEY_ARTIST),
+                // The tag that names one act. Read from the SAME retriever pass as everything
+                // else: a second open per track over a few thousand files is a scan nobody waits
+                // through.
+                albumArtist = mmr.str(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST),
                 album = mmr.str(MediaMetadataRetriever.METADATA_KEY_ALBUM),
                 durationMs = mmr.str(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull(),
                 trackNumber = mmr.str(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)

@@ -68,7 +68,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
  * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
  * version bump cannot leave the test still asserting against the old number.
  */
-const val PFP_DATABASE_VERSION = 50
+const val PFP_DATABASE_VERSION = 51
 
 @Database(
     entities = [
@@ -1405,6 +1405,26 @@ abstract class PFPDatabase : RoomDatabase() {
         }
 
         /**
+         * The album artist, so the Artists view lists artists.
+         *
+         * `artist` holds whatever the file was tagged with, which for most of a real library is
+         * the whole credit line -- "Ab-Soul, Anderson .Paak, James Blake" is one value from this
+         * device. Grouping on it produced a list of credit COMBINATIONS, with one performer
+         * appearing in a dozen rows and no row for the performer alone.
+         *
+         * Added as NULL rather than backfilled from `artist`: a copy of the credit line under a
+         * new name would look populated and group exactly as badly, and there would be no way
+         * afterwards to tell a real album artist from the copy. Null means "this file has not
+         * been re-read yet", which is true, and MusicTrack.primaryArtist falls back to `artist`
+         * so nothing looks broken in the meantime. The next scan of a folder fills it.
+         */
+        val MIGRATION_50_51 = object : Migration(50, 51) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE music_tracks ADD COLUMN album_artist TEXT")
+            }
+        }
+
+        /**
          * Recency for music and books, so the Last Played shelf can hold all four media.
          *
          * Games and videos already carried their own stamp (`last_played_at`, `last_watched_at`).
@@ -1494,6 +1514,7 @@ abstract class PFPDatabase : RoomDatabase() {
             MIGRATION_47_48,
             MIGRATION_48_49,
             MIGRATION_49_50,
+            MIGRATION_50_51,
         )
 
     }
