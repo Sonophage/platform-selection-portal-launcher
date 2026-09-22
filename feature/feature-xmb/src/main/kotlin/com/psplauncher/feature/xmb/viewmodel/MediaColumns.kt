@@ -287,6 +287,71 @@ data class MusicGroup(
 internal fun String?.musicGroupKey(): String = this?.trim()?.lowercase().orEmpty()
 
 /**
+ * What separates two acts in a credit line, everywhere in this file.
+ *
+ * Comma-space and nothing else. " & " is not here on purpose: it is inside act names far more
+ * often than it is between them ("Earth, Wind & Fire", "Hall & Oates", "Simon & Garfunkel"), so
+ * splitting on it would invent artists that do not exist.
+ */
+private const val CreditSeparator = ", "
+
+/**
+ * Every credit line in this library that names exactly one act, lowercased.
+ *
+ * This is the EVIDENCE a split is allowed to use. A comma in a credit line means one of two
+ * completely different things -- two acts, or one act whose name has a comma in it -- and the tag
+ * itself cannot tell them apart. What can is the rest of the library: if "Kendrick Lamar" turns
+ * up on its own somewhere, then "Kendrick Lamar, SZA" is two acts. If neither "Tyler" nor "The
+ * Creator" ever turns up alone, "Tyler, The Creator" is one.
+ *
+ * A credit line that itself contains the separator is still in here as its whole self, which is
+ * what lets "Earth, Wind & Fire" attest to itself without attesting to "Earth".
+ */
+internal fun List<MusicTrack>.soloCredits(): Set<String> =
+    mapNotNullTo(mutableSetOf()) { it.primaryArtist.musicGroupKey().ifEmpty { null } }
+
+/**
+ * The acts one track is filed under, given what [soloCredits] the library has seen.
+ *
+ * Always at least one entry, and the empty string is the unknown bucket -- a track that vanished
+ * from the Artists list because its credit could not be parsed would be a track the listener can
+ * no longer find.
+ *
+ * A fragment the library has never seen alone is NOT dropped, and it is not left standing on its
+ * own either: consecutive unattested fragments rejoin into one name. That single rule is what
+ * makes all three cases come out right, and each of the simpler rules gets one of them wrong:
+ *
+ *   "Kendrick Lamar, SZA"              both seen alone      -> two acts
+ *   "Andrew Lloyd Webber, Lana Del Rey" one seen alone      -> two acts, and Webber keeps a row
+ *                                                              he would lose under "keep only
+ *                                                              what you can prove"
+ *   "Tyler, The Creator, Kali Uchis"   only the last alone  -> "Tyler, The Creator" and "Kali
+ *                                                              Uchis", because the two unproven
+ *                                                              fragments are ADJACENT and so are
+ *                                                              read as the one name they are
+ *
+ * Splitting on any evidence at all would have invented a "Tyler" in that third line; requiring
+ * evidence for every fragment would have left the second one a combination row, which on a real
+ * library is most of them.
+ */
+internal fun MusicTrack.actsUnder(soloCredits: Set<String>): List<String> {
+    val credit = primaryArtist?.trim()?.ifBlank { null } ?: return listOf("")
+    val parts = credit.split(CreditSeparator).map { it.trim() }.filter { it.isNotEmpty() }
+    if (parts.size < 2) return listOf(credit)
+
+    val acts = mutableListOf<String>()
+    val pending = mutableListOf<String>()
+    fun flush() {
+        if (pending.isNotEmpty()) { acts += pending.joinToString(CreditSeparator); pending.clear() }
+    }
+    parts.forEach { part ->
+        if (part.musicGroupKey() in soloCredits) { flush(); acts += part } else pending += part
+    }
+    flush()
+    return acts
+}
+
+/**
  * Every artist in a set of tracks, alphabetical, each carrying the first cover it can find.
  *
  * Grouped on [primaryArtist], not on `artist`. The `artist` tag holds whatever the file was
@@ -294,11 +359,30 @@ internal fun String?.musicGroupKey(): String = this?.trim()?.lowercase().orEmpty
  * credit COMBINATIONS, with one performer in a dozen rows and no row for the performer alone.
  * The album artist names one act; it falls back to the credit line for a file that carries none,
  * which is right for a single and no worse than before for anything else.
+ *
+ * And where the fallback still leaves a joint credit, [actsUnder] splits it on the library's own
+ * evidence, so one track can appear under several artists. That is why the counts here are of
+ * MEMBERSHIPS rather than of tracks: a duet is one track and two rows, and it is a track in each.
  */
-internal fun List<MusicTrack>.artistGroups(): List<MusicGroup> =
-    musicGroups({ it.primaryArtist }, "Unknown Artist") { tracks ->
+internal fun List<MusicTrack>.artistGroups(): List<MusicGroup> {
+    val solo = soloCredits()
+    return musicGroups({ it.actsUnder(solo) }, "Unknown Artist") { tracks ->
         countLabel(tracks.size, "track", "tracks")
     }
+}
+
+/**
+ * The tracks one artist row stands for. The inverse of [artistGroups], and it has to stay so.
+ *
+ * Here rather than in the browser because the row and the drill-in are a pair that must agree:
+ * the browser used to filter on `primaryArtist.musicGroupKey() == key` itself, which was the same
+ * answer only for as long as a row meant exactly one whole credit line. The moment a line could
+ * split, that copy would have opened every joint artist's row onto nothing.
+ */
+internal fun List<MusicTrack>.tracksByArtistKey(key: String): List<MusicTrack> {
+    val solo = soloCredits()
+    return filter { track -> track.actsUnder(solo).any { it.musicGroupKey() == key } }
+}
 
 /**
  * Every album in a set of tracks, alphabetical, subtitled with who is on it.
@@ -309,7 +393,7 @@ internal fun List<MusicTrack>.artistGroups(): List<MusicGroup> =
  * subtitle at least makes visible.
  */
 internal fun List<MusicTrack>.albumGroups(): List<MusicGroup> =
-    musicGroups({ it.album }, "Unknown Album") { tracks ->
+    musicGroups({ listOf(it.album) }, "Unknown Album") { tracks ->
         val artists = tracks.mapNotNull { it.primaryArtist?.trim()?.ifBlank { null } }.distinct()
         listOfNotNull(
             when (artists.size) {
@@ -321,16 +405,24 @@ internal fun List<MusicTrack>.albumGroups(): List<MusicGroup> =
         ).joinToString("  ·  ")
     }
 
+/**
+ * The one shape every music group row is built in.
+ *
+ * [tag] returns a LIST because an artist credit can name several acts and an album name cannot;
+ * rather than two builders that drift apart, the single-valued case passes a list of one.
+ */
 private fun List<MusicTrack>.musicGroups(
-    tag: (MusicTrack) -> String?,
+    tag: (MusicTrack) -> List<String?>,
     unknownName: String,
     subtitle: (List<MusicTrack>) -> String,
 ): List<MusicGroup> =
-    groupBy { tag(it).musicGroupKey() }
-        .map { (key, tracks) ->
+    flatMap { track -> tag(track).map { it to track } }
+        .groupBy { (value, _) -> value.musicGroupKey() }
+        .map { (key, entries) ->
+            val tracks = entries.map { it.second }
             MusicGroup(
                 key = key,
-                name = tracks.firstNotNullOfOrNull { tag(it)?.trim()?.ifBlank { null } } ?: unknownName,
+                name = entries.firstNotNullOfOrNull { it.first?.trim()?.ifBlank { null } } ?: unknownName,
                 subtitle = subtitle(tracks),
                 trackCount = tracks.size,
                 artUri = tracks.firstNotNullOfOrNull { it.artUri },

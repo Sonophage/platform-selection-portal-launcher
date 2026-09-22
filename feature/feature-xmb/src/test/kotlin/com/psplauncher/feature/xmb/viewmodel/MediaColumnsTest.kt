@@ -257,8 +257,106 @@ class MediaColumnsTest {
             track("1", "Come Together", artist = "The Beatles"),
             track("2", "Something", artist = "the beatles"),
             track("3", "Kashmir", artist = "Led Zeppelin"),
-        ).filter { it.artist.musicGroupKey() == group.key }
+        ).tracksByArtistKey(group.key)
         assertEquals(listOf("1", "2"), tracks.map { it.id })
+    }
+
+    // ── Splitting a credit line, on the library's own evidence ────────────
+
+    @Test
+    fun `a joint credit splits on names the library has seen alone`() {
+        // The pair this exists for. Both lines carry a comma; only one of them is two acts, and
+        // nothing in the LINE says which. What says which is that "Kendrick Lamar" and "SZA" each
+        // have a solo track in this library and no fragment of "Tyler, The Creator" has one.
+        val groups = listOf(
+            track("1", "All the Stars", artist = "Kendrick Lamar, SZA"),
+            track("2", "HUMBLE.",      artist = "Kendrick Lamar"),
+            track("3", "Good Days",    artist = "SZA"),
+            track("4", "EARFQUAKE",    artist = "Tyler, The Creator"),
+        ).artistGroups()
+
+        assertEquals(listOf("Kendrick Lamar", "SZA", "Tyler, The Creator"), groups.map { it.name })
+        // The duet counts in BOTH of its acts -- it is a track of each, not half a track of each.
+        assertEquals(listOf(2, 2, 1), groups.map { it.trackCount })
+    }
+
+    @Test
+    fun `a name the library has never seen alone still gets its own row`() {
+        // Baby Keem has no solo track here, so nothing PROVES he is a separate act -- but the
+        // name beside him is proven, which makes the comma a separator, which makes him one.
+        // Dropping him instead would delete a real artist from the library's own index because
+        // of what the library happens not to contain.
+        val groups = listOf(
+            track("1", "Family Ties", artist = "Kendrick Lamar, Baby Keem"),
+            track("2", "HUMBLE.",     artist = "Kendrick Lamar"),
+        ).artistGroups()
+        assertEquals(listOf("Baby Keem", "Kendrick Lamar"), groups.map { it.name })
+        assertEquals(listOf(1, 2), groups.map { it.trackCount })
+    }
+
+    @Test
+    fun `unproven names next to each other are read as the one name they are`() {
+        // The case that rules out splitting on any evidence at all. "Kali Uchis" is proven, so
+        // the line does split -- but "Tyler" and "The Creator" are BOTH unproven and ADJACENT,
+        // and a rapper called "Tyler" is not a thing this library has ever seen.
+        val groups = listOf(
+            track("1", "See You Again", artist = "Tyler, The Creator, Kali Uchis"),
+            track("2", "Telepatia",     artist = "Kali Uchis"),
+        ).artistGroups()
+        assertEquals(listOf("Kali Uchis", "Tyler, The Creator"), groups.map { it.name })
+    }
+
+    @Test
+    fun `an act whose own name has a comma survives when no part of it stands alone`() {
+        // Under a plain comma split this band is two bands. What stops it is that neither half
+        // has ever been seen on its own.
+        val ordinary = listOf(
+            track("1", "September", artist = "Earth, Wind & Fire"),
+            track("2", "Solo",      artist = "Chic"),
+        ).artistGroups()
+        assertEquals(listOf("Chic", "Earth, Wind & Fire"), ordinary.map { it.name })
+
+        // And the honest limit, recorded rather than left to be discovered: a library that really
+        // does contain a separate act called "Earth" makes the comma look like a separator, and
+        // the band comes apart. Nothing in a tag can tell these two libraries apart.
+        val coincidence = listOf(
+            track("1", "September", artist = "Earth, Wind & Fire"),
+            track("2", "Solo",      artist = "Earth"),
+        ).artistGroups()
+        assertEquals(listOf("Earth", "Wind & Fire"), coincidence.map { it.name })
+    }
+
+    @Test
+    fun `an ampersand is never a separator`() {
+        // " & " sits inside act names far more often than between them. Splitting on it would
+        // invent a "Garfunkel" nobody recorded anything as.
+        val groups = listOf(
+            track("1", "The Boxer", artist = "Simon & Garfunkel"),
+            track("2", "Sound",     artist = "Simon"),
+            track("3", "Angel",     artist = "Garfunkel"),
+        ).artistGroups()
+        assertEquals(listOf("Garfunkel", "Simon", "Simon & Garfunkel"), groups.map { it.name })
+    }
+
+    @Test
+    fun `every artist row opens onto exactly the tracks it counted`() {
+        // The Rule 13 guard. The row and the drill-in are two things that must agree, and before
+        // this they were two separate expressions -- the browser filtered on the whole credit
+        // line while the row could stand for a fragment of one. This fails the moment they drift.
+        val library = listOf(
+            track("1", "All the Stars", artist = "Kendrick Lamar, SZA"),
+            track("2", "HUMBLE.",       artist = "Kendrick Lamar"),
+            track("3", "Good Days",     artist = "SZA"),
+            track("4", "EARFQUAKE",     artist = "Tyler, The Creator"),
+            track("5", "Untitled",      artist = "   "),
+        )
+        library.artistGroups().forEach { group ->
+            assertEquals(
+                "row \"${group.name}\" counts ${group.trackCount} but opens onto a different set",
+                group.trackCount,
+                library.tracksByArtistKey(group.key).size,
+            )
+        }
     }
 
     @Test
