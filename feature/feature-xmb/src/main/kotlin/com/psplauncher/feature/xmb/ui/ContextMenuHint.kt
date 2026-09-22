@@ -24,12 +24,17 @@ import com.psplauncher.core.ui.preview.PfpPreview
 // glyphs track both the controller display style and a swapped X/Y layout, mirroring the
 // reference PSP UI.
 //
-// The pill carries up to two prompts:
-//   [ {CHANGE_SORT} Sort  {OPEN_CONTEXT_MENU} Options ]
+// The pill carries up to three prompts:
+//   [ {PREV_CATEGORY}{NEXT_CATEGORY} Pages  {CHANGE_SORT} Sort  {OPEN_CONTEXT_MENU} Options ]
 // Sort appears only where an X/Square press really re-sorts the list on screen
-// (XMBUiState.canSortCurrentList), and Options only where the focused item really has a
-// context menu (XMBUiState.focusedItemHasContextMenu). Both are conditional because a pill
-// promising an action that does nothing is worse than a smaller pill.
+// (XMBUiState.canSortCurrentList), Options only where the focused item really has a
+// context menu (XMBUiState.focusedItemHasContextMenu), and Pages only where the hovered game
+// has a second panel page to walk to (XMBUiState.hoverPanelHasPages). All three are conditional
+// because a pill promising an action that does nothing is worse than a smaller pill.
+//
+// Pages is one prompt over both shoulders rather than two prompts, which is what the
+// multi-action ControllerPromptItem is for — and it is correctly not tappable, because a tap
+// cannot say which shoulder was meant.
 //
 // Visibility is driven entirely by XMBUiState.showContextMenuHint (the shell/detail screens
 // fade it in but remove it immediately when it becomes ineligible); this composable only renders
@@ -41,6 +46,8 @@ import com.psplauncher.core.ui.preview.PfpPreview
 @Composable
 fun ContextMenuHint(
     modifier: Modifier = Modifier,
+    /** Show the Pages half — the hovered game's panel has somewhere for L1/R1 to go. */
+    showPages: Boolean = false,
     /** Show the Sort half — the current list responds to CHANGE_SORT. */
     showSort: Boolean = false,
     /** Show the Options half — the focused item has a context menu. */
@@ -50,6 +57,12 @@ fun ContextMenuHint(
     onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     val items = buildList {
+        if (showPages) add(
+            ControllerPromptItem(
+                listOf(GamepadAction.PREV_CATEGORY, GamepadAction.NEXT_CATEGORY),
+                "Pages",
+            ),
+        )
         if (showSort) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Sort"))
         if (showOptions) add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"))
     }
@@ -69,7 +82,7 @@ fun ContextMenuHintPreview() {
                 CompositionLocalProvider(
                     LocalControllerPromptStyle provides ControllerPromptStyle(family = family),
                 ) {
-                    ContextMenuHint(showSort = true, showOptions = true)
+                    ContextMenuHint(showPages = true, showSort = true, showOptions = true)
                 }
                 Spacer(Modifier.size(8.dp))
             }

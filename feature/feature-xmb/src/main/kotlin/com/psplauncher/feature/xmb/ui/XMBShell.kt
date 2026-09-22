@@ -1077,6 +1077,7 @@ fun XMBShell(
                 modifier = Modifier.align(Alignment.BottomEnd),
             ) {
                 ContextMenuHint(
+                    showPages = uiState.hoverPanelHasPages,
                     showSort = uiState.canSortCurrentList,
                     showOptions = uiState.focusedItemHasContextMenu,
                     onAction = onPromptTapped,

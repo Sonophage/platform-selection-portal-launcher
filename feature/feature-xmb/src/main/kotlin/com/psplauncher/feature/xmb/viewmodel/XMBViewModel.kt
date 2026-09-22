@@ -885,6 +885,18 @@ data class XMBUiState(
             )
         }
 
+    /**
+     * True iff L1/R1 would actually move the hover panel — the focused game has scraped enough
+     * to have a second page.
+     *
+     * Read off hoverPanelContent rather than asked separately, so the hint and the walk cannot
+     * disagree: the pages the strip draws ARE the pages the shoulders step through, and a pill
+     * offering Pages on a game with nothing but its logo would be a prompt for a press that
+     * does nothing.
+     */
+    val hoverPanelHasPages: Boolean
+        get() = (hoverPanelContent?.pages?.size ?: 0) > 1
+
     // True iff a Y/Triangle press on the focused item would open a context menu — the exact mirror
     // of XMBViewModel.onItemLongPress / dispatchGamepadAction(OPEN_CONTEXT_MENU)'s when-branches, so the
     // idle hint and the real trigger never drift apart. Computed (never stored) so it stays
