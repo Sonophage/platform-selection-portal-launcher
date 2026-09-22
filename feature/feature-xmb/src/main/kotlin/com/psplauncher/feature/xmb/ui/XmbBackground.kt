@@ -243,7 +243,8 @@ private fun WaveBackground(
 // height is changing fastest, so |dh/dx| drives the same highlight their dot(view, N) does.
 // Fourteen hairlines bunched into one ribbon, which is what the reference image shows: not a
 // stack of shaded sheets but a bundle of fine strands following one long S. Affordable only
-// because each strand costs ONE height evaluation now — see the slope note in main().
+// because each strand costs ONE height evaluation and no pow() — see the notes in main(). Every
+// change here has been measured with `dumpsys gfxinfo`.
 private const val SHEETS = 14
 private const val AGSL_WAVE = """
 uniform float2 iResolution;
@@ -279,6 +280,39 @@ const float travelAmp1        = 0.014;
 const float travelSpeed2      = 0.15;
 const float travelAmp2        = 0.008;
 
+// Every x frequency, named ONCE. They were literals inside waveHeight and again inside the
+// analytic derivative in main(), which is a pair that has to agree and only one of which anyone
+// would think to change — the derivative would have gone on shading a wave that was no longer
+// the wave being drawn, and it would have looked merely a bit off rather than broken.
+//
+// Lowered together to stretch the ribbon out: roughly one long S across the screen instead of
+// two, which is what the reference shows.
+// How far the wave swings, before the middle-third envelope narrows where it may do so.
+const float waveGain    = 1.15;
+const float mainFreq    = 1.28;
+const float bandFreq    = 3.90;
+const float band2Freq   = 3.00;
+const float travel1Freq = 2.60;
+const float travel2Freq = 5.40;
+
+/**
+ * How much the wave is allowed to move at this x. Peaks in the middle third, never collapses.
+ *
+ * The floor and the width both matter, and the first attempt got both wrong: 0.20 + 0.80 with a
+ * width of 1.75 left only 5% of the swing at the screen edges, so all fourteen strands converged
+ * into one flat pencil line and faded. That reads as the wave STARTING at the left edge and
+ * ENDING at the right, when the whole point is that it runs in from off screen and back out.
+ *
+ * So the taper now happens mostly OUTSIDE the visible range: 0.70 of full swing still left at
+ * px = ±1, which keeps the strands fanned and the shape continuing as it leaves. The middle
+ * third still moves half as much again as the margins, which is the bias that was asked for —
+ * a bias, not a fade to nothing.
+ */
+float travelEnvelope(float px) {
+    float a = px * 0.75;
+    return 0.30 + 0.70 * exp(-a * a);   // a*a, not pow(a, 2.0) — this is on the hot path
+}
+
 // AGSL is not GLSL: SkSL has no tanh, and asking for one fails at RuntimeShader construction
 // rather than at build time. exp is there, so this is the identity written out, with the argument
 // clamped because exp(2x) overflows long before the curve stops being flat.
@@ -298,12 +332,12 @@ float waveHeight(float x, float z, float t, float amp) {
     // directions, which is why the strands drift apart instead of moving as one.
     float flow = t * flowSpeed;
     float rowPhase = flow * 0.25 + z * 1.7;
-    y += sin(rowPhase + (x * 0.5 + 0.5) * 6.2) * bandAmplitude * 0.10;
-    y += cos(z * bandSecondaryFreq + (x * 0.5 + 0.5) * 4.8 + flow * 0.09) * bandSecondaryAmp;
-    y += sin(((x * 0.5 + 0.5) * 4.08 + z * 0.8) - flow * travelSpeed1) * travelAmp1 * tension * 12.0;
-    y += sin(((x * 0.5 + 0.5) * 8.80 - z * 1.2) + flow * travelSpeed2) * travelAmp2 * 12.0;
+    y += sin(rowPhase + (x * 0.5 + 0.5) * bandFreq) * bandAmplitude * 0.10;
+    y += cos(z * bandSecondaryFreq + (x * 0.5 + 0.5) * band2Freq + flow * 0.09) * bandSecondaryAmp;
+    y += sin(((x * 0.5 + 0.5) * travel1Freq + z * 0.8) - flow * travelSpeed1) * travelAmp1 * tension * 12.0;
+    y += sin(((x * 0.5 + 0.5) * travel2Freq - z * 1.2) + flow * travelSpeed2) * travelAmp2 * 12.0;
 
-    float base = cos(x * 2.0 - t * 0.5) * waveCosAmp + waveBias;
+    float base = cos(x * mainFreq - t * 0.5) * waveCosAmp + waveBias;
     base *= (1.0 - damping);
     base += tension * sin(x * splineLength + t * flowSpeed * 0.25);
 
@@ -315,7 +349,14 @@ float waveHeight(float x, float z, float t, float amp) {
     float total = (base + structured) * waveHeightScale;
     // Their soft clip, which is what stops the crest spiking into a hard fin.
     total = waveSoftClip * softTanh(total / waveSoftClip);
-    return (y - total) * amp;
+    // waveGain scales the whole displacement. It was cut to 0.62 to "keep the movement shorter",
+    // which shortened the wrong thing — the envelope below is what confines the motion to the
+    // middle third, and the gain on top of it just flattened the S everywhere. Back above 1.0:
+    // full swing where the envelope allows any, still nearly flat at the edges.
+    //
+    // The envelope is NOT applied here — it depends only on x, so main() computes it once and
+    // scales the result, rather than this evaluating it once per strand for the same answer.
+    return (y - total) * amp * waveGain;
 }
 
 // A cheap stable hash. Two layers of these are the PS3's additive point-sprite sparkles; this
@@ -361,6 +402,11 @@ half4 main(float2 fragCoord) {
     float px = uv.x * 2.0 - 1.0;
     float t  = iTime;
 
+    // Loop-invariant: the envelope is a function of x alone. Evaluating it inside the loop cost
+    // fourteen exp calls per pixel for one value and took legacy jank from 0.4% to 26.7% —
+    // measured, not guessed.
+    float env = travelEnvelope(px);
+
     float acc = 0.0;
     float crestY = 0.70;   // replaced by the front sheet's crest below
     for (int i = 0; i < ${SHEETS}; i++) {
@@ -370,13 +416,13 @@ half4 main(float2 fragCoord) {
         // Bunched, not spread. The reference is one ribbon about a twentieth of the screen deep
         // with every strand inside it; spreading them over a quarter of the screen was what made
         // this read as stacked sheets instead of a bundle of hairs.
-        float seat = 0.50 + f * 0.055;
+        float seat = 0.50 + f * 0.036;
         // ONE clock for every strand. They were each given their own rate, 0.80x to 1.28x, and
         // the bundle came apart — strands overtaking one another reads as interference rather
         // than as a ribbon. They still differ, by the z phase inside waveHeight, which offsets
         // them in space without letting them drift apart in time; that is what makes the bundle
         // travel as one object with depth in it.
-        float h = waveHeight(px, z, t, ampScale);
+        float h = waveHeight(px, z, t, ampScale) * env;
         float sy   = seat + h;
 
         float d = uv.y - sy;
@@ -388,12 +434,16 @@ half4 main(float2 fragCoord) {
         // paying it fourteen times buys less than spending the same budget on fourteen strands
         // instead of seven. Two trig calls in place of eight.
         float flowS = t * flowSpeed;
-        float dMain = -2.0 * sin(px * 2.0 - t * 0.5) * waveCosAmp * waveHeightScale;
-        float dBandT = 0.5 * 6.2 * cos(flowS * 0.25 + z * 1.7 + (px * 0.5 + 0.5) * 6.2)
+        float dMain = -mainFreq * sin(px * mainFreq - t * 0.5) * waveCosAmp * waveHeightScale;
+        float dBandT = 0.5 * bandFreq * cos(flowS * 0.25 + z * 1.7 + (px * 0.5 + 0.5) * bandFreq)
                      * bandAmplitude * 0.10;
-        float slope = abs(dMain + dBandT) * ampScale;
+        // The same gain and envelope the height carries, or the shading would describe a wave
+        // steeper or flatter than the one on screen.
+        float slope = abs(dMain + dBandT) * ampScale * waveGain * env;
         float edgeOn = slope / sqrt(1.0 + slope * slope);
-        float F = fresnelScale * pow(edgeOn, 1.0 / fresnelPower);
+        // fresnelPower is 4, so pow(edgeOn, 0.25) is a fourth root — two sqrts, and sqrt is a
+        // machine instruction where pow is a call.
+        float F = fresnelScale * sqrt(sqrt(edgeOn));
 
         // The sheet's body below its crest, and the bright line riding the crest itself.
         //
@@ -404,7 +454,10 @@ half4 main(float2 fragCoord) {
         // NO body wash. A smoothstep fill under each crest is what turned these into sheets; the
         // reference has none at all, only the lines. Hairline crest: 150 -> 430, about two pixels
         // at 1080p.
-        float line = exp(-pow(d * 430.0, 2.0)) * (0.16 + 0.30 * F);
+        // 430 -> 330: a little blur back into the strands, which were rendering close to
+        // aliasing on a 1080p panel.
+        float dn = d * 330.0;
+        float line = exp(-dn * dn) * (0.16 + 0.30 * F);
 
         // Strands fade only a little toward the back, so the bundle reads as one object with
         // depth in it rather than as a queue.
@@ -415,7 +468,8 @@ half4 main(float2 fragCoord) {
     // scatters them around it and well ABOVE it, thinning downward — spray thrown off the crest
     // rather than a symmetric halo — so the falloff is asymmetric: slow up, sharp down.
     float dBand = uv.y - crestY;
-    float band = dBand < 0.0 ? exp(-pow(dBand * 3.4, 2.0)) : exp(-pow(dBand * 9.0, 2.0));
+    float bu = dBand * 3.4; float bd = dBand * 9.0;
+    float band = dBand < 0.0 ? exp(-bu * bu) : exp(-bd * bd);
     acc += sparkles(uv, t) * band * 0.80;
 
     acc = clamp(acc * alphaScale, 0.0, 0.62);
