@@ -241,9 +241,10 @@ private fun WaveBackground(
 //
 // The slope stands in for their normal: a surface turning edge-on to the viewer is a surface whose
 // height is changing fastest, so |dh/dx| drives the same highlight their dot(view, N) does.
-// Seven. The constant is interpolated into the shader below rather than sitting beside a literal
-// 4 that had to be remembered — it was already out of step once by being unused entirely.
-private const val SHEETS = 7
+// Fourteen hairlines bunched into one ribbon, which is what the reference image shows: not a
+// stack of shaded sheets but a bundle of fine strands following one long S. Affordable only
+// because each strand costs ONE height evaluation now — see the slope note in main().
+private const val SHEETS = 14
 private const val AGSL_WAVE = """
 uniform float2 iResolution;
 uniform float  iTime;
@@ -366,10 +367,10 @@ half4 main(float2 fragCoord) {
         float f = float(i) / ${SHEETS - 1}.0;
         float z = f * 2.0 - 1.0;
 
-        // Each sheet sits a little lower and is a little fainter than the one in front of it,
-        // which is what the mesh's own depth does for them. Spread wider than with four, so
-        // seven read as seven lines rather than as one thick band.
-        float seat = 0.55 + f * 0.24;
+        // Bunched, not spread. The reference is one ribbon about a twentieth of the screen deep
+        // with every strand inside it; spreading them over a quarter of the screen was what made
+        // this read as stacked sheets instead of a bundle of hairs.
+        float seat = 0.50 + f * 0.055;
         // Each strand runs on its own clock as well as its own z phase: 0.80x at the front to
         // 1.28x at the back. Their pipeline gets this from the kernel walking at row * 0.93,
         // which advances a different distance per row; here it is stated directly.
@@ -381,10 +382,15 @@ half4 main(float2 fragCoord) {
         // The front sheet is the one the sparkles ride.
         if (i == 0) { crestY = sy; }
 
-        // Slope as a stand-in for the surface normal turning edge-on.
-        float e  = 0.02;
-        float dh = waveHeight(px + e, z, ts, ampScale) - h;
-        float slope = abs(dh) / e;
+        // The slope, analytically, from the two terms that dominate it — rather than a second
+        // full waveHeight call. That finite difference cost as much as the strand itself, and
+        // paying it fourteen times buys less than spending the same budget on fourteen strands
+        // instead of seven. Two trig calls in place of eight.
+        float flowS = ts * flowSpeed;
+        float dMain = -2.0 * sin(px * 2.0 - ts * 0.5) * waveCosAmp * waveHeightScale;
+        float dBandT = 0.5 * 6.2 * cos(flowS * 0.25 + z * 1.7 + (px * 0.5 + 0.5) * 6.2)
+                     * bandAmplitude * 0.10;
+        float slope = abs(dMain + dBandT) * ampScale;
         float edgeOn = slope / sqrt(1.0 + slope * slope);
         float F = fresnelScale * pow(edgeOn, 1.0 / fresnelPower);
 
@@ -394,21 +400,22 @@ half4 main(float2 fragCoord) {
         // falloff 34 -> 68, which is the same halving written the other way round because one is
         // a width and the other is its reciprocal. The wave read as a smear rather than as a
         // surface with an edge.
-        // The line is thinner again, 68 -> 150, and the body is dimmed because seven of them
-        // stack where four did and the sum, not the single sheet, is what the eye sees.
-        float body = smoothstep(0.0, 0.10, d) * 0.026;
-        float line = exp(-pow(d * 150.0, 2.0)) * (0.10 + 0.24 * F);
+        // NO body wash. A smoothstep fill under each crest is what turned these into sheets; the
+        // reference has none at all, only the lines. Hairline crest: 150 -> 430, about two pixels
+        // at 1080p.
+        float line = exp(-pow(d * 430.0, 2.0)) * (0.16 + 0.30 * F);
 
-        acc += (body + line) * (1.0 - f * 0.45);
+        // Strands fade only a little toward the back, so the bundle reads as one object with
+        // depth in it rather than as a queue.
+        acc += line * (1.0 - f * 0.40);
     }
 
-    // Sparkles belong to the band, not to the screen. Centred on the FRONT SHEET'S crest rather
-    // than a fixed height, so they travel with the wave instead of sitting in a stripe the wave
-    // moves through, and falling off sharply enough that they are dense on the band and gone a
-    // little way out. Spread wide and even, they read as dust on the glass.
+    // Sparkles ride the front strand's crest so they travel with the ribbon. The reference
+    // scatters them around it and well ABOVE it, thinning downward — spray thrown off the crest
+    // rather than a symmetric halo — so the falloff is asymmetric: slow up, sharp down.
     float dBand = uv.y - crestY;
-    float band = exp(-pow(dBand * 6.5, 2.0));
-    acc += sparkles(uv, t) * band * 0.62;
+    float band = dBand < 0.0 ? exp(-pow(dBand * 3.4, 2.0)) : exp(-pow(dBand * 9.0, 2.0));
+    acc += sparkles(uv, t) * band * 0.80;
 
     acc = clamp(acc * alphaScale, 0.0, 0.62);
     return half4(1.0, 1.0, 1.0, 1.0) * acc;   // premultiplied white -> SrcOver lightens the gradient
