@@ -52,19 +52,19 @@ class GameDetailPanelPagesTest {
     @Test
     fun `an asset page appears only when its asset does`() {
         assertEquals(
-            listOf(DetailPanelPage.LOGO, DetailPanelPage.BOX_ART, DetailPanelPage.INFO),
+            listOf(DetailPanelPage.LOGO, DetailPanelPage.INFO, DetailPanelPage.BOX_ART),
             availablePanelPages(hasBoxArt = true, hasVideo = false, hasGallery = false, hasInfo = true),
         )
         assertEquals(
-            listOf(DetailPanelPage.LOGO, DetailPanelPage.GALLERY, DetailPanelPage.INFO),
+            listOf(DetailPanelPage.LOGO, DetailPanelPage.INFO, DetailPanelPage.GALLERY),
             availablePanelPages(hasBoxArt = false, hasVideo = false, hasGallery = true, hasInfo = true),
         )
         assertEquals(
             listOf(
                 DetailPanelPage.LOGO,
+                DetailPanelPage.INFO,
                 DetailPanelPage.BOX_ART,
                 DetailPanelPage.GALLERY,
-                DetailPanelPage.INFO,
             ),
             availablePanelPages(hasBoxArt = true, hasVideo = false, hasGallery = true, hasInfo = true),
         )
@@ -76,7 +76,7 @@ class GameDetailPanelPagesTest {
 
     @Test
     fun `the strip is drawn in enum order whatever drops out of it`() {
-        // Box art is declared before Gallery, and a filter must not be allowed to reorder them:
+        // Info is declared before Box Art, and a filter must not be allowed to reorder them:
         // the strip's icons and the L1 R1 walk have to agree with each other.
         val pages = availablePanelPages(hasBoxArt = true, hasVideo = false, hasGallery = true, hasInfo = true)
 
@@ -94,8 +94,8 @@ class GameDetailPanelPagesTest {
         )
         assertEquals(
             "R1 on the last page stays put",
-            DetailPanelPage.INFO,
-            stepPanelPage(DetailPanelPage.INFO, pages, +1),
+            DetailPanelPage.GALLERY,
+            stepPanelPage(DetailPanelPage.GALLERY, pages, +1),
         )
     }
 
@@ -104,7 +104,7 @@ class GameDetailPanelPagesTest {
         // It is the snap the crossbar already had approved, so a game with no video must not be
         // offered a tab that would open an empty player.
         assertEquals(
-            listOf(DetailPanelPage.LOGO, DetailPanelPage.VIDEO, DetailPanelPage.INFO),
+            listOf(DetailPanelPage.LOGO, DetailPanelPage.INFO, DetailPanelPage.VIDEO),
             availablePanelPages(hasBoxArt = false, hasVideo = true, hasGallery = false, hasInfo = true),
         )
         assertEquals(
@@ -115,9 +115,9 @@ class GameDetailPanelPagesTest {
 
     @Test
     fun `walking skips the pages that are not offered`() {
-        // The real case: a game with no box art. R1 from Logo must land on Media, not on a box
-        // art page that the strip is not drawing.
-        val pages = availablePanelPages(hasBoxArt = false, hasVideo = false, hasGallery = true, hasInfo = true)
+        // A scraped-art game that filled in no text: Info is declared second but is not offered,
+        // so R1 from Logo must land on Media rather than on a tab the strip is not drawing.
+        val pages = availablePanelPages(hasBoxArt = false, hasVideo = false, hasGallery = true, hasInfo = false)
 
         assertEquals(DetailPanelPage.GALLERY, stepPanelPage(DetailPanelPage.LOGO, pages, +1))
         assertEquals(DetailPanelPage.LOGO, stepPanelPage(DetailPanelPage.GALLERY, pages, -1))

@@ -17,12 +17,20 @@ import com.psplauncher.feature.xmb.viewmodel.gameMetadataLine
  * the wallpaper. Its slot goes to the media strip, which is the richer thing this app has and
  * NeoStation does not.
  */
+/**
+ * The panel's pages, in strip order — which is declaration order, because availablePanelPages
+ * filters `entries` and the shoulders walk what it returns.
+ *
+ * Logo, then Info, then Video, then the art. The owner's order, and it reads as one: the logo is
+ * the game, what it IS comes next, the clip after that, and the box and the gallery are the
+ * browsing pages you go looking for rather than the ones you want first.
+ */
 enum class DetailPanelPage(val label: String) {
     LOGO("Logo"),
-    BOX_ART("Box Art"),
-    VIDEO("Video"),
-    GALLERY("Media"),
     INFO("Info"),
+    VIDEO("Video"),
+    BOX_ART("Box Art"),
+    GALLERY("Media"),
 }
 
 /**

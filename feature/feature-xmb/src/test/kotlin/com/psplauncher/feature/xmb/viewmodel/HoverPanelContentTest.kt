@@ -44,10 +44,13 @@ class HoverPanelContentTest {
         val pages = s.hoverPanelContent!!.pages
         assertTrue("the strip draws a Video tab, so the walk must be able to land on it",
             DetailPanelPage.VIDEO in pages)
+        // This game fills in no text, so its strip is Logo, Video, Box Art and the step that
+        // proves the point starts at Logo. Stepping from a page the strip is NOT drawing would
+        // return it unchanged and the assertion would pass for the wrong reason.
         assertEquals(
-            "R1 from Box Art lands on Video, not over it",
+            "R1 from the logo lands on Video, not over it",
             DetailPanelPage.VIDEO,
-            com.psplauncher.feature.xmb.ui.detail.stepPanelPage(DetailPanelPage.BOX_ART, pages, +1),
+            com.psplauncher.feature.xmb.ui.detail.stepPanelPage(DetailPanelPage.LOGO, pages, +1),
         )
     }
 
