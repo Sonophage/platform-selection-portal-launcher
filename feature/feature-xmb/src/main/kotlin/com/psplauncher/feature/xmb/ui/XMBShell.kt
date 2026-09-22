@@ -84,6 +84,7 @@ import com.psplauncher.core.ui.motion.rememberAppVisible
 import androidx.compose.ui.text.style.TextOverflow
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.psplauncher.core.ui.components.DiscLaunchCeremony
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.XmbTouchButton
 import com.psplauncher.core.ui.preview.DevicePreviews
@@ -194,6 +195,8 @@ fun XMBShellContainer(
         onPreviewBootSequence = viewModel::previewBootSequence,
         onPreviewGameBoot = viewModel::previewGameBoot,
         onGameBootComplete = viewModel::onGameBootComplete,
+        onDiscCeremonyHandOff = viewModel::onDiscCeremonyHandOff,
+        onDiscCeremonyFinished = viewModel::onDiscCeremonyFinished,
         onCloseCustomIcons = viewModel::closeCustomIcons,
         onCustomIconsActionConsumed = viewModel::onCustomIconsActionConsumed,
         onCustomIconsSlotFocused = viewModel::onCustomIconSlotFocused,
@@ -310,6 +313,8 @@ fun XMBShell(
     onPreviewBootSequence: () -> Unit = {},
     onPreviewGameBoot: () -> Unit = {},
     onGameBootComplete: () -> Unit = {},
+    onDiscCeremonyHandOff: () -> Unit = {},
+    onDiscCeremonyFinished: () -> Unit = {},
     onCloseCustomIcons: () -> Unit = {},
     onCustomIconsActionConsumed: () -> Unit = {},
     onCustomIconsSlotFocused: (Int) -> Unit = {},
@@ -1478,6 +1483,20 @@ fun XMBShell(
                     // (GameBoot runs on every launch, unlike the once-per-start boot sequence),
                     // still at full length, so the launch waits for the whole presentation.
                     waveStyle = gameBootWaveStyle,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            // The launch disc, for a film, a book or a track. Last child for the same reason
+            // GameBoot is: anything composed after it would cover it. The two are mutually
+            // exclusive by construction — GameBoot is games only, and the disc never runs for a
+            // game — so the order between them does not matter, only that both are above
+            // everything else.
+            uiState.discCeremony?.let { ceremony ->
+                DiscLaunchCeremony(
+                    art = ceremony.art,
+                    onHandOff = onDiscCeremonyHandOff,
+                    onFinished = onDiscCeremonyFinished,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

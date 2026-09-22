@@ -78,8 +78,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,6 +96,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 
 private fun XmbPalette.toPFPColors() = PFPColors(
@@ -618,6 +621,10 @@ data class XMBUiState(
     // True when [activeGameBoot] came from Settings ▸ Display ▸ GameBoot ▸ Preview, which must
     // never touch the gate — nothing is launching.
     val gameBootIsPreview: Boolean = false,
+    // The launch disc, on screen between confirming a film, book or track and the thing opening.
+    // Games are not here: they already have GameBoot, and two presentations for one launch is one
+    // too many. See [awaitDiscHandOff].
+    val discCeremony: DiscCeremonyState? = null,
     // Startup choreography: the boot sequence holds on a black frame until MainActivity reports
     // the notification-permission dialog is out of the way, so the order on a fresh install is
     // permission dialog -> boot animation -> first-run setup wizard.
@@ -951,6 +958,7 @@ data class XMBUiState(
     val hasBlockingOverlay: Boolean
         get() = showBootSequence ||
             activeGameBoot != null ||
+            discCeremony != null ||
             activeSettingsScreen != null ||
             activeAppDrawerFilter != null ||
             activeGameId != null ||
@@ -976,6 +984,15 @@ data class XMBUiState(
             launchRecovery != null ||
             showWindowsSetupPrompt
 }
+
+/**
+ * The launch disc on screen, and the cover art printed on its face.
+ *
+ * Art only — no title, no id, nothing the overlay could act on. The disc reports two moments and
+ * the ViewModel decides what they mean, which is what keeps one overlay usable by three unrelated
+ * launch paths.
+ */
+data class DiscCeremonyState(val art: String?)
 
 /**
  * How many result cards a search row holds.
@@ -3614,6 +3631,9 @@ class XMBViewModel @Inject constructor(
         menuSound.play(MenuSound.LAUNCH)
         viewModelScope.launch {
             val book = bookRepository.getBook(bookId) ?: return@launch
+            // After the lookup, before the hand-off: a book that is not in the library never gets
+            // a disc, for the same reason a game that cannot launch never gets a GameBoot.
+            awaitDiscHandOff(book.coverUri)
             val error = bookIntentResolver.launch(book, _uiState.value.defaultReader)
             if (error != null) {
                 _uiState.update { it.copy(infoDialog = InfoDialogState(title = book.displayTitle, message = error)) }
@@ -4247,8 +4267,11 @@ class XMBViewModel @Inject constructor(
     private fun openSearchedTrack(row: XMBItem) {
         val trackId = row.id.removePrefix("mt_")
         val track = searchTracks.firstOrNull { it.id == trackId } ?: return
-        musicPlayer.setQueue(listOf(track), 0)
-        _uiState.update { it.copy(musicPlayerVisible = true) }
+        viewModelScope.launch {
+            awaitDiscHandOff(track.artUri)
+            musicPlayer.setQueue(listOf(track), 0)
+            _uiState.update { it.copy(musicPlayerVisible = true) }
+        }
     }
 
     // ── Result rows ─────────────────────────────────────────────────────────────
@@ -4454,8 +4477,12 @@ class XMBViewModel @Inject constructor(
         val trackId = item.id.removePrefix("mt_")
         val startIndex = currentMusicTracks.indexOfFirst { it.id == trackId }.coerceAtLeast(0)
         if (currentMusicTracks.isEmpty()) return
-        musicPlayer.setQueue(currentMusicTracks, startIndex)
-        _uiState.update { it.copy(musicPlayerVisible = true) }
+        val track = currentMusicTracks[startIndex]
+        viewModelScope.launch {
+            awaitDiscHandOff(track.artUri)
+            musicPlayer.setQueue(currentMusicTracks, startIndex)
+            _uiState.update { it.copy(musicPlayerVisible = true) }
+        }
     }
 
     // ── In-app player controls (driven by the player overlay) ───────────────────
@@ -8534,6 +8561,51 @@ class XMBViewModel @Inject constructor(
         _uiState.update { it.copy(showBootSequence = true) }
     }
 
+    // ── The launch disc ───────────────────────────────────────────────────────
+    //
+    // Modelled on GameBootGate, and deliberately NOT a copy of it: that gate is a singleton
+    // because LaunchDispatcher lives outside this ViewModel, and every caller of this one is a
+    // method a few hundred lines up. A second singleton for three local call sites would be
+    // machinery, not structure.
+    //
+    // Games are absent on purpose. They already have GameBoot, whose switch means "a presentation
+    // plays" or "the launch is silent by decision" — a disc on top of either answer contradicts
+    // the one the user gave.
+
+    @Volatile
+    private var discHandOff: CompletableDeferred<Unit>? = null
+
+    /**
+     * Puts the disc up and suspends until it is ready to hand over — which is when it BEGINS
+     * fading out, not when it disappears. The caller starts the thing at that point, so the app's
+     * cold start happens under the last of the animation instead of after it.
+     *
+     * Bounded, and a timeout PROCEEDS: a stuck overlay costs the user a moment, never their film.
+     * The overlay clears itself through [onDiscCeremonyFinished] once it has faded.
+     */
+    private suspend fun awaitDiscHandOff(art: String?) {
+        val handOff = CompletableDeferred<Unit>()
+        discHandOff = handOff
+        _uiState.update { it.copy(discCeremony = DiscCeremonyState(art)) }
+        try {
+            withTimeout(DISC_CEREMONY_TIMEOUT_MS) { handOff.await() }
+        } catch (_: TimeoutCancellationException) {
+            Timber.w("Launch disc watchdog fired after ${DISC_CEREMONY_TIMEOUT_MS}ms — opening anyway")
+            _uiState.update { it.copy(discCeremony = null) }
+        }
+    }
+
+    /** The disc has started fading out: whatever was waiting on it may now open. */
+    fun onDiscCeremonyHandOff() {
+        discHandOff?.complete(Unit)
+        discHandOff = null
+    }
+
+    /** The disc has finished fading and should come off the screen. */
+    fun onDiscCeremonyFinished() {
+        _uiState.update { it.copy(discCeremony = null) }
+    }
+
     // ── GameBoot ──────────────────────────────────────────────────────────────
 
     private fun observeGameBoot() {
@@ -9061,6 +9133,15 @@ class XMBViewModel @Inject constructor(
     // ── Static data ───────────────────────────────────────────────────────────
 
     companion object {
+        /**
+         * How long the launch disc may hold a launch before it is opened anyway.
+         *
+         * Generous against DiscCeremony's own ~2s timeline, because it is a watchdog and not a
+         * schedule: it exists for the case where the overlay never reports back at all (a
+         * composition torn down mid-animation), not to police a slow frame.
+         */
+        private const val DISC_CEREMONY_TIMEOUT_MS = 6_000L
+
         private val KEY_WAVE_STYLE        = stringPreferencesKey("display_wave_style")
         // Must match DisplaySettingsViewModel — both read/write these wave power-throttle prefs.
         private val KEY_RESPECT_BATTERY   = booleanPreferencesKey("display_battery_saver")
