@@ -42,6 +42,35 @@ sealed interface MusicScanResult {
  * for every track without embedded art, which is silent and just makes scanning slow forever.
  * [BookQuickScanTest] documents the same trap for covers.
  */
+/**
+ * Whether a quick scan may carry this track's row over untouched.
+ *
+ * Three conditions, and each of them was a bug before it was a condition.
+ *
+ * The file has not changed — the ordinary reason to skip work.
+ *
+ * Its album art is still on disk. Art comes out of the same metadata pass as the title, so a
+ * missing art file means reparsing the track; see MusicQuickScanTest for the 3,965-of-3,966 case
+ * that put this here.
+ *
+ * And the row has been read since `album_artist` existed. That column was added NULL for every
+ * existing track, and without this the ordinary "rescan my music" would reuse those rows wholesale
+ * and never fill it — the scan would appear to do nothing and Artists would list credit lines
+ * forever. A metadata read always writes a non-null value (empty string for a file with no album
+ * artist), so null means exactly "not read since the column existed" and the heal costs one pass
+ * per track, once.
+ */
+internal fun canReuseMusicMetadata(
+    prior: MusicTrack?,
+    lastModified: Long?,
+    artExists: (String) -> Boolean,
+): Boolean {
+    if (prior == null) return false
+    if (prior.lastModified != lastModified) return false
+    if (prior.albumArtist == null) return false
+    return musicArtStillOnDisk(prior.artUri, artExists)
+}
+
 internal fun musicArtStillOnDisk(artUri: String?, exists: (String) -> Boolean): Boolean {
     if (artUri.isNullOrBlank()) return true
     // Plain string handling rather than Uri.parse, which is an Android stub returning null off the
@@ -140,7 +169,7 @@ class MusicScanner @Inject constructor(
         // naming it forever. Measured on the device after the package rename: 3,965 of 3,966
         // tracks pointed into the OLD package's private directory, which this app cannot read, and
         // no quick scan would ever have looked again.
-        if (!deep && prior != null && prior.lastModified == lastModified && artStillOnDisk(prior.artUri)) {
+        if (prior != null && !deep && canReuseMusicMetadata(prior, lastModified) { artStillOnDisk(it) }) {
             return prior.copy(folderId = folderId, relativePath = relPath.takeIf { it.isNotEmpty() })
         }
 
@@ -179,7 +208,15 @@ class MusicScanner @Inject constructor(
     private data class TrackMeta(
         val title: String?,
         val artist: String?,
-        val albumArtist: String?,
+        /**
+         * NON-NULL, and that is the guard rather than a comment about one.
+         *
+         * canReuseMusicMetadata reads a null album_artist as "this row has not been parsed since
+         * the column existed". That is only true while every parse writes something, so dropping
+         * the `.orEmpty()` below has to be a compile error, not a silent regression that turns
+         * every quick scan into a deep one.
+         */
+        val albumArtist: String,
         val album: String?,
         val durationMs: Long?,
         val trackNumber: Int?,
@@ -199,7 +236,11 @@ class MusicScanner @Inject constructor(
                 // The tag that names one act. Read from the SAME retriever pass as everything
                 // else: a second open per track over a few thousand files is a scan nobody waits
                 // through.
-                albumArtist = mmr.str(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST),
+                // orEmpty, never null: a null album artist is how a row says it has not been
+                // read since the column was added, and a file that genuinely carries no
+                // ALBUMARTIST tag must not keep claiming that forever. MusicTrack.primaryArtist
+                // treats blank and absent the same, so "" behaves exactly like no tag.
+                albumArtist = mmr.str(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST).orEmpty(),
                 album = mmr.str(MediaMetadataRetriever.METADATA_KEY_ALBUM),
                 durationMs = mmr.str(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull(),
                 trackNumber = mmr.str(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)

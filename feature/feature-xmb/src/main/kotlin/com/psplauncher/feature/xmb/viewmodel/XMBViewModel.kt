@@ -7858,7 +7858,11 @@ class XMBViewModel @Inject constructor(
                 .sanitize(parsed, context.packageManager)
                 ?: error("Captured shortcut is not safe to launch"))
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(launch)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            context.startActivity(
+                launch,
+                com.psplauncher.core.common.launch.LaunchTransition.options(context),
+            )
         }.onFailure { e ->
             Timber.e(e, "Failed to launch captured shortcut: $label")
             taskNotifier.failed("launch_intent_${label.hashCode()}", label, "Couldn't launch: ${e.message}")

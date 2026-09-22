@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.os.Build
 import android.os.Process
+import com.psplauncher.core.common.launch.LaunchTransition
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -104,6 +105,10 @@ class LauncherShortcutRepository @Inject constructor(
     }
 
     fun launch(hostPackage: String, shortcutId: String): Result<Unit> = runCatching {
-        launcherApps.startShortcut(hostPackage, shortcutId, null, null, Process.myUserHandle())
+        launcherApps.startShortcut(
+            hostPackage, shortcutId, null,
+            LaunchTransition.options(context),
+            Process.myUserHandle(),
+        )
     }.onFailure { Timber.e(it, "startShortcut failed: $hostPackage / $shortcutId") }
 }

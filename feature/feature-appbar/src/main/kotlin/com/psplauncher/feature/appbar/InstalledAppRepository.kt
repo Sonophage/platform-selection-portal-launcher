@@ -2,6 +2,8 @@ package com.psplauncher.feature.appbar
 
 import android.content.Context
 import android.content.Intent
+import com.psplauncher.core.common.launch.LaunchTransition
+import com.psplauncher.core.common.launch.LaunchTransition.withoutTransition
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.content.pm.ApplicationInfo
@@ -99,8 +101,8 @@ class InstalledAppRepository @Inject constructor(
     fun launchApp(packageName: String) {
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
         if (intent != null) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).withoutTransition()
+            context.startActivity(intent, LaunchTransition.options(context))
         } else {
             Timber.w("No launch intent for $packageName")
         }

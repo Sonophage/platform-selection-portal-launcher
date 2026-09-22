@@ -1,5 +1,6 @@
 package com.psplauncher.feature.library.scanner
 
+import com.psplauncher.core.domain.model.MusicTrack
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -56,5 +57,52 @@ class MusicQuickScanTest {
     fun `a stored value that is not a usable path forces a reparse`() {
         // Better to reparse one track than to keep a row pointing at something unreadable forever.
         assertFalse(musicArtStillOnDisk("://not a uri", gone))
+    }
+
+    // ── The whole reuse rule ──────────────────────────────────────────────
+
+    private fun track(
+        lastModified: Long? = 1000L,
+        artUri: String? = null,
+        albumArtist: String? = "",
+    ) = MusicTrack(
+        id = "t1", folderId = "f1", uri = "content://t1", displayName = "t1.mp3",
+        lastModified = lastModified, artUri = artUri, albumArtist = albumArtist,
+    )
+
+    @Test
+    fun `an unchanged, already-read track is reused`() {
+        assertTrue(canReuseMusicMetadata(track(), 1000L, present))
+    }
+
+    @Test
+    fun `a changed file is reparsed`() {
+        assertFalse(canReuseMusicMetadata(track(lastModified = 1000L), 2000L, present))
+    }
+
+    @Test
+    fun `a track never seen before is parsed`() {
+        assertFalse(canReuseMusicMetadata(null, 1000L, present))
+    }
+
+    @Test
+    fun `a row written before album_artist existed is reparsed, once`() {
+        // THE MIGRATION CASE. album_artist was added NULL for every existing track. Without this
+        // the ordinary "rescan my music" reuses those rows wholesale, fills nothing, and Artists
+        // goes on listing credit lines no matter how many times you press Rescan.
+        assertFalse(canReuseMusicMetadata(track(albumArtist = null), 1000L, present))
+    }
+
+    @Test
+    fun `a file that genuinely has no album artist is reused after one read`() {
+        // The expensive mistake in the other direction. A read writes "" rather than null for a
+        // file carrying no ALBUMARTIST tag, so it is distinguishable from "never read" and every
+        // quick scan does NOT secretly become a deep scan for that half of the library.
+        assertTrue(canReuseMusicMetadata(track(albumArtist = ""), 1000L, present))
+    }
+
+    @Test
+    fun `the art rule still applies to a row that has been read`() {
+        assertFalse(canReuseMusicMetadata(track(artUri = "file:///gone.img"), 1000L, gone))
     }
 }

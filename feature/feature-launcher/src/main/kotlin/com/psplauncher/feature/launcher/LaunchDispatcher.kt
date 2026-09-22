@@ -2,6 +2,8 @@ package com.psplauncher.feature.launcher
 
 import android.content.Context
 import android.content.Intent
+import com.psplauncher.core.common.launch.LaunchTransition
+import com.psplauncher.core.common.launch.LaunchTransition.withoutTransition
 import com.psplauncher.core.domain.model.Game
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -93,7 +95,12 @@ class LaunchDispatcher @Inject constructor(
         return try {
             // Every dispatcher launch comes from an app-graph context (ViewModel/Activity via the
             // shared singleton), so NEW_TASK is required to start outside our own task. Idempotent.
-            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            // No window transition: the launch disc is holding the screen and Android would
+            // otherwise slide it away with PFP's window. See LaunchTransition.
+            context.startActivity(
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).withoutTransition(),
+                LaunchTransition.options(context),
+            )
             // A RetroArch core launch pins the console to that core (see AutoCoreMemory), so the
             // console's automatic pick — and its RetroArch configs — stay stable across detection
             // passes. Written only once the intent actually reached the emulator, so a launch that
