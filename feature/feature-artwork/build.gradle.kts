@@ -10,8 +10,9 @@ import java.security.MessageDigest
 import java.util.Properties
 
 // ── ScreenScraper developer-pair obfuscation (build-time) ─────────────────────
-// Loads screenscraper.devId / screenscraper.devPassword (or legacy SS_DEV_ID /
-// SS_DEV_PASSWORD, or the SS_DEV_* environment variables for CI) plus the optional
+// Loads screenscraper.devId and the per-build-type screenscraper.devPasswordDebug /
+// screenscraper.devPasswordRelease (each falling back to plain screenscraper.devPassword, or the
+// legacy SS_DEV_* property and environment names for CI) plus the optional
 // screenscraper.obfuscationSalt from local.properties and XOR-encodes each value with
 // SHA-256(salt + propertyName) as the keystream. Encoded as buildConfigField byte arrays;
 // credentials/DevPairDecoder reassembles them at runtime. DevPairDecoderTest mirrors this
@@ -23,10 +24,29 @@ private val ssProps: Properties = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 
-private fun ssEncoded(prop: String, envName: String): Pair<String, String> {
+/**
+ * Writes the dev-password pair of fields onto [target], from [prop]/[envName] if either is set and
+ * from the build-type-agnostic `screenscraper.devPassword` otherwise.
+ *
+ * The keystream is derived from the property NAME, so a debug and a release password encode under
+ * different keys even when they fall back to the same value — which is the point: two identical
+ * byte arrays in two APKs would advertise that the fallback happened.
+ */
+private fun ssDevPassword(
+    target: com.android.build.api.dsl.VariantDimension,
+    prop: String,
+    envName: String,
+) {
+    val (share, mask) = ssEncoded(prop, envName, fallbackProp = "screenscraper.devPassword")
+    target.buildConfigField("byte[]", "SS_DEV_PASSWORD_SHARE", share)
+    target.buildConfigField("byte[]", "SS_DEV_PASSWORD_MASK",  mask)
+}
+
+private fun ssEncoded(prop: String, envName: String, fallbackProp: String? = null): Pair<String, String> {
     val value = ssProps.getProperty(prop)
         ?: ssProps.getProperty(envName)
         ?: System.getenv(envName)
+        ?: fallbackProp?.let { ssProps.getProperty(it) ?: System.getenv("SS_DEV_PASSWORD") }
         ?: ""
     if (value.isEmpty()) return "new byte[]{}" to "new byte[]{}"
     val salt = (ssProps.getProperty("screenscraper.obfuscationSalt")
@@ -64,12 +84,29 @@ android {
         // This is obfuscation, not security: dex2jar + a decompiler recovers it. It defeats
         // `strings` scrapes and automated harvesters only. Rotation = change the values (and
         // ideally the salt) in local.properties and release; no server round-trip.
-        val (ssDevIdShare, ssDevIdMask)           = ssEncoded("screenscraper.devId", "SS_DEV_ID")
-        val (ssDevPwShare, ssDevPwMask)           = ssEncoded("screenscraper.devPassword", "SS_DEV_PASSWORD")
-        buildConfigField("byte[]", "SS_DEV_ID_SHARE",       ssDevIdShare)
-        buildConfigField("byte[]", "SS_DEV_ID_MASK",        ssDevIdMask)
-        buildConfigField("byte[]", "SS_DEV_PASSWORD_SHARE", ssDevPwShare)
-        buildConfigField("byte[]", "SS_DEV_PASSWORD_MASK",  ssDevPwMask)
+        val (ssDevIdShare, ssDevIdMask) = ssEncoded("screenscraper.devId", "SS_DEV_ID")
+        buildConfigField("byte[]", "SS_DEV_ID_SHARE", ssDevIdShare)
+        buildConfigField("byte[]", "SS_DEV_ID_MASK",  ssDevIdMask)
+        // The password is per build type — see buildTypes below. Declared here too so every
+        // variant has the field even if a build type is ever added without setting it: a missing
+        // buildConfigField does not compile, and a variant that silently fell back to the wrong
+        // password would be worse than one that does not build.
+        ssDevPassword(this, "screenscraper.devPassword", "SS_DEV_PASSWORD")
+    }
+    buildTypes {
+        // ScreenScraper issues a developer a SEPARATE password per application, and PFP is
+        // registered twice — debug and release are two applications to them, because they are two
+        // package ids. Using one password for both gets the other build 403ed as bad credentials,
+        // which is indistinguishable from a typo.
+        //
+        // Each falls back to the plain `screenscraper.devPassword` when its own key is absent, so
+        // a machine (or CI, via SS_DEV_PASSWORD) that only has one password still builds both.
+        getByName("debug") {
+            ssDevPassword(this, "screenscraper.devPasswordDebug", "SS_DEV_PASSWORD_DEBUG")
+        }
+        getByName("release") {
+            ssDevPassword(this, "screenscraper.devPasswordRelease", "SS_DEV_PASSWORD_RELEASE")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
