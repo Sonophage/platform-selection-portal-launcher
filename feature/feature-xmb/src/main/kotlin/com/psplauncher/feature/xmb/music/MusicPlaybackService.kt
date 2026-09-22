@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
@@ -141,7 +142,9 @@ class MusicPlaybackService : Service() {
             Intent(this, MusicPlaybackService::class.java).setAction(intentAction),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        return Notification.Action.Builder(icon, title, pi).build()
+        // The Icon overload, not the int one: the int-resource constructor is deprecated, and
+        // the replacement takes an Icon so an action can carry a bitmap. Same drawable either way.
+        return Notification.Action.Builder(Icon.createWithResource(this, icon), title, pi).build()
     }
 
     private fun createChannel() {

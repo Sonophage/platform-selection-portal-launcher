@@ -64,8 +64,11 @@ class InstalledAppRepository @Inject constructor(
                 val label = resolveInfo.loadLabel(pm).toString()
                 val icon  = resolveInfo.loadIcon(pm)
 
-                val isGame = appInfo.category == ApplicationInfo.CATEGORY_GAME ||
-                             (appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0
+                // FLAG_IS_GAME was the pre-API-26 way of saying this and is deprecated in
+                // favour of `category`, which the same check already reads. minSdk is 29, so
+                // every device here reports the category and the flag bit adds nothing but a
+                // warning.
+                val isGame = appInfo.category == ApplicationInfo.CATEGORY_GAME
 
                 val isEmulator = KnownEmulatorPackages.isEmulator(packageName)
                 // A system app that has NOT been updated by the user can't be uninstalled; treat
@@ -105,6 +108,10 @@ class InstalledAppRepository @Inject constructor(
 
     fun hasUsageAccess(): Boolean {
         val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
+        // unsafeCheckOpNoThrow is deprecated in favour of the attribution-tag overload, which
+        // needs API 30; minSdk is 29, so this is the newest call every supported device has.
+        // Kept deliberately, with the warning suppressed so a real deprecation is not lost in it.
+        @Suppress("DEPRECATION")
         val mode = appOps.unsafeCheckOpNoThrow(
             AppOpsManager.OPSTR_GET_USAGE_STATS,
             Process.myUid(),
