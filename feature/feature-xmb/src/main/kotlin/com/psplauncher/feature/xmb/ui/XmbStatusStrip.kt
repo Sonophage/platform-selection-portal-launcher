@@ -178,31 +178,48 @@ fun XmbPspStatusStrip(
             Text(dateString, color = StripMuted,   fontSize = StripFontSize, fontWeight = FontWeight.Normal)
             StripSeparator()
             Text(timeString, color = StripPrimary, fontSize = StripFontSize, fontWeight = FontWeight.Medium)
-            // Current sort mode — shown only on sortable lists. Touch: a tappable chip that cycles
-            // the sort order; controller: a plain label (X / Square cycles it).
-            if (sortLabel != null) {
-                StripSeparator()
+        }
+
+        }
+
+        // ── Centre: which cut of this list you are looking at ──────────────
+        //
+        // The home shelf's media filters, or on every other column the sort mode. ONE slot,
+        // because they answer the same question, and the shelf having its answer centred while
+        // every other column had its answer tucked beside the clock made the two read as
+        // unrelated things.
+        //
+        // The filters win where both could apply: X cycles the filter on that page, not the sort.
+        when {
+            centre != null -> centre.invoke(this)
+            sortLabel != null -> {
+                // Touch: a chip that cycles the sort. Controller: a plain label, because X
+                // already does it and a chip would be a button that cannot be reached.
                 if (showSortButton) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .align(Alignment.Center)
+                            .clip(RoundedCornerShape(5.dp))
                             .background(Color(0x24FFFFFF))
                             .clickable(onClick = onSortTapped)
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
                     ) {
                         Text("⇅", color = StripPrimary, fontSize = StripFontSize, fontWeight = FontWeight.Medium)
                         Text(sortLabel, color = StripPrimary, fontSize = StripFontSize, fontWeight = FontWeight.Medium)
                     }
                 } else {
-                    Text(sortLabel, color = StripPrimary, fontSize = StripFontSize, fontWeight = FontWeight.Medium)
+                    Text(
+                        sortLabel,
+                        color = StripPrimary,
+                        fontSize = StripFontSize,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
                 }
             }
         }
-
-        }
-        centre?.invoke(this)
 
         // ── Right: [controller] [BT] [WiFi] [Signal] [Battery] ─────────────
         // Every status icon except battery is conditional: shown only when that hardware is

@@ -1076,7 +1076,11 @@ fun XMBShell(
             // height of the content: a spine that stopped at the filter row would be a rule, not
             // an edge.
             if (uiState.onLastPlayedHome) {
-                LaunchSpine(modifier = Modifier.align(Alignment.CenterEnd))
+                LaunchSpine(
+                    label = if (uiState.directLaunch) "Play" else "Details",
+                    onClick = { onItemTap(uiState.selectedItemIndex) },
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                )
             }
             } // end: XMB foreground hidden while music browser is open
 

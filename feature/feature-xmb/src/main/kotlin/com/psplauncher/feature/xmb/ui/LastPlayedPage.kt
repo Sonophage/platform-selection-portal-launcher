@@ -1,6 +1,16 @@
 package com.psplauncher.feature.xmb.ui
 
 import com.psplauncher.core.ui.theme.LocalPFPColors
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.slideOutHorizontally
@@ -233,39 +243,91 @@ fun RecentFilterRow(filter: RecentFilter, modifier: Modifier = Modifier) {
 }
 
 /**
- * The launch spine: a full-height bar down the edge, in the focused item's own colour.
+ * The launch spine: a bar down the edge, in the focused item's own colour, with the word running
+ * down it and a shimmer travelling through.
  *
- * It replaces a Play pill that sat in the middle of the page. A pill there was a control in the
- * one place the cursor never goes, competing with the artwork for the centre; a spine is chrome
- * at the edge that says the same thing by being the colour of the thing you would launch.
+ * It replaces a Play pill that sat in the middle of the page -- a control in the one place the
+ * cursor never goes, competing with the artwork for the centre. The spine is at the edge, says
+ * the same word, and is pressable.
  *
- * The colour is the AMBIENT accent, not a parameter. On this page the palette is already
- * re-tinted from the focused item's artwork -- it is why the whole screen goes red on one row
- * and olive on the next -- so reading the theme gets the item's colour for free and cannot
- * disagree with the page it sits on. A second derivation would be a second answer to the same
- * question.
+ * The colour is the AMBIENT accent, not a parameter. This page is already re-tinted from the
+ * focused item's artwork -- it is why the whole screen goes red on one row and gold on the next --
+ * so reading the theme gets the item's colour for free and cannot disagree with the page it sits
+ * on. A second derivation would be a second answer to the same question.
  *
- * It fades at both ends rather than running flat edge to edge: a solid bar reads as a border on
- * the window, and this belongs to the item rather than to the screen.
+ * The shimmer is on the WORD, travelling top to bottom through the letters -- the bar underneath
+ * is a flat wash. It is what makes an edge read as something you can press rather than as a rule:
+ * a static strip of colour is chrome, and one with movement in it is an invitation.
  */
 @Composable
-fun LaunchSpine(modifier: Modifier = Modifier) {
+fun LaunchSpine(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val accent = LocalPFPColors.current.accentColor
+    val travel by rememberInfiniteTransition(label = "spine").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        // Slow. A fast shimmer on a bar this long reads as a loading indicator, which is the one
+        // thing it must not be mistaken for on a page whose button launches something.
+        animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing)),
+        label = "travel",
+    )
     Box(
         modifier = modifier
             .fillMaxHeight()
             .width(SpineWidth)
-            .background(
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        // The bar itself, fading at both ends: a solid one reads as a border on the window, and
+        // this belongs to the item rather than to the screen.
+        Box(
+            Modifier.matchParentSize().background(
                 Brush.verticalGradient(
                     0.00f to accent.copy(alpha = 0.00f),
-                    0.50f to accent.copy(alpha = 0.90f),
+                    0.50f to accent.copy(alpha = 0.55f),
                     1.00f to accent.copy(alpha = 0.00f),
                 )
-            ),
-    )
+            )
+        )
+        // The shimmer is on the WORD, not the bar. A band travelling down the whole strip read
+        // as a progress indicator on a bar whose job is to launch something; on the letters it
+        // reads as a highlight passing over a label, which is the thing that says "press me".
+        //
+        // The gradient runs along the text's own X axis, which a quarter turn later is down the
+        // screen -- so a linear gradient here IS the vertical travel, with no second rotation to
+        // keep in step.
+        val labelPx = with(LocalDensity.current) { SpineLabelLength.toPx() }
+        val glintWidth = labelPx * 0.30f
+        val glintHead = travel * (labelPx + glintWidth * 2f) - glintWidth
+        val shimmer = Brush.linearGradient(
+            colors = listOf(SpineLabelRest, Color.White, SpineLabelRest),
+            start = Offset(glintHead, 0f),
+            end = Offset(glintHead + glintWidth, 0f),
+        )
+        Text(
+            text = label.uppercase(),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 3.sp,
+            maxLines = 1,
+            // requiredWidth before rotate: the node is measured at its own width, ignoring the
+            // spine's, and THEN turned a quarter turn. Measuring it inside a 36dp column first
+            // would wrap the word one letter per line.
+            modifier = Modifier
+                .requiredWidth(SpineLabelLength)
+                .rotate(90f),
+            textAlign = TextAlign.Center,
+            style = TextStyle(brush = shimmer, shadow = XmbTextShadow),
+        )
+    }
 }
 
-private val SpineWidth = 4.dp
+/** What the spine's label reads between glints: legible, not lit. */
+private val SpineLabelRest = Color.White.copy(alpha = 0.55f)
+
+/** How long the rotated label is allowed to be. Longer than any word that goes in it. */
+private val SpineLabelLength = 220.dp
+
+private val SpineWidth = 36.dp
 
 @Composable
 private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {
