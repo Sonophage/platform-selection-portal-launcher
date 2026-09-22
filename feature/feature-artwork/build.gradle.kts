@@ -28,9 +28,9 @@ private val ssProps: Properties = Properties().apply {
  * Writes the dev-password pair of fields onto [target], from [prop]/[envName] if either is set and
  * from the build-type-agnostic `screenscraper.devPassword` otherwise.
  *
- * The keystream is derived from the property NAME, so a debug and a release password encode under
- * different keys even when they fall back to the same value — which is the point: two identical
- * byte arrays in two APKs would advertise that the fallback happened.
+ * The keystream is derived from the property NAME, so debug and release encode under different
+ * keys even when they fall back to the same value — which is the point: two identical byte arrays
+ * in two APKs would advertise that the fallback happened, and the fallback is the normal case.
  */
 private fun ssDevPassword(
     target: com.android.build.api.dsl.VariantDimension,
@@ -94,13 +94,18 @@ android {
         ssDevPassword(this, "screenscraper.devPassword", "SS_DEV_PASSWORD")
     }
     buildTypes {
-        // ScreenScraper issues a developer a SEPARATE password per application, and PFP is
-        // registered twice — debug and release are two applications to them, because they are two
-        // package ids. Using one password for both gets the other build 403ed as bad credentials,
-        // which is indistinguishable from a typo.
+        // A hook for a per-build-type developer password, unused at present.
         //
-        // Each falls back to the plain `screenscraper.devPassword` when its own key is absent, so
-        // a machine (or CI, via SS_DEV_PASSWORD) that only has one password still builds both.
+        // It exists because ScreenScraper issues a password per registered APPLICATION, and a
+        // project with a debug and a release package id registered separately would need two.
+        // Whether PFP is such a project is NOT established: the account held two passwords, and
+        // testing both against ssinfraInfos.php showed only one authenticates with devid
+        // `badwolfvi` — the other is 403 "Erreur de login", so it belongs to something else.
+        //
+        // Both build types therefore fall back to the plain `screenscraper.devPassword` today.
+        // The keys stay because the fallback is the whole mechanism: a machine (or CI, via
+        // SS_DEV_PASSWORD) with one password builds both variants, and a second password can be
+        // adopted later by setting one key, with no code change.
         getByName("debug") {
             ssDevPassword(this, "screenscraper.devPasswordDebug", "SS_DEV_PASSWORD_DEBUG")
         }
