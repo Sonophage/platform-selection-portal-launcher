@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.psplauncher.core.domain.model.ControllerIcon
+import com.psplauncher.core.ui.components.ControllerPromptGlyphs
 import com.psplauncher.core.ui.detail.DetailMediaTileHeight
 import com.psplauncher.core.ui.detail.DetailMediaTileWidth
 import com.psplauncher.core.ui.detail.PfpDetailMediaTile
@@ -68,23 +70,26 @@ private fun DetailPanelPage.icon(): ImageVector = when (this) {
     DetailPanelPage.INFO -> Icons.Filled.Info
 }
 
-private val StripIconSize: Dp = 20.dp
-private val StripCellSize: Dp = 28.dp
+private val StripTabShape = RoundedCornerShape(4.dp)
+private val StripTabGap: Dp = 8.dp
+private val StripShoulderSize: Dp = 18.dp
 private val PanelCardShape = RoundedCornerShape(14.dp)
 
 /**
- * The page strip, wearing the helper footer's pill.
+ * The page strip: named tabs, not a row of icons.
  *
- * Every other pill in the shell is a ControllerHintBar — black at half alpha, a 10 dp corner and
- * 8 by 4 of padding around 20 dp glyphs — and this one sits in the opposite corner of the same
- * screen. The numbers are taken from that component rather than chosen again here, because two
- * copies of a number with a comment saying they must match is how a shell stops looking like one
- * thing. It is not a ControllerHintBar itself: those are a glyph plus a label with no selected
- * state, and this is a set of tabs where exactly one is current.
+ * It was five 20dp glyphs in a black pill, and a glyph is a guess -- an "i" and a picture frame
+ * do not tell you that one is the description and the other is the box art until you have pressed
+ * both. The console this borrows from spells its tabs out, so this does too: the label IS the
+ * affordance, and the row reads left to right like a sentence rather than like a toolbar.
  *
- * Drawn even at one page: it is what says L1/R1 do anything here, and hiding it at one page would
- * make the shoulders look dead on exactly the games with the least artwork — the ones most worth
- * going to look for a scrape on.
+ * L1 and R1 sit at the ends because the shoulders are what walks it. They are drawn by the prompt
+ * system, so a user on an Xbox pad sees LB and RB: this row must not be the one place in the shell
+ * that hard-codes a button name.
+ *
+ * Drawn even at one page: it is what says the shoulders do anything here, and hiding it at one
+ * page would make them look dead on exactly the games with the least artwork -- the ones most
+ * worth going to look for a scrape on.
  */
 @Composable
 fun DetailPanelStrip(
@@ -94,37 +99,54 @@ fun DetailPanelStrip(
     onPageTapped: ((DetailPanelPage) -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(StripTabGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        ControllerPromptGlyphs(
+            icons = listOf(ControllerIcon.BUMPER_LEFT),
+            label = "",
+            glyphSize = StripShoulderSize,
+        )
         pages.forEach { page ->
             val selected = page == current
             Box(
                 modifier = Modifier
-                    .size(StripCellSize)
+                    .clip(StripTabShape)
+                    // Selected is a filled capsule; the rest are outlines. One fill and several
+                    // outlines says "you are here" without a second colour, which is what keeps
+                    // the row readable over artwork it does not control.
                     .background(
-                        if (selected) Color.White.copy(alpha = 0.22f) else Color.Transparent,
-                        RoundedCornerShape(6.dp),
+                        if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent,
+                        StripTabShape,
+                    )
+                    .border(
+                        1.dp,
+                        Color.White.copy(alpha = if (selected) 0.55f else 0.22f),
+                        StripTabShape,
                     )
                     .then(
                         if (onPageTapped != null) Modifier.clickable { onPageTapped(page) }
                         else Modifier
-                    ),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = page.icon(),
-                    contentDescription = page.label,
-                    // The footer's labels are white; its unselected state is the absence of a
-                    // prompt rather than a dim one, so the dimming here is this component's own.
-                    tint = if (selected) Color.White else Color.White.copy(alpha = 0.45f),
-                    modifier = Modifier.size(StripIconSize),
+                Text(
+                    text = page.label.uppercase(),
+                    color = if (selected) Color.White else Color.White.copy(alpha = 0.55f),
+                    fontSize = 11.sp,
+                    letterSpacing = 1.2.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
                 )
             }
         }
+        ControllerPromptGlyphs(
+            icons = listOf(ControllerIcon.BUMPER_RIGHT),
+            label = "",
+            glyphSize = StripShoulderSize,
+        )
     }
 }
 

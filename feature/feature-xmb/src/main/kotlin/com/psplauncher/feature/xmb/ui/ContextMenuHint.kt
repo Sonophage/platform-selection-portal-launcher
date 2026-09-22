@@ -46,8 +46,6 @@ import com.psplauncher.core.ui.preview.PfpPreview
 @Composable
 fun ContextMenuHint(
     modifier: Modifier = Modifier,
-    /** Show the Pages half — the hovered game's panel has somewhere for L1/R1 to go. */
-    showPages: Boolean = false,
     /** Show the Sort half — the current list responds to CHANGE_SORT. */
     showSort: Boolean = false,
     /** Show the Filter half — X cycles the home shelf's media instead of sorting. */
@@ -68,12 +66,10 @@ fun ContextMenuHint(
     onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     val items = buildList {
-        if (showPages) add(
-            ControllerPromptItem(
-                listOf(GamepadAction.PREV_CATEGORY, GamepadAction.NEXT_CATEGORY),
-                "Pages",
-            ),
-        )
+        // No Pages prompt. The page strip carries its own LB/RB glyphs at its ends now, right
+        // on the row they walk, so one in this corner is the same instruction twice and further
+        // from what it refers to. The parameter went with it: a caller still passing a flag
+        // nothing reads is a lie about what this depends on.
         // Sort and Filter are the same button doing two jobs, so they are mutually exclusive
         // by construction rather than by both callers remembering to be careful.
         if (showFilter) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Filter"))
@@ -102,7 +98,7 @@ fun ContextMenuHintPreview() {
                 CompositionLocalProvider(
                     LocalControllerPromptStyle provides ControllerPromptStyle(family = family),
                 ) {
-                    ContextMenuHint(showPages = true, showSort = true, showOptions = true)
+                    ContextMenuHint(showSort = true, showOptions = true)
                 }
                 Spacer(Modifier.size(8.dp))
             }
