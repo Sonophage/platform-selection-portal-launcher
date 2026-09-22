@@ -143,10 +143,14 @@ fun LastPlayedPage(
                         label = if (directLaunch) "Play" else "Details",
                         icon = if (directLaunch) Icons.Filled.PlayArrow else Icons.Filled.Info,
                         focused = false,
+                        // Compact, because on this page it names the button in your hand rather
+                        // than being a control to reach. At full size it was the loudest thing on
+                        // a page whose subject is the artwork behind it.
+                        compact = true,
                         onClick = { onCardTapped(selectedIndex) },
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
-                            .width(240.dp),
+                            .width(150.dp),
                     )
                 } else {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {

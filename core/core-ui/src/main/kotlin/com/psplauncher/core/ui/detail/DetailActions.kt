@@ -58,6 +58,15 @@ fun PfpDetailLaunchButton(
     // focused state is never tinted: exactly one control is focused, and it always looks the same
     // so the eye can find it without reading anything.
     fill: Color = DetailButtonRest,
+    /**
+     * Half-size, for a placement where this is a LEGEND rather than a control.
+     *
+     * The Recent shelf's is never focused -- the cursor lives in the card column and A on a card
+     * already fires it -- so at full size it read as the biggest, most important thing on a page
+     * whose subject is the artwork behind it. A detail screen's Launch is the opposite: it is the
+     * one control you reach for, and it keeps every pixel.
+     */
+    compact: Boolean = false,
 ) {
     // A pill, not a rounded rectangle: at this height the radius is half the height, which is what
     // makes a tvOS button read as a button rather than as a card.
@@ -65,7 +74,7 @@ fun PfpDetailLaunchButton(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 58.dp)
+            .defaultMinSize(minHeight = if (compact) 38.dp else 58.dp)
             .clip(shape)
             .background(if (focused) DetailButtonFocusFill else fill)
             // The cursor's bright edge, AFTER the fill so it draws on top of it.
@@ -83,18 +92,26 @@ fun PfpDetailLaunchButton(
                 shape = shape,
             )
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(vertical = 15.dp, horizontal = 26.dp),
+            .padding(
+                vertical = if (compact) 8.dp else 15.dp,
+                horizontal = if (compact) 16.dp else 26.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val content = if (focused) DetailButtonFocusText else DetailTextPrimary
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(12.dp))
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = content,
+                modifier = Modifier.size(if (compact) 16.dp else 24.dp),
+            )
+            Spacer(Modifier.width(if (compact) 8.dp else 12.dp))
         }
         Text(
             text = label,
             color = content,
-            fontSize = 19.sp,
+            fontSize = if (compact) 13.sp else 19.sp,
             // Semibold, not bold. The focused pill already carries the emphasis; bold on top of
             // the inversion is two shouts for one thing.
             fontWeight = FontWeight.SemiBold,

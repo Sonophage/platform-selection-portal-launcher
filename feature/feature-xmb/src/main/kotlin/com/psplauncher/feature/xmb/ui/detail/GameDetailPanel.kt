@@ -71,8 +71,8 @@ private fun DetailPanelPage.icon(): ImageVector = when (this) {
 }
 
 private val StripTabShape = RoundedCornerShape(4.dp)
-private val StripTabGap: Dp = 8.dp
-private val StripShoulderSize: Dp = 18.dp
+private val StripTabGap: Dp = 6.dp
+private val StripShoulderSize: Dp = 13.dp
 private val PanelCardShape = RoundedCornerShape(14.dp)
 
 /**
@@ -129,14 +129,17 @@ fun DetailPanelStrip(
                         if (onPageTapped != null) Modifier.clickable { onPageTapped(page) }
                         else Modifier
                     )
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                    .padding(horizontal = 10.dp, vertical = 3.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = page.label.uppercase(),
                     color = if (selected) Color.White else Color.White.copy(alpha = 0.55f),
-                    fontSize = 11.sp,
-                    letterSpacing = 1.2.sp,
+                    // Small. These sit INSIDE the XMB canvas, which the user can scale, so a
+                    // size chosen against the reference at 1x came out a third bigger again on
+                    // this device -- the row was reading as a headline rather than as chrome.
+                    fontSize = 8.sp,
+                    letterSpacing = 0.8.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                 )
