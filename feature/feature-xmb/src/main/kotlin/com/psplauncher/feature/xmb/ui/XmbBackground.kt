@@ -35,6 +35,7 @@ import com.psplauncher.core.ui.motion.MotionWallpaperBackground
 import com.psplauncher.core.ui.motion.MotionWallpaperPolicy
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.wave.WaveStyle
+import timber.log.Timber
 import kotlin.math.sin
 
 // Frozen "time" (seconds) used to pose the wave when animation is disabled.
@@ -214,46 +215,142 @@ private fun WaveBackground(
 }
 
 // ── AGSL wave (API 33+) ──────────────────────────────────────────────────────
-// The real PSP "Original" wave: soft, long-wavelength light FOLDS — gentle luminance sheets that
-// blend the gradient beneath toward white. Low contrast, no hard ribbon, no sparkles. Because it
-// only ever lightens the gradient, the colour always comes from whatever theme is applied.
+//
+// The PlayStation 3 XMB wave, ported from linkev/PlayStation-3-XMB (MIT, (c) 2025 Mart), whose
+// author reverse-engineered it from the PS3's own spline.elf. Their permission notice is kept in
+// LICENSES/PlayStation-3-XMB-MIT.txt.
+//
+// What is ported is the MOTION — the height field below is their vertex shader's arithmetic, with
+// their reverse-engineered constants — and the shading idea: a Fresnel term that lights the parts
+// of the surface turning edge-on, drawn as white with alpha. That last part is why this fits here
+// at all. Their fragment shader ends in `vec4(vec3(1.0), F * opacity * brightness)`: white over a
+// coloured gradient, which is exactly how this file already composites, so the wave stays a
+// lightening pass and the COLOUR still comes entirely from the theme. The monthly hue, a category
+// tinting the wave, a user's chosen scheme — all of it behaves as before.
+//
+// What is NOT ported is the rendering model, and it could not be. Theirs displaces a 100x100 grid
+// mesh in WebGL2 from a spline texture the CPU regenerates each frame, and reads its normal from
+// screen-space derivatives. This is one fullscreen AGSL pass with no mesh and no texture, so the
+// surface is evaluated analytically per pixel and the overlapping sheets the mesh gets for free —
+// its far edge folding over its near edge, which is most of the PS3 look — are summed explicitly
+// as SHEETS slices through z. Four, because each slice costs six sines per pixel and this draws
+// behind the entire UI on a handheld.
+//
+// The slope stands in for their normal: a surface turning edge-on to the viewer is a surface whose
+// height is changing fastest, so |dh/dx| drives the same highlight their dot(view, N) does.
+private const val SHEETS = 4
 private const val AGSL_WAVE = """
 uniform float2 iResolution;
 uniform float  iTime;
 uniform float  ampScale;
 uniform float  alphaScale;
 
-const float TAU = 6.2831853;
+// Reverse-engineered defaults from the source project's spline-settings.js. Named as they are
+// there so the two can be compared without translating.
+const float flowSpeed         = 0.18;
+const float tension           = 0.12;
+const float damping           = 0.0001;
+const float splineLength      = 0.306001;
+const float spacing           = 407.658;
+const float perturbation      = 0.0998587;
+const float perturbationScale = 0.07;
+const float waveCosAmp        = 0.09;
+const float waveBias          = -0.1;
+const float waveHeightScale   = 0.5;
+const float waveSoftClip      = 0.22;
+const float ffdYAmp           = 0.03;
+const float fresnelPower      = 4.0;
+const float fresnelScale      = 0.5;
 
-// One fold: a broad soft sheet of light below crest [c], plus a faint luminous crest line.
-float fold(float y, float c, float sheet, float edge) {
-    float body = smoothstep(0.0, 0.17, y - c) * sheet;   // brightens the region below the crest
-    float line = exp(-pow((y - c) * 42.0, 2.0)) * edge;  // thin highlight riding the crest
-    return body + line;
+// AGSL is not GLSL: SkSL has no tanh, and asking for one fails at RuntimeShader construction
+// rather than at build time. exp is there, so this is the identity written out, with the argument
+// clamped because exp(2x) overflows long before the curve stops being flat.
+float softTanh(float x) {
+    float e = exp(2.0 * clamp(x, -8.0, 8.0));
+    return (e - 1.0) / (e + 1.0);
+}
+
+// Their vertex shader's displacement, flattened to a function of (x, z, t). The spline texture
+// lookup they start from is a low-frequency band, so it is folded into the FFD sine here rather
+// than carried as a texture.
+float waveHeight(float x, float z, float t, float amp) {
+    float y = sin(x * 3.1 + z * 0.7 + t * flowSpeed) * ffdYAmp;
+
+    float base = cos(x * 2.0 - t * 0.5) * waveCosAmp + waveBias;
+    base *= (1.0 - damping);
+    base += tension * sin(x * splineLength + t * flowSpeed * 0.25);
+
+    float structured = perturbation * perturbationScale * (
+        sin((x * splineLength * 6.0 + z * 0.5) * spacing * 0.01 + t * flowSpeed * 0.7) * 0.5 +
+        sin((x * splineLength * 10.0 - z * 0.8) * spacing * 0.005 - t * flowSpeed * 0.35) * 0.25
+    );
+
+    float total = (base + structured) * waveHeightScale;
+    // Their soft clip, which is what stops the crest spiking into a hard fin.
+    total = waveSoftClip * softTanh(total / waveSoftClip);
+    return (y - total) * amp;
 }
 
 half4 main(float2 fragCoord) {
-    float2 uv = fragCoord / iResolution;   // 0..1, y down
-    float x = uv.x;
-    float t = iTime;
-    float a = 0.05 * ampScale;
+    float2 uv = fragCoord / iResolution;
+    // x in clip space, matching theirs; y measured down the screen as this file's gradient is.
+    float px = uv.x * 2.0 - 1.0;
+    float t  = iTime;
 
-    // Two overlapping fold crests low on the screen (top ribbon removed).
-    float c2 = 0.63 + a * 0.9 * sin(x * TAU * 0.80 - t * 0.38 + 1.7);
-    float c3 = 0.75 + a * 1.2 * sin(x * TAU * 0.42 + t * 0.30 + 3.1);
+    float acc = 0.0;
+    for (int i = 0; i < 4; i++) {
+        float f = float(i) / 3.0;
+        float z = f * 2.0 - 1.0;
 
-    float b = fold(uv.y, c2, 0.090, 0.125)
-            + fold(uv.y, c3, 0.105, 0.145);
+        // Each sheet sits a little lower and is a little fainter than the one in front of it,
+        // which is what the mesh's own depth does for them.
+        float seat = 0.60 + f * 0.13;
+        float h    = waveHeight(px, z, t, ampScale);
+        float sy   = seat + h;
 
-    b = clamp(b * alphaScale, 0.0, 0.6);
-    return half4(1.0, 1.0, 1.0, 1.0) * b;   // premultiplied white → SrcOver blends the gradient toward white
+        float d = uv.y - sy;
+
+        // Slope as a stand-in for the surface normal turning edge-on.
+        float e  = 0.02;
+        float dh = waveHeight(px + e, z, t, ampScale) - h;
+        float slope = abs(dh) / e;
+        float edgeOn = slope / sqrt(1.0 + slope * slope);
+        float F = fresnelScale * pow(edgeOn, 1.0 / fresnelPower);
+
+        // The sheet's body below its crest, and the bright line riding the crest itself.
+        float body = smoothstep(0.0, 0.20, d) * 0.055;
+        float line = exp(-pow(d * 34.0, 2.0)) * (0.10 + 0.22 * F);
+
+        acc += (body + line) * (1.0 - f * 0.35);
+    }
+
+    acc = clamp(acc * alphaScale, 0.0, 0.62);
+    return half4(1.0, 1.0, 1.0, 1.0) * acc;   // premultiplied white -> SrcOver lightens the gradient
 }
 """
+
+/**
+ * The AGSL wave, or null when this device's SkSL will not compile it.
+ *
+ * RuntimeShader validates at CONSTRUCTION and throws IllegalArgumentException, so an unsupported
+ * builtin is not a build error, it is a crash — and this draws behind the launcher's home screen,
+ * so the crash is at boot, every boot. That is not hypothetical: this shader called tanh, which
+ * GLSL has and SkSL does not, and the launcher died on launch until it was written out by hand.
+ * SkSL is not uniform across vendors and Android versions, so the next one will be found the same
+ * way. Falling back to the Canvas wave loses the Fresnel edge and keeps the launcher.
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@Composable
+private fun rememberWaveShader(): RuntimeShader? = remember {
+    runCatching { RuntimeShader(AGSL_WAVE) }
+        .onFailure { Timber.e(it, "XMB wave shader did not compile; falling back to the Canvas wave") }
+        .getOrNull()
+}
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 private fun ShaderWave(time: Float, alphaScale: Float, ampScale: Float) {
-    val shader = remember { RuntimeShader(AGSL_WAVE) }
+    val shader = rememberWaveShader() ?: return FallbackWave(time, alphaScale, ampScale)
     val brush = remember(shader) { ShaderBrush(shader) }
     Canvas(modifier = Modifier.fillMaxSize()) {
         shader.setFloatUniform("iResolution", size.width, size.height)
