@@ -383,6 +383,17 @@ internal fun Modifier.settingsSelectedPlate(selected: Boolean): Modifier = this
         else Modifier
     )
 
+/**
+ * The picker's own shape and edges, squarer and flatter than a settings row's.
+ *
+ * A dropdown is a panel that opens ON something, not a card that sits in a list, and the
+ * reference draws it as a near-rectangle with one hairline. The row plate's 10dp radius and
+ * gradient edge belong to rows; reusing them here made the panel read as a very large row.
+ */
+private val PICKER_SHAPE = RoundedCornerShape(4.dp)
+private val PICKER_EDGE = Color.White.copy(alpha = 0.22f)
+private val PICKER_FOCUS_EDGE = Color.White.copy(alpha = 0.55f)
+
 /** One choice offered by a [SettingsPickerRow]. */
 data class SettingsPickerOption(val label: String, val help: String? = null)
 
@@ -1376,7 +1387,10 @@ private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
             .fillMaxSize()
             // Light, because the point of anchoring is that the row you came from stays visible.
             // Contrast alone has to say which layer is on top, and the opaque list below does it.
-            .background(Color.Black.copy(alpha = 0.45f)),
+            // Barely a scrim. The reference dims almost nothing -- the panel's own opacity is
+            // what separates the layers -- and 0.45 was dark enough to read as a modal dialog
+            // rather than as a list opening on a row.
+            .background(Color.Black.copy(alpha = 0.22f)),
     ) {
         val panelHeight = PICKER_ROW_HEIGHT * picker.options.size + PICKER_PADDING * 2
         val anchorDp = with(density) { picker.anchorY.toDp() }
@@ -1390,12 +1404,14 @@ private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
             modifier = Modifier
                 .padding(start = 48.dp)
                 .offset(y = top)
-                .widthIn(min = 260.dp, max = SETTINGS_COLUMN_MAX_WIDTH)
-                .clip(SETTINGS_ROW_SHAPE)
+                // Hugs its content. 260dp was a panel wide enough to look like a dialog next to
+                // five one-word options; the reference is only as wide as its longest label.
+                .widthIn(min = 150.dp, max = SETTINGS_COLUMN_MAX_WIDTH)
+                .clip(PICKER_SHAPE)
                 // Opaque: this list sits ON the settings list, so the rows underneath must not
                 // read through the options the way they did through the full-screen panel.
-                .background(Color(0xF21A1A22), SETTINGS_ROW_SHAPE)
-                .border(1.dp, SettingsRowSelectedEdgeBrush, SETTINGS_ROW_SHAPE)
+                .background(Color(0xF21A1A22), PICKER_SHAPE)
+                .border(1.dp, PICKER_EDGE, PICKER_SHAPE)
                 .padding(PICKER_PADDING),
         ) {
             picker.options.forEachIndexed { index, option ->
@@ -1404,17 +1420,16 @@ private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(PICKER_ROW_HEIGHT)
-                        .clip(SETTINGS_ROW_SHAPE)
+                        .clip(PICKER_SHAPE)
                         .background(
                             if (focused) SETTINGS_ROW_SELECTED_FILL else Color.Transparent,
-                            SETTINGS_ROW_SHAPE,
+                            PICKER_SHAPE,
                         )
+                        // A flat light hairline, not the row plate's left-to-right gradient. On a
+                        // 150dp panel the gradient reads as one lit edge and one missing one.
                         .then(
-                            if (focused) {
-                                Modifier.border(1.dp, SettingsRowSelectedEdgeBrush, SETTINGS_ROW_SHAPE)
-                            } else {
-                                Modifier
-                            }
+                            if (focused) Modifier.border(1.dp, PICKER_FOCUS_EDGE, PICKER_SHAPE)
+                            else Modifier
                         )
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,

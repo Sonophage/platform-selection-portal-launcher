@@ -2,6 +2,8 @@ package com.psplauncher.core.data.media
 
 import android.content.Context
 import android.content.Intent
+import com.psplauncher.core.common.launch.LaunchTransition
+import com.psplauncher.core.common.launch.LaunchTransition.withoutTransition
 import android.net.Uri
 import timber.log.Timber
 
@@ -40,6 +42,11 @@ object MediaOpenIntent {
             // Without the grant the target app resolves the uri and reads nothing.
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // The launch disc is holding the screen for this. Without it the reader slides in
+            // over the ceremony, which is the one medium that still looked wrong: video and
+            // music open in-app and never leave PFP's window, so a book was the only hand-off
+            // the system still animated. See LaunchTransition.
+            withoutTransition()
             if (!pinnedPackage.isNullOrBlank()) setPackage(pinnedPackage)
         }
 
@@ -57,7 +64,7 @@ object MediaOpenIntent {
         noHandlerMessage: String,
         logLabel: String,
     ): String? = try {
-        context.startActivity(intent)
+        context.startActivity(intent, LaunchTransition.options(context))
         Timber.i("Opened $logLabel (app=${intent.`package` ?: "system"})")
         null
     } catch (e: Exception) {
@@ -79,6 +86,8 @@ object MediaOpenIntent {
         logLabel: String,
     ): String? {
         val open = Intent(intent).apply { `package` = null }
+        // The chooser keeps its animation: it is a dialog the user has to read and act on, not
+        // a hand-off, and an instant cut to it with the disc still fading reads as a glitch.
         val chooser = Intent.createChooser(open, chooserTitle)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return try {

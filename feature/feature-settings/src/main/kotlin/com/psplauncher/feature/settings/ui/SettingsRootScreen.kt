@@ -1,6 +1,8 @@
 package com.psplauncher.feature.settings.ui
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -47,10 +49,22 @@ fun SettingsRootScreen(
     ) {
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            // The root is the one settings screen with nothing in its left column, so its rows
+            // sat hard against the edge where every other screen has a rail. Inset by a fifth of
+            // the page and dropped below the title: the list now starts where a section's
+            // content starts, so opening one is the list staying put and a rail appearing beside
+            // it rather than everything jumping left.
+            //
+            // A fraction of the measured width, not a fixed dp: this screen is drawn at the
+            // device's own density (the XMB's canvas scale does not reach it), so a dp inset
+            // would be a different share of the page on a different panel.
+            val inset = maxWidth * ROOT_LEFT_INSET_FRACTION
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState),
+                .verticalScroll(scrollState)
+                .padding(start = inset, top = ROOT_TOP_DROP),
         ) {
             SettingsSectionId.entries.forEach { section ->
                 // A section row opens its FIRST screen, which is also the row the rail will land
@@ -75,8 +89,20 @@ fun SettingsRootScreen(
                 )
             }
         }
+        }
     }
 }
+
+/**
+ * How far in from the left the root's rows sit, as a share of the page.
+ *
+ * A fifth, which is where a section screen's content begins once its rail is beside it. The two
+ * agreeing is the whole point: the list does not move when you open a section.
+ */
+private const val ROOT_LEFT_INSET_FRACTION = 0.20f
+
+/** How far below the title the first row starts. The title is 30sp and was nearly touching it. */
+private val ROOT_TOP_DROP = 28.dp
 
 /**
  * The row icon for a section.

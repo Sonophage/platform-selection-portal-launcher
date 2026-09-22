@@ -259,7 +259,11 @@ object DiscCeremony {
 
     /** The iris opens back out from the disc and the app takes the screen. Slow, so it is a
      *  transition rather than a cut. */
-    const val FadeOutMs = 900
+    // The tail. Long, because almost all of it is a hold on black behind a cold-starting app
+    // and only the last stretch is ever seen -- and when it IS seen (a launch that never
+    // arrived) it is the slowest thing in the ceremony on purpose. At 900 the room snapped back
+    // in about a third of a second, which read as a cut rather than a reveal.
+    const val FadeOutMs = 1500
 
     const val TotalMs = FadeInMs + SinkMs + SpinMs + FadeOutMs
 
@@ -286,8 +290,8 @@ object DiscCeremony {
      * screen somewhere in here, and black is the only thing that can be under a hand-off without
      * being the wrong thing. Only a launch that never arrives gets as far as the open.
      */
-    private const val DiscLeaveShare = 0.55f
-    private const val RoomOpensShare = 0.65f
+    private const val DiscLeaveShare = 0.38f
+    private const val RoomOpensShare = 0.45f
     val DiscGoneFraction = FadeOutFraction + (1f - FadeOutFraction) * DiscLeaveShare
     val RoomOpensFraction = FadeOutFraction + (1f - FadeOutFraction) * RoomOpensShare
 

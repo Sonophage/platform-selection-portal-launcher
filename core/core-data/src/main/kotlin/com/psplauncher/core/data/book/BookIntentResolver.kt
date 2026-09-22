@@ -2,6 +2,8 @@ package com.psplauncher.core.data.book
 
 import android.content.Context
 import android.content.Intent
+import com.psplauncher.core.common.launch.LaunchTransition
+import com.psplauncher.core.common.launch.LaunchTransition.withoutTransition
 import com.psplauncher.core.data.media.MediaOpenIntent
 import com.psplauncher.core.domain.model.Book
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -74,9 +76,10 @@ class BookIntentResolver @Inject constructor(
     fun launchReader(packageName: String): String? {
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?.withoutTransition()
             ?: return "${readerLabel(packageName) ?: "That reader"} is not installed."
         return try {
-            context.startActivity(intent)
+            context.startActivity(intent, LaunchTransition.options(context))
             null
         } catch (e: Exception) {
             "${readerLabel(packageName) ?: "That reader"} could not be opened."
