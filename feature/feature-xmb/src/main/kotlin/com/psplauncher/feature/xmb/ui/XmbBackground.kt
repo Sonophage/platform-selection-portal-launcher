@@ -241,7 +241,9 @@ private fun WaveBackground(
 //
 // The slope stands in for their normal: a surface turning edge-on to the viewer is a surface whose
 // height is changing fastest, so |dh/dx| drives the same highlight their dot(view, N) does.
-private const val SHEETS = 4
+// Seven. The constant is interpolated into the shader below rather than sitting beside a literal
+// 4 that had to be remembered — it was already out of step once by being unused entirely.
+private const val SHEETS = 7
 private const val AGSL_WAVE = """
 uniform float2 iResolution;
 uniform float  iTime;
@@ -339,13 +341,14 @@ half4 main(float2 fragCoord) {
 
     float acc = 0.0;
     float crestY = 0.70;   // replaced by the front sheet's crest below
-    for (int i = 0; i < 4; i++) {
-        float f = float(i) / 3.0;
+    for (int i = 0; i < ${SHEETS}; i++) {
+        float f = float(i) / ${SHEETS - 1}.0;
         float z = f * 2.0 - 1.0;
 
         // Each sheet sits a little lower and is a little fainter than the one in front of it,
-        // which is what the mesh's own depth does for them.
-        float seat = 0.60 + f * 0.13;
+        // which is what the mesh's own depth does for them. Spread wider than with four, so
+        // seven read as seven lines rather than as one thick band.
+        float seat = 0.55 + f * 0.24;
         float h    = waveHeight(px, z, t, ampScale);
         float sy   = seat + h;
 
@@ -366,10 +369,12 @@ half4 main(float2 fragCoord) {
         // falloff 34 -> 68, which is the same halving written the other way round because one is
         // a width and the other is its reciprocal. The wave read as a smear rather than as a
         // surface with an edge.
-        float body = smoothstep(0.0, 0.10, d) * 0.055;
-        float line = exp(-pow(d * 68.0, 2.0)) * (0.10 + 0.22 * F);
+        // The line is thinner again, 68 -> 150, and the body is dimmed because seven of them
+        // stack where four did and the sum, not the single sheet, is what the eye sees.
+        float body = smoothstep(0.0, 0.10, d) * 0.026;
+        float line = exp(-pow(d * 150.0, 2.0)) * (0.10 + 0.24 * F);
 
-        acc += (body + line) * (1.0 - f * 0.35);
+        acc += (body + line) * (1.0 - f * 0.45);
     }
 
     // Sparkles belong to the band, not to the screen. Centred on the FRONT SHEET'S crest rather
