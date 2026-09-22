@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -241,10 +242,22 @@ class ScreenScraperApi @Inject constructor(
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    // Single-flight + spacing: ScreenScraper enforces per-account thread and per-minute limits.
-    // The mutex keeps to the one thread an account has (maxthreads 1); starts at least
-    // [requestIntervalMs] apart keep to the per-minute limit, with 1.1 s as the floor.
-    private val requestGate = Mutex()
+    // Two separate limits, enforced separately, because they are separate things.
+    //
+    // THREADS -- how many requests may be in the air at once. [requestSlots] holds one permit per
+    // thread the account allows. It starts at one, because before the first response we have no
+    // idea what the account is, and grows when a response says so.
+    //
+    // SPACING -- how far apart requests may START. Account-wide, so it stays one mutex however
+    // many threads are running: a coroutine takes it only long enough to wait its turn and stamp
+    // its start, then lets the next one in while its own request is still in flight.
+    //
+    // Before this the two were one mutex, with the comment "the one thread an account has
+    // (maxthreads 1)" -- a guess that was wired in as a constant. The account block has carried
+    // `maxthreads` all along; it was parsed, printed in Settings, and never used for anything.
+    @Volatile private var requestSlots = Semaphore(1)
+    @Volatile private var maxThreads = 1
+    private val spacingGate = Mutex()
     private var lastRequestStartedAt = 0L
 
     // The account's `maxrequestspermin`, from the latest response that carried one. Null until then.
@@ -488,38 +501,70 @@ class ScreenScraperApi @Inject constructor(
     }
 
     /**
-     * Runs [block] through the single-flight gate, starting it no sooner than the account's
-     * interval after the previous request STARTED. Spacing from the previous request's end made a
-     * request wait 1.1 s even after a 10 s search had already used up far more than the interval.
+     * Runs [block] through the gate: at most [maxThreads] at once, and starting no sooner than the
+     * account's interval after the previous request STARTED. Spacing from the previous request's
+     * end made a request wait 1.1 s even after a 10 s search had already used up far more than the
+     * interval.
      *
-     * Logs, per [endpoint], how long the request waited — queued behind another request for the
-     * lock, then spaced — and how long ScreenScraper took, so queueing can be told apart from
-     * server time on a device.
+     * The spacing lock is released before [block] runs, not after. Holding it across the request
+     * is what made this single-flight in the first place -- with it released, four permits mean
+     * four requests genuinely overlapping while their starts stay 1.1 s apart.
+     *
+     * Logs, per [endpoint], how long the request waited — queued for a thread, then spaced — and
+     * how long ScreenScraper took, so queueing can be told apart from server time on a device.
      */
-    private suspend fun <T> rateLimited(endpoint: String, block: suspend () -> T): T {
+    // internal, not private, so a test can prove the thing this change is FOR: that two requests
+    // are in the air at once when the account allows two. Nothing outside this class calls it.
+    internal suspend fun <T> rateLimited(endpoint: String, block: suspend () -> T): T {
         val askedAt = System.currentTimeMillis()
-        return requestGate.withLock {
-            val lockedAt = System.currentTimeMillis()
-            val wait = waitBeforeNextRequest(lockedAt, lastRequestStartedAt, requestIntervalMs(maxRequestsPerMinute))
-            if (wait > 0) delay(wait)
-            val startedAt = System.currentTimeMillis()
-            lastRequestStartedAt = startedAt
+        // Read once: a response can swap the semaphore mid-flight, and releasing a permit to a
+        // different object than the one it was taken from would quietly inflate the permit count.
+        val slots = requestSlots
+        slots.acquire()
+        try {
+            val queuedAt = System.currentTimeMillis()
+            val startedAt = spacingGate.withLock {
+                val wait = waitBeforeNextRequest(
+                    System.currentTimeMillis(), lastRequestStartedAt, requestIntervalMs(maxRequestsPerMinute),
+                )
+                if (wait > 0) delay(wait)
+                System.currentTimeMillis().also { lastRequestStartedAt = it }
+            }
             try {
-                block()
+                return block()
             } finally {
                 Timber.d(
-                    "ScreenScraper gate %s: waited %d ms (queued %d, spaced %d), request %d ms",
-                    endpoint, startedAt - askedAt, lockedAt - askedAt, startedAt - lockedAt,
-                    System.currentTimeMillis() - startedAt,
+                    "ScreenScraper gate %s: waited %d ms (queued %d, spaced %d), request %d ms, %d thread(s)",
+                    endpoint, startedAt - askedAt, queuedAt - askedAt, startedAt - queuedAt,
+                    System.currentTimeMillis() - startedAt, maxThreads,
                 )
             }
+        } finally {
+            slots.release()
         }
     }
 
-    /** Keeps what a response's `ssuser` block says: the pacing limit, and the daily counter. */
-    private fun rememberRequestLimit(user: SsUser?) {
+    /**
+     * Keeps what a response's `ssuser` block says: the thread count, the pacing limit, and the
+     * daily counter.
+     *
+     * Widening the thread count REPLACES the semaphore rather than adding permits to it, because
+     * kotlinx's has no way to add any. The cost is that requests already in the air hold permits
+     * on the old one, so for the moment of the swap the real count can exceed the new limit by
+     * however many those were -- in practice one, since the swap is driven by a response and the
+     * limit before the first response is one. A single extra request on the first swap of a run is
+     * a smaller error than the one this replaces, which was every run capped at one thread
+     * forever.
+     */
+    internal fun rememberRequestLimit(user: SsUser?) {
         user ?: return
         user.maxRequestsPerMinute?.toIntOrNull()?.let { maxRequestsPerMinute = it }
+        val threads = effectiveThreads(user.maxThreads)
+        if (threads != maxThreads) {
+            Timber.d("ScreenScraper threads: %d → %d (account says %s)", maxThreads, threads, user.maxThreads)
+            maxThreads = threads
+            requestSlots = Semaphore(threads)
+        }
         if (user.requestsToday != null || user.maxRequestsPerDay != null) _quota.value = user
     }
 
@@ -622,6 +667,9 @@ class ScreenScraperApi @Inject constructor(
     companion object {
         private const val BASE = "https://api.screenscraper.fr/api2"
         private const val MIN_REQUEST_INTERVAL_MS = 1_100L
+
+        /** The most requests we will ever have in the air, whatever the account claims. */
+        internal const val MAX_THREADS = 8
         private const val SEARCH_SOCKET_TIMEOUT_MS = 40_000L
 
         /**
@@ -634,6 +682,21 @@ class ScreenScraperApi @Inject constructor(
             val perMinute = maxRequestsPerMinute?.takeIf { it > 0 } ?: return MIN_REQUEST_INTERVAL_MS
             return maxOf(MIN_REQUEST_INTERVAL_MS, (60_000L + perMinute - 1) / perMinute)
         }
+
+        /**
+         * How many requests this account may have in the air at once, from its `maxthreads`.
+         *
+         * Clamped into [1, [MAX_THREADS]]. One at the bottom because zero threads is not a rate
+         * limit, it is a deadlock, and ScreenScraper has been seen to send "0" for an account
+         * whose allowance is simply not set. A ceiling at the top because this number arrives from
+         * a server: a wrong or hostile one must not be able to open an unbounded number of
+         * sockets on a handheld, and no real allowance is near it.
+         *
+         * Anything unparseable keeps one, which is exactly the behaviour that was hard-coded here
+         * before — so an account that reports nothing is no worse off than it was.
+         */
+        internal fun effectiveThreads(maxThreads: String?): Int =
+            maxThreads?.trim()?.toIntOrNull()?.coerceIn(1, MAX_THREADS) ?: 1
 
         /** How long a request must wait at [nowMs] when the previous one started at [lastStartMs]. */
         internal fun waitBeforeNextRequest(nowMs: Long, lastStartMs: Long, intervalMs: Long): Long =

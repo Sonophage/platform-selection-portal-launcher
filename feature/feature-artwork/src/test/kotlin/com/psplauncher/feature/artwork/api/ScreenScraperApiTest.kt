@@ -1,6 +1,10 @@
 package com.psplauncher.feature.artwork.api
 
 import io.mockk.mockk
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -195,5 +199,134 @@ class ScreenScraperApiTest {
         assertEquals(false, resultWith(SsFailureReason.RATE_LIMITED).isBatchStopper)
         assertEquals(true,  resultWith(SsFailureReason.TOO_MANY_UNRECOGNIZED).stopsUnhashedLookups)
         assertEquals(false, resultWith(SsFailureReason.TOO_MANY_UNRECOGNIZED).isBatchStopper)
+    }
+
+    // ── Threads (the account's `maxthreads`) ─────────────────────────────────
+
+    @Test
+    fun `an account's thread count is read, clamped, and never zero`() {
+        // Zero is the one that matters. ScreenScraper sends "0" for an account whose allowance is
+        // not set, and a semaphore built with zero permits is not a rate limit, it is a scrape
+        // that hangs on its first request with no error anywhere.
+        assertEquals(1, ScreenScraperApi.effectiveThreads("0"))
+        assertEquals(1, ScreenScraperApi.effectiveThreads("-4"))
+
+        // Absent or unparseable keeps one -- exactly what was hard-coded here before, so an
+        // account that reports nothing is no worse off than it was.
+        assertEquals(1, ScreenScraperApi.effectiveThreads(null))
+        assertEquals(1, ScreenScraperApi.effectiveThreads(""))
+        assertEquals(1, ScreenScraperApi.effectiveThreads("lots"))
+
+        assertEquals(1, ScreenScraperApi.effectiveThreads("1"))
+        assertEquals(4, ScreenScraperApi.effectiveThreads(" 4 "))
+
+        // The ceiling. This number comes off the wire, and a wrong or hostile one must not open an
+        // unbounded number of sockets on a handheld.
+        assertEquals(ScreenScraperApi.MAX_THREADS, ScreenScraperApi.effectiveThreads("9999"))
+    }
+
+    @Test
+    fun `two threads means two requests actually in the air at once`() = runBlocking {
+        // The whole point of the change, and the one part of it a pure function cannot show.
+        //
+        // Before this, spacing and concurrency were the same mutex, held across the request: a
+        // second request could not start until the first had COME BACK, so an account allowed four
+        // threads still ran one at a time forever. The permit is now held across the request and
+        // the spacing lock is not, and this is what tells those two arrangements apart.
+        //
+        // Real time, not virtual: the gate reads the wall clock, and the 1.1 s floor is what makes
+        // the overlap observable at all. Each block outlives that floor on purpose -- with a block
+        // shorter than the spacing, nothing would overlap however many permits there were, and the
+        // test would pass against the very code it exists to reject.
+        val api = ScreenScraperApi(
+            appContext = mockk(relaxed = true),
+            httpClient = mockk(relaxed = true),
+            credentials = mockk(relaxed = true),
+        )
+        api.rememberRequestLimit(
+            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString(SsUser.serializer(), """{"id":"someone","maxthreads":"2"}"""),
+        )
+
+        val inFlight = java.util.concurrent.atomic.AtomicInteger()
+        val peak = java.util.concurrent.atomic.AtomicInteger()
+        coroutineScope {
+            repeat(2) {
+                launch {
+                    api.rateLimited("test") {
+                        peak.accumulateAndGet(inFlight.incrementAndGet(), ::maxOf)
+                        delay(2_000)
+                        inFlight.decrementAndGet()
+                    }
+                }
+            }
+        }
+        assertEquals("both requests should have been in the air together", 2, peak.get())
+    }
+
+    @Test
+    fun `widening the limit mid-request does not hand back a permit that was never taken`() = runBlocking {
+        // A permit leak, and the reason rateLimited reads the semaphore into a local first.
+        //
+        // rememberRequestLimit runs INSIDE a request -- it is fed from that request's own response
+        // -- so the semaphore can be replaced while a permit is outstanding on the old one.
+        // Releasing to `requestSlots` instead of to the instance the permit came from adds a
+        // permit to the new semaphore that nobody ever acquired, and the account's limit is one
+        // higher from then on, for the rest of the process, with nothing to show for it.
+        //
+        // Two permits after the swap, three callers: the third must wait. If the leak is there it
+        // does not, and a scrape quietly runs one thread over what the account allows.
+        val api = ScreenScraperApi(
+            appContext = mockk(relaxed = true),
+            httpClient = mockk(relaxed = true),
+            credentials = mockk(relaxed = true),
+        )
+        api.rateLimited("first") {
+            api.rememberRequestLimit(
+                kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                    .decodeFromString(SsUser.serializer(), """{"id":"someone","maxthreads":"2"}"""),
+            )
+        }
+
+        val inFlight = java.util.concurrent.atomic.AtomicInteger()
+        val peak = java.util.concurrent.atomic.AtomicInteger()
+        coroutineScope {
+            repeat(3) {
+                launch {
+                    api.rateLimited("test") {
+                        peak.accumulateAndGet(inFlight.incrementAndGet(), ::maxOf)
+                        delay(2_500)
+                        inFlight.decrementAndGet()
+                    }
+                }
+            }
+        }
+        assertEquals("the swap must not have added a permit", 2, peak.get())
+    }
+
+    @Test
+    fun `one thread still means one request at a time`() = runBlocking {
+        // The other half of the pair: an account that allows one must still be serialised, and a
+        // semaphore whose permits were released to a different instance than they were taken from
+        // would quietly stop enforcing that.
+        val api = ScreenScraperApi(
+            appContext = mockk(relaxed = true),
+            httpClient = mockk(relaxed = true),
+            credentials = mockk(relaxed = true),
+        )
+        val inFlight = java.util.concurrent.atomic.AtomicInteger()
+        val peak = java.util.concurrent.atomic.AtomicInteger()
+        coroutineScope {
+            repeat(2) {
+                launch {
+                    api.rateLimited("test") {
+                        peak.accumulateAndGet(inFlight.incrementAndGet(), ::maxOf)
+                        delay(300)
+                        inFlight.decrementAndGet()
+                    }
+                }
+            }
+        }
+        assertEquals("an unconfigured account must stay single-flight", 1, peak.get())
     }
 }
