@@ -49,7 +49,7 @@ class SettingsHierarchyTest {
         assertEquals(
             "The settings row must land on the rail's first screen",
             opensId,
-            settingsRailRows(opensId).first { !it.isSection }.id,
+            settingsRailRows(opensId).first().id,
         )
     }
 
@@ -103,11 +103,25 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `every screen the rail can reach resolves to a route`() {
-        // The rail is now the ONLY way to reach most of these: the crossbar opens one screen and
-        // the rail gets you to the rest. A row here with no route is a dead end with no symptom.
+        // The rail is one section's screens now, and the shoulders are the only way to another
+        // section — so between them they are the ONLY way to reach most of these. A row here with
+        // no route is a dead end with no symptom.
         SettingsSectionId.entries.forEach { section ->
             settingsRailRows(settingsEntriesIn(section).first().id).forEach { row ->
-                assertTrue("No route for rail row ${row.id} (opens ${row.opens})", row.opens in SETTINGS_SCREEN_ROUTES)
+                assertTrue("No route for rail row ${row.id}", row.id in SETTINGS_SCREEN_ROUTES)
+            }
+        }
+    }
+
+    @Test fun `every section the shoulders can reach resolves to a route`() {
+        // The other half of the same guarantee. settingsRailRows can only ever offer screens
+        // inside the section you are already in, so a section whose first screen has no route
+        // would be unreachable with nothing failing.
+        SettingsSectionId.entries.forEach { section ->
+            val from = settingsEntriesIn(section).first().id
+            listOf(-1, +1).forEach { delta ->
+                val target = com.psplauncher.core.domain.model.settingsSectionStepTarget(from, delta)
+                assertTrue("No route stepping $delta from $from (got $target)", target in SETTINGS_SCREEN_ROUTES)
             }
         }
     }

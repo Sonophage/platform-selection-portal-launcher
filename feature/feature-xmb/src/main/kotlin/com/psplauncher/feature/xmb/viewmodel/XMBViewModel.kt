@@ -5757,6 +5757,12 @@ class XMBViewModel @Inject constructor(
                     GamepadAction.NAVIGATE_RIGHT,
                     GamepadAction.OPEN_CONTEXT_MENU,
                     GamepadAction.CHANGE_SORT,
+                    // The shoulders step between settings SECTIONS. They used to fall through to
+                    // `else -> Unit` here, which is why the rail could afford to list every
+                    // section: there was no other way to reach one. Now the rail lists the
+                    // current section's screens and these are how you leave it.
+                    GamepadAction.PREV_CATEGORY,
+                    GamepadAction.NEXT_CATEGORY,
                     GamepadAction.SELECT -> _uiState.update { it.copy(pendingSettingsAction = action) }
                     else -> Unit
                 }

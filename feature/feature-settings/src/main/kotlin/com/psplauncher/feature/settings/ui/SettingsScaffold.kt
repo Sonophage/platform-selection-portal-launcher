@@ -512,8 +512,8 @@ fun SettingsScaffold(
     val helpText = remember { mutableStateOf<String?>(null) }
     // The open picker and the cursor inside it. Cursor lives beside the request rather than in it
     // so re-opening the same setting always starts on its current value.
-    // The section rail: every section, the open one expanded to its screens, and whether the
-    // cursor is in it.
+    // The section rail: the current section's screens, and whether the cursor is in it. The
+    // section itself is the page title; the shoulders move between sections.
     //
     // Only for a screen that IS one of the catalog's screens. A deep link or the wizard has no
     // siblings to show, and an empty rail would be a column of nothing holding the content in.
@@ -779,6 +779,23 @@ fun SettingsScaffold(
             return@LaunchedEffect
         }
 
+        // ── Section switch ──────────────────────────────────────────────────
+        // The shoulders step between SECTIONS, landing on the first screen of the next one.
+        //
+        // Ahead of the rail block, not inside it, because this has to work wherever the cursor
+        // is: the rail lists one section's screens now, so with this bound only while the rail
+        // has focus there would be no way out of a section from the content column.
+        //
+        // Nothing was displaced. The XMB's dispatcher dropped both shoulder actions on the floor
+        // for settings screens (`else -> Unit`), so they had no meaning here at all.
+        if (pendingAction == GamepadAction.PREV_CATEGORY || pendingAction == GamepadAction.NEXT_CATEGORY) {
+            val delta = if (pendingAction == GamepadAction.NEXT_CATEGORY) 1 else -1
+            com.psplauncher.core.domain.model.settingsSectionStepTarget(screenId, delta)
+                ?.let(openScreen)
+            onConsumed()
+            return@LaunchedEffect
+        }
+
         // ── Section rail ────────────────────────────────────────────────────
         // While the cursor is in the rail it owns vertical movement and Confirm, exactly as the
         // content list does when the cursor is there. RIGHT returns; BACK leaves the screen, so
@@ -793,9 +810,8 @@ fun SettingsScaffold(
                 GamepadAction.SELECT -> {
                     val target = railEntries.getOrNull(railCursor.intValue)
                     // Confirming the screen you are already on just puts the cursor back in it,
-                    // rather than reloading the page you can see. A section row opens its first
-                    // screen, which is also what expands that section in the rail.
-                    if (target != null && target.opens != screenId) openScreen(target.opens)
+                    // rather than reloading the page you can see.
+                    if (target != null && target.id != screenId) openScreen(target.id)
                     else railFocused.value = false
                 }
                 GamepadAction.BACK -> onBack()
@@ -1193,10 +1209,9 @@ fun SettingsScaffold(
                     // wider than the screen and this is a no-op, so narrow devices keep the full
                     // width they need.
                     Row(Modifier.fillMaxSize()) {
-                        // The section rail: all six sections, with the one you are inside
-                        // expanded to its screens. This is the PS5 layout, and the reason it
-                        // earns its width is that the crossbar is down to a single Settings row
-                        // now, so the rail is the only place the whole tree exists.
+                        // The current section's screens. The section's own name is the page
+                        // title, so listing it here too was the duplicate row you could see on
+                        // Overview.
                         if (railEntries.isNotEmpty()) {
                             SettingsSectionRail(
                                 entries = railEntries,
@@ -1206,7 +1221,7 @@ fun SettingsScaffold(
                                 },
                                 onPick = { row ->
                                     notifyTouchInput()
-                                    if (row.opens != screenId) openScreen(row.opens)
+                                    if (row.id != screenId) openScreen(row.id)
                                 },
                             )
                         }
@@ -1402,10 +1417,10 @@ private val PICKER_EDGE_MARGIN = 24.dp
  */
 @Composable
 private fun SettingsSectionRail(
-    entries: List<com.psplauncher.core.domain.model.SettingsRailRow>,
+    entries: List<com.psplauncher.core.domain.model.SettingsEntry>,
     currentId: String?,
     cursorIndex: Int?,
-    onPick: (com.psplauncher.core.domain.model.SettingsRailRow) -> Unit,
+    onPick: (com.psplauncher.core.domain.model.SettingsEntry) -> Unit,
 ) {
     // A list, not a Column: two levels of a six-section tree is up to twelve rows, which is
     // taller than the rail on a handheld in landscape. The cursor scrolls it.
@@ -1459,14 +1474,9 @@ private fun SettingsSectionRail(
                         }
                     )
                     .clickable { onPick(row) }
-                    // A section's screens are indented under it. Indentation is the only thing
-                    // that says which section a screen belongs to once all six are listed.
-                    .padding(
-                        start = if (row.isSection) 10.dp else 22.dp,
-                        end = 10.dp,
-                        top = 7.dp,
-                        bottom = 7.dp,
-                    ),
+                    // No indentation any more: every row in this column is a screen of the one
+                    // section named in the title, so there is no hierarchy left to express.
+                    .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -1482,12 +1492,8 @@ private fun SettingsSectionRail(
                     // thirteen-row tree at a glance.
                     color = if (isCurrent) SettingsText
                             else SettingsText.copy(alpha = SETTINGS_RAIL_INACTIVE_ALPHA),
-                    fontSize = if (row.isSection) 14.sp else 13.sp,
-                    fontWeight = when {
-                        isCurrent -> FontWeight.SemiBold
-                        row.isSection -> FontWeight.Medium
-                        else -> FontWeight.Normal
-                    },
+                    fontSize = 15.sp,
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = TextStyle(shadow = SettingsTextShadow),

@@ -2,95 +2,97 @@ package com.psplauncher.core.domain.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The section rail's two-level shape.
+ * The section rail's shape, and the shoulders that are now the only way between sections.
  *
- * It is the only place the settings tree exists now: the crossbar is down to a single Settings
- * row, so a rail that showed the wrong section expanded, or no sections at all, would leave whole
- * parts of Settings unreachable without anything failing.
+ * This asserted a two-level rail — every section listed, the open one expanded under it. That rail
+ * was thirteen rows and showed the open section twice, once as its heading and once as its first
+ * screen. It is one section's screens now, with the section's name as the page title.
+ *
+ * The pair that matters: the rail no longer offers a route to another section, so
+ * [settingsSectionStepTarget] is the only one. A rail that listed everything could afford a broken
+ * step; this one cannot, and the last two tests here are why.
  */
 class SettingsRailRowsTest {
 
     @Test
-    fun `every section is listed, whichever screen you are on`() {
+    fun `the rail is exactly its own section's screens`() {
         SETTINGS_CATALOG.forEach { entry ->
-            val sections = settingsRailRows(entry.id).filter { it.isSection }.map { it.id }
             assertEquals(
-                SettingsSectionId.entries.map { it.id },
-                sections,
-                "on ${entry.id} the rail must still offer every section",
+                settingsEntriesIn(entry.section).map { it.id },
+                settingsRailRows(entry.id).map { it.id },
+                "rail for ${entry.id}",
             )
         }
     }
 
     @Test
-    fun `exactly the section you are in is expanded`() {
-        val rows = settingsRailRows("settings_audio")
-        val screens = rows.filterNot { it.isSection }.map { it.id }
-        assertEquals(settingsEntriesIn(SettingsSectionId.INTERFACE).map { it.id }, screens)
-        // ...and nothing from any other section leaked in.
-        assertFalse(rows.any { it.id == "settings_artwork" })
-    }
-
-    @Test
-    fun `a section's screens sit directly under its own row`() {
-        // Indentation is all that says which section a screen belongs to, so the ORDER has to
-        // carry it: a screen listed under the wrong heading reads as belonging to it.
-        val rows = settingsRailRows("settings_themes")
-        val headingIndex = rows.indexOfFirst { it.id == SettingsSectionId.APPEARANCE.id }
-        val expected = settingsEntriesIn(SettingsSectionId.APPEARANCE).map { it.id }
-        assertEquals(expected, rows.subList(headingIndex + 1, headingIndex + 1 + expected.size).map { it.id })
-    }
-
-    @Test
-    fun `a section row opens its first screen`() {
-        settingsRailRows("settings_about").filter { it.isSection }.forEach { row ->
-            val section = SettingsSectionId.entries.first { it.id == row.id }
-            assertEquals(settingsEntriesIn(section).first().id, row.opens)
-        }
-    }
-
-    @Test
-    fun `a row's id and what it opens differ only for a section`() {
-        settingsRailRows("settings_library").forEach { row ->
-            if (row.isSection) {
-                // The LIBRARY heading and the Library Manager screen both open settings_library.
-                // They must not also share an id, or the rail would mark two rows as current.
-                assertTrue(row.id != row.opens, "${row.id} must not be its own target")
-            } else {
-                assertEquals(row.id, row.opens)
-            }
-        }
-    }
-
-    @Test
-    fun `every row id is unique, so the list can be keyed by it`() {
+    fun `the screen you are on is always in its own rail, exactly once`() {
         SETTINGS_CATALOG.forEach { entry ->
             val ids = settingsRailRows(entry.id).map { it.id }
-            assertEquals(ids.size, ids.distinct().size, "duplicate rail id while on ${entry.id}")
+            assertEquals(1, ids.count { it == entry.id }, "${entry.id} in its own rail")
         }
     }
 
     @Test
-    fun `a route outside the catalog gets no rail at all`() {
-        // The wizard's first-run variant is meant to be finished, not navigated away from.
+    fun `no row is repeated`() {
+        SETTINGS_CATALOG.forEach { entry ->
+            val ids = settingsRailRows(entry.id).map { it.id }
+            assertEquals(ids.distinct(), ids, "duplicate rail row for ${entry.id}")
+        }
+    }
+
+    @Test
+    fun `a route outside the catalog has no rail`() {
+        // The wizard's first-run variant and Library Manager's deep links are finished screens
+        // reached from elsewhere; a rail there is a way out of something meant to be completed.
         assertEquals(emptyList(), settingsRailRows("settings_initial_setup_first"))
         assertEquals(emptyList(), settingsRailRows("settings_import_pc"))
         assertEquals(emptyList(), settingsRailRows(null))
     }
 
     @Test
-    fun `the cursor can always find the screen you are on`() {
-        // The scaffold opens the rail with its cursor on indexOfFirst { it.id == screenId }. A
-        // screen missing from its own rail would silently park the cursor on row zero.
+    fun `the shoulders reach every section from every screen`() {
+        // The rail cannot leave a section any more, so this is the whole escape route. Stepping
+        // forward from any screen, section by section, must visit all seven.
         SETTINGS_CATALOG.forEach { entry ->
-            assertTrue(
-                settingsRailRows(entry.id).any { it.id == entry.id && !it.isSection },
-                "${entry.id} is absent from its own rail",
-            )
+            val seen = mutableSetOf<SettingsSectionId>()
+            var id: String? = entry.id
+            repeat(SettingsSectionId.entries.size) {
+                val section = id?.let(::settingsSectionFor)
+                assertNotNull(section, "step from ${entry.id} left the catalog")
+                seen += section
+                id = settingsSectionStepTarget(id, 1)
+            }
+            assertEquals(SettingsSectionId.entries.toSet(), seen, "from ${entry.id}")
+        }
+    }
+
+    @Test
+    fun `stepping wraps in both directions and always lands on a real screen`() {
+        val first = SettingsSectionId.entries.first()
+        val last = SettingsSectionId.entries.last()
+        assertEquals(last, settingsSectionStep(first, -1))
+        assertEquals(first, settingsSectionStep(last, +1))
+
+        SETTINGS_CATALOG.forEach { entry ->
+            listOf(-1, +1).forEach { delta ->
+                val target = settingsSectionStepTarget(entry.id, delta)
+                assertNotNull(target, "no target stepping $delta from ${entry.id}")
+                assertNotNull(settingsEntryFor(target), "$target is not a catalog screen")
+            }
+        }
+    }
+
+    @Test
+    fun `every section has at least one screen to land on`() {
+        // settingsSectionStepTarget takes the section's first screen. An empty section would make
+        // the shoulders silently do nothing on the way past it.
+        SettingsSectionId.entries.forEach { section ->
+            assertTrue(settingsEntriesIn(section).isNotEmpty(), "$section has no screens")
         }
     }
 }

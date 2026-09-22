@@ -117,51 +117,37 @@ fun settingsSectionFor(screenId: String): SettingsSectionId? = settingsEntryFor(
 // ── The section rail ──────────────────────────────────────────────────────────
 
 /**
- * One row of the section rail drawn down the left of every settings screen.
+ * The rail for the screen you are on: the screens of ITS section, and nothing else.
  *
- * [id] identifies the row and [opens] is what confirming it opens, and they are NOT the same thing
- * for a section: a section row opens its first screen, and if the two ids were one string the rail
- * would have two rows claiming the same identity and would highlight both.
- */
-data class SettingsRailRow(
-    val id: String,
-    val opens: String,
-    val title: String,
-    /** A section heading you can confirm, as opposed to one of its screens. */
-    val isSection: Boolean,
-)
-
-/**
- * The rail for the screen you are on: every section, with the one you are inside expanded to show
- * its screens.
+ * It used to list all seven sections with the open one expanded under it — up to thirteen rows,
+ * and the open section appeared twice, once as the heading and once as its first screen. The PS5
+ * reference this is modelled on puts only the current section's items in that column and uses the
+ * section's name as the page title, which is shorter, has no duplicate, and makes the bright row
+ * mean one thing.
  *
- * The crossbar used to be where you chose a section, and the rail only listed the screens of the
- * one you had already chosen. With the crossbar down to a single Settings row, the rail is the
- * only place the tree exists, so it has to carry both levels: the six sections, always, and the
- * open section's screens under it.
+ * Switching section is [settingsSectionStep], on the shoulders — they were unbound in Settings.
  *
  * Empty for a route outside the catalog. The setup wizard's first-run variant and Library
  * Manager's deep links are reached from elsewhere and have no siblings to move between; a rail
  * there would offer a way out of a screen that is meant to be finished.
  */
-fun settingsRailRows(screenId: String?): List<SettingsRailRow> {
-    val open = screenId?.let(::settingsSectionFor) ?: return emptyList()
-    return buildList {
-        SettingsSectionId.entries.forEach { section ->
-            val screens = settingsEntriesIn(section)
-            add(
-                SettingsRailRow(
-                    id = section.id,
-                    opens = screens.first().id,
-                    title = section.title,
-                    isSection = true,
-                ),
-            )
-            if (section == open) {
-                screens.forEach {
-                    add(SettingsRailRow(id = it.id, opens = it.id, title = it.title, isSection = false))
-                }
-            }
-        }
-    }
+fun settingsRailRows(screenId: String?): List<SettingsEntry> =
+    screenId?.let(::settingsSectionFor)?.let(::settingsEntriesIn) ?: emptyList()
+
+/**
+ * The section [delta] steps from [section], wrapping at both ends.
+ *
+ * Wrapping, unlike the row cursor inside a screen: the sections are a ring you flick through with
+ * the shoulders, and stopping dead at System would make the last section feel like a wall.
+ */
+fun settingsSectionStep(section: SettingsSectionId, delta: Int): SettingsSectionId {
+    val all = SettingsSectionId.entries
+    val next = ((section.ordinal + delta) % all.size + all.size) % all.size
+    return all[next]
+}
+
+/** Where the shoulders land: the first screen of the section [delta] steps away, or null. */
+fun settingsSectionStepTarget(screenId: String?, delta: Int): String? {
+    val section = screenId?.let(::settingsSectionFor) ?: return null
+    return settingsEntriesIn(settingsSectionStep(section, delta)).firstOrNull()?.id
 }

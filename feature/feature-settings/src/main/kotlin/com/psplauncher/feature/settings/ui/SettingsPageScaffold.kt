@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
@@ -14,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.core.domain.model.settingsSectionFor
 import com.psplauncher.core.ui.components.ControllerPromptItem
 
 /**
@@ -66,7 +68,17 @@ fun SettingsPageScaffold(
         // the page. TextLegibilityStyle is what protects the text there — see the note in
         // SettingsScaffold's scrim block on why these anchors are NOT solved like the dark ones.
         lightScrim = true,
-        header = { SettingsPageTitle(subtitle) },
+        // The SECTION's name, not the screen's. The rail lists the section's screens and the
+        // title says which section they belong to — the same split the reference uses, and what
+        // stops "Overview" appearing twice. Falls back to the screen name for a route outside
+        // the catalog, which has no section to name.
+        header = {
+            val screenId = LocalSettingsScreenId.current
+            val section = remember(screenId) {
+                screenId?.let { settingsSectionFor(it) }
+            }
+            SettingsPageTitle(section?.title ?: subtitle)
+        },
         // The reference has no rule under the title. The rail and the content are separated by
         // their own columns; a horizontal line across both only adds a second boundary.
         showDivider = false,
