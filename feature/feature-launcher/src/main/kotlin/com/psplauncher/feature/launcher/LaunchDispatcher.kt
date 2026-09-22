@@ -89,7 +89,7 @@ class LaunchDispatcher @Inject constructor(
         // this line is preflight: a game that cannot launch must never show a presentation. Both
         // game-launch call sites (Game Detail and the XMB's direct launch) get it for free.
         // No-op when GameBoot is disabled, and bounded by its own watchdog — see GameBootGate.
-        gameBootGate.awaitPresentation(game.displayTitle)
+        gameBootGate.awaitPresentation(game.displayTitle, game.discFaceUri)
         return try {
             // Every dispatcher launch comes from an app-graph context (ViewModel/Activity via the
             // shared singleton), so NEW_TASK is required to start outside our own task. Idempotent.

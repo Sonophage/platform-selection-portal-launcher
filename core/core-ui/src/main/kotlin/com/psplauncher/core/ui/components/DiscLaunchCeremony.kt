@@ -85,7 +85,8 @@ fun DiscLaunchCeremony(
     val now = t.value
     val rise = phase(now, 0f, DiscCeremony.FadeInFraction)
     val sink = phase(now, DiscCeremony.FadeInFraction, DiscCeremony.HandOffFraction)
-    val leave = phase(now, DiscCeremony.HandOffFraction, 1f)
+    val spin = phase(now, DiscCeremony.HandOffFraction, DiscCeremony.FadeOutFraction)
+    val leave = phase(now, DiscCeremony.FadeOutFraction, 1f)
 
     val riseEase = LinearOutSlowInEasing.transform(rise)
     val sinkEase = FastOutSlowInEasing.transform(sink)
@@ -93,9 +94,9 @@ fun DiscLaunchCeremony(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            // The room dims as the disc sinks, so the launcher recedes and the disc is the only
-            // lit thing by the time it spins.
-            .background(Color.Black.copy(alpha = sinkEase * DiscCeremony.MaxDim)),
+            // The room dims as the disc is drawn in, so the launcher has receded by the time the
+            // disc is spinning and the app is loading behind it.
+            .background(Color.Black.copy(alpha = sinkEase * DiscCeremony.MaxDim * (1f - leave))),
         contentAlignment = Alignment.Center,
     ) {
         val discSize = minOf(maxWidth, maxHeight) * DiscCeremony.SizeFraction
@@ -114,11 +115,13 @@ fun DiscLaunchCeremony(
                     val shrink = 1f - (1f - DiscCeremony.RestScale) * sinkEase
                     scaleX = grow * shrink
                     scaleY = grow * shrink
-                    // Spins UP rather than at a constant rate: squaring the sink phase means it is
-                    // barely turning as it leaves the centre and moving properly by the time it
-                    // settles, which is what reads as a disc being spun up rather than one that
-                    // was already going.
-                    rotationZ = sink * sink * DiscCeremony.SpinUpDegrees +
+                    // Slow to fast, and only once it has been drawn in. Squaring the spin phase is
+                    // constant angular ACCELERATION, so the disc is barely turning as it seats and
+                    // is going properly by the time it fades -- a disc being spun up, not one that
+                    // was already at speed. The sink contributes a token quarter-turn so the pull
+                    // downward does not look completely rigid.
+                    rotationZ = sinkEase * DiscCeremony.SinkDegrees +
+                        spin * spin * DiscCeremony.SpinUpDegrees +
                         leave * DiscCeremony.SpinOutDegrees
                     translationY = driftPx * sinkEase
                     // BlendMode.Clear needs its own layer, or it punches through the whole screen
@@ -200,24 +203,32 @@ private fun phase(now: Float, from: Float, to: Float): Float =
  */
 object DiscCeremony {
     /** Centre stage: the disc fades up and settles at full size. */
-    const val FadeInMs = 950
+    const val FadeInMs = 800
 
-    /** It sinks toward the bottom, spinning up, while the room darkens. */
-    const val SinkMs = 1150
+    /** It is drawn downward until its centre reaches the bottom edge — half in, half out. */
+    const val SinkMs = 850
 
-    /** It fades out over the app that is already starting behind it. */
+    /**
+     * Seated at the bottom, spinning up slow to fast. THIS is the phase the app opens under: the
+     * hand-off fires as it begins, so the cold start and the spin happen at the same time rather
+     * than one after the other.
+     */
+    const val SpinMs = 1000
+
+    /** It fades out to reveal the app that has been loading behind it. */
     const val FadeOutMs = 550
 
-    const val TotalMs = FadeInMs + SinkMs + FadeOutMs
+    const val TotalMs = FadeInMs + SinkMs + SpinMs + FadeOutMs
 
-    /** The moment the caller should actually start the thing. */
+    /** The moment the caller should actually start the thing — the top of the spin. */
     const val HandOffMs = FadeInMs + SinkMs
 
     val FadeInFraction = FadeInMs.toFloat() / TotalMs
     val HandOffFraction = HandOffMs.toFloat() / TotalMs
+    val FadeOutFraction = (HandOffMs + SpinMs).toFloat() / TotalMs
 
     /** Disc diameter, against the screen's short edge. */
-    const val SizeFraction = 0.58f
+    const val SizeFraction = 0.72f
 
     /** Scale it fades up from, and the scale it settles to once it has sunk. */
     const val EntryScale = 0.86f
@@ -233,8 +244,12 @@ object DiscCeremony {
     const val HoleFraction = 0.125f
     const val HubFraction = 0.21f
 
-    const val SpinUpDegrees = 300f
-    const val SpinOutDegrees = 420f
+    /** A token turn while it is being drawn in, so the pull down is not rigid. */
+    const val SinkDegrees = 70f
+
+    /** The spin-up itself, and the turn it keeps making while it fades. */
+    const val SpinUpDegrees = 900f
+    const val SpinOutDegrees = 780f
 
     /** How dark the room gets behind the disc. */
     const val MaxDim = 0.90f

@@ -95,4 +95,14 @@ data class Game(
 ) {
     // Resolved display name: user override → scraped metadata title → raw scan title.
     val displayTitle: String get() = userTitleOverride ?: scrapedTitle ?: title
+
+    /**
+     * The art printed on the launch disc, best first, or null when this game has none.
+     *
+     * Portrait slots lead, the same order [XMBItem.shelfCoverArt] uses for a card: the disc is a
+     * circle cropped from the middle of whatever it is given, and a box front keeps its subject
+     * there. A landscape banner cropped to a circle is usually a piece of sky.
+     */
+    val discFaceUri: String? get() = listOfNotNull(boxArtUri, box3dUri, artworkUri, heroUri, iconUri)
+        .firstOrNull { it.isNotBlank() }
 }

@@ -195,6 +195,7 @@ fun XMBShellContainer(
         onPreviewBootSequence = viewModel::previewBootSequence,
         onPreviewGameBoot = viewModel::previewGameBoot,
         onGameBootComplete = viewModel::onGameBootComplete,
+        onGameBootHandOff = viewModel::onGameBootHandOff,
         onDiscCeremonyHandOff = viewModel::onDiscCeremonyHandOff,
         onDiscCeremonyFinished = viewModel::onDiscCeremonyFinished,
         onCloseCustomIcons = viewModel::closeCustomIcons,
@@ -313,6 +314,7 @@ fun XMBShell(
     onPreviewBootSequence: () -> Unit = {},
     onPreviewGameBoot: () -> Unit = {},
     onGameBootComplete: () -> Unit = {},
+    onGameBootHandOff: () -> Unit = {},
     onDiscCeremonyHandOff: () -> Unit = {},
     onDiscCeremonyFinished: () -> Unit = {},
     onCloseCustomIcons: () -> Unit = {},
@@ -1473,6 +1475,23 @@ fun XMBShell(
             // it (the old position sat below GameDetailScreen) covers the sequence. Leaving
             // composition releases its players before the emulator gets the screen.
             uiState.activeGameBoot?.let { request ->
+                if (request.videoPath == null) {
+                    // The built-in GameBoot presentation IS the launch disc now — one ceremony for
+                    // every kind of media, rather than a title card for games and a disc for
+                    // everything else. GameBoot's switch still decides whether games get one at
+                    // all, and a user who supplied their own clip still gets their clip below.
+                    //
+                    // Unlike the book and music paths, the launch here is suspended on
+                    // GameBootGate, so the hand-off RELEASES the gate instead of starting anything
+                    // itself; the emulator then loads under the spin.
+                    DiscLaunchCeremony(
+                        art = request.coverArt,
+                        onHandOff = onGameBootHandOff,
+                        onFinished = onGameBootComplete,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    return@let
+                }
                 GameBootOverlay(
                     gameTitle = request.gameTitle,
                     onComplete = onGameBootComplete,

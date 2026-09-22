@@ -8623,6 +8623,18 @@ class XMBViewModel @Inject constructor(
     }
 
     /**
+     * The GameBoot disc has spun up and the game may start NOW, while it is still on screen.
+     *
+     * Only the disc calls this. The built-in title card and a user clip both release the launch at
+     * their end, because nothing is drawn behind them worth revealing; the disc's whole point is
+     * that the emulator's cold start happens under the spin, so it releases early and stays up.
+     * Releasing twice is harmless — the gate completes its deferred once.
+     */
+    fun onGameBootHandOff() {
+        if (!_uiState.value.gameBootIsPreview) gameBootGate.onPresentationFinished()
+    }
+
+    /**
      * The overlay's presentation is over — naturally, skipped, failed, or watchdogged. A preview
      * just closes; a real one releases the launch that is waiting on the gate.
      */
@@ -8634,7 +8646,11 @@ class XMBViewModel @Inject constructor(
             // preview has to silence itself, or the sound plays on over the settings screen.
             uiMediaAudioPlayer.stop()
         } else {
+            // Both, and in this order: a title card or a clip is releasing the launch for the
+            // first time here, while the disc already released it at its hand-off and is only
+            // reporting that it has finished fading. complete() on a spent deferred is a no-op.
             gameBootGate.onPresentationFinished()
+            gameBootGate.onPresentationDismissed()
         }
     }
 
@@ -8669,6 +8685,12 @@ class XMBViewModel @Inject constructor(
                     defaultUri = com.psplauncher.core.ui.media.gameBootDefaultAudioUri(context.packageName),
                 )
             }
+            // A real cover, because the built-in presentation is a disc now and a preview of a
+            // blank one tells the user nothing about what they are switching on. Any game in the
+            // library with art will do — this is a sample, not a launch.
+            val previewArt = if (video != null) null else runCatching {
+                gameRepository.observeAllGames().first().firstNotNullOfOrNull { it.discFaceUri }
+            }.getOrNull()
             // Started here, immediately before the overlay composes, exactly as GameBootGate
             // starts it before a real presentation — the sequence is beat-matched to this sound,
             // so a silent preview would show light landing on nothing.
@@ -8685,6 +8707,7 @@ class XMBViewModel @Inject constructor(
                         gameTitle = "Preview",
                         videoPath = video,
                         audioPath = audio,
+                        coverArt = previewArt,
                     ),
                     gameBootIsPreview = true,
                 )

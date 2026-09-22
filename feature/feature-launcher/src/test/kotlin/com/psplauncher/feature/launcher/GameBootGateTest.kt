@@ -100,8 +100,19 @@ class GameBootGateTest {
         h.gate.onPresentationFinished()
         advanceUntilIdle()
 
-        assertTrue(awaiting.isCompleted)
-        assertNull(h.gate.active.value, "The request must be cleared once the presentation ends")
+        // Releasing the launch and taking the overlay down are two signals, not one. The disc
+        // presentation releases the launch the moment it starts spinning and then stays on screen
+        // for another second while the emulator loads under it, so a finish that also cleared the
+        // request would pull the overlay off mid-animation. This asserted the opposite when
+        // finishing was the only signal there was.
+        assertTrue(awaiting.isCompleted, "The launch must be released by onPresentationFinished")
+        assertNotNull(
+            h.gate.active.value,
+            "The overlay must stay up until it says it has left the screen",
+        )
+
+        h.gate.onPresentationDismissed()
+        assertNull(h.gate.active.value, "The request must be cleared once the overlay is dismissed")
     }
 
     @Test

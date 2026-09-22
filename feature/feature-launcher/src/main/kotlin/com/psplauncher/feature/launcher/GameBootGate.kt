@@ -27,6 +27,13 @@ data class GameBootRequest(
     val gameTitle: String,
     val videoPath: String? = null,
     val audioPath: String? = null,
+    /**
+     * The game's cover, for the built-in presentation to print on the disc.
+     *
+     * Only read when [videoPath] is null. A user who supplied their own clip gets their clip —
+     * the built-in sequence is what the disc replaced, not their asset.
+     */
+    val coverArt: String? = null,
 )
 
 /**
@@ -82,7 +89,7 @@ class GameBootGate @Inject constructor(
      * When on, this suspends until the presentation finishes, is skipped, or times out. A second
      * request while one is already on screen is dropped, not queued.
      */
-    suspend fun awaitPresentation(gameTitle: String) {
+    suspend fun awaitPresentation(gameTitle: String, coverArt: String? = null) {
         if (!preferences.gameBootEnabledFlow.first()) return
         if (isActive) {
             Timber.d("GameBoot already presenting — ignoring a second request for $gameTitle")
@@ -104,21 +111,35 @@ class GameBootGate @Inject constructor(
         audio?.let {
             audioPlayer.play(uri = it, clipEndMs = UiMediaLimits.GAMEBOOT_SEQUENCE_MS, label = "gameboot")
         }
-        _active.value = GameBootRequest(gameTitle = gameTitle, videoPath = video, audioPath = audio)
+        _active.value = GameBootRequest(gameTitle = gameTitle, videoPath = video, audioPath = audio, coverArt = coverArt)
         try {
             withTimeout(TIMEOUT_MS) { done.await() }
         } catch (_: TimeoutCancellationException) {
             // Deliberately swallowed: the launch continues. Rule 13 — never trap the user on the
-            // transition screen because a player stalled.
+            // transition screen because a player stalled. The watchdog tears the overlay down
+            // itself, because by definition nothing else is going to.
             Timber.w("GameBoot watchdog fired after ${TIMEOUT_MS}ms — launching anyway")
-        } finally {
             clear()
+        } finally {
+            // The deferred is spent either way. The REQUEST is not: the disc presentation releases
+            // the launch as it starts spinning and stays on screen for another second while the
+            // emulator loads under it, so clearing here would pull the overlay off mid-animation.
+            // [onPresentationDismissed] is what takes it down.
+            completion = null
         }
     }
 
-    /** The overlay reports its presentation is over (ended, skipped, or failed). */
+    /**
+     * The overlay reports the LAUNCH may proceed (ended, skipped, failed, or — for the disc — spun
+     * up far enough that the game should now start behind it).
+     */
     fun onPresentationFinished() {
         completion?.complete(Unit)
+    }
+
+    /** The overlay has left the screen and the request can be dropped. */
+    fun onPresentationDismissed() {
+        clear()
     }
 
     private fun clear() {
