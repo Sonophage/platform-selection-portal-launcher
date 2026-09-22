@@ -38,6 +38,10 @@ import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameCollection
 import com.psplauncher.core.domain.model.GameContentType
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.feature.xmb.ui.detail.DetailPanelContent
+import com.psplauncher.feature.xmb.ui.detail.DetailPanelPage
+import com.psplauncher.feature.xmb.ui.detail.detailPanelContentFor
+import com.psplauncher.feature.xmb.ui.detail.stepPanelPage
 import com.psplauncher.core.domain.model.HiddenPlacement
 import com.psplauncher.core.domain.model.HideLocationType
 import com.psplauncher.core.domain.model.IconDisplayMode
@@ -757,6 +761,19 @@ data class XMBUiState(
      * five with a content:// one.
      */
     val focusedItemBackdrop: String? = null,
+    /**
+     * Which page the hover panel was walked to with L1/R1, and the game it was walked to ON.
+     *
+     * The pair is the whole mechanism. Moving the cursor to another game returns the panel to its
+     * logo page — the crossbar goes back to looking like the crossbar — and that reset is derived
+     * from [panelPageGameId] rather than written at every place the cursor can move. There are
+     * many such places and a reset missed at one of them is a panel stuck open on the wrong
+     * game's art, which is exactly the kind of thing that only shows up on a handheld.
+     *
+     * Read [effectivePanelPage], never these two directly.
+     */
+    val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
+    val panelPageGameId: Long? = null,
     val librarySetupComplete: Boolean = false,
     val themeColors: PFPColors = DefaultPFPColors,
     // Custom icon slots of the applied theme (theme slot key → CustomIcon); empty = the
@@ -820,6 +837,53 @@ data class XMBUiState(
     // The item currently under the XMB cursor, or null.
     val focusedItem: XMBItem?
         get() = currentItems.getOrNull(selectedItemIndex)
+
+    /**
+     * The row the hover panel is drawn for, or null when there is no panel.
+     *
+     * Gated on a real game WITH backdrop art: the region has always needed something behind it,
+     * and a panel floating on the bare wallpaper reads as a stray card.
+     */
+    val hoverPanelItem: XMBItem?
+        get() = focusedItem?.takeIf { it.isRealGame && it.backdropArt.isNotEmpty() }
+
+    /**
+     * What the hover panel is showing, INCLUDING which pages it offers.
+     *
+     * Computed here rather than at each consumer because there are two and they must not
+     * disagree: XMBShell draws the panel and its strip, and stepHoverPanelPage decides where
+     * L1/R1 land. They did disagree — the shell passed the approved snap and the walk did not,
+     * so the strip drew a Video tab that R1 stepped straight over. One property, no second
+     * chance to forget an argument.
+     */
+    /**
+     * The page the panel is actually on: the walked-to page while the cursor is still on the game
+     * it was walked to on, and the logo page the moment it is not.
+     */
+    val effectivePanelPage: DetailPanelPage
+        get() = if (panelPageGameId != null && panelPageGameId == hoverPanelItem?.gameId) panelPage
+        else DetailPanelPage.LOGO
+
+    /**
+     * Standing on the home page — the state in which the crossbar is hidden and the screen is the
+     * game you were last playing.
+     *
+     * The drill exclusion is not decoration. The shell reads this to decide whether to draw the
+     * page or the bar, and a drilled sub-item under a hidden bar would be a screen LEFT can no
+     * longer back out of.
+     */
+    val onLastPlayedHome: Boolean
+        get() = categories.getOrNull(selectedCategoryIndex)?.id == BuiltInCategory.RECENTLY_PLAYED &&
+            !isInSubItem
+
+    val hoverPanelContent: DetailPanelContent?
+        get() = hoverPanelItem?.let { item ->
+            detailPanelContentFor(
+                item = item,
+                platformName = item.platformId?.uppercase().orEmpty(),
+                videoUri = focusedGameVideo?.takeIf { it.gameId == item.gameId }?.uri,
+            )
+        }
 
     // True iff a Y/Triangle press on the focused item would open a context menu — the exact mirror
     // of XMBViewModel.onItemLongPress / dispatchGamepadAction(OPEN_CONTEXT_MENU)'s when-branches, so the
@@ -1316,6 +1380,13 @@ data class XMBItem(
     // on. Formatted once here rather than carrying four nullable columns into the UI, and null
     // when the game was never scraped.
     val metadataLine: String? = null,
+    // The description and the ROM path, carried on the row so the hover panel can draw its Info
+    // page without a query. Nothing else reads them; they are here because the alternative is a
+    // database round trip on every D-pad press.
+    val description: String? = null,
+    val romPath: String? = null,
+    /** Milliseconds this game has been played; 0 when it has never been launched from here. */
+    val totalPlayTimeMillis: Long = 0L,
     val gameId: Long? = null,
     val platformId: String? = null,
     val collectionId: Long? = null,     // set on COLLECTION rows in the Games root
@@ -3202,7 +3273,6 @@ class XMBViewModel @Inject constructor(
     private fun booksRootSections(): List<XMBItem> {
         val shelves = _uiState.value.bookLibraries
         val totalBooks = shelves.sumOf { it.bookCount }
-        val hasScannedShelf = shelves.any { it.lastScannedAt != null }
         val reader = _uiState.value.defaultReader
         return buildList {
             // The reader, first, so the app you read in is one press away whether or not you are
@@ -5018,6 +5088,9 @@ class XMBViewModel @Inject constructor(
             iconDisplayModeOverride = g.iconDisplayMode,
             subtitle     = platformEmulatorLabel(g),
             metadataLine = gameMetadataLine(g.releaseYear, g.genre, g.developer, g.players),
+            description  = g.description,
+            romPath      = g.romPath,
+            totalPlayTimeMillis = g.totalPlayTimeMillis,
             gameId       = g.id,
             platformId   = g.platformId,
             accentColor  = platformCache[g.platformId]?.accentColor,
@@ -5551,10 +5624,34 @@ class XMBViewModel @Inject constructor(
             // the first matching branch, so a second mention was dead — and the kind of dead that
             // bites, because the next person to change sort behaviour has two places to find and
             // only one that runs.
-            GamepadAction.OPEN_CONTEXT_MENU,
-            GamepadAction.PREV_CATEGORY,
-            GamepadAction.NEXT_CATEGORY -> Unit
+            GamepadAction.OPEN_CONTEXT_MENU -> Unit
+            // The shoulders were dead on the crossbar root. They now walk the hover panel in the
+            // logo region. No conflict to resolve: nothing else on this screen claimed them.
+            GamepadAction.PREV_CATEGORY -> stepHoverPanelPage(-1)
+            GamepadAction.NEXT_CATEGORY -> stepHoverPanelPage(+1)
         }
+    }
+
+    /**
+     * Walk the hover panel's page for the row under the cursor.
+     *
+     * The available pages are recomputed from the focused row rather than stored, so a row with
+     * no box art cannot be walked onto a box art page. Non-game rows ignore the shoulders
+     * entirely: there is no panel over a settings row or a music folder to walk.
+     */
+    /** A tap on the strip goes straight to that page; the strip only draws pages that exist. */
+    fun onPanelPageTapped(page: DetailPanelPage) = _uiState.update {
+        it.copy(panelPage = page, panelPageGameId = it.hoverPanelItem?.gameId)
+    }
+
+    private fun stepHoverPanelPage(delta: Int) = _uiState.update { s ->
+        val content = s.hoverPanelContent ?: return@update s
+        s.copy(
+            // Stepping from the EFFECTIVE page, so the first shoulder press after moving to a
+            // new game steps off that game's logo rather than off whatever the last game was on.
+            panelPage = stepPanelPage(s.effectivePanelPage, content.pages, delta),
+            panelPageGameId = s.hoverPanelItem?.gameId,
+        )
     }
 
     // ── Context menu ──────────────────────────────────────────────────────────
@@ -8572,14 +8669,23 @@ class XMBViewModel @Inject constructor(
                 .map { s ->
                     val item = s.currentItems.getOrNull(s.selectedItemIndex)
                     // Approve only if the snap has somewhere to draw. snapSiteFor is the one
-                    // definition of that, shared with the two render sites -- the in-tile
+                    // definition of that, shared with the three render sites -- the in-tile
                     // placement needs an ICON0 tile to play over, the background placement needs
-                    // nothing and so plays in any icon mode.
+                    // nothing and so plays in any icon mode, and the hover panel's video page
+                    // needs neither.
+                    //
+                    // effectivePanelPage, not the page resolved against the available list: a
+                    // game's Video tab only exists once a snap has been approved, so resolving
+                    // against that list first would be a loop that never starts. Asking the
+                    // walked-to page instead means "the user is sitting on Video" is itself the
+                    // reason to decode -- which is how a snap reaches the panel on an icon mode
+                    // that has no tile to play it over.
                     val eligible = item?.gameId != null && item.isRealGame &&
                         !s.hasBlockingOverlay &&
                         com.psplauncher.feature.xmb.ui.snapSiteFor(
                             s.snapPlacement,
                             resolveIconDisplay(item, s.iconDisplayMode, s.iconDisplayModeByPlatform).mode,
+                            s.effectivePanelPage == DetailPanelPage.VIDEO,
                         ) != null
                     if (eligible) item.gameId else null
                 }
@@ -8923,8 +9029,18 @@ class XMBViewModel @Inject constructor(
     private fun canonicalXmbCategories(categories: List<Category>): List<Category> =
         canonicalXmbCategories(categories, FALLBACK_CATEGORIES)
 
+    /**
+     * Where the launcher opens: Last Played, which is the home.
+     *
+     * It used to be Games. Last Played is the leftmost column and is now a full page that hides
+     * the crossbar, so opening there means the launcher greets you with what you were playing
+     * rather than with a list to walk. Games remains the fallback for a bar that has had Last
+     * Played hidden, and index 0 for one that has neither.
+     */
     private fun defaultXmbCategoryIndex(categories: List<Category>): Int =
-        categories.indexOfFirst { it.id == BuiltInCategory.GAMES }
+        categories.indexOfFirst { it.id == BuiltInCategory.RECENTLY_PLAYED }
             .takeIf { it >= 0 }
+            ?: categories.indexOfFirst { it.id == BuiltInCategory.GAMES }
+                .takeIf { it >= 0 }
             ?: 0
 }

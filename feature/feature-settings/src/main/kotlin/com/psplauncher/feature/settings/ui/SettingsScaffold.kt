@@ -102,7 +102,8 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.isDirectional
 import com.psplauncher.core.ui.components.ControllerHintBar
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.gesture.dragToScroll
 import com.psplauncher.core.ui.theme.LocalPFPColors
@@ -2012,11 +2013,9 @@ fun SettingsTextFieldRow(
                     )
                 }
                 if (helperPrompt != null) {
-                    ControllerPromptBar(
+                    PfpControllerHints(
                         items = listOf(helperPrompt),
-                        labelColor = SettingsSubtext.copy(alpha = 0.6f),
-                        labelStyle = TextStyle(fontSize = 11.sp),
-                        glyphSize = 14.dp,
+                        style = ControllerHintStyle.INLINE,
                     )
                 }
             }

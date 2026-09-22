@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import com.psplauncher.core.data.database.dao.ThemeDao
+import com.psplauncher.core.data.database.entity.MemoryCardEntity
 import com.psplauncher.core.data.database.entity.ThemeEntity
 import com.psplauncher.core.data.datastore.pfpDataStore
 import com.psplauncher.core.data.repository.CategoryRepositoryImpl
@@ -23,6 +24,32 @@ private val KEY_LAST_PLAYED_PLACED = booleanPreferencesKey("last_played_placed_v
 // updates a name because a name is user-editable. Flag-guarded so that renaming it yourself
 // afterwards — back to "Online" or to anything else — sticks.
 private val KEY_NETWORK_RENAMED = booleanPreferencesKey("network_renamed_v1")
+// One-shot: the Android library is app-based, so no scan or import ever creates its Memory Card
+// and it has to be seeded. Flag-guarded for the same reason as the rename above -- DELETING it
+// yourself afterwards has to stick. It did not: the card was created from LibraryManagerViewModel's
+// init block, so removing it and reopening Library Manager brought it straight back, and the
+// comment on startAddConsole ("the only way back when the auto-created card is removed") described
+// a removal that was never possible.
+private val KEY_ANDROID_CARD_SEEDED = booleanPreferencesKey("android_card_seeded_v1")
+
+/** The Android library's platform id, and the card seeded for it exactly once. */
+private const val ANDROID_PLATFORM_ID = "android"
+
+/** What [DatabaseInitializer.seedAndroidCard] should do on this launch. */
+internal enum class AndroidCardSeed { CREATE_AND_MARK, MARK_ONLY, NOTHING }
+
+/**
+ * The seeding decision, as a pure function, because the subtle half is easy to get wrong and
+ * impossible to see: an install that already HAS the card from the old always-create behaviour
+ * must still get the flag written, or the one-shot never retires and the card comes back the
+ * first time the user deletes it. That is the reported bug, one step removed.
+ */
+internal fun androidCardSeedAction(alreadySeeded: Boolean, cardExists: Boolean): AndroidCardSeed =
+    when {
+        alreadySeeded -> AndroidCardSeed.NOTHING
+        cardExists -> AndroidCardSeed.MARK_ONLY
+        else -> AndroidCardSeed.CREATE_AND_MARK
+    }
 
 /** Built-in theme seeded separately from the main DB seed so it can be added to existing installs. */
 private val BUILTIN_CLASSIC_BLUE = ThemeEntity(
@@ -53,6 +80,7 @@ class DatabaseInitializer @Inject constructor(
     private val categoryRepository: CategoryRepositoryImpl,
     private val themeDao: ThemeDao,
     private val libraryConsolidation: LibraryConsolidation,
+    private val memoryCardDao: com.psplauncher.core.data.database.dao.MemoryCardDao,
 ) {
     // Called once from PFPApplication after DI is ready.
     // Safe to call multiple times — guarded by DataStore flags and INSERT OR IGNORE.
@@ -67,6 +95,7 @@ class DatabaseInitializer @Inject constructor(
         categoryRepository.reconcileBuiltInCategories()
         placeLastPlayed()
         renameNetworkColumn()
+        seedAndroidCard()
         seedThemes()
         // One-shot v22 follow-up (flag-guarded): the Windows-card consolidation steps that
         // need app logic — spoof-package label checks, duplicate merge, card creation.
@@ -101,6 +130,38 @@ class DatabaseInitializer @Inject constructor(
         if (prefs[KEY_NETWORK_RENAMED] == true) return
         categoryRepository.renameStaleOnlineColumn()
         context.pfpDataStore.edit { it[KEY_NETWORK_RENAMED] = true }
+    }
+
+    /**
+     * Creates the Android Memory Card once, ever.
+     *
+     * Once, not "when missing": the card is the user's to delete. The flag is what makes a
+     * delete stick, exactly as KEY_NETWORK_RENAMED makes a rename stick. Library Manager's Add
+     * Console list keeps Android selectable, which is the way back.
+     *
+     * The existence check is still here for the install that already has one from the old
+     * behaviour — it would otherwise get a duplicate-key upsert on the next launch.
+     */
+    private suspend fun seedAndroidCard() {
+        val prefs = context.pfpDataStore.data.first()
+        val action = androidCardSeedAction(
+            alreadySeeded = prefs[KEY_ANDROID_CARD_SEEDED] == true,
+            cardExists = memoryCardDao.getById(ANDROID_PLATFORM_ID) != null,
+        )
+        if (action == AndroidCardSeed.NOTHING) return
+        if (action == AndroidCardSeed.CREATE_AND_MARK) {
+            memoryCardDao.upsert(
+                MemoryCardEntity(
+                    platformId  = ANDROID_PLATFORM_ID,
+                    displayName = "Android Memory Card",
+                    enabled     = true,
+                    sortOrder   = memoryCardDao.maxSortOrder() + 1,
+                    gameCount   = 0,
+                )
+            )
+            Timber.i("Android Memory Card seeded")
+        }
+        context.pfpDataStore.edit { it[KEY_ANDROID_CARD_SEEDED] = true }
     }
 
     private suspend fun seedThemes() {

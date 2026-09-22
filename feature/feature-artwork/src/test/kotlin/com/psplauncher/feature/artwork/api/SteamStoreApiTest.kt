@@ -97,4 +97,52 @@ class SteamStoreApiTest {
     /** Mirrors the private extension, which is not visible from here; same regex, same intent. */
     private fun yearFrom(raw: String): Int? =
         Regex("(19|20)\\d{2}").find(raw)?.value?.toIntOrNull()
+
+    // ── steamAppIdOf ─────────────────────────────────────────────────────────
+    //
+    // The pair (storefront, id) is stored rather than the id alone precisely because
+    // ("STEAM","620") and ("GOG","620") are different games. Every one of these is a way to turn
+    // them back into the same game by accident.
+
+    @Test
+    fun `another store's id is never treated as a Steam id`() {
+        assertNull(steamAppIdOf("GOG", "620"))
+        assertNull(steamAppIdOf("EPIC", "620"))
+        assertNull(steamAppIdOf("AMAZON", "620"))
+        assertNull(steamAppIdOf(null, "620"))
+    }
+
+    @Test
+    fun `the storefront is matched however it was cased`() {
+        // PcShortcutImporter writes "STEAM"; PcLauncherAdapter maps "steam" from a lowercase
+        // source. Both reach this, so both must answer.
+        assertEquals("620", steamAppIdOf("STEAM", "620"))
+        assertEquals("620", steamAppIdOf("steam", "620"))
+        assertEquals("620", steamAppIdOf("Steam", " 620 "))
+    }
+
+    @Test
+    fun `an id that is not a positive integer is not an app id`() {
+        // A non-numeric or zero id would build four asset URLs that 404 and one appdetails call
+        // that cannot succeed.
+        assertNull(steamAppIdOf("STEAM", null))
+        assertNull(steamAppIdOf("STEAM", ""))
+        assertNull(steamAppIdOf("STEAM", "   "))
+        assertNull(steamAppIdOf("STEAM", "0"))
+        assertNull(steamAppIdOf("STEAM", "-5"))
+        assertNull(steamAppIdOf("STEAM", "620a"))
+        assertNull(steamAppIdOf("STEAM", "com.valve.portal2"))
+    }
+
+    @Test
+    fun `it agrees with steamAppArt about what an app id is`() {
+        // Two shape rules that must not drift: one decides whether to ASK Steam, the other
+        // whether to build the asset URLs. A pair that disagreed would either skip a game Steam
+        // could serve, or fetch a store record and then have nowhere to get its art.
+        listOf("620", "1", "9999999", "0", "-5", "620a", "", "  ").forEach { id ->
+            val asksSteam = steamAppIdOf("STEAM", id) != null
+            val buildsArt = steamAppArt(id) != null
+            assertEquals(asksSteam, buildsArt, "disagreed about '$id'")
+        }
+    }
 }

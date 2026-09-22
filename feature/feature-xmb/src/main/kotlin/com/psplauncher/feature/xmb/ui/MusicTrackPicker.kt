@@ -36,7 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.feature.xmb.viewmodel.MusicTrackPickerState
@@ -87,16 +88,13 @@ fun MusicTrackPicker(
                 modifier = Modifier.padding(top = 2.dp, bottom = 12.dp),
             ) {
                 Text("${state.selected.size} selected", color = PickerSubtext, fontSize = 12.sp)
-                ControllerPromptBar(
+                PfpControllerHints(
                     items = listOf(
                         ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
                         ControllerPromptItem(GamepadAction.HOME, "Add"),
                         ControllerPromptItem(GamepadAction.BACK, "Cancel"),
                     ),
-                    labelColor = PickerSubtext,
-                    labelStyle = TextStyle(fontSize = 12.sp),
-                    glyphSize = 16.dp,
-                    arrangement = Arrangement.spacedBy(18.dp),
+                    style = ControllerHintStyle.OVERLAY,
                 )
             }
 

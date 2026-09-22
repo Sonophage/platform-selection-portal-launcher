@@ -85,7 +85,8 @@ import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.common.logging.LogRedaction
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.ControllerPrompt
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
@@ -850,7 +851,7 @@ internal fun ArtworkStudioContent(
             // apply at every level, and the three hand-written lists are exactly how the old
             // "NSFW" label for X survived it being rebound to search. Paging is not listed (the
             // page line carries its LB/RB glyphs) and neither is mature (its START badge does).
-            if (!showTouchControls) ControllerPromptBar(
+            if (!showTouchControls) PfpControllerHints(
                 items = buildList {
                     when (state.zone) {
                         StudioZone.TABS -> {
@@ -871,11 +872,8 @@ internal fun ArtworkStudioContent(
                     add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "search"))
                     add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "options"))
                 },
+                style = ControllerHintStyle.OVERLAY,
                 modifier = Modifier.padding(top = 6.dp),
-                labelColor = Color.White.copy(alpha = 0.35f),
-                labelStyle = TextStyle(fontSize = 10.sp),
-                glyphSize = 14.dp,
-                arrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
             )
         }
 

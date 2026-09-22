@@ -12,6 +12,11 @@ import com.psplauncher.feature.artwork.api.IgdbApi
 import com.psplauncher.feature.artwork.api.IgdbGameInfo
 import com.psplauncher.feature.artwork.api.ScrapeOptions
 import com.psplauncher.feature.artwork.api.ScreenScraperApi
+import com.psplauncher.feature.artwork.api.SteamAppArt
+import com.psplauncher.feature.artwork.api.SteamAppDetails
+import com.psplauncher.feature.artwork.api.SteamStoreApi
+import com.psplauncher.feature.artwork.api.steamAppArt
+import com.psplauncher.feature.artwork.api.steamAppIdOf
 import com.psplauncher.feature.artwork.api.SgdbApiKeyProvider
 import com.psplauncher.feature.artwork.api.SsGameInfo
 import com.psplauncher.feature.artwork.api.SteamGridDbApi
@@ -55,10 +60,20 @@ data class MetadataCandidates(
     val sgdbGridUrl: String?,
     val sgdbHeroUrl: String?,
     val sgdbLogoUrl: String?,
+    /** Steam's store record, for a row the PC importer tagged with a Steam app id. */
+    val steamDetails: SteamAppDetails?,
+    /** Steam's three library assets, derived from that same app id. Present iff [steamDetails] is. */
+    val steamArt: SteamAppArt?,
 ) {
-    /** No provider returned anything — the seam where [MetadataRepository.fetchForGame] stops. */
+    /**
+     * No provider returned anything — the seam where [MetadataRepository.fetchForGame] stops.
+     *
+     * Steam counts. Without it here, a Windows game that Steam answered for and nobody else did
+     * would be declared "Not found on any source" and every asset it just fetched would be
+     * dropped on the floor — the one failure mode this whole provider exists to remove.
+     */
     val isEmpty: Boolean
-        get() = ssInfo == null && igdbInfo == null && sgdbGridUrl == null
+        get() = ssInfo == null && igdbInfo == null && sgdbGridUrl == null && steamDetails == null
 }
 
 // Fetches metadata + artwork from multiple sources in priority order.
@@ -75,6 +90,7 @@ class MetadataRepository @Inject constructor(
     private val screenScraper: ScreenScraperApi,
     private val romHasher: RomHasher,
     private val steamGridDb: SteamGridDbApi,
+    private val steamStoreApi: SteamStoreApi,
     private val igdbApi: IgdbApi,
     private val sgdbKeyProvider: SgdbApiKeyProvider,
     private val imageLoader: ImageLoader,
@@ -132,6 +148,24 @@ class MetadataRepository @Inject constructor(
 
         if (bestTitle != title) {
             Timber.d("MetadataRepository: using bestTitle='$bestTitle' instead of raw title='$title'")
+        }
+
+        // ── 0. Steam's own store (id-addressed, no key) ───────────────────────
+        // First because it is the only step here that is not a guess: the PC importer recorded
+        // the app id, so this asks Steam about a game by the number Steam assigned it. Runs even
+        // on metadata-only scrapes, which the other artwork providers skip, because Steam is the
+        // one of them that supplies text.
+        var steamDetails: SteamAppDetails? = null
+        var steamArt: SteamAppArt? = null
+        steamAppIdOf(gameEntity?.storefront, gameEntity?.storefrontGameId)?.let { appId ->
+            onAssetProgress?.invoke("Steam", "Reading store page…")
+            steamDetails = runCatching { steamStoreApi.appDetails(appId) }
+                .onFailure { Timber.w(it, "Steam store error for app $appId") }
+                .getOrNull()
+            // The art is derived from the id, not from the response, so it stands whether or not
+            // the store record came back — a delisted app still serves its library assets. A
+            // missing one 404s at download time and is treated as "no logo", never as a failure.
+            steamArt = steamAppArt(appId)
         }
 
         // ── 1. ScreenScraper (hash-based, primary) ────────────────────────────
@@ -229,6 +263,8 @@ class MetadataRepository @Inject constructor(
             sgdbGridUrl = sgdbGridUrl,
             sgdbHeroUrl = sgdbHeroUrl,
             sgdbLogoUrl = sgdbLogoUrl,
+            steamDetails = steamDetails,
+            steamArt = steamArt,
         )
     }
 
@@ -259,19 +295,28 @@ class MetadataRepository @Inject constructor(
         val sgdbGridUrl = candidates.sgdbGridUrl
         val sgdbHeroUrl = candidates.sgdbHeroUrl
         val sgdbLogoUrl = candidates.sgdbLogoUrl
+        val steamDetails = candidates.steamDetails
+        val steamArt    = candidates.steamArt
 
         // ── Assemble per-asset winners ─────────────────────────────────────────
-        val finalBoxArtUrl = ssInfo?.artworkUrl ?: igdbInfo?.artworkUrl ?: sgdbGridUrl
+        // Steam leads for a Steam game, ahead of ScreenScraper and IGDB, because those two had
+        // to work out WHICH game a Windows shortcut is from a title that came out of a filename,
+        // and this one was told. An exact id beats a good guess.
+        //
+        // It does not lead over SteamGridDB when the user has asked for SGDB heroes: that
+        // preference is about which picture they want, not about which game it is, and this
+        // provider has no opinion worth overriding it with.
+        val finalBoxArtUrl = steamArt?.boxArtUrl ?: ssInfo?.artworkUrl ?: igdbInfo?.artworkUrl ?: sgdbGridUrl
         val finalHeroUrl   = if (options.preferSteamGridDbHeroes)
-            sgdbHeroUrl ?: ssInfo?.heroUrl ?: igdbInfo?.heroUrl
+            sgdbHeroUrl ?: steamArt?.heroUrl ?: ssInfo?.heroUrl ?: igdbInfo?.heroUrl
         else
-            ssInfo?.heroUrl ?: igdbInfo?.heroUrl ?: sgdbHeroUrl
+            steamArt?.heroUrl ?: ssInfo?.heroUrl ?: igdbInfo?.heroUrl ?: sgdbHeroUrl
         val finalLogoUrl = if (options.downloadClearLogos)
-            ssInfo?.logoUrl ?: igdbInfo?.logoUrl ?: sgdbLogoUrl
+            steamArt?.logoUrl ?: ssInfo?.logoUrl ?: igdbInfo?.logoUrl ?: sgdbLogoUrl
         else null
 
         // ── Download to disk ───────────────────────────────────────────────────
-        val src = primarySource(ssInfo, igdbInfo, sgdbGridUrl)
+        val src = primarySource(ssInfo, igdbInfo, sgdbGridUrl, steamDetails)
 
         // Dead-URL fallback bookkeeping: kinds whose CACHED ScreenScraper URL failed to
         // download. Only meaningful on cache-hit runs; live-URL failures keep old behavior.
@@ -372,17 +417,20 @@ class MetadataRepository @Inject constructor(
 
         // Scraped title: ScreenScraper's canonical name. Deliberately NOT
         // written through updateMetadata below — see the fill-only write after it.
-        val newScrapedTitle = ssInfo?.title
+        val newScrapedTitle = ssInfo?.title ?: steamDetails?.title
         val existingOverride = gameEntity?.userTitleOverride
 
         // ── Persist metadata (COALESCE in SQL preserves existing non-null values) ─
         gameDao.updateMetadata(
             id           = gameId,
-            description  = ssInfo?.description,
-            developer    = ssInfo?.developer,
-            publisher    = ssInfo?.publisher,
-            releaseYear  = ssInfo?.releaseYear,
-            genre        = ssInfo?.genre,
+            // Steam fills what ScreenScraper leaves rather than outranking it: SS is the
+            // specialist on the games it knows, and for the games it does not — every Windows
+            // shortcut — its side of each of these is null anyway, so the fallback is the value.
+            description  = ssInfo?.description ?: steamDetails?.description,
+            developer    = ssInfo?.developer ?: steamDetails?.developer,
+            publisher    = ssInfo?.publisher ?: steamDetails?.publisher,
+            releaseYear  = ssInfo?.releaseYear ?: steamDetails?.releaseYear,
+            genre        = ssInfo?.genre ?: steamDetails?.genre,
             // Metadata-only runs pass null artwork columns — COALESCE leaves them untouched.
             artworkUri   = if (options.metadataOnly) null else backgroundPath ?: finalHeroUrl ?: finalBoxArtUrl,
             heroUri      = if (options.metadataOnly) null else heroPath ?: finalHeroUrl,
@@ -472,9 +520,18 @@ class MetadataRepository @Inject constructor(
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private fun primarySource(ss: SsGameInfo?, igdb: IgdbGameInfo?, sgdbUrl: String?): String =
+    private fun primarySource(
+        ss: SsGameInfo?,
+        igdb: IgdbGameInfo?,
+        sgdbUrl: String?,
+        steam: SteamAppDetails?,
+    ): String =
         when {
             ss != null      -> "screenscraper"
+            // Below SS for the same reason SS keeps the text columns, and above the two that
+            // guess: this names what actually identified the game, and it is what the user reads
+            // on the scrape result.
+            steam != null   -> "steam"
             igdb != null    -> "igdb"
             sgdbUrl != null -> "steamgriddb"
             else            -> "mixed"

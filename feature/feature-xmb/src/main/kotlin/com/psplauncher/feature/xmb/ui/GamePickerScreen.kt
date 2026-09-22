@@ -29,7 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.menuCursor
 
@@ -131,7 +132,7 @@ fun GamePickerScreen(
                 fontSize = 12.sp,
                 color = Color(0xFFC9C7E8),
             )
-            ControllerPromptBar(
+            PfpControllerHints(
                 items = listOf(
                     ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
                     // Only meaningful on a platform header, but the picker opens on one and the
@@ -141,10 +142,7 @@ fun GamePickerScreen(
                     ControllerPromptItem(GamepadAction.HOME, "Add"),
                     ControllerPromptItem(GamepadAction.BACK, "Cancel"),
                 ),
-                labelColor = Color(0xFFC9C7E8),
-                labelStyle = TextStyle(fontSize = 12.sp),
-                glyphSize = 16.dp,
-                arrangement = Arrangement.spacedBy(18.dp),
+                style = ControllerHintStyle.OVERLAY,
             )
         }
 

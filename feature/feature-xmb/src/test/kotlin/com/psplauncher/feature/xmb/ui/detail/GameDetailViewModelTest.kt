@@ -1359,15 +1359,15 @@ class GameDetailViewModelTest {
         // The dropped press did not accumulate: the cursor starts on Play, where the design says
         // it starts, and the next press is the one that moves it.
         assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.DETAILS, viewModel.uiState.value.navFocusKey)
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, viewModel.uiState.value.navFocusKey)
     }
 
     @Test
     fun `Options owns every input while open and hands the page its cursor back`() = runTest {
         loadedAndLaidOut()
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.DETAILS, viewModel.uiState.value.navFocusKey)
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, viewModel.uiState.value.navFocusKey)
 
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
         assertTrue(viewModel.uiState.value.showOptions)
@@ -1387,7 +1387,7 @@ class GameDetailViewModelTest {
         assertFalse(viewModel.uiState.value.showOptions)
         assertFalse(viewModel.uiState.value.closed)
         // …and the page is back on the exact node it was interrupted on.
-        assertEquals(GameDetailKeys.DETAILS, viewModel.uiState.value.navFocusKey)
+        assertEquals(GameDetailKeys.OPTIONS, viewModel.uiState.value.navFocusKey)
 
         // A second Back, with nothing open, leaves Game Detail.
         viewModel.handleGamepadAction(GamepadAction.BACK)
@@ -1397,20 +1397,18 @@ class GameDetailViewModelTest {
     @Test
     fun `a page action cannot fire through the Options overlay`() = runTest {
         loadedAndLaidOut()
-        // Page cursor parked on Overview, whose Confirm expands the description. Chosen because
-        // its effect is visible in the state: if the page node fired through the overlay, the
-        // description would be expanded as well as the favorite toggled.
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_UP)
-        assertEquals(GameDetailKeys.OVERVIEW, viewModel.uiState.value.navFocusKey)
-        assertFalse(viewModel.uiState.value.descriptionExpanded)
+        // Page cursor parked on Play. If a page node fired through the overlay, the game would
+        // launch as well as the favorite toggling — which is the loudest possible version of this
+        // bug, and the reason Play is the node this test parks on.
+        assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
 
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
         viewModel.handleGamepadAction(GamepadAction.SELECT)   // the first option: Favorite
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.descriptionExpanded)
         assertTrue(viewModel.uiState.value.game?.isFavorite == true)
         coVerify { gameRepository.setFavorite(1L, true) }
+        assertNull(viewModel.uiState.value.launchError)
     }
 
     @Test
@@ -1426,14 +1424,16 @@ class GameDetailViewModelTest {
         assertTrue(GameDetailKeys.disc(2L) in viewModel.focusableNodeKeys())
         assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
 
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)   // first disc
-        assertEquals(GameDetailKeys.disc(1L), viewModel.uiState.value.navFocusKey)
+        // Play is the footer's third button, so the disc row hands back its own nearest member —
+        // its last, with two discs. The engine's nearest-index rule, not an accident.
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        assertEquals(GameDetailKeys.disc(2L), viewModel.uiState.value.navFocusKey)
 
         viewModel.handleGamepadAction(GamepadAction.SELECT)
         testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(1L, viewModel.uiState.value.selectedDiscId)
+        assertEquals(2L, viewModel.uiState.value.selectedDiscId)
         // Confirming a disc never throws the cursor somewhere unrelated.
-        assertEquals(GameDetailKeys.disc(1L), viewModel.uiState.value.navFocusKey)
+        assertEquals(GameDetailKeys.disc(2L), viewModel.uiState.value.navFocusKey)
     }
 
     @Test
@@ -1448,7 +1448,8 @@ class GameDetailViewModelTest {
 
         val keys = viewModel.focusableNodeKeys()
         assertTrue(GameDetailKeys.LAUNCH in keys)
-        assertTrue(GameDetailKeys.DETAILS in keys)
+        assertTrue(GameDetailKeys.OPTIONS in keys)
+        assertTrue(GameDetailKeys.FAVORITE in keys)
     }
 
     @Test
@@ -1464,7 +1465,7 @@ class GameDetailViewModelTest {
 
         // And the dropdown's own node graph has no row for it either, so neither a controller
         // nor a tap can reach the action that would have to explain itself.
-        viewModel.onNodeTapped(GameDetailKeys.DETAILS)
+        viewModel.openDetailsMenu()
         testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(viewModel.uiState.value.showDetailsMenu)
         assertFalse(
@@ -1495,7 +1496,7 @@ class GameDetailViewModelTest {
     fun `Details opens its dropdown, and its Options row opens the full menu`() = runTest {
         loadedAndLaidOut()
 
-        viewModel.onNodeTapped(GameDetailKeys.DETAILS)
+        viewModel.openDetailsMenu()
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.showDetailsMenu)
@@ -1519,15 +1520,15 @@ class GameDetailViewModelTest {
     @Test
     fun `Back closes the Details dropdown before it closes the page`() = runTest {
         loadedAndLaidOut()
-        viewModel.onNodeTapped(GameDetailKeys.DETAILS)
+        viewModel.openDetailsMenu()
         testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(viewModel.uiState.value.showDetailsMenu)
 
         viewModel.handleGamepadAction(GamepadAction.BACK)
         assertFalse(viewModel.uiState.value.showDetailsMenu)
         assertFalse(viewModel.uiState.value.closed)
-        // The page gets its own cursor back, on the button that opened the dropdown.
-        assertEquals(GameDetailKeys.DETAILS, viewModel.uiState.value.navFocusKey)
+        // The page gets its own cursor back, on the node it was interrupted on.
+        assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
 
         viewModel.handleGamepadAction(GamepadAction.BACK)
         assertTrue(viewModel.uiState.value.closed)
@@ -1537,10 +1538,10 @@ class GameDetailViewModelTest {
     fun `a tap and a Cross press on the same node do the same thing`() = runTest {
         loadedAndLaidOut()
 
-        viewModel.onNodeTapped(GameDetailKeys.OVERVIEW)
+        viewModel.onNodeTapped(GameDetailKeys.FAVORITE)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(GameDetailKeys.OVERVIEW, viewModel.uiState.value.navFocusKey)
+        assertEquals(GameDetailKeys.FAVORITE, viewModel.uiState.value.navFocusKey)
         // Touch hides the controller cursor without losing the logical node.
         assertFalse(viewModel.uiState.value.cursorVisible)
     }

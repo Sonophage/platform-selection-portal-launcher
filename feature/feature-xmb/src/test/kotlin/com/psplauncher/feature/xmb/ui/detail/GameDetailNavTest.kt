@@ -21,17 +21,15 @@ class GameDetailNavTest {
         loaded: Boolean = true,
         emulatorControls: Boolean = true,
         discs: List<Long> = emptyList(),
-        overview: Boolean = true,
-        info: Boolean = true,
         media: List<String> = emptyList(),
+        onMediaPage: Boolean = media.isNotEmpty(),
     ) = GameDetailNavContent(
         gameId = 7L,
         loaded = loaded,
         showEmulatorControls = emulatorControls,
         discIds = discs,
-        showOverview = overview,
-        showInfo = info,
         mediaIds = media,
+        onMediaPage = onMediaPage,
     )
 
     private fun nav(
@@ -51,9 +49,9 @@ class GameDetailNavTest {
     // ── Readiness ─────────────────────────────────────────────────────────
 
     @Test
-    fun `the page opens on Play, not on the Overview registered above it`() {
-        // Overview is the first node in the graph because it is the first thing on screen. The
-        // cursor still starts on the page's reason for existing.
+    fun `the page opens on Play, not on the first button in the footer`() {
+        // The footer reads heart, gear, Play, and the engine focuses the first node it is given.
+        // The cursor still starts on the page's reason for existing.
         assertEquals(GameDetailKeys.LAUNCH, readyNav().focusedKey)
     }
 
@@ -62,11 +60,11 @@ class GameDetailNavTest {
         // The opening placement fires once. Artwork or metadata arriving afterwards rebuilds the
         // graph, and a rebuild that re-homed the cursor would undo every move the user made.
         val nav = readyNav()
-        nav.handleAction(GamepadAction.NAVIGATE_UP)
-        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
 
         nav.updateContent(content(media = listOf("i:a")))
-        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
     }
 
     @Test
@@ -79,8 +77,8 @@ class GameDetailNavTest {
         assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
 
         nav.markReady()
-        nav.handleAction(GamepadAction.NAVIGATE_UP)
-        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
     }
 
     @Test
@@ -93,160 +91,151 @@ class GameDetailNavTest {
     // ── Rows and boundaries ───────────────────────────────────────────────
 
     @Test
-    fun `the action row is Play then Details, and neither edge wraps`() {
+    fun `the footer is Favourite, Options, Play, and neither edge wraps`() {
         val nav = readyNav()
         assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
 
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.FAVORITE, nav.focusedKey)
 
-        // Right at the end stops instead of wrapping back to Play.
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
-
-        // Left at the start stops on Play, never on the invisible band that holds the two.
+        // Left at the start stops instead of wrapping, and never parks on the invisible band
+        // that holds the three.
         repeat(3) { nav.handleAction(GamepadAction.NAVIGATE_LEFT) }
+        assertEquals(GameDetailKeys.FAVORITE, nav.focusedKey)
+
+        repeat(5) { nav.handleAction(GamepadAction.NAVIGATE_RIGHT) }
         assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
     }
 
     @Test
-    fun `up from the action row reaches Overview and stops at the top of the page`() {
+    fun `up from the footer stays put, because the panel is not a node`() {
+        // The overview, the information band and the media strip were rows above this one. They
+        // are the panel's PAGES now, walked with the shoulders, and a page is not somewhere a
+        // cursor goes — so the footer is the top of the graph.
         val nav = readyNav()
-        nav.handleAction(GamepadAction.NAVIGATE_UP)
-        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
-
-        nav.handleAction(GamepadAction.NAVIGATE_UP)
-        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
+        repeat(3) { nav.handleAction(GamepadAction.NAVIGATE_UP) }
+        assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
     }
 
     @Test
-    fun `Details is always reachable, with or without a manual`() {
-        // The pills it replaced hid Manual by disabling a slot in a fixed row. Details itself is
-        // never conditional: its dropdown is what varies.
-        assertTrue(GameDetailKeys.DETAILS in readyNav().reachableKeys())
-        assertTrue(GameDetailKeys.DETAILS in readyNav(content(emulatorControls = false)).reachableKeys())
+    fun `Options is always reachable, whatever the entry is`() {
+        // It is the way to scrape and edit, and to the emulator picker that used to sit on the
+        // information band. Never conditional: the MENU varies, this button does not.
+        assertTrue(GameDetailKeys.OPTIONS in readyNav().reachableKeys())
+        assertTrue(GameDetailKeys.OPTIONS in readyNav(content(emulatorControls = false)).reachableKeys())
     }
 
     @Test
-    fun `down walks the page rows in the order the redesign lays them out`() {
-        // Overview, action row, discs, media, information band. The band moved BELOW the media
-        // strip: the artwork comes first on the page and the numbers close it.
+    fun `down walks the rows the page still has`() {
+        // Three now, not five: the footer, the disc row, and the media tiles while their page is
+        // showing. Everything else became a panel page.
         val nav = readyNav(content(discs = listOf(1L, 2L), media = listOf("i:shot")))
         assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
-        nav.handleAction(GamepadAction.NAVIGATE_UP)
-        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
 
-        nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // action row
-        assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
+        // Play is the third button, so the disc row hands back its own third member — here its
+        // last, since there are two. That is the engine's nearest-index rule, not an accident.
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // discs
-        assertEquals(GameDetailKeys.disc(1L), nav.focusedKey)
-        nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // media strip
+        assertEquals(GameDetailKeys.disc(2L), nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // media tiles
         assertEquals(GameDetailKeys.media("i:shot"), nav.focusedKey)
-        nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // information band
-        assertEquals(GameDetailKeys.INFO, nav.focusedKey)
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // bottom boundary
-        assertEquals(GameDetailKeys.INFO, nav.focusedKey)
+        assertEquals(GameDetailKeys.media("i:shot"), nav.focusedKey)
+    }
+
+    @Test
+    fun `the media tiles are unreachable while their page is not showing`() {
+        // A node the user cannot see is a place the cursor can vanish into. The tiles join the
+        // graph only when the panel is on its media page.
+        val hidden = readyNav(content(media = listOf("i:a"), onMediaPage = false))
+        assertTrue(GameDetailKeys.media("i:a") !in hidden.reachableKeys())
+
+        val shown = readyNav(content(media = listOf("i:a"), onMediaPage = true))
+        assertTrue(GameDetailKeys.media("i:a") in shown.reachableKeys())
     }
 
     @Test
     fun `the disc row hands the cursor to the member nearest where it came from`() {
         val nav = readyNav(content(discs = listOf(1L, 2L, 3L)))
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)  // Details (child 1 of the action row)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)   // Options (child 1 of the footer)
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)
         assertEquals(GameDetailKeys.disc(2L), nav.focusedKey)
     }
 
     @Test
     fun `media strip boundaries stop at the ends`() {
-        val nav = readyNav(content(media = listOf("i:a", "i:b"), overview = false, info = false))
+        val nav = readyNav(content(media = listOf("i:a", "i:b")))
+        // Down from Play (the third button) lands on the tile nearest that index — the last one.
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.media("i:a"), nav.focusedKey)
+        assertEquals(GameDetailKeys.media("i:b"), nav.focusedKey)
+
+        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
+        assertEquals(GameDetailKeys.media("i:b"), nav.focusedKey)
 
         nav.handleAction(GamepadAction.NAVIGATE_LEFT)
         assertEquals(GameDetailKeys.media("i:a"), nav.focusedKey)
 
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.media("i:b"), nav.focusedKey)
-
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.media("i:b"), nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.media("i:a"), nav.focusedKey)
     }
 
     @Test
     fun `up from the media strip lands on the row above, not on the band`() {
         val nav = readyNav(content(media = listOf("i:a")))
-        nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // media strip
+        nav.handleAction(GamepadAction.NAVIGATE_DOWN)   // media tiles
         assertEquals(GameDetailKeys.media("i:a"), nav.focusedKey)
 
+        // Back up to the footer — a button, never the invisible band that holds the three.
         nav.handleAction(GamepadAction.NAVIGATE_UP)
-        assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
+        assertEquals(GameDetailKeys.FAVORITE, nav.focusedKey)
     }
 
     // ── Geometry ──────────────────────────────────────────────────────────
 
     @Test
     fun `vertical order follows reported geometry, not registration order`() {
-        // Registered order is overview-then-info; on screen they are the other way round here, and
+        // Registered order is discs-then-media; on screen they are the other way round here, and
         // the cursor must follow what the user sees.
         val nav = readyNav(
-            content = content(),
+            content = content(discs = listOf(1L, 2L), media = listOf("i:a")),
             geometry = mapOf(
                 GameDetailKeys.ACTIONS to 60f,
-                GameDetailKeys.INFO to 200f,
-                GameDetailKeys.OVERVIEW to 320f,
+                GameDetailKeys.MEDIA to 200f,
+                GameDetailKeys.DISCS to 320f,
             ),
         )
         assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
+
+        // Registration puts the disc row BEFORE the media tiles. Geometry puts the tiles first,
+        // and the cursor follows what the user sees — down from the footer reaches the tiles,
+        // not the row that was registered above them.
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.INFO, nav.focusedKey)
-        nav.handleAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.OVERVIEW, nav.focusedKey)
+        assertEquals(GameDetailKeys.media("i:a"), nav.focusedKey)
     }
 
     // ── Dynamic content ───────────────────────────────────────────────────
 
     @Test
-    fun `Details hands back its own key, so the page opens the dropdown and nothing else`() {
+    fun `the gear hands back its own key, so the page opens Options and nothing else`() {
         val nav = readyNav()
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
 
         nav.handleAction(GamepadAction.SELECT)
-        assertEquals(listOf(GameDetailKeys.DETAILS), activated)
+        assertEquals(listOf(GameDetailKeys.OPTIONS), activated)
     }
 
     @Test
-    fun `a package-backed entry keeps Details but has no emulator information field`() {
+    fun `a package-backed entry keeps the whole footer`() {
+        // The emulator picker used to hang off the information band, which is a panel page now
+        // and holds no cursor. It is an Options row instead, and Options is on every entry —
+        // so a package-backed game loses nothing by having no emulator of its own.
         val nav = readyNav(content(emulatorControls = false))
-        assertTrue(GameDetailKeys.OVERVIEW in nav.reachableKeys())
-        // Details opens the dropdown, which every entry has; only the emulator field is ROM-only.
-        assertTrue(GameDetailKeys.DETAILS in nav.reachableKeys())
 
-        // The information band is still a reading stop, but confirming it does nothing.
-        focusInfo(nav)
-        nav.handleAction(GamepadAction.SELECT)
-        assertTrue(activated.isEmpty())
-    }
-
-    @Test
-    fun `confirming the highlighted information band opens the emulator picker straight away`() {
-        val nav = readyNav()
-        focusInfo(nav)
-        assertEquals(GameDetailKeys.INFO, nav.focusedKey)
-
-        // No RIGHT into an inner field first: the highlighted row IS the action.
-        nav.handleAction(GamepadAction.SELECT)
-        assertEquals(listOf(GameDetailKeys.INFO), activated)
-
-        // And RIGHT has nowhere to go inside it.
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.INFO, nav.focusedKey)
-    }
-
-    /** Walks the action row down to the information band, the page's last row. */
-    private fun focusInfo(nav: GameDetailNav) {
-        nav.handleAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.INFO, nav.focusedKey)
+        assertTrue(GameDetailKeys.FAVORITE in nav.reachableKeys())
+        assertTrue(GameDetailKeys.OPTIONS in nav.reachableKeys())
+        assertTrue(GameDetailKeys.LAUNCH in nav.reachableKeys())
     }
 
     @Test
@@ -267,12 +256,12 @@ class GameDetailNavTest {
     @Test
     fun `an unrelated content change keeps the cursor where it is`() {
         val nav = readyNav()
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
 
         // A scrape finished loading: the graph changed, the focused node did not.
         nav.updateContent(content())
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
     }
 
     @Test
@@ -296,14 +285,14 @@ class GameDetailNavTest {
 
     @Test
     fun `touch hides the cursor but keeps logical focus, and controller input brings it back`() {
-        val nav = readyNav()
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        val nav = readyNav(content(discs = listOf(1L, 2L)))
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
         assertTrue(nav.cursorVisible)
 
         nav.markTouchInput()
         assertFalse(nav.cursorVisible)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
 
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)
         assertTrue(nav.cursorVisible)
@@ -314,9 +303,9 @@ class GameDetailNavTest {
         val nav = readyNav()
         nav.markTouchInput()
 
-        assertTrue(nav.touch(GameDetailKeys.DETAILS))
-        assertEquals(listOf(GameDetailKeys.DETAILS), activated)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        assertTrue(nav.touch(GameDetailKeys.OPTIONS))
+        assertEquals(listOf(GameDetailKeys.OPTIONS), activated)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
         // A tap is still touch input: the cursor stays hidden.
         assertFalse(nav.cursorVisible)
     }
@@ -325,7 +314,9 @@ class GameDetailNavTest {
 
     @Test
     fun `repeated input during an alignment is dropped, not queued`() {
-        val nav = readyNav()
+        // Two discs, not one: a single-disc game registers no disc row at all, so the page would
+        // have nothing below the footer and this test would pass by having nowhere to move.
+        val nav = readyNav(content(discs = listOf(1L, 2L)))
         assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
 
         nav.beginRecoveryLock()
@@ -334,7 +325,7 @@ class GameDetailNavTest {
 
         nav.endRecoveryLock()
         nav.handleAction(GamepadAction.NAVIGATE_DOWN)
-        assertEquals(GameDetailKeys.INFO, nav.focusedKey)
+        assertEquals(GameDetailKeys.disc(2L), nav.focusedKey)
     }
 
     // ── Modal contexts ────────────────────────────────────────────────────
@@ -342,8 +333,8 @@ class GameDetailNavTest {
     @Test
     fun `a modal owns all input and hands back the exact page node it interrupted`() {
         val nav = readyNav()
-        nav.handleAction(GamepadAction.NAVIGATE_RIGHT)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        nav.handleAction(GamepadAction.NAVIGATE_LEFT)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
 
         val modalRows = listOf(
             NavigationNode("modal:row0", onSelect = { activated += "modal:row0" }),
@@ -360,9 +351,9 @@ class GameDetailNavTest {
         assertEquals(listOf("modal:row1"), activated)
 
         // Closing restores the exact node the page was on — not Play, not the first row.
-        assertEquals(GameDetailKeys.DETAILS, nav.popModal())
+        assertEquals(GameDetailKeys.OPTIONS, nav.popModal())
         assertFalse(nav.isModalActive)
-        assertEquals(GameDetailKeys.DETAILS, nav.focusedKey)
+        assertEquals(GameDetailKeys.OPTIONS, nav.focusedKey)
     }
 
     @Test

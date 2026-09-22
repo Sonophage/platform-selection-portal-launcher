@@ -46,7 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerPromptBar
+import com.psplauncher.core.ui.components.ControllerHintStyle
+import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
@@ -183,7 +184,7 @@ fun MusicBrowserScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            ControllerPromptBar(
+            PfpControllerHints(
                 items = listOfNotNull(
                     ControllerPromptItem(GamepadAction.SELECT, "Open"),
                     // Sort is a no-op on playlist views — the ViewModel ignores it and the touch
@@ -192,10 +193,7 @@ fun MusicBrowserScreen(
                     ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                     ControllerPromptItem(GamepadAction.BACK, "Back"),
                 ),
-                labelColor = SecondaryText.copy(alpha = 0.7f),
-                labelStyle = TextStyle(fontSize = 11.sp),
-                glyphSize = 16.dp,
-                arrangement = Arrangement.spacedBy(18.dp),
+                style = ControllerHintStyle.INLINE,
             )
         }
     }

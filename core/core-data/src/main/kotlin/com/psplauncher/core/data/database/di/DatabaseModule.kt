@@ -21,7 +21,6 @@ import com.psplauncher.core.data.database.dao.PlaylistDao
 import com.psplauncher.core.data.database.dao.PlaySessionDao
 import com.psplauncher.core.data.database.dao.PlatformDao
 import com.psplauncher.core.data.database.dao.ThemeDao
-import com.psplauncher.core.data.database.dao.UnmatchedRomDao
 import com.psplauncher.core.data.database.dao.HiddenPlacementDao
 import com.psplauncher.core.data.database.dao.BookDao
 import com.psplauncher.core.data.database.dao.BookLibraryDao
@@ -78,7 +77,6 @@ object DatabaseModule {
     @Provides fun provideCategoryDao(db: PFPDatabase): CategoryDao = db.categoryDao()
     @Provides fun providePlaySessionDao(db: PFPDatabase): PlaySessionDao = db.playSessionDao()
     @Provides fun provideLibrarySourceDao(db: PFPDatabase): LibrarySourceDao = db.librarySourceDao()
-    @Provides fun provideUnmatchedRomDao(db: PFPDatabase): UnmatchedRomDao = db.unmatchedRomDao()
     @Provides fun provideThemeDao(db: PFPDatabase): ThemeDao = db.themeDao()
     @Provides fun provideMemoryCardDao(db: PFPDatabase): MemoryCardDao = db.memoryCardDao()
     @Provides fun provideAppOverrideDao(db: PFPDatabase): AppOverrideDao = db.appOverrideDao()

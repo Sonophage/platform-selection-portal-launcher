@@ -160,22 +160,10 @@ class LibraryManagerViewModel @Inject constructor(
         viewModelScope.launch {
             romRootRepository.roots.distinctUntilChanged().collect { refreshRomRoots() }
         }
-        // The Android library is app-based (no ROM folder), so nothing else ever creates its
-        // card — auto-create it so the Memory Card row and its Apps management UI exist from
-        // the first load. Idempotent: skips when a card already exists. Same self-heal spirit
-        // as openWindowsGamesRoot / ensureWindowsCard.
-        viewModelScope.launch { ensureAndroidCard() }
-    }
-
-    /** Creates the Android Memory Card when missing. One card per platform makes this idempotent. */
-    private suspend fun ensureAndroidCard() {
-        if (memoryCardRepository.unconfiguredPlatforms().none { it.id == ANDROID_PLATFORM_ID }) return
-        memoryCardRepository.addCard(
-            platformId  = ANDROID_PLATFORM_ID,
-            displayName = defaultDisplayName("Android"),
-            romDirectory = null,
-            emulatorId  = null,
-        )
+        // The Android card is NOT created here any more. It was, from this init block, which
+        // made it undeletable: removing it and reopening this screen brought it back. It is a
+        // flag-guarded one-shot in DatabaseInitializer now, beside the other one-shots, so a
+        // delete sticks and Add Console is the way back.
     }
 
     val uiState: StateFlow<LibraryManagerUiState> = combine(

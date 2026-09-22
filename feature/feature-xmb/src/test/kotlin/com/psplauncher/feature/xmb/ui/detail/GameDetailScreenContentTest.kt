@@ -77,13 +77,13 @@ class GameDetailScreenContentTest {
             ),
         )
 
-        // The information band's inline emulator field is gone, not disabled.
+        // The emulator lives in the Options menu now, which is closed here. It was an inline
+        // field on the information band, and the band became a panel page.
         assertAbsent("Emulator", "a package-backed entry must not offer an emulator action")
-        assertAbsent("MEDIA PREVIEW", "an entry with no media must not show a media band")
-        // The page itself is still a page: Play, Details and its footer documentation are present.
+        // The footer is the page's whole cursor surface: heart, gear, Play.
         assertPresent("Play", "the primary action must survive an entry with no extra content")
-        assertPresent("Details", "the secondary action must survive an entry with no extra content")
-        assertPresent("Options", "the helper footer must document Options on the base page")
+        assertPresent("Favourite", "the footer's first button must survive a bare entry")
+        assertPresent("Options", "the gear is where scrape and edit live, on every entry")
         assertPresent("Back", "the helper footer must document Back")
     }
 
@@ -108,25 +108,18 @@ class GameDetailScreenContentTest {
             ),
         )
 
-        // The emulator is changed from the information band's field, and the action row is now
-        // only Play and Details: everything else lives inside the dropdown Details opens, which
-        // is closed here, so none of its rows may be on the page.
-        assertAbsent("Emulator", "the action row must not duplicate the emulator field")
-        assertPresent("Details", "the action row's second button opens the dropdown")
-        assertAbsent("Manual", "the manual row belongs to the closed dropdown, not to the page")
-        assertAbsent("Favorite", "the favorite row belongs to the closed dropdown, not to the page")
-        assertAbsent("Unavailable", "a missing manual is omitted, not explained")
-        // The hero banner and the icon tile are gone: the art is the page's background now, and
-        // the title is drawn by the logo block at the top left.
-        assertPresent("Crash Bandicoot", "the logo block falls back to the title when there is no logo")
-        assertPresent("MEDIA PREVIEW", "the media band appears once the strip has an asset")
-        // The named plate on a playable tile: "this is playable" never rests on the glyph alone.
-        assertPresent("VIDEO", "a video tile must be named, not just glyphed")
-        // Field labels are uppercase chrome; the values keep their own casing.
-        assertPresent("RELEASED", "the information band shows the values it has")
-        assertPresent("1996", "the information band shows the values it has")
-        assertPresent("Naughty Dog", "field values keep their own casing")
-        assertAbsent("PUBLISHER", "absent values are omitted, never filled with Unknown")
+        // The page opens on its logo page, which for a game with no logo is the title. The
+        // overview, the media strip and the information band are OTHER pages: one at a time, so
+        // what used to be five bands stacked down a scrolling column is now four tabs, and only
+        // the current one may be on screen.
+        assertPresent("Crash Bandicoot", "the logo page falls back to the title when there is no logo")
+        assertAbsent("Emulator", "the emulator field is an Options row now, not a page band")
+        assertAbsent("Manual", "the manual row belongs to the closed Options menu")
+        assertAbsent("VIDEO", "the media tiles belong to the media page, which is not the one showing")
+        assertAbsent("Bandicoot jumps.", "the description belongs to the info page, not the logo page")
+        // The footer is present on every page.
+        assertPresent("Play", "the footer carries Play on every page")
+        assertPresent("Options", "the footer carries the gear on every page")
     }
 
     @Test

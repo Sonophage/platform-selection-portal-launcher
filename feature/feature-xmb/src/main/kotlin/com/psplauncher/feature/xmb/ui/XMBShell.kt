@@ -73,9 +73,17 @@ import com.psplauncher.core.ui.detail.PfpOverlayTitle
 import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.domain.model.VideoSnapPlacement
+import com.psplauncher.feature.xmb.ui.detail.DetailPanelPage
+import com.psplauncher.feature.xmb.ui.detail.DetailPanelStrip
+import com.psplauncher.feature.xmb.ui.detail.GameDetailPanel
+import com.psplauncher.feature.xmb.ui.detail.detailPanelContentFor
+import com.psplauncher.feature.xmb.ui.detail.resolvePanelPage
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.ui.motion.MotionWallpaperPolicy
 import com.psplauncher.core.ui.motion.rememberAppVisible
+import androidx.compose.ui.text.style.TextOverflow
+import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.XmbTouchButton
 import com.psplauncher.core.ui.preview.DevicePreviews
@@ -171,6 +179,7 @@ fun XMBShellContainer(
         onTouchBack = viewModel::onHomeBack,
         onTouchInput = viewModel::markTouchInput,
         onXmbSortTapped = viewModel::onSortLabelTapped,
+        onPanelPageTapped = viewModel::onPanelPageTapped,
         onOpenAppDrawer = viewModel::onOpenAppDrawer,
         onItemTap = viewModel::onItemTap,
         onItemLongPress = viewModel::onItemLongPress,
@@ -285,6 +294,7 @@ fun XMBShell(
     onTouchBack: () -> Unit = {},
     onTouchInput: () -> Unit = {},
     onXmbSortTapped: () -> Unit = {},
+    onPanelPageTapped: (DetailPanelPage) -> Unit = {},
     onOpenAppDrawer: () -> Unit = {},
     // Row tap: move the cursor there, or activate if it's already selected (see XMBViewModel.onItemTap).
     onItemTap: (Int) -> Unit = {},
@@ -432,6 +442,9 @@ fun XMBShell(
           LocalIconDisplayMode provides uiState.iconDisplayMode,
           LocalIconDisplayModeByPlatform provides uiState.iconDisplayModeByPlatform,
           LocalFocusedGameVideo provides uiState.focusedGameVideo,
+          // Whether the hover panel has claimed the snap. Provided here, next to the snap
+          // itself, so a tile several layers down cannot read one without the other.
+          LocalPanelShowingVideo provides (uiState.effectivePanelPage == DetailPanelPage.VIDEO),
           // The icon-legibility treatment: PortalIcon + the theme-override glyph branches read
           // it ambiently, so every XMB silhouette glyph gets the matte from one provider.
           com.psplauncher.core.ui.icons.LocalIconLegibility provides uiState.iconLegibility,
@@ -547,14 +560,41 @@ fun XMBShell(
             // resolved to nothing and the wallpaper showed instead. The ViewModel now hands over
             // the first candidate that actually DECODED, which is the same image its colour came
             // from, so the backdrop and the tint over it can never be of two different pictures.
+            // The hover panel, computed here rather than beside the code that draws it: the
+            // full-bleed snap layer below has to know whether the panel has claimed the clip,
+            // and it is composed before the foreground. Pure reads of uiState, no remember, so
+            // the position is free.
+            //
+            // The crossbar's right-hand region, which used to draw only the PIC0 logo. It still draws exactly that by default; L1/R1 now walk it to the game's
+            // box art or its information card. One component draws this region, shared with the
+            // drill-down page, so the two cannot describe the same game differently.
+            //
+            // Gated on a real game WITH backdrop art: the region has always needed something
+            // behind it, and a panel floating on the bare wallpaper reads as a stray card.
+            val recentsListState = rememberLazyListState()
+            val panelItem = uiState.hoverPanelItem
+            // uiState.hoverPanelContent, not a build of it here: the shoulder walk reads the
+            // same property, and the strip's tabs and where R1 lands have to be the same list.
+            val panelContent = uiState.hoverPanelContent
+            // The content's own logo field, which is already gated on hasVisibleLogo — the same
+            // predicate XMBItemList reads to decide whether the row keeps its title. Reading the
+            // item again here would be a second answer to one question.
+            val panelLogo = panelContent?.logoUri
+            val panelPage = panelContent?.let { resolvePanelPage(uiState.effectivePanelPage, it.pages) }
+            val panelShowingVideo = panelPage == DetailPanelPage.VIDEO
+
             val selectedItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
             val selectedBg = uiState.focusedItemBackdrop?.takeIf { uiState.itemBackdropEnabled }
             // PS3 placement: the approved snap plays full-bleed here instead of in the tile,
             // over the still art and UNDER the legibility scrim, so the crossbar keeps the same
             // contrast it has over a still background. Same FocusedGameVideo, same gates, same
             // single player — Icon1VideoOverlay centre-crops to whatever bounds it is given.
+            // shellSnapSite, not a placement test: the shortcut of reading the placement alone
+            // stopped being safe the moment a third site could claim the clip. With the panel on
+            // its video page this returns PANEL and the full-bleed layer draws nothing.
             val backgroundSnap = uiState.focusedGameVideo?.takeIf {
-                it.placement == VideoSnapPlacement.BACKGROUND && it.gameId == selectedItem?.gameId
+                shellSnapSite(it.placement, panelShowingVideo) == SnapSite.BACKGROUND &&
+                    it.gameId == selectedItem?.gameId
             }
             Crossfade(targetState = selectedBg, animationSpec = tween(320), label = "xmbGameBackground") { bg ->
                 if (bg != null || backgroundSnap != null) {
@@ -632,26 +672,68 @@ fun XMBShell(
                 uiState.customIconSession == null
             ) {
 
-            // PIC0-style logo overlay — the focused game's clear logo fades in center-right
-            // over the hover background, a beat AFTER the background lands (the PSP's
-            // icon → PIC1 → PIC0 stagger). Fades out instantly with any focus move.
-            val selectedLogo = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.takeIf { it.hasVisibleLogo }?.logoUri
-            var pic0Visible by remember(selectedLogo) { mutableStateOf(false) }
-            androidx.compose.runtime.LaunchedEffect(selectedLogo) {
-                if (selectedLogo != null) {
+            // ── Home ──────────────────────────────────────────────────────────
+            // Last Played REPLACES the crossbar rather than sitting beside it: standing on the
+            // leftmost column hides the caticon bar and the item list, and the screen becomes
+            // the game you were last playing. RIGHT walks the recents and then steps to the next
+            // category, which is what brings the bar back.
+            if (uiState.onLastPlayedHome) {
+                LastPlayedPage(
+                    items = uiState.currentItems,
+                    selectedIndex = uiState.selectedItemIndex,
+                    content = uiState.hoverPanelContent,
+                    page = uiState.effectivePanelPage,
+                    listState = recentsListState,
+                    directLaunch = uiState.directLaunch,
+                    onPageTapped = onPanelPageTapped,
+                    onCardTapped = onItemTap,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = StripHeight),
+                )
+            } else {
+
+            // The PSP's icon → PIC1 → PIC0 stagger, kept: the logo arrives a beat after the
+            // background and snaps away the instant the cursor moves, so the next game's logo is
+            // never glimpsed before its own linger completes.
+            //
+            // The linger is the LOGO page's alone. A shoulder press is an answer to the user and
+            // must land at once; waiting 650 ms to redraw a page they just asked for would read
+            // as the button having missed.
+            var pic0Visible by remember(panelLogo) { mutableStateOf(false) }
+            androidx.compose.runtime.LaunchedEffect(panelLogo) {
+                if (panelLogo != null) {
                     kotlinx.coroutines.delay(650)
                     pic0Visible = true
                 }
             }
-            // Fade-in only: stepping the cursor must hide the logo INSTANTLY (snap), so the
-            // next game's logo is never glimpsed before its own linger completes.
             val pic0Alpha by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = if (pic0Visible && selectedLogo != null) 1f else 0f,
+                targetValue = if (pic0Visible && panelLogo != null) 1f else 0f,
                 animationSpec = if (pic0Visible) tween(500) else androidx.compose.animation.core.snap(),
                 label = "pic0Fade",
             )
-            if (selectedLogo != null && pic0Alpha > 0f) {
+            val onLogoPage = panelPage == DetailPanelPage.LOGO
+            // "Is anything on the right already naming this game?"
+            //
+            // Off the logo page the panel is 42% of the width and the label runs straight into
+            // it, so the label goes. ON the logo page it goes only once a logo is actually
+            // DRAWN — pic0Alpha, not merely "this game has one" — because the logo arrives a
+            // beat after the background and a game that was nameless for those 650 ms is the bug
+            // hasVisibleLogo's comment describes having already been fixed once.
+            //
+            // A logo-less game therefore keeps its label on the logo page, which is the whole
+            // point: nothing else is naming it. Seen on the device as SKYRIM's wordmark with the
+            // row's title printed across it.
+            //
+            // One val, two consumers (the crossbar list and the drill flyout). They were the pair
+            // that disagreed — the flyout never received this at all — so they read one value.
+            val focusedNameShownOnRight = panelContent != null &&
+                (!onLogoPage || pic0Alpha > 0f)
+            val panelAlpha = if (onLogoPage) pic0Alpha else 1f
+            // On the logo page this is the old condition unchanged, so a game with no logo shows
+            // nothing here exactly as before. Off it, the panel is what the user asked for with
+            // the shoulders and appears whether the game has a logo or not.
+            if (panelContent != null && panelPage != null && (!onLogoPage || (panelLogo != null && pic0Alpha > 0f))) {
                 // BoxWithConstraints, not Box: the vertical placement below is derived from the
                 // screen height, and it MUST be measured here rather than reusing the shell's outer
                 // maxHeight — that one is taken before the LocalDensity override above, so its dp
@@ -666,27 +748,44 @@ fun XMBShell(
                     // inside the content Box, which is inset by contentTopPadding. This rebuilds
                     // that same line here in the unpadded space, from the very constants the cross
                     // and the game column lay out with, so the two cannot drift apart.
+                    // The logo page keeps the region it has always had. The other pages need
+                    // more of it: 30% of the width is right for a wordmark and cramped for a
+                    // portrait box or a paragraph, and the still art is solid out to 40% and
+                    // gone by 68% (XMBGameBackdrop), so widening to 40% stays in the open side.
+                    val panelWidthFraction = if (onLogoPage) 0.30f else 0.42f
+                    // 70%, up from 62%: the strip used to take the top of this region and now
+                    // sits in the chrome under the status bar, so the page gets what it was
+                    // spending on its own tab row.
+                    val panelHeightFraction = if (onLogoPage) 0.38f else 0.70f
                     val logoCenterOffset: Dp = if (uiState.drillTitle != null) {
                         val contentTop = uiState.layoutSpec.contentTopPaddingDp.dp
                         val crossHeight = maxHeight - contentTop
                         val anchorTop = crossHeight * layoutAdjust.barTopFraction + CAT_BAR_HEIGHT
                         val rowCenter = contentTop + anchorTop + ROW_HEIGHT / 2
-                        // The logo is 38% of the height and centred, so keep its centre within
-                        // [19%, 81%] — a low crossbar must not push it off the bottom edge.
-                        rowCenter.coerceIn(maxHeight * 0.19f, maxHeight * 0.81f) - maxHeight / 2
+                        // Keep the panel's CENTRE far enough from each edge that the panel itself
+                        // stays on screen — half its own height, derived rather than the literal
+                        // 19% that was correct only while the height was always 38%. A low
+                        // crossbar must not push it off the bottom.
+                        val halfPanel = panelHeightFraction / 2f
+                        rowCenter.coerceIn(maxHeight * halfPanel, maxHeight * (1f - halfPanel)) -
+                            maxHeight / 2
                     } else {
                         0.dp
                     }
-                    AsyncImage(
-                        model = rememberArtworkModel(selectedLogo),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
+                    GameDetailPanel(
+                        content = panelContent,
+                        page = panelPage,
+                        // The strip is chrome, and on the logo page the crossbar should look
+                        // exactly as it did before this change — so it appears only once the user
+                        // has walked off the logo, which is the only way to get here.
+                        // The row already shows the title for a logo-less game. See LogoPage.
+                        titleFallback = false,
                         modifier = Modifier
-                            .fillMaxWidth(0.30f)
-                            .fillMaxHeight(0.38f)
+                            .fillMaxWidth(panelWidthFraction)
+                            .fillMaxHeight(panelHeightFraction)
                             .offset(y = logoCenterOffset)
                             .padding(end = 44.dp)
-                            .alpha(pic0Alpha),
+                            .alpha(panelAlpha),
                     )
                 }
             }
@@ -696,8 +795,15 @@ fun XMBShell(
             // no text, because the logo IS the identity. This is the other half of the PS3's
             // game info -- what the thing IS, not what it is called -- so it lives with the
             // logo rather than in the list.
+            // Only on the logo page. This line is positioned for a panel that is 38% of the
+            // height; every other page is 62% and draws straight through it — seen on the
+            // device, the line and its accent bar printed across the middle of the box art.
+            // The Info card also leads with this exact text, so on that page it was saying it
+            // twice as well. A null panel (a row with no backdrop art, so no panel at all)
+            // keeps the line: there is nothing for it to collide with.
+            val panelLeavesRoomForMeta = panelPage == null || panelPage == DetailPanelPage.LOGO
             val metadataLine = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.takeIf { uiState.gameMetadataVisible && it.isRealGame }
+                ?.takeIf { uiState.gameMetadataVisible && it.isRealGame && panelLeavesRoomForMeta }
                 ?.metadataLine
             var metaVisible by remember(metadataLine) { mutableStateOf(false) }
             androidx.compose.runtime.LaunchedEffect(metadataLine) {
@@ -758,6 +864,23 @@ fun XMBShell(
                 onSortTapped = onXmbSortTapped,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
+
+            // The panel's page strip, directly under the status bar and in the opposite corner
+            // from the helper footer, which is the pill it is wearing. Not on the logo page: that
+            // view is the crossbar exactly as it was, and a tab row over it would be new chrome
+            // on a screen nobody asked to change.
+            if (panelContent != null && panelPage != null && panelPage != DetailPanelPage.LOGO) {
+                DetailPanelStrip(
+                    pages = panelContent.pages,
+                    current = panelPage,
+                    onPageTapped = onPanelPageTapped,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        // StripHeight, not a copy of 28: the gap under the status bar has to
+                        // follow it if it ever changes.
+                        .padding(top = StripHeight + ControllerHintEdgeGap, end = ControllerHintEdgeGap),
+                )
+            }
 
             Box(
                 modifier = Modifier
@@ -831,6 +954,7 @@ fun XMBShell(
                             // Tapping the active memory card under the caticon backs out of the
                             // drill; taps on the other (dimmed) cards are ignored.
                             onSiblingTap = { i -> if (i == uiState.drillSiblingIndex) onTouchBack() },
+                            focusedLogoVisible = focusedNameShownOnRight,
                             iconStyle = uiState.iconStyle,
                             barTopY = barTop,
                             belowTopY = anchorTop,
@@ -872,7 +996,7 @@ fun XMBShell(
                                 solidUnfocusedIcons = uiState.solidUnfocusedIcons,
                                 textShadow = uiState.textShadow,
                                 iconAnimatingAllowed = iconAnimatingAllowed,
-                                focusedLogoVisible = pic0Alpha > 0f,
+                                focusedLogoVisible = focusedNameShownOnRight,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -902,6 +1026,7 @@ fun XMBShell(
                     }
                 }
             }
+            } // end: else — the crossbar, shown on every column but Last Played
             } // end: XMB foreground hidden while music browser is open
 
             // Bottom-right App Drawer affordance. Shown only at the XMB root — while drilled into a

@@ -159,9 +159,10 @@ fun GameIcon(
                 }
 
                 else -> {
+                    val panelShowingVideo = LocalPanelShowingVideo.current
                     val video = LocalFocusedGameVideo.current?.takeIf {
                         it.gameId == item.gameId &&
-                            snapSiteFor(it.placement, resolved.mode) == SnapSite.TILE
+                            snapSiteFor(it.placement, resolved.mode, panelShowingVideo) == SnapSite.TILE
                     }
                     Box(modifier = modifier) {
                         PspIcon0Icon(

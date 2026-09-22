@@ -15,6 +15,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
@@ -44,11 +45,35 @@ class MetadataApplyTest {
     private fun candidates(
         ssInfo: SsGameInfo? = null,
         igdbInfo: IgdbGameInfo? = null,
+        steamDetails: com.psplauncher.feature.artwork.api.SteamAppDetails? = null,
     ) = MetadataCandidates(
         gameEntity = null, bestTitle = "Chrono Trigger", ssInfo = ssInfo, romIdentity = null,
         usedSsCache = false, cachedSsId = null, igdbInfo = igdbInfo,
         sgdbGameId = null, sgdbGridUrl = null, sgdbHeroUrl = null, sgdbLogoUrl = null,
+        steamDetails = steamDetails, steamArt = null,
     )
+
+    @Test
+    fun `a game only Steam answered for is not "found on no source"`() {
+        // fetchForGame stops on isEmpty and reports "Not found on any source". Steam was not in
+        // that predicate at first, so a Windows game that ONLY Steam could serve would have had
+        // every asset it just fetched thrown away — the exact failure this provider exists to
+        // remove, reintroduced by the seam that decides whether anything was found.
+        val steamOnly = candidates(
+            steamDetails = com.psplauncher.feature.artwork.api.SteamAppDetails(
+                appId = "620",
+                title = "Portal 2",
+                developer = "Valve",
+                publisher = "Valve",
+                genre = "Action",
+                releaseYear = 2011,
+                description = "Two portals.",
+            ),
+        )
+
+        assertFalse("Steam answered, so the scrape found something", steamOnly.isEmpty)
+        assertTrue("nothing answered at all", candidates().isEmpty)
+    }
 
     @Test
     fun `ScreenScraper becomes a preset, artwork-only answers never do`() {

@@ -51,6 +51,22 @@ data class SteamAppArt(
     val logoUrl: String,
 )
 
+/**
+ * The Steam app id for a library row's storefront pair, or null when the row is not a Steam game.
+ *
+ * ONE predicate for "this is addressable on Steam", because the alternative is the string "STEAM"
+ * compared by hand at every site that wants to ask. The pair is stored rather than the id alone
+ * precisely so that ("STEAM","620") and ("GOG","620") are different games — checking the id and
+ * forgetting the store is how they become the same one.
+ */
+fun steamAppIdOf(storefront: String?, storefrontGameId: String?): String? {
+    if (!storefront.equals("STEAM", ignoreCase = true)) return null
+    val id = storefrontGameId?.trim().orEmpty()
+    // Same shape rule as steamAppArt: a positive integer. Anything else is another store's id
+    // that happened to be labelled STEAM, and asking Steam about it is a guaranteed miss.
+    return id.takeIf { it.isNotEmpty() && it.all(Char::isDigit) && (it.toLongOrNull() ?: 0L) > 0L }
+}
+
 /** Build the asset URLs for [appId]. Pure: no network, no validation beyond the id's shape. */
 fun steamAppArt(appId: String): SteamAppArt? {
     val id = appId.trim()

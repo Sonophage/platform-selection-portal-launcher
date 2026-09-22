@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -82,6 +83,8 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.detail.DetailRowSpacing
 import com.psplauncher.core.ui.detail.PfpDetailBackground
+import com.psplauncher.core.ui.detail.LocalDetailViewportHeight
+import com.psplauncher.core.ui.detail.PfpDetailQuickAction
 import com.psplauncher.core.ui.detail.detailPalette
 import com.psplauncher.core.ui.detail.PfpDetailBreadcrumb
 import com.psplauncher.core.ui.detail.PfpDetailField
@@ -136,6 +139,13 @@ private val LOGO_TOP_GAP = 26.dp
 private val LOGO_MAX_HEIGHT = 104.dp
 private val LOGO_MAX_WIDTH = 460.dp
 private val PLAY_BUTTON_WIDTH = 238.dp
+
+/**
+ * What the panel's height has to give back to the rest of the body: the page strip, the action
+ * row, and the gaps around them. Derived from the viewport rather than a fixed panel height, so
+ * the page fills whatever screen it is on instead of guessing.
+ */
+private val PANEL_CHROME_HEIGHT = 130.dp
 private val DETAILS_BUTTON_WIDTH = 196.dp
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -394,84 +404,98 @@ private fun GameDetailContent(
         overlay = { GameDetailOverlays(state = state, game = game, viewModel = viewModel) },
     ) {
         Box(Modifier.fillMaxWidth().height(1.dp).bringIntoViewRequester(pageTopRequester))
-        Spacer(Modifier.height(LOGO_TOP_GAP))
 
-        // ── Identity ────────────────────────────────────────────
-        // The game's logo, top left, over its own artwork. Nothing frames it: the art IS the page
-        // (see PfpDetailArtBackdrop), so a card around the logo would be a box drawn on a picture.
-        GameLogoBlock(
-            logoUri = game.logoUri,
-            title = game.displayTitle,
-            platform = state.platform?.name ?: game.platformId.uppercase(),
-        )
-
-        // ── Overview ──────────────────────────────────────────
-        Spacer(Modifier.height(DetailRowSpacing))
-        val description = game.description?.takeIf { it.isNotBlank() } ?: "No description available."
-        val expandable = description.length > OVERVIEW_EXPAND_THRESHOLD
-        PfpDetailTextRow(
-            label = "Overview",
-            text = description,
-            expanded = state.descriptionExpanded,
-            focused = focus == GameDetailKeys.OVERVIEW,
-            onClick = if (expandable) ({ viewModel.onNodeTapped(GameDetailKeys.OVERVIEW) }) else null,
-            modifier = Modifier.detailNode(GameDetailKeys.OVERVIEW, requesterFor, nodeY),
-        )
-
-        // ── Meta line ─────────────────────────────────────────
-        // The same one-line summary the XMB shows under a focused game, so moving from the list
-        // into the page does not re-say the same facts in a different shape. The full set is in
-        // the information band at the foot of the page.
-        val meta = gameMetadataLine(game.releaseYear, game.genre, game.developer, game.players)
-        if (meta != null || game.isFavorite) {
+        // ── The panel ─────────────────────────────────────────────────────
+        // The page is a panel and a footer. What used to be a scrolling column — the logo, the
+        // overview, the meta line, the media strip and the information band — are the panel's
+        // PAGES now, walked with L1/R1, which is the same component and the same content shape
+        // the crossbar's hover panel uses. One definition of what a game looks like.
+        val panelContent = state.panelContent
+        val panelPage = state.effectivePanelPage
+        if (panelContent != null) {
+            Spacer(Modifier.height(6.dp))
+            DetailPanelStrip(
+                pages = panelContent.pages,
+                current = panelPage,
+                onPageTapped = viewModel::onPanelPageTapped,
+                modifier = Modifier.align(Alignment.End),
+            )
             Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Favorite state has nowhere else to live now that the hero badge is gone, and
-                // it is state rather than a scraped fact, so it leads the line instead of joining it.
-                if (game.isFavorite) {
-                    Icon(
-                        imageVector = Icons.Filled.Favorite,
-                        contentDescription = "In favourites",
-                        tint = detailPalette().focus,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                if (meta != null) {
-                    Text(
-                        text = meta,
-                        color = TextMuted,
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            // Sized from the scaffold's own viewport rather than a constant, so the panel fills
+            // the page above the footer instead of guessing at a height that is wrong on the next
+            // screen. The subtraction is the strip, the action row and the gaps around them.
+            val panelHeight = (LocalDetailViewportHeight.current - PANEL_CHROME_HEIGHT)
+                .coerceAtLeast(180.dp)
+            // Geometry for the media CONTAINER only. LEFT/RIGHT between tiles is sibling traversal
+            // and needs none; UP/DOWN onto the strip needs the row's position, and the row is the
+            // panel while its page is showing.
+            val panelBase = Modifier.fillMaxWidth().height(panelHeight)
+            val panelModifier = if (panelPage == DetailPanelPage.GALLERY) {
+                panelBase.detailNode(GameDetailKeys.MEDIA, requesterFor, nodeY)
+            } else {
+                panelBase
             }
+            GameDetailPanel(
+                content = panelContent,
+                page = panelPage,
+                // The drill-down has no row label behind it, so a logo-less game is named here.
+                titleFallback = true,
+                focusedMediaId = focus?.removePrefix("game-detail:media:")?.takeIf {
+                    focus.startsWith("game-detail:media:")
+                },
+                onMediaTapped = { viewModel.onNodeTapped(GameDetailKeys.media(mediaStableId(it))) },
+                modifier = panelModifier,
+            )
         }
 
-        // ── Play and Details ─────────────────────────────────────
+        // ── Discs (multi-disc sets only) ──────────────────────────────────
+        if (state.showDiscPicker) {
+            Spacer(Modifier.height(DetailRowSpacing))
+            DiscRow(
+                members = state.discMembers,
+                selectedId = state.selectedDiscId,
+                focusedKey = focus,
+                requesterFor = requesterFor,
+                nodeY = nodeY,
+                onSelect = { id -> viewModel.onNodeTapped(GameDetailKeys.disc(id)) },
+                rowModifier = Modifier.detailNode(GameDetailKeys.DISCS, requesterFor, nodeY),
+            )
+        }
+
+        // ── Footer: heart, gear, Play ─────────────────────────────────────
+        // NeoStation's arrangement, and the owner's answer to where scrape and edit go: the gear
+        // opens Options, which is where DetailAction already keeps Artwork, Update Metadata,
+        // Refresh, Edit Title and Edit Note. No new action plumbing — the menu was already right.
         Spacer(Modifier.height(DetailRowSpacing))
         Row(
             modifier = Modifier.detailNode(GameDetailKeys.ACTIONS, requesterFor, nodeY),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            PfpDetailQuickAction(
+                label = if (game.isFavorite) "Favourited" else "Favourite",
+                icon = Icons.Filled.Favorite,
+                focused = focus == GameDetailKeys.FAVORITE,
+                available = true,
+                onClick = { viewModel.onNodeTapped(GameDetailKeys.FAVORITE) },
+                modifier = Modifier.detailNode(GameDetailKeys.FAVORITE, requesterFor, nodeY),
+            )
+            PfpDetailQuickAction(
+                label = "Options",
+                icon = Icons.Filled.Settings,
+                focused = focus == GameDetailKeys.OPTIONS,
+                available = true,
+                onClick = { viewModel.onNodeTapped(GameDetailKeys.OPTIONS) },
+                modifier = Modifier.detailNode(GameDetailKeys.OPTIONS, requesterFor, nodeY),
+            )
             PfpDetailLaunchButton(
                 label = "Play",
                 icon = Icons.Filled.PlayArrow,
                 focused = focus == GameDetailKeys.LAUNCH,
                 onClick = { viewModel.onNodeTapped(GameDetailKeys.LAUNCH) },
                 modifier = Modifier
-                    .width(PLAY_BUTTON_WIDTH)
+                    .weight(1f)
                     .detailNode(GameDetailKeys.LAUNCH, requesterFor, nodeY),
-            )
-            PfpDetailLaunchButton(
-                label = "Details",
-                icon = Icons.Filled.MoreHoriz,
-                focused = focus == GameDetailKeys.DETAILS,
-                onClick = { viewModel.onNodeTapped(GameDetailKeys.DETAILS) },
-                modifier = Modifier
-                    .width(DETAILS_BUTTON_WIDTH)
-                    .detailNode(GameDetailKeys.DETAILS, requesterFor, nodeY),
             )
         }
 
@@ -491,64 +515,6 @@ private fun GameDetailContent(
         } else (state.actionMessage ?: state.artworkMessage)?.let {
             Spacer(Modifier.height(8.dp))
             Text(it, color = detailPalette().focus, fontSize = 12.sp)
-        }
-
-        // ── Discs (multi-disc sets only) ──────────────────────────────────
-        if (state.showDiscPicker) {
-            Spacer(Modifier.height(DetailRowSpacing))
-            DiscRow(
-                members = state.discMembers,
-                selectedId = state.selectedDiscId,
-                focusedKey = focus,
-                requesterFor = requesterFor,
-                nodeY = nodeY,
-                onSelect = { id -> viewModel.onNodeTapped(GameDetailKeys.disc(id)) },
-                rowModifier = Modifier.detailNode(GameDetailKeys.DISCS, requesterFor, nodeY),
-            )
-        }
-
-        // ── Media strip ───────────────────────────────────────────────────
-        if (state.detailMedia.isNotEmpty()) {
-            Spacer(Modifier.height(DetailRowSpacing + 6.dp))
-            PfpDetailSectionLabel("Media Preview")
-            Spacer(Modifier.height(8.dp))
-            LazyRow(
-                state = mediaListState,
-                modifier = Modifier.detailNode(GameDetailKeys.MEDIA, requesterFor, nodeY),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                itemsIndexed(
-                    items = state.detailMedia,
-                    // Stable identity: a re-scrape or a reorder must not move the cursor to a
-                    // different asset.
-                    key = { _, media -> GameDetailKeys.media(mediaStableId(media)) },
-                ) { _, media ->
-                    val key = GameDetailKeys.media(mediaStableId(media))
-                    PfpDetailMediaTile(
-                        uri = media.uri,
-                        isVideo = media.isVideo,
-                        focused = focus == key,
-                        posterFallbackUri = state.detailMedia.firstOrNull { !it.isVideo }?.uri
-                            ?: game.heroUri ?: game.artworkUri,
-                        contentDescription = if (media.isVideo) "Play video" else "Screenshot",
-                        onClick = { viewModel.onNodeTapped(key) },
-                        modifier = Modifier.detailNode(key, requesterFor, nodeY),
-                    )
-                }
-            }
-        }
-
-        // ── Game information ──────────────────────────────────────────────
-        if (state.showInfoBand) {
-            Spacer(Modifier.height(DetailRowSpacing))
-            GameInformationBand(
-                game = game,
-                state = state,
-                focusedKey = focus,
-                requesterFor = requesterFor,
-                nodeY = nodeY,
-                viewModel = viewModel,
-            )
         }
 
         Spacer(Modifier.height(DetailRowSpacing))
@@ -930,10 +896,10 @@ private fun confirmLabelFor(state: GameDetailUiState): String {
  * park the page just above it, and the logo and the art could then never be seen again.
  */
 private val TopBandKeys = setOf(
-    GameDetailKeys.OVERVIEW,
-    GameDetailKeys.LAUNCH,
     GameDetailKeys.ACTIONS,
-    GameDetailKeys.DETAILS,
+    GameDetailKeys.FAVORITE,
+    GameDetailKeys.OPTIONS,
+    GameDetailKeys.LAUNCH,
 )
 
 /**

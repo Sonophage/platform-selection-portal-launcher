@@ -22,7 +22,6 @@ import com.psplauncher.core.data.database.dao.PlaylistDao
 import com.psplauncher.core.data.database.dao.PlaySessionDao
 import com.psplauncher.core.data.database.dao.PlatformDao
 import com.psplauncher.core.data.database.dao.ThemeDao
-import com.psplauncher.core.data.database.dao.UnmatchedRomDao
 import com.psplauncher.core.data.database.dao.HiddenPlacementDao
 import com.psplauncher.core.data.database.dao.BookDao
 import com.psplauncher.core.data.database.dao.BookLibraryDao
@@ -51,7 +50,6 @@ import com.psplauncher.core.data.database.entity.PlaylistTrackEntity
 import com.psplauncher.core.data.database.entity.PlaySessionEntity
 import com.psplauncher.core.data.database.entity.PlatformEntity
 import com.psplauncher.core.data.database.entity.ThemeEntity
-import com.psplauncher.core.data.database.entity.UnmatchedRomEntity
 import com.psplauncher.core.data.database.entity.HiddenPlacementEntity
 import com.psplauncher.core.data.database.entity.BookEntity
 import com.psplauncher.core.data.database.entity.BookLibraryEntity
@@ -70,7 +68,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
  * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
  * version bump cannot leave the test still asserting against the old number.
  */
-const val PFP_DATABASE_VERSION = 47
+const val PFP_DATABASE_VERSION = 48
 
 @Database(
     entities = [
@@ -81,7 +79,6 @@ const val PFP_DATABASE_VERSION = 47
         CategoryItemEntity::class,
         PlaySessionEntity::class,
         LibrarySourceEntity::class,
-        UnmatchedRomEntity::class,
         ThemeEntity::class,
         MemoryCardEntity::class,
         AppOverrideEntity::class,
@@ -117,7 +114,6 @@ abstract class PFPDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun playSessionDao(): PlaySessionDao
     abstract fun librarySourceDao(): LibrarySourceDao
-    abstract fun unmatchedRomDao(): UnmatchedRomDao
     abstract fun themeDao(): ThemeDao
     abstract fun memoryCardDao(): MemoryCardDao
     abstract fun appOverrideDao(): AppOverrideDao
@@ -1376,6 +1372,26 @@ abstract class PFPDatabase : RoomDatabase() {
         }
 
         /**
+         * Drops `unmatched_roms`.
+         *
+         * The table, its entity and its DAO were declared and then never used: nothing wrote a
+         * row and nothing read one, and the Settings screen its comment promised ("Settings →
+         * Library → Unmatched ROMs") does not exist. The scanner's own `UnmatchedRom` is a
+         * different, live type — a result it hands back in memory — and is untouched by this.
+         *
+         * A real DROP rather than the retire-in-place that ScanTombstoneEntity got. That one is
+         * kept to hold the schema version steady; there is no such reason here, the rows were
+         * worthless where they existed at all, and DROP TABLE is the one destructive schema verb
+         * that minSdk 29's SQLite does support — unlike ALTER TABLE DROP COLUMN, which is why
+         * games.tgdb_id is still a documented-retired column rather than a removed one.
+         */
+        val MIGRATION_47_48 = object : Migration(47, 48) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS unmatched_roms")
+            }
+        }
+
+        /**
          * Every migration, in order, as ONE list.
          *
          * DatabaseModule used to hand-type all of these into `addMigrations(...)`, which made the
@@ -1433,6 +1449,7 @@ abstract class PFPDatabase : RoomDatabase() {
             MIGRATION_44_45,
             MIGRATION_45_46,
             MIGRATION_46_47,
+            MIGRATION_47_48,
         )
 
     }

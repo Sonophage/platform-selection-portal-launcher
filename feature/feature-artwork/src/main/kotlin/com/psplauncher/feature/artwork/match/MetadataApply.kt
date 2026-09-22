@@ -57,9 +57,15 @@ data class MetadataPreview(
 object MetadataApply {
 
     /**
-     * Text presets from one retrieval. Only providers that return text can produce one:
-     * ScreenScraper. IGDB's `IgdbGameInfo` carries cover/hero URLs and no text today,
-     * and SteamGridDB is artwork-only by design, so neither is offered.
+     * Text presets from one retrieval. Only providers that return text can produce one, and
+     * ProviderCapabilities is where "returns text" is declared — `suppliesMetadata`. Every
+     * provider with that flag must be able to appear here, which MetadataPresetCoverageTest
+     * asserts, because the two drifting apart is invisible: the capability table says Steam
+     * supplies metadata, this function did not offer it, and the screen answered "No source
+     * recognised this game" about a game Steam had just described. Seen on the device.
+     *
+     * IGDB's `IgdbGameInfo` carries cover/hero URLs and no text today, and SteamGridDB is
+     * artwork-only by design; neither claims suppliesMetadata and neither is offered.
      */
     fun presetsFrom(candidates: MetadataCandidates): List<MetadataPreset> = listOfNotNull(
         candidates.ssInfo?.let { ss ->
@@ -75,6 +81,21 @@ object MetadataApply {
                 ageRating = ss.ageRating,
                 franchise = ss.franchise,
                 communityRating = ss.communityRating,
+            )
+        },
+        candidates.steamDetails?.let { steam ->
+            MetadataPreset(
+                provider = MatchProvider.STEAM_STORE,
+                title = steam.title,
+                description = steam.description,
+                developer = steam.developer,
+                publisher = steam.publisher,
+                releaseYear = steam.releaseYear,
+                genre = steam.genre,
+                // Steam's store record carries no age rating, franchise or community score in a
+                // form worth taking: the age rating is a per-territory board block, and the
+                // review score is a percentage over a vote count, not a rating out of ten. Left
+                // null rather than approximated.
             )
         },
     ).filterNot { it.isEmpty }
