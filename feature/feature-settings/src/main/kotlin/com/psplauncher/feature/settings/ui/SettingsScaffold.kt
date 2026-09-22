@@ -1618,7 +1618,9 @@ fun SettingsRow(
     val rowSelected =
         isFocused && cursorVisible && !(hideRowHighlightOnActionFocus && anyActionFocused)
 
-    Row(
+    // A Column, not a Row: the plate holds the label line AND, when focused, the explanation
+    // under it. The row itself is the inner Row below.
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .focusRequester(row.focusRequester)
@@ -1637,11 +1639,11 @@ fun SettingsRow(
                 if (state.isFocused) {
                     focusTracker(click)
                     reportFocused(row.focusRequester)
-                    // The row's explanation goes to the band at the foot of the screen. Written
-                    // on focus GAIN only: clearing it on focus loss would blank the band for a
-                    // frame on every cursor step, because the outgoing row loses focus before the
-                    // incoming one gains it.
-                    help.value = sublabel
+                    // The explanation is drawn in this row's own plate below, not sent to the
+                    // band at the foot. The band still exists — it holds the controller prompts,
+                    // and SettingsSliderRow still writes its helper there — so this clears it
+                    // rather than leaving the previous row's words stranded under the cursor.
+                    help.value = null
                     Timber.d("Settings focus: row=\"$label\" clickable=${click != null}")
                 }
             }
@@ -1669,9 +1671,12 @@ fun SettingsRow(
             // air. With the helper moved to the foot of the screen the rows are one line, and at
             // 18dp a screen held three of them. A console settings list is denser than that.
             .padding(horizontal = 8.dp, vertical = 12.dp),
+    ) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
+      ) {
         if (leading != null) {
             leading()
             Spacer(Modifier.width(16.dp))
@@ -1743,6 +1748,28 @@ fun SettingsRow(
                     }
                 }
             }
+        }
+      }
+        // The explanation, inside the focused row's plate.
+        //
+        // It used to go to a band at the foot of the screen, which put the words as far from the
+        // row as the screen allows and gave every page a reserved strip whether or not anything
+        // was in it. The reference keeps them together: in the PS5 capture only the focused row
+        // carries a description, it sits under that row's label inside the same plate, and it is
+        // at full brightness rather than treated as a footnote.
+        //
+        // Only when focused, which is what keeps the list dense — this is the "what can be a
+        // single item should be a single item" rule. An unfocused row is one line.
+        if (rowSelected && !sublabel.isNullOrBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = sublabel,
+                color = Color.White.copy(alpha = 0.86f),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                style = TextStyle(shadow = SettingsTextShadow),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 
