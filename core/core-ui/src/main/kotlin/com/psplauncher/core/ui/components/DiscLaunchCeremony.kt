@@ -93,6 +93,7 @@ fun DiscLaunchCeremony(
     // The vignette runs across the sink AND the spin as one movement, so the room keeps closing in
     // the whole time the disc is seated rather than stopping the moment it lands.
     val closeEase = FastOutSlowInEasing.transform(phase(now, DiscCeremony.FadeInFraction, DiscCeremony.FadeOutFraction))
+    val leaveEase = FastOutSlowInEasing.transform(leave)
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize(),
@@ -106,29 +107,35 @@ fun DiscLaunchCeremony(
         }
 
         // The room closes in like an iris rather than dimming flat: a black ring whose clear
-        // centre shrinks around the disc and follows it down. Held black through the fade-out
-        // instead of lifting with it — an app's window is not necessarily up yet when the disc
-        // starts fading, and lifting the vignette would flash the launcher before it arrives.
+        // centre shrinks around the disc and follows it down.
+        //
+        // And then OPENS again, outward from the disc, over the whole fade. It used to be held
+        // black until the overlay was simply taken away, which is a cut rather than a transition
+        // and read as a flicker. Retreating from the disc to the edges gives the last beat
+        // somewhere to go: the black is already thin and nearly clear by the time the composition
+        // leaves, so there is no frame where a full-black screen becomes something else at once.
         Box(
             Modifier
                 .fillMaxSize()
                 .drawWithContent {
                     val centre = Offset(size.width / 2f, size.height / 2f + driftPx * sinkEase)
+                    // closeEase shuts the iris, leaveEase re-opens it — one expression, so the
+                    // radius it opens from is exactly the radius it closed to.
+                    val shut = closeEase * (1f - leaveEase)
                     val radius = (DiscCeremony.VignetteOpenRadius -
-                        (DiscCeremony.VignetteOpenRadius - DiscCeremony.VignetteClosedRadius) * closeEase)
+                        (DiscCeremony.VignetteOpenRadius - DiscCeremony.VignetteClosedRadius) * shut)
                         .coerceAtLeast(0.05f) * size.minDimension
-                    // The centre only fills in at the very end, so the disc spins in clear air and
-                    // the screen is fully black by the time the overlay is taken away.
+                    // The centre only fills in at the very end of the close, so the disc spins in
+                    // clear air, and it empties again first on the way out.
                     val inner = ((closeEase - DiscCeremony.VignetteFillFrom) /
-                        (1f - DiscCeremony.VignetteFillFrom)).coerceIn(0f, 1f)
+                        (1f - DiscCeremony.VignetteFillFrom)).coerceIn(0f, 1f) * (1f - leaveEase)
+                    val dim = DiscCeremony.MaxDim * (1f - leaveEase)
                     drawRect(
                         brush = Brush.radialGradient(
                             colorStops = arrayOf(
-                                0.00f to Color.Black.copy(alpha = inner * DiscCeremony.MaxDim),
-                                0.62f to Color.Black.copy(
-                                    alpha = maxOf(inner, closeEase * 0.40f) * DiscCeremony.MaxDim,
-                                ),
-                                1.00f to Color.Black.copy(alpha = closeEase * DiscCeremony.MaxDim),
+                                0.00f to Color.Black.copy(alpha = inner * dim),
+                                0.62f to Color.Black.copy(alpha = maxOf(inner, shut * 0.40f) * dim),
+                                1.00f to Color.Black.copy(alpha = shut * dim),
                             ),
                             center = centre,
                             radius = radius,
@@ -240,10 +247,11 @@ object DiscCeremony {
     const val SinkMs = 950
 
     /** Seated at the bottom, spinning up slow to fast, in a room that is still closing in. */
-    const val SpinMs = 1250
+    const val SpinMs = 1150
 
-    /** It fades out, and the app takes the screen. */
-    const val FadeOutMs = 650
+    /** The iris opens back out from the disc and the app takes the screen. Slow, so it is a
+     *  transition rather than a cut. */
+    const val FadeOutMs = 900
 
     const val TotalMs = FadeInMs + SinkMs + SpinMs + FadeOutMs
 

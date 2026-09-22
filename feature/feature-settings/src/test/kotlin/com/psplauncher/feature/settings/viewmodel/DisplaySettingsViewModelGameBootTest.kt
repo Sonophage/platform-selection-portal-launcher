@@ -48,6 +48,9 @@ class DisplaySettingsViewModelGameBootTest {
             context,
             UiMediaStore(context),
             GameBootPreferences(context),
+            // Real, not a mock: it reads the same DataStore the assertions do, so a test about
+            // one toggle cannot pass because the other one was stubbed.
+            com.psplauncher.core.data.launch.LaunchDiscPreferences(context),
             io.mockk.mockk(relaxed = true),
             // The layout repo only feeds the media rows' face-button shortcuts. A relaxed mock
             // would hand the combine a flow that never emits, so the state would never build.

@@ -463,13 +463,25 @@ fun DisplaySettingsScreen(
                     onFocusChanged = { focusedSlot = if (it) UiMediaSlot.BOOT_VIDEO else null },
                 )
 
+                SettingsGroup("Launch Disc")
+
+                SettingsToggleRow(
+                    label    = "Launch Disc",
+                    sublabel = "The cover turns into a spinning disc between confirming something " +
+                        "and it opening — films, books, music and apps.  Games use GameBoot below " +
+                        "instead, so this does not govern them.  Off opens everything straight away.",
+                    onFocusChangedExternal = { if (it) focusedSlot = null },
+                    checked  = state.launchDiscEnabled,
+                    onToggle = { viewModel.setLaunchDiscEnabled(it) },
+                )
+
                 SettingsGroup("GameBoot")
 
                 SettingsToggleRow(
                     label    = "GameBoot",
-                    sublabel = "A short presentation between confirming a game and the emulator " +
-                        "opening — five seconds built in, up to ten with your own clip — skippable " +
-                        "with Confirm or Back.  Off is a silent launch — no animation, no sound.",
+                    sublabel = "The launch disc, for games — between confirming one and the " +
+                        "emulator opening, or up to ten seconds with your own clip instead.  " +
+                        "Off is a silent launch — no animation, no sound.",
                     onFocusChangedExternal = { if (it) focusedSlot = null },
                     checked  = state.gameBootEnabled,
                     onToggle = { viewModel.setGameBootEnabled(it) },

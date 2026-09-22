@@ -638,6 +638,10 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("windows_library_setup_prompt"),
             // GameBoot presentation (Display ▸ GameBoot) — the live key.
             booleanPreferencesKey("display_gameboot_enabled"),
+            // The launch disc for everything that is not a game (Display ▸ Launch Disc). Carried
+            // for the same reason GameBoot is: it is a taste setting about how launches feel, and
+            // a restore that silently turned it back on would undo a deliberate choice.
+            booleanPreferencesKey("display_launch_disc"),
             // Controller — D-pad LEFT as "back out" (Settings ▸ Controller).
             booleanPreferencesKey("controller_left_backs_out"),
             // Sound

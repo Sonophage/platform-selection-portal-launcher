@@ -130,6 +130,7 @@ class AppDrawerViewModel @Inject constructor(
     private val menuSound: MenuSoundPlayer,
     private val gameRepository: com.psplauncher.core.domain.repository.GameRepository,
     private val memoryCardRepository: com.psplauncher.core.data.repository.MemoryCardRepository,
+    private val mediaLaunchGate: com.psplauncher.core.data.launch.MediaLaunchGate,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AppDrawerUiState())
@@ -186,7 +187,13 @@ class AppDrawerViewModel @Inject constructor(
     fun launchApp(packageName: String) {
         // Fires for both controller SELECT and a touch tap on an app tile.
         menuSound.play(MenuSound.LAUNCH)
-        appRepository.launchApp(packageName)
+        // Behind the disc, like everything else that opens. The icon is the Drawable already in
+        // hand from the tile — the drawer never had a uri for it, which is why the gate takes Any?.
+        val icon = _uiState.value.visibleApps.firstOrNull { it.packageName == packageName }?.icon
+        viewModelScope.launch {
+            mediaLaunchGate.awaitHandOff(icon)
+            appRepository.launchApp(packageName)
+        }
     }
 
     fun refresh() {

@@ -187,6 +187,7 @@ data class DisplaySettingsUiState(
     // ── GameBoot (Display ▸ GameBoot) ────────────────────────────────────────
     // One switch and one replaceable asset: on/off, plus the user's own clip when they have one.
     val gameBootEnabled: Boolean = true,
+    val launchDiscEnabled: Boolean = true,
     val gameBootVideoLabel: String = UI_MEDIA_DEFAULT_LABEL,
     val gameBootVideoAssigned: Boolean = false,
     val gameBootPreviewVisible: Boolean = false,
@@ -208,6 +209,7 @@ class DisplaySettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val uiMediaStore: UiMediaStore,
     private val gameBootPreferences: GameBootPreferences,
+    private val launchDiscPreferences: com.psplauncher.core.data.launch.LaunchDiscPreferences,
     private val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer,
     private val controllerLayout: ControllerLayoutRepository,
 ) : ViewModel() {
@@ -286,6 +288,7 @@ class DisplaySettingsViewModel @Inject constructor(
             // Same read-time migration the gate uses, so the row can never disagree with what
             // will actually play at launch.
             gameBootEnabled      = GameBootPreferences.resolve(prefs),
+            launchDiscEnabled    = com.psplauncher.core.data.launch.LaunchDiscPreferences.resolve(prefs),
             gameBootVideoLabel   = label(UiMediaSlot.GAMEBOOT_VIDEO),
             gameBootVideoAssigned = UiMediaSlot.GAMEBOOT_VIDEO in assigned,
             gameBootPreviewVisible = transient.gameBootPreviewVisible,
@@ -335,6 +338,10 @@ class DisplaySettingsViewModel @Inject constructor(
     /** Display ▸ GameBoot — the one switch for the whole presentation. */
     fun setGameBootEnabled(enabled: Boolean) = viewModelScope.launch {
         gameBootPreferences.setGameBootEnabled(enabled)
+    }
+
+    fun setLaunchDiscEnabled(enabled: Boolean) = viewModelScope.launch {
+        launchDiscPreferences.setLaunchDiscEnabled(enabled)
     }
 
     fun showBootPreview() { _bootPreviewVisible.value = true }

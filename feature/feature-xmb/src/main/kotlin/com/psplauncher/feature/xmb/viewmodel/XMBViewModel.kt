@@ -992,7 +992,7 @@ data class XMBUiState(
  * the ViewModel decides what they mean, which is what keeps one overlay usable by three unrelated
  * launch paths.
  */
-data class DiscCeremonyState(val art: String?)
+data class DiscCeremonyState(val art: Any?)
 
 /**
  * How many result cards a search row holds.
@@ -1691,7 +1691,7 @@ class XMBViewModel @Inject constructor(
     private val pfpThemeStore: PfpThemeStore,
     private val uiMediaStore: com.psplauncher.core.data.repository.UiMediaStore,
     private val gameBootGate: com.psplauncher.feature.launcher.GameBootGate,
-    private val mediaLaunchGate: com.psplauncher.feature.launcher.MediaLaunchGate,
+    private val mediaLaunchGate: com.psplauncher.core.data.launch.MediaLaunchGate,
     // The preview plays its own audio: the gate owns playback for a real launch, and a preview
     // must never touch the gate. Same singleton player, so the two can never sound different.
     private val uiMediaAudioPlayer: com.psplauncher.core.ui.media.UiMediaAudioPlayer,
@@ -3170,7 +3170,9 @@ class XMBViewModel @Inject constructor(
         }
         // Video-app rows launch the app.
         item.packageName != null -> {
-            menuSound.play(MenuSound.LAUNCH); appCategoryRepository.launch(item.packageName); true
+            menuSound.play(MenuSound.LAUNCH)
+            launchAppWithDisc(item.packageName, item.shelfCoverArt)
+            true
         }
         else -> false
     }
@@ -3623,7 +3625,9 @@ class XMBViewModel @Inject constructor(
         }
         // A reader row launches its app, the same way a music or video app row does.
         item.packageName != null -> {
-            menuSound.play(MenuSound.LAUNCH); appCategoryRepository.launch(item.packageName); true
+            menuSound.play(MenuSound.LAUNCH)
+            launchAppWithDisc(item.packageName, item.shelfCoverArt)
+            true
         }
         else -> false
     }
@@ -3848,7 +3852,9 @@ class XMBViewModel @Inject constructor(
         }
         // Photo-app rows launch the app.
         item.packageName != null -> {
-            menuSound.play(MenuSound.LAUNCH); appCategoryRepository.launch(item.packageName); true
+            menuSound.play(MenuSound.LAUNCH)
+            launchAppWithDisc(item.packageName, item.shelfCoverArt)
+            true
         }
         item.type == XMBItemType.PHOTO_FOLDER && item.id.startsWith("plib_") -> {
             menuSound.play(MenuSound.SELECT)
@@ -4469,7 +4475,9 @@ class XMBViewModel @Inject constructor(
         // Music-app rows launch the app. They sit at the root now, so the row's own package is
         // the whole test -- there is no sub-view left to be in.
         item.packageName != null -> {
-            menuSound.play(MenuSound.LAUNCH); appCategoryRepository.launch(item.packageName); true
+            menuSound.play(MenuSound.LAUNCH)
+            launchAppWithDisc(item.packageName, item.shelfCoverArt)
+            true
         }
         else -> false
     }
@@ -6595,7 +6603,7 @@ class XMBViewModel @Inject constructor(
                         "add"  -> appAction { appCategoryRepository.addToCategory(pkg, targetCategory) }
                     }
                 } else when (itemId) {
-                    "launch"    -> appCategoryRepository.launch(pkg)
+                    "launch"    -> launchAppWithDisc(pkg, selectedItemArt())
                     "edit_app"  -> openAppDetail(menu.gameId, pkg)
                     // Promote a standard app to the Android card as a real game (reuses any
                     // existing decoration row so art/favorites/collections carry over).
@@ -7678,7 +7686,7 @@ class XMBViewModel @Inject constructor(
 
         // Standard (non-game) app — A/Cross launches it directly, no detail page.
         if (item?.packageName != null) {
-            appCategoryRepository.launch(item.packageName)
+            launchAppWithDisc(item.packageName, item.shelfCoverArt)
             return
         }
 
@@ -8594,7 +8602,29 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    private suspend fun awaitDiscHandOff(art: String?) = mediaLaunchGate.awaitHandOff(art)
+    private suspend fun awaitDiscHandOff(art: Any?) = mediaLaunchGate.awaitHandOff(art)
+
+    /**
+     * Opens an installed app behind the disc.
+     *
+     * Every app row goes through here rather than calling the repository directly — there were
+     * five such calls, one per column that can host an app shortcut, and a ceremony wired into
+     * four of them is the bug this shape exists to prevent.
+     */
+    /**
+     * The art of whatever the cursor is on — for the paths that act on the selected row without
+     * being handed it, like a context menu's Launch. The menu was raised FROM this row, so its
+     * face is the row's own.
+     */
+    private fun selectedItemArt(): Any? =
+        _uiState.value.currentItems.getOrNull(_uiState.value.selectedItemIndex)?.shelfCoverArt
+
+    private fun launchAppWithDisc(packageName: String, art: Any?) {
+        viewModelScope.launch {
+            awaitDiscHandOff(art)
+            appCategoryRepository.launch(packageName)
+        }
+    }
 
     /** The disc has started fading out: whatever was waiting on it may now open. */
     fun onDiscCeremonyHandOff() = mediaLaunchGate.onHandOff()

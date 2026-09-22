@@ -38,6 +38,9 @@ class AppDrawerViewModelTest {
             mockk(relaxed = true),   // menuSound
             mockk(relaxed = true),   // gameRepository
             mockk(relaxed = true),   // memoryCardRepository
+            // The launch disc's gate. Relaxed, so awaitHandOff returns at once: these tests are
+            // about which app is launched, not about the ceremony in front of it.
+            mockk(relaxed = true),   // mediaLaunchGate
         )
     }
 
@@ -268,6 +271,9 @@ class AppDrawerViewModelTest {
             mockk(relaxed = true),   // menuSound
             mockk(relaxed = true),   // gameRepository
             mockk(relaxed = true),   // memoryCardRepository
+            // The launch disc's gate. Relaxed, so awaitHandOff returns at once: these tests are
+            // about which app is launched, not about the ceremony in front of it.
+            mockk(relaxed = true),   // mediaLaunchGate
         )
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.setFilter(AppFilter.RECENT)

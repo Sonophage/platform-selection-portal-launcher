@@ -99,7 +99,7 @@ class VideoDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val videoRepository: VideoRepository,
     private val intentResolver: com.psplauncher.core.data.video.VideoIntentResolver,
-    private val mediaLaunchGate: com.psplauncher.feature.launcher.MediaLaunchGate,
+    private val mediaLaunchGate: com.psplauncher.core.data.launch.MediaLaunchGate,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VideoDetailUiState())
