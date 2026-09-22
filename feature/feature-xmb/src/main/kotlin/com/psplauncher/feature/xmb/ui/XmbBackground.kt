@@ -266,6 +266,17 @@ const float waveSoftClip      = 0.22;
 const float ffdYAmp           = 0.03;
 const float fresnelPower      = 4.0;
 const float fresnelScale      = 0.5;
+// From their spline pipeline's per-row generation rather than the vertex shader. This is the
+// part that makes one strand differ from the next: a phase that depends on z, and two travelling
+// waves at DIFFERENT speeds running in OPPOSITE directions, so the pattern shears instead of
+// sliding along as one sheet.
+const float bandAmplitude     = 0.200;
+const float bandSecondaryFreq = 7.0;
+const float bandSecondaryAmp  = 0.025;
+const float travelSpeed1      = 0.25;
+const float travelAmp1        = 0.014;
+const float travelSpeed2      = 0.15;
+const float travelAmp2        = 0.008;
 
 // AGSL is not GLSL: SkSL has no tanh, and asking for one fails at RuntimeShader construction
 // rather than at build time. exp is there, so this is the identity written out, with the argument
@@ -280,6 +291,16 @@ float softTanh(float x) {
 // than carried as a texture.
 float waveHeight(float x, float z, float t, float amp) {
     float y = sin(x * 3.1 + z * 0.7 + t * flowSpeed) * ffdYAmp;
+
+    // Their rowPhase: flow * 0.25 + z * 1.7. The z term is why no two strands sit at the same
+    // point in the cycle, and the two travel terms below run at 0.25 and 0.15 in opposite
+    // directions, which is why the strands drift apart instead of moving as one.
+    float flow = t * flowSpeed;
+    float rowPhase = flow * 0.25 + z * 1.7;
+    y += sin(rowPhase + (x * 0.5 + 0.5) * 6.2) * bandAmplitude * 0.10;
+    y += cos(z * bandSecondaryFreq + (x * 0.5 + 0.5) * 4.8 + flow * 0.09) * bandSecondaryAmp;
+    y += sin(((x * 0.5 + 0.5) * 4.08 + z * 0.8) - flow * travelSpeed1) * travelAmp1 * tension * 12.0;
+    y += sin(((x * 0.5 + 0.5) * 8.80 - z * 1.2) + flow * travelSpeed2) * travelAmp2 * 12.0;
 
     float base = cos(x * 2.0 - t * 0.5) * waveCosAmp + waveBias;
     base *= (1.0 - damping);
@@ -349,7 +370,11 @@ half4 main(float2 fragCoord) {
         // which is what the mesh's own depth does for them. Spread wider than with four, so
         // seven read as seven lines rather than as one thick band.
         float seat = 0.55 + f * 0.24;
-        float h    = waveHeight(px, z, t, ampScale);
+        // Each strand runs on its own clock as well as its own z phase: 0.80x at the front to
+        // 1.28x at the back. Their pipeline gets this from the kernel walking at row * 0.93,
+        // which advances a different distance per row; here it is stated directly.
+        float ts   = t * (0.80 + f * 0.48);
+        float h    = waveHeight(px, z, ts, ampScale);
         float sy   = seat + h;
 
         float d = uv.y - sy;
@@ -358,7 +383,7 @@ half4 main(float2 fragCoord) {
 
         // Slope as a stand-in for the surface normal turning edge-on.
         float e  = 0.02;
-        float dh = waveHeight(px + e, z, t, ampScale) - h;
+        float dh = waveHeight(px + e, z, ts, ampScale) - h;
         float slope = abs(dh) / e;
         float edgeOn = slope / sqrt(1.0 + slope * slope);
         float F = fresnelScale * pow(edgeOn, 1.0 / fresnelPower);
