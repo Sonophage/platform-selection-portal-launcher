@@ -42,6 +42,40 @@ class StorefrontColorsTest {
         assertTrue("expected mid-blue/white ratio between 3.0 and 4.5, was $ratio", ratio in 3.0..4.5)
     }
 
+    // ── The one accent hue ────────────────────────────────────────────────
+    //
+    // Settings, the context menu and the App Drawer are supposed to share a tint and did not.
+    // menuCursorEdge lerped the raw accentColor toward white; this palette resolves the hue first.
+    // These pin the resolution, so the menus and the drawer cannot go back to disagreeing.
+
+    @Test
+    fun `a white theme accent falls back to the wave's hue`() {
+        // The NORMAL case, not an edge case: XmbColorScheme.resolve sets accentColor = white for
+        // every preset. lerp(white, white) is white, which is why every menu cursor outside a game
+        // detail page was a plain neutral highlight while the drawer wore the theme's colour.
+        val pfp = DefaultPFPColors.copy(accentColor = Color.White, waveColor = color(0xFF0055AA))
+        assertEquals(color(0xFF0055AA), storefrontColorsFor(pfp).accentHue)
+    }
+
+    @Test
+    fun `a vivid accent outranks the wave`() {
+        // A game detail page tints accentColor with the artwork (withArtTint). That colour is the
+        // point of the page, so it must not be thrown away for the wave behind it.
+        val art = color(0xFFE03B4F)
+        val pfp = DefaultPFPColors.copy(accentColor = art, waveColor = color(0xFF0055AA))
+        assertEquals(art, storefrontColorsFor(pfp).accentHue)
+    }
+
+    @Test
+    fun `the selection edge is that hue pulled toward white`() {
+        // The pair itself: menuCursorEdge now RETURNS tileSelectedEdge, so this is the formula
+        // both the menus and the drawer are drawing. If the edge stops being derived from
+        // accentHue, the menu cursor silently stops matching the drawer again.
+        val pfp = DefaultPFPColors.copy(accentColor = Color.White, waveColor = color(0xFF0055AA))
+        val sf = storefrontColorsFor(pfp)
+        assertEquals(androidx.compose.ui.graphics.lerp(sf.accentHue, Color.White, 0.55f), sf.tileSelectedEdge)
+    }
+
     // ── ensureReadable ─────────────────────────────────────────────────────
 
     @Test

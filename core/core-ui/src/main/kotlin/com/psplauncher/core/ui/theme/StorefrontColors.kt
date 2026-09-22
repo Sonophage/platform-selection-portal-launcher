@@ -1,6 +1,7 @@
 package com.psplauncher.core.ui.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -18,6 +19,17 @@ import androidx.compose.ui.graphics.lerp
  */
 @Immutable
 data class StorefrontColors(
+    /**
+     * The ONE hue every accent in the app is built from — this palette's edges, and the menu
+     * cursor in Settings and the context menu ([menuCursorEdge]).
+     *
+     * Exposed because those two were resolving it differently and it showed: menuCursorEdge lerped
+     * the raw accentColor toward white, and the theme sets accentColor to pure WHITE, so
+     * lerp(white, white) left every menu with a plain white cursor while the drawer — which falls
+     * back to the wave when the accent has no hue — wore the theme's colour. Same intent, two
+     * resolvers, and only one of them followed the wallpaper accent.
+     */
+    val accentHue: Color,
     /** Deep upper (header) region of the background gradient. */
     val backgroundDeep: Color,
     /** Rich midtone (grid) region of the background gradient. */
@@ -71,6 +83,7 @@ data class StorefrontColors(
 )
 
 private val DefaultStorefrontColors = StorefrontColors(
+    accentHue         = Color(0xFF128BC9),
     backgroundDeep    = Color(0xFF0743A2),
     backgroundMid     = Color(0xFF128BC9),
     selectionGlow     = Color(0x297EE8FF),
@@ -138,7 +151,10 @@ private fun Color.isVividHue(): Boolean {
  * changes the drawer while text keeps a contrast floor ([ensureReadable]).
  */
 @Composable
-fun deriveStorefrontColors(): StorefrontColors = storefrontColorsFor(LocalPFPColors.current)
+fun deriveStorefrontColors(): StorefrontColors {
+    val pfp = LocalPFPColors.current
+    return remember(pfp) { storefrontColorsFor(pfp) }
+}
 
 /**
  * The pure derivation behind [deriveStorefrontColors], for callers that already hold the theme
@@ -218,6 +234,7 @@ fun storefrontColorsFor(pfp: PFPColors): StorefrontColors {
     val menuRowSelected = edge.copy(alpha = 0.20f)
 
     return StorefrontColors(
+        accentHue           = hue,
         backgroundDeep      = backgroundDeep,
         backgroundMid       = backgroundMid,
         selectionGlow       = (if (lightChrome) lerp(hue, Color.Black, 0.55f)

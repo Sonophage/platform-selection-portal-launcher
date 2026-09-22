@@ -861,13 +861,6 @@ fun XMBShell(
                 }
             }
 
-            XmbPspStatusStrip(
-                sortLabel = uiState.sortLabel,
-                showSortButton = uiState.resolvedShowTouchButton,
-                onSortTapped = onXmbSortTapped,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
-
             // The panel's page strip, directly under the status bar and in the opposite corner
             // from the helper footer, which is the pill it is wearing. Not on the logo page: that
             // view is the crossbar exactly as it was, and a tab row over it would be new chrome
@@ -1030,6 +1023,20 @@ fun XMBShell(
                 }
             }
             } // end: else — the crossbar, shown on every column but Last Played
+
+            // The clock, the date and the battery, on EVERY column including Last Played.
+            //
+            // This used to live inside the else above, so the one screen that replaces the
+            // crossbar was also the one screen with no status bar — while LastPlayedPage went on
+            // padding itself down by StripHeight to make room for it, leaving an empty band where
+            // the time should be. Out here both branches draw it, and it is still inside the
+            // overlay guard, so the drawer and Settings cover it as before.
+            XmbPspStatusStrip(
+                sortLabel = uiState.sortLabel,
+                showSortButton = uiState.resolvedShowTouchButton,
+                onSortTapped = onXmbSortTapped,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
             } // end: XMB foreground hidden while music browser is open
 
             // Bottom-right App Drawer affordance. Shown only at the XMB root — while drilled into a
