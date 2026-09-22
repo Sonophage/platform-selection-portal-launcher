@@ -25,7 +25,6 @@ data class DebugState(
     val simulatedThermalStatus: SimulatedThermal = SimulatedThermal.NONE,
 
     // Performance overlay
-    val showPerfOverlay: Boolean = true,
 )
 
 enum class DebugScenario(val label: String) {
@@ -78,8 +77,6 @@ class DebugController @Inject constructor() {
     fun setSimulatedThermal(thermal: SimulatedThermal) =
         _state.update { it.copy(simulatedThermalStatus = thermal) }
 
-    fun setShowPerfOverlay(show: Boolean) =
-        _state.update { it.copy(showPerfOverlay = show) }
 
     fun reset() = _state.update { DebugState() }
 }

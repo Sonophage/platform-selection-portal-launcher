@@ -39,7 +39,6 @@ class DebugMenuViewModel @Inject constructor(
 
     fun setShowBootOnNextLaunch(show: Boolean) = debugController.setShowBootOnNextLaunch(show)
 
-    fun setShowPerfOverlay(show: Boolean) = debugController.setShowPerfOverlay(show)
 
     fun reset() = debugController.reset()
 

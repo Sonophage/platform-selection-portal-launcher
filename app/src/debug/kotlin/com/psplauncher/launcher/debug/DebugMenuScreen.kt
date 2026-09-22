@@ -122,12 +122,6 @@ fun DebugMenuScreen(
                 checked  = state.showBootOnNextLaunch,
                 onToggle = { viewModel.setShowBootOnNextLaunch(it) },
             )
-            DebugToggle(
-                label    = "Performance overlay",
-                checked  = state.showPerfOverlay,
-                onToggle = { viewModel.setShowPerfOverlay(it) },
-            )
-
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
             // ── Reset ─────────────────────────────────────────────────────

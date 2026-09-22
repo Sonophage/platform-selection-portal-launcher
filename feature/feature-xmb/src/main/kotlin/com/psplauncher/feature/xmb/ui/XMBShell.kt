@@ -172,6 +172,17 @@ fun XMBShellContainer(
     // Settings, detail screens, dialogs and overlays are never rescaled when the user
     // scales the XMB. Font scale rides along via density, keeping text and layout proportional.
 
+    // The disc is composed OUTSIDE XMBShell, above everything it draws.
+    //
+    // It used to be the last child of the XMB canvas, which put it above the shell's own
+    // overlays but still inside two things it has no business being inside: the canvas Box, and
+    // the density provider that scales the XMB. A ceremony that covers the screen while another
+    // app takes over should not be scaled by the crossbar's zoom, and "last child of the canvas"
+    // is only "on top" for as long as nothing is ever composed beside the canvas.
+    //
+    // GameBoot stays where it is: it is games-only and the disc never runs for a game, so the
+    // two can never be on screen together.
+    Box(Modifier.fillMaxSize()) {
     XMBShell(
         uiState = uiState,
         onCategorySelected = viewModel::onCategoryTapped,
@@ -198,8 +209,6 @@ fun XMBShellContainer(
         onPreviewGameBoot = viewModel::previewGameBoot,
         onGameBootComplete = viewModel::onGameBootComplete,
         onGameBootHandOff = viewModel::onGameBootHandOff,
-        onDiscCeremonyHandOff = viewModel::onDiscCeremonyHandOff,
-        onDiscCeremonyFinished = viewModel::onDiscCeremonyFinished,
         onCloseCustomIcons = viewModel::closeCustomIcons,
         onCustomIconsActionConsumed = viewModel::onCustomIconsActionConsumed,
         onCustomIconsSlotFocused = viewModel::onCustomIconSlotFocused,
@@ -288,6 +297,16 @@ fun XMBShellContainer(
         onOpenAndroidLibraryPicker = viewModel::openAndroidLibraryPicker,
     )
 
+    uiState.discCeremony?.let { ceremony ->
+        DiscLaunchCeremony(
+            art = ceremony.art,
+            onHandOff = viewModel::onDiscCeremonyHandOff,
+            onFinished = viewModel::onDiscCeremonyFinished,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+    }
+
 }
 
 @OptIn(UnstableApi::class)
@@ -317,8 +336,6 @@ fun XMBShell(
     onPreviewGameBoot: () -> Unit = {},
     onGameBootComplete: () -> Unit = {},
     onGameBootHandOff: () -> Unit = {},
-    onDiscCeremonyHandOff: () -> Unit = {},
-    onDiscCeremonyFinished: () -> Unit = {},
     onCloseCustomIcons: () -> Unit = {},
     onCustomIconsActionConsumed: () -> Unit = {},
     onCustomIconsSlotFocused: (Int) -> Unit = {},
@@ -1508,19 +1525,6 @@ fun XMBShell(
                 )
             }
 
-            // The launch disc, for a film, a book or a track. Last child for the same reason
-            // GameBoot is: anything composed after it would cover it. The two are mutually
-            // exclusive by construction — GameBoot is games only, and the disc never runs for a
-            // game — so the order between them does not matter, only that both are above
-            // everything else.
-            uiState.discCeremony?.let { ceremony ->
-                DiscLaunchCeremony(
-                    art = ceremony.art,
-                    onHandOff = onDiscCeremonyHandOff,
-                    onFinished = onDiscCeremonyFinished,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
             } // end: base-density reset — non-XMB screens render unscaled
         } // end: XMB canvas Box
             } // end: CompositionLocalProvider (XMB-only canvas scale)

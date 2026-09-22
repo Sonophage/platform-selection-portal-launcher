@@ -147,3 +147,38 @@ internal fun relativeDate(epochMillis: Long, now: Long = System.currentTimeMilli
  * with its own idea of the unit to round to; they are untouched and worth collapsing into this one
  * the next time either is edited.
  */
+
+/**
+ * How far through a video you are, 0..1, or null when there is nothing to say.
+ *
+ * Null rather than 0 for "not started": the bar and the words both key off null to mean "say
+ * nothing", and a zero would draw an empty bar on every video that has never been opened.
+ * A missing or nonsense duration is the same case — a fraction of an unknown length is not a
+ * fraction, and a resume point past the end is a stale stamp, not 110% watched.
+ */
+internal fun videoProgressFraction(resumePositionMs: Long, durationMs: Long?): Float? {
+    if (resumePositionMs <= 0L) return null
+    val duration = durationMs?.takeIf { it > 0L } ?: return null
+    return (resumePositionMs.toFloat() / duration).takeIf { it < 1f }
+}
+
+/**
+ * "34 min left", beside the bar.
+ *
+ * Time REMAINING, not elapsed and not a percentage: what the next press costs you is the
+ * question a resume point answers, and "62%" makes you do the arithmetic to get there.
+ */
+internal fun videoProgressLabel(resumePositionMs: Long, durationMs: Long?): String? {
+    val duration = durationMs?.takeIf { it > 0L } ?: return null
+    if (videoProgressFraction(resumePositionMs, durationMs) == null) return null
+    val remainingMin = ((duration - resumePositionMs) / 60_000L).toInt()
+    return when {
+        remainingMin <= 0 -> "Almost finished"
+        remainingMin < 60 -> "$remainingMin min left"
+        else -> {
+            val h = remainingMin / 60
+            val m = remainingMin % 60
+            if (m == 0) "$h hr left" else "$h hr $m min left"
+        }
+    }
+}

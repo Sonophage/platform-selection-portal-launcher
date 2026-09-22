@@ -330,3 +330,65 @@ private fun List<MusicTrack>.musicGroups(
         // The unknown bucket sorts last whatever it is called: it is not a name, and an "Unknown
         // Artist" row landing between Tom Waits and Townes Van Zandt reads as one.
         .sortedWith(compareBy({ it.key.isEmpty() }, { it.name.lowercase() }))
+
+// ── Music rows ────────────────────────────────────────────────────────────────
+
+/** One row per track, as the Music column draws them. */
+internal fun List<MusicTrack>.toMusicItems(): List<XMBItem> = map { track ->
+    XMBItem(
+        id            = "mt_${track.id}",
+        title         = track.displayTitle,
+        subtitle      = musicRowSubtitle(track.artist, track.album, track.durationMs),
+        type          = XMBItemType.MUSIC_TRACK,
+        mediaUri      = track.uri,
+        mimeType      = track.mimeType,
+        coverUri      = track.artUri,
+        musicFolderId = track.folderId,
+        musicGroupKey = track.album.musicGroupKey().ifEmpty { null },
+    )
+}
+
+/**
+ * The Recent shelf's music rows: a RUN of tracks from one album becomes one album row.
+ *
+ * An evening with one record used to be the entire shelf -- twelve rows of the same cover, with
+ * the game you played yesterday pushed off the end. The shelf answers "what was I doing", and
+ * "this album" is the honest answer to an evening of it.
+ *
+ * Consecutive only, never global. The list is newest-first, so a run IS a listening session;
+ * grouping every track of an album wherever it appeared would reorder the shelf by album rather
+ * than by recency, which is the one thing this list is for. A run of one stays a track: an album
+ * row standing for a single track hides which track it was.
+ *
+ * Each pair is (recency stamp, row) to match what mergeRecents takes. A collapsed run carries
+ * the NEWEST stamp in it, which is the one that earned its place.
+ */
+internal fun List<MusicTrack>.recentMusicRows(): List<Pair<Long, XMBItem>> {
+    val rows = mutableListOf<Pair<Long, XMBItem>>()
+    var i = 0
+    while (i < size) {
+        val key = this[i].album.musicGroupKey()
+        // A track with no album tag can only ever be itself: every untagged track shares the
+        // empty key, and collapsing on it would merge unrelated songs into one "album".
+        var end = i + 1
+        if (key.isNotEmpty()) {
+            while (end < size && this[end].album.musicGroupKey() == key) end++
+        }
+        val run = subList(i, end)
+        rows += if (run.size == 1) {
+            (run[0].lastPlayedAt ?: 0L) to run.toMusicItems().single()
+        } else {
+            val name = run.firstNotNullOfOrNull { it.album?.trim()?.ifBlank { null } } ?: "Album"
+            run.maxOf { it.lastPlayedAt ?: 0L } to XMBItem(
+                id            = "mg_alb_$key",
+                title         = name,
+                subtitle      = countLabel(run.size, "track", "tracks"),
+                coverUri      = run.firstNotNullOfOrNull { it.artUri },
+                musicGroupKey = key,
+                type          = XMBItemType.MUSIC_GROUP,
+            )
+        }
+        i = end
+    }
+    return rows
+}

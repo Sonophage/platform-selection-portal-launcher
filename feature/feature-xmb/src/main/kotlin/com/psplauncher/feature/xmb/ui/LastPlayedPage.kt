@@ -163,11 +163,10 @@ fun LastPlayedPage(
 
         Spacer(Modifier.height(12.dp))
         Text(
-            // The filter is named here rather than only in the pill: the pill says which button
-            // changes it, this says what it is currently set to, and a shelf that has gone empty
-            // because you filtered it needs to say so or it reads as a bug.
-            text = focused?.let { "${filter.label}: ${it.title}" }
-                ?: if (filter == RecentFilter.ALL) "Last Played" else "${filter.label} — nothing yet",
+            // What is focused, and -- when something is part-watched -- how much of it is left.
+            // The bar on the card says there IS a resume point; this says what it costs.
+            text = listOfNotNull(focused?.title, focused?.progressLabel).joinToString("  ·  ")
+                .ifBlank { if (filter == RecentFilter.ALL) "Last Played" else "${filter.label} — nothing yet" },
             color = LocalPfpTextColors.current.primary,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
@@ -177,6 +176,24 @@ fun LastPlayedPage(
             // row labels wear over the same kind of image.
             style = TextStyle(shadow = XmbTextShadow),
         )
+        Spacer(Modifier.height(8.dp))
+        // Every filter on one line, the active one lit. It used to name only the CURRENT filter,
+        // which says what you are looking at but not what else there is or which way X goes --
+        // so cycling was a guess until the label changed. A whole row costs one line and answers
+        // both at a glance, the way the app drawer's tab strip does.
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            RecentFilter.entries.forEach { entry ->
+                val active = entry == filter
+                Text(
+                    text = entry.label,
+                    color = if (active) LocalPfpTextColors.current.primary
+                            else LocalPfpTextColors.current.secondary.copy(alpha = 0.55f),
+                    fontSize = 13.sp,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    style = TextStyle(shadow = XmbTextShadow),
+                )
+            }
+        }
         Spacer(Modifier.height(14.dp))
     }
 }
@@ -193,5 +210,6 @@ private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {
         focused = focused,
         onClick = onClick,
         width = CardWidth,
+        progress = item.progressFraction,
     )
 }

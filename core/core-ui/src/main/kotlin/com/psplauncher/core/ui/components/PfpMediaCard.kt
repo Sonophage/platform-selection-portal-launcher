@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -76,6 +78,13 @@ fun PfpMediaCard(
     /** Y / long-press. Null leaves the card with no menu, which is not the same as an empty one. */
     onLongClick: (() -> Unit)? = null,
     width: Dp = PfpMediaCardDefaults.Width,
+    /**
+     * How far through this thing you are, 0..1, or null for something with no notion of it.
+     *
+     * Drawn as a bar across the FOOT OF THE ART rather than a line under the card, which is
+     * where every video app puts it and where it cannot be mistaken for the focus edge.
+     */
+    progress: Float? = null,
 ) {
     val palette = detailPalette()
     val shape = RoundedCornerShape(10.dp)
@@ -136,6 +145,24 @@ fun PfpMediaCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(10.dp),
                 )
+            }
+            // Only a STARTED and unfinished thing gets a bar: a full-width bar on something
+            // finished and an invisible one on something untouched are both noise.
+            progress?.takeIf { it > 0.01f && it < 0.995f }?.let { fraction ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .background(Color.Black.copy(alpha = 0.55f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction)
+                            .fillMaxHeight()
+                            .background(menuCursorEdge()),
+                    )
+                }
             }
         }
 

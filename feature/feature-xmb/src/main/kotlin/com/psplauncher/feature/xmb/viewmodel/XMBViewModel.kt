@@ -1552,6 +1552,17 @@ data class XMBItem(
     val mimeType: String? = null,
     // Square album-cover art (on MUSIC_TRACK rows); a file:// uri cached during scan, may be null.
     val coverUri: String? = null,
+    /**
+     * How far through this row you are, 0..1, or null when the medium has no notion of it.
+     *
+     * Only video has one today: a book opens in somebody else's reader, which never tells us
+     * where it got to, and a game has no length to be a fraction of. Kept as a fraction rather
+     * than a position and a duration because the two are only ever used together and a row that
+     * carried one without the other could not say anything at all.
+     */
+    val progressFraction: Float? = null,
+    /** "23 min left" — the words beside [progressFraction]. Null whenever that is. */
+    val progressLabel: String? = null,
     // Playlist id on PLAYLIST rows.
     val playlistId: Long? = null,
     // Text-only row: never draws a leading icon/tile and always shows its label, regardless of
@@ -2300,7 +2311,10 @@ class XMBViewModel @Inject constructor(
                         val visibleGames = games.notHiddenAt(HideLocationType.ALL_GAMES)
                         mergeRecents(
                             games  = visibleGames.map { it.lastPlayedAt ?: 0L }.zip(visibleGames.toXmbItems()),
-                            music  = tracks.map { it.lastPlayedAt ?: 0L }.zip(tracks.toMusicItems()),
+                            // Collapsed: a run of tracks from one album is one album row. See
+                            // recentMusicRows -- an evening with a record should not be the
+                            // whole shelf.
+                            music  = tracks.recentMusicRows(),
                             books  = books.map { it.lastOpenedAt ?: 0L }.zip(bookItems(books)),
                             videos = videos.map { it.lastWatchedAt ?: 0L }.zip(videos.toVideoItems()),
                             filter = filter,
@@ -2772,20 +2786,6 @@ class XMBViewModel @Inject constructor(
         type     = XMBItemType.ADD_ACTION,
     )
 
-    private fun List<com.psplauncher.core.domain.model.MusicTrack>.toMusicItems(): List<XMBItem> =
-        map { track ->
-            XMBItem(
-                id            = "mt_${track.id}",
-                title         = track.displayTitle,
-                subtitle      = musicRowSubtitle(track.artist, track.album, track.durationMs),
-                type          = XMBItemType.MUSIC_TRACK,
-                mediaUri      = track.uri,
-                mimeType      = track.mimeType,
-                coverUri      = track.artUri,
-                musicFolderId = track.folderId,
-            )
-        }
-
     // Caches the on-screen track list (raw + sorted) and pushes the sorted items, or an empty-state
     // row when there are none. [trailing] rows (e.g. a playlist's "Add Tracks") always show.
     private fun setMusicTrackItems(
@@ -3004,6 +3004,8 @@ class XMBViewModel @Inject constructor(
                 mediaUri = video.uri,
                 mimeType = video.mimeType,
                 coverUri = video.effectiveThumbnailUri,
+                progressFraction = videoProgressFraction(video.resumePositionMs, video.durationMs),
+                progressLabel    = videoProgressLabel(video.resumePositionMs, video.durationMs),
             )
         }
 
@@ -7462,6 +7464,16 @@ class XMBViewModel @Inject constructor(
             XMBItemType.MUSIC_TRACK -> {
                 menuSound.play(MenuSound.SELECT)
                 openMusicPlayerForItem(item)
+                return
+            }
+            // A collapsed album run on the Recent shelf. Opens that album in the browser rather
+            // than starting it: the shelf said "this record", and which track to resume is a
+            // question the album view can answer and a blind play cannot.
+            XMBItemType.MUSIC_GROUP -> {
+                item.musicGroupKey?.let {
+                    menuSound.play(MenuSound.SELECT)
+                    openMusicBrowser(MusicBrowserView.Album(item.title, it))
+                }
                 return
             }
             else -> Unit

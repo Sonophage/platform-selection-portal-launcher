@@ -265,4 +265,102 @@ class MediaColumnsTest {
         assertEquals(emptyList<MusicGroup>(), emptyList<MusicTrack>().artistGroups())
         assertEquals(emptyList<MusicGroup>(), emptyList<MusicTrack>().albumGroups())
     }
+
+    // ── The Recent shelf's music rows ─────────────────────────────────────
+
+    private fun played(
+        id: String, title: String, album: String? = null, at: Long, artUri: String? = null,
+    ) = MusicTrack(
+        id = id, folderId = "f1", uri = "content://$id", displayName = "$id.mp3",
+        title = title, album = album, artUri = artUri, lastPlayedAt = at,
+    )
+
+    @Test
+    fun `a run of one album becomes one album row`() {
+        // An evening with one record used to be the whole shelf.
+        val rows = listOf(
+            played("1", "Everything In Its Right Place", album = "Kid A", at = 900),
+            played("2", "Kid A", album = "Kid A", at = 800),
+            played("3", "The National Anthem", album = "Kid A", at = 700),
+        ).recentMusicRows()
+        assertEquals(1, rows.size)
+        assertEquals("Kid A", rows.single().second.title)
+        assertEquals("3 tracks", rows.single().second.subtitle)
+        assertEquals(XMBItemType.MUSIC_GROUP, rows.single().second.type)
+        // The newest stamp in the run: that is the one that earned its place on the shelf.
+        assertEquals(900L, rows.single().first)
+    }
+
+    @Test
+    fun `only CONSECUTIVE tracks collapse`() {
+        // Grouping every track of an album wherever it appeared would order the shelf by album
+        // instead of by recency, which is the one thing this list is for.
+        val rows = listOf(
+            played("1", "Idioteque", album = "Kid A", at = 900),
+            played("2", "Song B", album = "Other", at = 800),
+            played("3", "Optimistic", album = "Kid A", at = 700),
+        ).recentMusicRows()
+        assertEquals(listOf("Idioteque", "Song B", "Optimistic"), rows.map { it.second.title })
+        assertTrue(rows.all { it.second.type == XMBItemType.MUSIC_TRACK })
+    }
+
+    @Test
+    fun `a run of one stays a track`() {
+        // An album row standing for a single track hides which track it was.
+        val rows = listOf(played("1", "Idioteque", album = "Kid A", at = 900)).recentMusicRows()
+        assertEquals("Idioteque", rows.single().second.title)
+        assertEquals(XMBItemType.MUSIC_TRACK, rows.single().second.type)
+    }
+
+    @Test
+    fun `untagged tracks never collapse into each other`() {
+        // Every untagged track shares the empty album key. Collapsing on it would merge unrelated
+        // songs into one row calling itself an album.
+        val rows = listOf(
+            played("1", "Untitled", at = 900),
+            played("2", "Untitled II", album = "", at = 800),
+            played("3", "Untitled III", album = "   ", at = 700),
+        ).recentMusicRows()
+        assertEquals(3, rows.size)
+        assertTrue(rows.all { it.second.type == XMBItemType.MUSIC_TRACK })
+    }
+
+    @Test
+    fun `the album row carries the key the drill-in filters by, and a cover`() {
+        val rows = listOf(
+            played("1", "Intro", album = "Kid A", at = 900),
+            played("2", "Idioteque", album = "Kid A", at = 800, artUri = "file:///art/kida.png"),
+        ).recentMusicRows()
+        assertEquals("kid a", rows.single().second.musicGroupKey)
+        assertEquals("file:///art/kida.png", rows.single().second.coverUri)
+    }
+
+    // ── Video resume ──────────────────────────────────────────────────────
+
+    @Test
+    fun `an unstarted or unmeasurable video has no progress at all`() {
+        // Null, not zero: the bar and the words both read null as "say nothing", and a zero would
+        // draw an empty bar on every video that has never been opened.
+        assertEquals(null, videoProgressFraction(0L, 60_000L))
+        assertEquals(null, videoProgressFraction(30_000L, null))
+        assertEquals(null, videoProgressFraction(30_000L, 0L))
+        assertEquals(null, videoProgressLabel(0L, 60_000L))
+    }
+
+    @Test
+    fun `a resume point past the end is a stale stamp, not a finished video`() {
+        // It happens: the duration is re-probed smaller, or the file is replaced. Reporting 110%
+        // would draw a bar wider than its track.
+        assertEquals(null, videoProgressFraction(120_000L, 60_000L))
+    }
+
+    @Test
+    fun `the words say what is left, not what is done`() {
+        // What the next press costs you is the question a resume point answers; "62%" makes you
+        // do the arithmetic to get there.
+        assertEquals("30 min left", videoProgressLabel(30 * 60_000L, 60 * 60_000L))
+        assertEquals("1 hr left", videoProgressLabel(60 * 60_000L, 120 * 60_000L))
+        assertEquals("1 hr 30 min left", videoProgressLabel(30 * 60_000L, 120 * 60_000L))
+        assertEquals("Almost finished", videoProgressLabel(119 * 60_000L + 59_000L, 120 * 60_000L))
+    }
 }
