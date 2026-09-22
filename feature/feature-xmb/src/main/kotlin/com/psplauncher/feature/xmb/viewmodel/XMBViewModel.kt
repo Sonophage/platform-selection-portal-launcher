@@ -2280,8 +2280,10 @@ class XMBViewModel @Inject constructor(
                     // and is pure so the ordering can be proven without a device.
                     //
                     // The rows are built by the SAME mappers the Music, Library and Video columns
-                    // use, so selecting one launches it, its context menu works, and it looks like
-                    // itself — none of that needed a second code path.
+                    // use, so the context menu works and each row looks like itself. Selecting one
+                    // did NOT come for free: the columns open their own rows in their own
+                    // selection handlers, which never run here. See the media fallthrough in the
+                    // confirm dispatch.
                     var keepCursor = keepCursorOnRow
                     combine(
                         gameRepository.observeRecentlyPlayed(RECENTLY_PLAYED_LIMIT),
@@ -2290,6 +2292,11 @@ class XMBViewModel @Inject constructor(
                         videoRepository.observeRecentlyWatched(),
                         _uiState.map { it.recentFilter }.distinctUntilChanged(),
                     ) { games, tracks, books, videos, filter ->
+                        // The play queue for a track opened from this shelf is the shelf's own
+                        // music. openMusicPlayerForItem reads it and RETURNS SILENTLY when it is
+                        // empty, which is what made A do nothing on a Recent music row: the rows
+                        // were built by the Music column's mapper, but its queue was never filled.
+                        currentMusicTracks = tracks
                         val visibleGames = games.notHiddenAt(HideLocationType.ALL_GAMES)
                         mergeRecents(
                             games  = visibleGames.map { it.lastPlayedAt ?: 0L }.zip(visibleGames.toXmbItems()),
@@ -7433,6 +7440,31 @@ class XMBViewModel @Inject constructor(
         if (item?.collectionId != null && item.type == XMBItemType.COLLECTION) {
             openCollectionFolder(item.collectionId)
             return
+        }
+
+        // Media rows, wherever they are shown outside their own column -- which in practice
+        // means the Recent shelf. The Music / Video / Library columns answer these in their own
+        // selection handlers, which run first and return; this is the fallthrough for a row that
+        // reached the generic path, and without it A on a Recent book, track or video did
+        // nothing at all. Not a second code path for opening media: each branch calls the same
+        // opener its column calls.
+        if (item != null) when (item.type) {
+            XMBItemType.VIDEO_FILE -> {
+                menuSound.play(MenuSound.SELECT)
+                _uiState.update { it.copy(activeVideoId = item.id.removePrefix("vid_")) }
+                return
+            }
+            XMBItemType.LIBRARY_BOOK -> {
+                menuSound.play(MenuSound.SELECT)
+                openBook(item.id.removePrefix("book_"))
+                return
+            }
+            XMBItemType.MUSIC_TRACK -> {
+                menuSound.play(MenuSound.SELECT)
+                openMusicPlayerForItem(item)
+                return
+            }
+            else -> Unit
         }
 
         // Real games — including package/shortcut-backed gaming apps (Android/Windows cards) —
