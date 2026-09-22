@@ -36,4 +36,13 @@ object PlatformIds {
      * it is import-driven rather than scanned, and it has no ROMs to match artwork against.
      */
     const val WINDOWS = "windows"
+
+    /**
+     * Installed Android apps promoted into the library as games.
+     *
+     * Branched on in seven places before this: the seeder decides whether to create the card, the
+     * drawer and Library Manager filter on it, Game Detail and the XMB offer "Unmark as Game" only
+     * for it, and both shortcut entry points in `app` stamp it onto pinned shortcuts.
+     */
+    const val ANDROID = "android"
 }

@@ -190,7 +190,7 @@ class ContextMenusTest {
     fun `an android game entry can be demoted rather than only deleted`() {
         val items = ids(
             gameContextMenuItems(
-                game(platformId = XMBViewModel.ANDROID_PLATFORM_ID, packageName = "com.x"),
+                game(platformId = PlatformIds.ANDROID, packageName = "com.x"),
                 state(), 1, false, null,
             ),
         )
@@ -288,7 +288,7 @@ class ContextMenusTest {
 
     @Test
     fun `android libraries find apps where consoles scan folders`() {
-        val android = ids(platformContextMenuItems(XMBViewModel.ANDROID_PLATFORM_ID, false, "Global: Icon"))
+        val android = ids(platformContextMenuItems(PlatformIds.ANDROID, false, "Global: Icon"))
         assertTrue("find_games" in android)
         assertFalse("scan_roms" in android)
 

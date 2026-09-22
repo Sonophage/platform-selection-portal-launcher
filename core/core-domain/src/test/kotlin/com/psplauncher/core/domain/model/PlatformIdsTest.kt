@@ -17,4 +17,17 @@ class PlatformIdsTest {
     fun `the windows id is the one already written to every install's database`() {
         assertEquals("windows", PlatformIds.WINDOWS)
     }
+
+    @Test
+    fun `the android id is the one already written to every install's database`() {
+        assertEquals("android", PlatformIds.ANDROID)
+    }
+
+    @Test
+    fun `the ids are distinct`() {
+        // They are compared against each other to decide which card a game belongs on, so two ids
+        // that collided would put every PC game on the Android card with nothing failing.
+        val all = listOf(PlatformIds.WINDOWS, PlatformIds.ANDROID)
+        assertEquals(all.distinct(), all)
+    }
 }

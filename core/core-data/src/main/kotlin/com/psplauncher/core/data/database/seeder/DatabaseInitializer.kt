@@ -1,5 +1,7 @@
 package com.psplauncher.core.data.database.seeder
 
+import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
+
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -33,7 +35,6 @@ private val KEY_NETWORK_RENAMED = booleanPreferencesKey("network_renamed_v1")
 private val KEY_ANDROID_CARD_SEEDED = booleanPreferencesKey("android_card_seeded_v1")
 
 /** The Android library's platform id, and the card seeded for it exactly once. */
-private const val ANDROID_PLATFORM_ID = "android"
 
 /** What [DatabaseInitializer.seedAndroidCard] should do on this launch. */
 internal enum class AndroidCardSeed { CREATE_AND_MARK, MARK_ONLY, NOTHING }

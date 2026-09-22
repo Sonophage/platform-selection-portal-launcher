@@ -1,5 +1,7 @@
 package com.psplauncher.launcher.receiver
 
+import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
+
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -99,6 +101,5 @@ class ShortcutConfirmReceiver : BroadcastReceiver() {
         const val EXTRA_INTENT_URI = "intent_uri"
         const val EXTRA_HOST_PACKAGE = "host_package"
         const val EXTRA_HOST_LABEL = "host_label"
-        private const val ANDROID_PLATFORM_ID = "android"
     }
 }

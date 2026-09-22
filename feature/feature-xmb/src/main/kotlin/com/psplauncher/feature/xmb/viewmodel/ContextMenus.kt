@@ -133,7 +133,7 @@ internal fun gameContextMenuItems(
             // rather than dropping it from one view. Everything else is recoverable by putting the
             // file back.
             add(XMBContextMenuItem("remove_missing", "Remove permanently", isDestructive = true))
-        } else if (item.platformId == XMBViewModel.ANDROID_PLATFORM_ID && item.packageName != null && !inCollection) {
+        } else if (item.platformId == PlatformIds.ANDROID && item.packageName != null && !inCollection) {
             add(XMBContextMenuItem("unmark_game", "Unmark as Game"))
             add(XMBContextMenuItem("remove_app", "Remove from Library", isDestructive = true))
         } else if (!inCollection) {
@@ -295,7 +295,7 @@ internal fun platformContextMenuItems(
     iconDisplayLabel: String,
 ): List<XMBContextMenuItem> = buildList {
     // Android libraries pick installed apps; consoles scan ROM folders.
-    if (platformId == XMBViewModel.ANDROID_PLATFORM_ID) add(XMBContextMenuItem("find_games", "Find Games"))
+    if (platformId == PlatformIds.ANDROID) add(XMBContextMenuItem("find_games", "Find Games"))
     else add(XMBContextMenuItem("scan_roms", "Scan This Console"))
     // The Windows card is import-driven — surface its Import PC Games section here too.
     if (platformId == PlatformIds.WINDOWS) {

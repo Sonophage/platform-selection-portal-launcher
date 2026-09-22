@@ -1,5 +1,7 @@
 package com.psplauncher.launcher.pin
 
+import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
+
 import android.content.pm.LauncherApps
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -109,7 +111,6 @@ class PinShortcutActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val ANDROID_PLATFORM_ID = "android"
         const val STORE_TIMEOUT_MS = 5_000L
     }
 }

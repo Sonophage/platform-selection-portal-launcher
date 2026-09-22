@@ -1,5 +1,7 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
+
 import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
 
 import android.content.Context
@@ -9169,7 +9171,6 @@ class XMBViewModel @Inject constructor(
         private const val ADD_GAMES_ITEM_ID = "add_games"
         private const val FIND_GAMES_ITEM_ID = "find_games"
         // Platform id whose library is built from installed apps (picker) instead of ROM scans.
-        internal const val ANDROID_PLATFORM_ID = "android"
         // Sentinel platform for app rows that merely BACK a category app's artwork / favorite /
         // collection membership. They reference an app by package but are NOT in the Android
         // library, so they use this id instead of "android" to stay out of observeByPlatform.

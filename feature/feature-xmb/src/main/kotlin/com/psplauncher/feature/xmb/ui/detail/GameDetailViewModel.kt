@@ -1,5 +1,7 @@
 package com.psplauncher.feature.xmb.ui.detail
 
+import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
+
 import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
 
 import android.content.Context
@@ -347,7 +349,6 @@ private const val FILE_SECTION = "File"
  * through `choice.takeIf { it != "default" }`, so both paths clear an override identically.
  */
 internal const val DEFAULT_EMULATOR_SENTINEL = "default"
-private const val ANDROID_PLATFORM_ID = "android"
 
 // Key prefixes the node graph hands back through [GameDetailNav.onActivate]. Kept next to the keys
 // themselves in GameDetailKeys; these are only the parts the ViewModel splits on.

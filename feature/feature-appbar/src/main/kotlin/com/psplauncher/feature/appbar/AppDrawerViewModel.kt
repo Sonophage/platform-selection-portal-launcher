@@ -1,5 +1,7 @@
 package com.psplauncher.feature.appbar
 
+import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.psplauncher.core.domain.model.GamepadAction
@@ -17,7 +19,6 @@ const val GRID_COLUMNS = 6
 
 // The Android Memory Card's platform id, and the sentinel platform for rows that only back an
 // app's artwork/favorites/collections without placing it in the library (mirrors XMBViewModel).
-private const val ANDROID_PLATFORM_ID = "android"
 private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
 
 /**
