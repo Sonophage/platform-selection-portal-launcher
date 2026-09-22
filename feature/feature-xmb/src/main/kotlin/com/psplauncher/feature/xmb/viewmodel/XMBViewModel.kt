@@ -7924,7 +7924,8 @@ class XMBViewModel @Inject constructor(
     // ── App drawer overlay ────────────────────────────────────────────────────
 
     fun onOpenAppDrawer() {
-        _uiState.update { it.copy(activeAppDrawerFilter = "ALL") }
+        // Not a literal: AppFilter.DEFAULT is the one place that decides where the menu opens.
+        _uiState.update { it.copy(activeAppDrawerFilter = com.psplauncher.feature.appbar.AppFilter.DEFAULT.name) }
     }
 
     fun onCloseAppDrawer() {

@@ -57,6 +57,17 @@ enum class AppFilter(val label: String, val subtitle: String) {
         EMULATORS -> app.isEmulator
         RECENT -> app.lastUsedAt > 0L
     }
+
+    companion object {
+        /**
+         * Where the app menu opens when nothing has asked for a particular section.
+         *
+         * Named, because there were two places that decided it: this ViewModel's initial state
+         * and XMBViewModel.onOpenAppDrawer, which passed the literal "ALL". Changing one left the
+         * other winning — the B-press route opened on All Apps no matter what the state said.
+         */
+        val DEFAULT = RECENT
+    }
 }
 
 // One row in an app's long-press mini menu.
@@ -70,7 +81,15 @@ enum class AppMenuAction(val label: String) {
 data class AppDrawerUiState(
     val allApps: List<InstalledApp> = emptyList(),
     val visibleApps: List<InstalledApp> = emptyList(),
-    val activeFilter: AppFilter = AppFilter.ALL,
+    /**
+     * Where the drawer opens: Recently Used.
+     *
+     * It opened on All Apps, which is 45 icons in alphabetical order — a list you have to read
+     * rather than recognise. What someone opening an app menu on a handheld usually wants is the
+     * thing they were using, and that section already has a real empty state ("Usage access
+     * needed", with the grant prompt), so landing here is useful even when it is empty.
+     */
+    val activeFilter: AppFilter = AppFilter.DEFAULT,
     val searchQuery: String = "",
     val isLoading: Boolean = true,
     val selectedIndex: Int = 0,

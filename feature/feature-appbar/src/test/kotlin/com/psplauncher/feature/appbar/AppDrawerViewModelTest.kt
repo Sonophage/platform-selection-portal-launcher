@@ -49,11 +49,13 @@ class AppDrawerViewModelTest {
     // ── Filter logic ──────────────────────────────────────────────────────
 
     @Test
-    fun `initial state has ALL filter and no search query`() = runTest {
+    fun `the drawer opens on Recently Used, not on the full alphabetical list`() = runTest {
+        // All Apps is 45 icons in alphabetical order on the owner's device — a list you read
+        // rather than recognise. Opening on what you were last using is the point of the section.
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals(AppFilter.ALL, state.activeFilter)
+            assertEquals(AppFilter.RECENT, state.activeFilter)
             assertTrue(state.searchQuery.isEmpty())
             cancelAndIgnoreRemainingEvents()
         }
@@ -62,9 +64,48 @@ class AppDrawerViewModelTest {
     @Test
     fun `ALL filter shows all apps`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setFilter(AppFilter.ALL)
+        testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals(fakeApps().size, state.visibleApps.size)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `APPS shows neither emulators nor games, and an app that is both is in both`() = runTest {
+        // The owner's rule. An emulator he has also marked as a game belongs under Emulators AND
+        // under Games — hiding it from one would make that section a lie — but it is not an
+        // "app", which is the distinction Apps exists to draw and All Apps cannot.
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setFilter(AppFilter.APPS)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.uiState.test {
+            val apps = awaitItem().visibleApps
+            assertTrue("Apps must contain no emulators", apps.none { it.isEmulator })
+            assertTrue("Apps must contain no games", apps.none { it.isGame })
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // No `if` around this. Guarding it on the fixture happening to contain such an app is how
+        // an assertion ends up passing because it never ran.
+        val both = fakeApps().filter { it.isEmulator && it.isGame }.map { it.label }
+        assertTrue("the fixture must contain an app that is both, or this proves nothing", both.isNotEmpty())
+
+        viewModel.setFilter(AppFilter.EMULATORS)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.uiState.test {
+            assertTrue(awaitItem().visibleApps.map { it.label }.containsAll(both))
+            cancelAndIgnoreRemainingEvents()
+        }
+        viewModel.setFilter(AppFilter.GAMES)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.uiState.test {
+            assertTrue(
+                "an app that is both an emulator and a game must appear under Games too",
+                awaitItem().visibleApps.map { it.label }.containsAll(both),
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -132,6 +173,12 @@ class AppDrawerViewModelTest {
     @Test
     fun `clearing search query restores full list`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
+        // These are about the menu / search / uninstall paths, not about which section opens, so
+        // the full list is selected explicitly. They used to rely on the drawer defaulting to
+        // All Apps, which made them fail the moment the default became Recently Used for reasons
+        // that had nothing to do with what they were testing.
+        viewModel.setFilter(AppFilter.ALL)
+        testDispatcher.scheduler.advanceUntilIdle()
         viewModel.setSearchQuery("PPSSPP")
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.setSearchQuery("")
@@ -179,6 +226,12 @@ class AppDrawerViewModelTest {
 
     @Test
     fun `back on the open options menu closes just the menu`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        // These are about the menu / search / uninstall paths, not about which section opens, so
+        // the full list is selected explicitly. They used to rely on the drawer defaulting to
+        // All Apps, which made them fail the moment the default became Recently Used for reasons
+        // that had nothing to do with what they were testing.
+        viewModel.setFilter(AppFilter.ALL)
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Controller Y opens the focused app's options module (grid focus is on index 0).
@@ -266,6 +319,12 @@ class AppDrawerViewModelTest {
     @Test
     fun `back after opening uninstall guard rail closes the dialog not the drawer`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
+        // These are about the menu / search / uninstall paths, not about which section opens, so
+        // the full list is selected explicitly. They used to rely on the drawer defaulting to
+        // All Apps, which made them fail the moment the default became Recently Used for reasons
+        // that had nothing to do with what they were testing.
+        viewModel.setFilter(AppFilter.ALL)
+        testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -313,6 +372,12 @@ class AppDrawerViewModelTest {
     @Test
     fun `the uninstall prompt opens with the cursor on Cancel`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
+        // These are about the menu / search / uninstall paths, not about which section opens, so
+        // the full list is selected explicitly. They used to rely on the drawer defaulting to
+        // All Apps, which made them fail the moment the default became Recently Used for reasons
+        // that had nothing to do with what they were testing.
+        viewModel.setFilter(AppFilter.ALL)
+        testDispatcher.scheduler.advanceUntilIdle()
         openUninstallPrompt()
         viewModel.uiState.test {
             val state = awaitItem()
@@ -341,6 +406,12 @@ class AppDrawerViewModelTest {
     fun `moving to Uninstall and confirming does uninstall`() = runTest {
         // The other direction. If this passed while the test above also passed by the prompt simply
         // never confirming, the guard rail would be a wall.
+        testDispatcher.scheduler.advanceUntilIdle()
+        // These are about the menu / search / uninstall paths, not about which section opens, so
+        // the full list is selected explicitly. They used to rely on the drawer defaulting to
+        // All Apps, which made them fail the moment the default became Recently Used for reasons
+        // that had nothing to do with what they were testing.
+        viewModel.setFilter(AppFilter.ALL)
         testDispatcher.scheduler.advanceUntilIdle()
         openUninstallPrompt()
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
@@ -395,6 +466,11 @@ class AppDrawerViewModelTest {
     private fun fakeApps() = listOf(
         InstalledApp(packageName = "org.ppsspp.ppsspp",           label = "PPSSPP",    icon = fakeDrawable, isEmulator = true,  isGame = false),
         InstalledApp(packageName = "com.retroarch",                label = "RetroArch", icon = fakeDrawable, isEmulator = true,  isGame = false),
+        // An emulator the user has also marked as a game. Not a curiosity: on the owner's device
+        // 8 of 8 emulators are tagged this way, and it is the case the Apps/Games/Emulators rule
+        // turns on. Without it in the fixture the "in both" assertion below has nothing to find
+        // and passes by doing nothing.
+        InstalledApp(packageName = "org.dolphinemu.dolphinemu",    label = "Dolphin",   icon = fakeDrawable, isEmulator = true,  isGame = true),
         InstalledApp(packageName = "com.mojang.minecraftpe",       label = "Minecraft", icon = fakeDrawable, isEmulator = false, isGame = true, lastUsedAt = 2_000L),
         InstalledApp(packageName = "com.psplauncher.launcher", label = "PFP",       icon = fakeDrawable, isEmulator = false, isGame = false),
         InstalledApp(packageName = "com.example.browser",          label = "Browser",   icon = fakeDrawable, isEmulator = false, isGame = false, lastUsedAt = 1_000L),
