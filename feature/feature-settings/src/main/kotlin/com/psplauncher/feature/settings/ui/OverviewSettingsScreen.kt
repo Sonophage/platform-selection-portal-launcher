@@ -42,9 +42,16 @@ fun OverviewSettingsScreen(
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
     }
 
-    SettingsScaffold(
-        title = "Settings",
+    // PILOT for the wizard skin across all of Settings (see SettingsPageScaffold). Overview first
+    // because it is where Settings lands, so it is the screen that sets the expectation.
+    //
+    // The hint is the catalog's own subtitle for this screen, quoted rather than referenced: the
+    // wiring that hands every screen its SettingsEntry belongs with the rollout, not with the one
+    // page proving the look.
+    SettingsPageScaffold(
         subtitle = "Overview",
+        heading = "Overview",
+        hint = "Library, artwork & build",
         onBack = onBack,
         modifier = modifier,
     ) {

@@ -69,6 +69,22 @@ fun CreditsSettingsScreen(
             )
 
             Spacer(Modifier.height(16.dp))
+            SettingsGroup("The Wave")
+
+            CreditParagraph(
+                "The animated wave behind the crossbar is ported from Mart's PlayStation-3-XMB, a " +
+                    "web recreation of the PS3 wave. The strand model and its motion are theirs; the " +
+                    "AGSL shader, the colour cascade and the wallpaper tinting are this project's."
+            )
+            CreditLine("Project", "PlayStation-3-XMB")
+            CreditLine("Author", "Mart — github.com/linkev/PlayStation-3-XMB")
+            CreditLine("License", "MIT — Copyright (c) 2025 Mart")
+            CreditParagraph(
+                "The MIT licence requires its copyright notice to travel with the software, so the " +
+                    "full text ships in the app's source at LICENSES/PlayStation-3-XMB-MIT.txt."
+            )
+
+            Spacer(Modifier.height(16.dp))
             SettingsGroup("System & Console Artwork")
 
             CreditParagraph(
@@ -138,7 +154,21 @@ fun CreditsSettingsScreen(
             CreditLine("Primary scraper", "ScreenScraper — screenscraper.fr, community-maintained game media database")
             CreditLine("Artwork", "SteamGridDB — steamgriddb.com")
             CreditLine("Metadata", "IGDB")
+            CreditLine("Film posters", "TMDB — themoviedb.org")
+            CreditParagraph(
+                "This product uses the TMDB API but is not endorsed or certified by TMDB."
+            )
 
+
+            Spacer(Modifier.height(16.dp))
+            SettingsGroup("Design Influence")
+            CreditParagraph(
+                "Several screens were designed by studying NeoStation: the Last Played home page, " +
+                    "the paged detail panel, and the Artwork Studio's scraping panel all owe it their " +
+                    "shape. No code and no artwork were taken — the influence is on layout and " +
+                    "interaction, and it is named here because it earned the mention."
+            )
+            CreditLine("Project", "NeoStation")
 
             Spacer(Modifier.height(16.dp))
             SettingsGroup("Notes")
