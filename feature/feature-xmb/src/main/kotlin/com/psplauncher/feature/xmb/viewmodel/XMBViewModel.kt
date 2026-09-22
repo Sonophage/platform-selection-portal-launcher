@@ -6151,7 +6151,7 @@ class XMBViewModel @Inject constructor(
                 }
                 itemId == "pin_collection"   -> appAction { collectionRepository.setPinned(collectionId, true) }
                 itemId == "unpin_collection" -> appAction { collectionRepository.setPinned(collectionId, false) }
-                itemId == "manage_collections" -> _uiState.update { it.copy(activeSettingsScreen = "settings_collections") }
+                itemId == "manage_collections" -> _uiState.update { it.copy(activeSettingsScreen = "settings_categories") }
                 itemId == "delete_collection"  -> appAction {
                     collectionRepository.delete(collectionId)
                     if (_uiState.value.selectedCollectionId == collectionId) closePlatformFolder()
@@ -6247,7 +6247,7 @@ class XMBViewModel @Inject constructor(
                         appAction { collectionRepository.removeGame(cid, gid) }
                     }
                 }
-                "manage_collections"     -> _uiState.update { it.copy(activeSettingsScreen = "settings_collections") }
+                "manage_collections"     -> _uiState.update { it.copy(activeSettingsScreen = "settings_categories") }
                 "add_category"           -> menu.categoryContext?.let { openGameCategoryPicker(menu.gameId, it, "add") }
                 "move_category"          -> menu.categoryContext?.let { openGameCategoryPicker(menu.gameId, it, "move") }
                 "remove_category"        -> menu.categoryContext?.let { cat ->

@@ -24,21 +24,125 @@ import com.psplauncher.feature.settings.viewmodel.CREATE_CATEGORY_FOCUS_KEY
 import com.psplauncher.feature.settings.viewmodel.CategoryManagerUiState
 import com.psplauncher.feature.settings.viewmodel.CategoryManagerViewModel
 import com.psplauncher.feature.settings.viewmodel.CategoryStep
+import com.psplauncher.feature.settings.viewmodel.CollectionsSettingsViewModel
+import com.psplauncher.core.domain.model.GameCollection
 
+/**
+ * Categories and Collections, on one screen.
+ *
+ * They were two Settings entries in two different sections -- Collections under Library,
+ * Categories under Interface -- for what reads as one idea: the groups the crossbar is made of.
+ * You could add a collection to a category from one screen and never find the category from the
+ * other.
+ *
+ * The two flows are still two state machines, owned by two ViewModels, and this only decides
+ * which one is on screen. The merged list shows when BOTH are at rest; a category step or an
+ * open collection takes over, because each of those is a whole screen of its own. Merging the
+ * state machines as well would have been a rewrite of two working things to change where a row
+ * is drawn.
+ */
 @Composable
 fun CategoryManagerScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CategoryManagerViewModel = hiltViewModel(),
+    collectionsViewModel: CollectionsSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    val handleBack: () -> Unit = { if (!viewModel.onBack()) onBack() }
+    val collections by collectionsViewModel.collections.collectAsState()
+    val gamingCategories by collectionsViewModel.gamingCategories.collectAsState()
 
-    when (state.step) {
-        CategoryStep.LIST      -> CategoryListContent(state, viewModel, handleBack, modifier)
-        CategoryStep.PICK_ICON -> PickIconContent(state, viewModel, handleBack, modifier)
-        CategoryStep.PICK_TYPE -> PickTypeContent(state, viewModel, handleBack, modifier)
-        CategoryStep.DETAIL    -> CategoryDetailContent(state, viewModel, handleBack, modifier)
+    // Collections' sub-steps, hoisted out of the screen this list used to live on so the merged
+    // list can decide which flow is showing. Same variables, same meanings.
+    var openCollectionId by remember { mutableStateOf<Long?>(null) }
+    var dialog by remember { mutableStateOf<CollectionDialog?>(null) }
+    var pickCategoryForNewCollection by remember { mutableStateOf<String?>(null) }
+    var iconPickerFor by remember { mutableStateOf<Long?>(null) }
+    val openCollection = collections.firstOrNull { it.id == openCollectionId }
+
+    // One Back, two flows: collapse whatever collection sub-step is open, then let the category
+    // ViewModel collapse its own, then leave. Order matters -- a collection dialog opened from
+    // the merged list must not fall through to the category machine, which knows nothing of it.
+    val handleBack: () -> Unit = {
+        when {
+            iconPickerFor != null               -> iconPickerFor = null
+            pickCategoryForNewCollection != null -> pickCategoryForNewCollection = null
+            dialog != null                      -> dialog = null
+            openCollectionId != null            -> openCollectionId = null
+            viewModel.onBack()                  -> Unit
+            else                                -> onBack()
+        }
+    }
+
+    when {
+        openCollection != null -> CollectionDetailStep(
+            collection   = openCollection,
+            gamesFlow    = { collectionsViewModel.gamesIn(openCollection.id) },
+            onRename     = { dialog = CollectionDialog("Rename Collection", openCollection.id, openCollection.name) },
+            onChangeIcon = { iconPickerFor = openCollection.id },
+            onMoveUp     = { collectionsViewModel.moveUp(openCollection.id) },
+            onMoveDown   = { collectionsViewModel.moveDown(openCollection.id) },
+            onDelete     = { collectionsViewModel.delete(openCollection.id); openCollectionId = null },
+            onRemoveGame = { game -> collectionsViewModel.removeGame(openCollection.id, game.id) },
+            onBack       = handleBack,
+            modifier     = modifier,
+        )
+        state.step == CategoryStep.PICK_ICON -> PickIconContent(state, viewModel, handleBack, modifier)
+        state.step == CategoryStep.PICK_TYPE -> PickTypeContent(state, viewModel, handleBack, modifier)
+        state.step == CategoryStep.DETAIL    -> CategoryDetailContent(state, viewModel, handleBack, modifier)
+        else -> CategoryListContent(
+            state = state,
+            vm = viewModel,
+            collections = collections,
+            onCreateCollection = { dialog = CollectionDialog("New Collection") },
+            onOpenCollection = { openCollectionId = it.id },
+            onBack = handleBack,
+            modifier = modifier,
+        )
+    }
+
+    // Name entry for a new or renamed collection. Suppressed while the category picker is up:
+    // creating runs name-then-category, and both dialogs at once would stack.
+    if (pickCategoryForNewCollection == null) {
+        dialog?.let { d ->
+            CollectionTextDialog(
+                title = d.title,
+                initial = d.initial,
+                onConfirm = { name ->
+                    if (d.renameId != null) {
+                        collectionsViewModel.rename(d.renameId, name)
+                        dialog = null
+                    } else {
+                        d.pendingName = name
+                        pickCategoryForNewCollection = gamingCategories.firstOrNull()?.id ?: "games"
+                    }
+                },
+                onCancel = { dialog = null },
+            )
+        }
+    }
+
+    dialog?.pendingName?.let { name ->
+        if (pickCategoryForNewCollection != null) {
+            CollectionCategoryPickerDialog(
+                categories = gamingCategories,
+                selectedCategoryId = pickCategoryForNewCollection ?: "games",
+                onCategorySelected = { categoryId ->
+                    collectionsViewModel.create(name, categoryId)
+                    pickCategoryForNewCollection = null
+                    dialog = null
+                },
+                onCancel = { pickCategoryForNewCollection = null },
+            )
+        }
+    }
+
+    iconPickerFor?.let { id ->
+        CollectionIconPickerDialog(
+            selectedIconKey = collections.firstOrNull { it.id == id }?.iconKey,
+            onPick = { key -> collectionsViewModel.setIcon(id, key); iconPickerFor = null },
+            onCancel = { iconPickerFor = null },
+        )
     }
 
     // Create-name dialog
@@ -75,11 +179,14 @@ fun CategoryManagerScreen(
 private fun CategoryListContent(
     state: CategoryManagerUiState,
     vm: CategoryManagerViewModel,
+    collections: List<GameCollection>,
+    onCreateCollection: () -> Unit,
+    onOpenCollection: (GameCollection) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier,
 ) {
     SettingsPageScaffold(
-        subtitle = "Categories",
+        subtitle = "Categories & Collections",
         onBack = onBack,
         modifier = modifier,
         restoreFocusKey = state.returnFocusKey,
@@ -94,6 +201,11 @@ private fun CategoryListContent(
                 focusKey = CREATE_CATEGORY_FOCUS_KEY,
                 onClick  = { vm.startCreate() },
             )
+            SettingsRow(
+                label    = "Create Collection",
+                sublabel = "e.g. RPGs, Currently Playing, Best PSP Games",
+                onClick  = onCreateCollection,
+            )
 
             SettingsGroup("XMB Categories")
             state.categories.forEach { cat ->
@@ -105,6 +217,25 @@ private fun CategoryListContent(
                 )
             }
 
+            // Collections sit UNDER the categories they belong to, which is the relationship
+            // they actually have: a collection lives inside a gaming category, and the two were
+            // being managed from opposite ends of Settings.
+            SettingsGroup("Collections")
+            if (collections.isEmpty()) {
+                SettingsRow(
+                    label    = "No collections yet",
+                    sublabel = "Create one above, or add a game from its Options menu.",
+                )
+            } else {
+                collections.forEach { collection ->
+                    SettingsRow(
+                        label    = collection.name,
+                        sublabel = "${collection.gameCount} ${if (collection.gameCount == 1) "game" else "games"}",
+                        focusKey = "collection_${collection.id}",
+                        onClick  = { onOpenCollection(collection) },
+                    )
+                }
+            }
         }
     }
 }

@@ -53,162 +53,23 @@ import com.psplauncher.core.ui.icons.CATEGORY_ICON_CATALOG
 import com.psplauncher.core.ui.icons.categoryIconFor
 import com.psplauncher.feature.settings.viewmodel.CollectionsSettingsViewModel
 
-// A two-level, fully controller-navigable manager:
-//   • List step  — create a collection, or open one.
-//   • Detail step — rename / reorder / delete the collection, and remove its games.
-// Naming uses a text dialog (a keyboard is unavoidable for free-text); every other action is
-// a focusable row that works with D-Pad + A/B.
-@Composable
-fun CollectionsSettingsScreen(
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-    viewModel: CollectionsSettingsViewModel = hiltViewModel(),
-) {
-    val collections by viewModel.collections.collectAsState()
-    val gamingCategories by viewModel.gamingCategories.collectAsState()
-
-    var openCollectionId by remember { mutableStateOf<Long?>(null) }
-    // Pending text dialog: Pair(title, renameId?) — renameId null means "create new".
-    var dialog by remember { mutableStateOf<CollectionDialog?>(null) }
-    var selectedCategoryForNewCollection by remember { mutableStateOf<String?>(null) }
-    // Non-null while the icon picker is open for that collection id.
-    var iconPickerFor by remember { mutableStateOf<Long?>(null) }
-
-    val openCollection = collections.firstOrNull { it.id == openCollectionId }
-
-    // BACK collapses the current sub-step before leaving the screen.
-    val handleBack: () -> Unit = {
-        when {
-            iconPickerFor != null     -> iconPickerFor = null
-            selectedCategoryForNewCollection != null -> selectedCategoryForNewCollection = null
-            dialog != null            -> dialog = null
-            openCollectionId != null  -> openCollectionId = null
-            else                      -> onBack()
-        }
-    }
-
-    // Each step owns its own SettingsScaffold so opening/closing a collection re-mounts it and
-    // re-assigns controller focus (a single shared scaffold never re-runs its focus pass, which is
-    // what broke the cursor after clicking into a collection).
-    if (openCollection == null) {
-        CollectionListStep(
-            collections = collections,
-            onCreate    = { dialog = CollectionDialog(title = "New Collection") },
-            onOpen      = { openCollectionId = it.id },
-            onBack      = handleBack,
-            modifier    = modifier,
-        )
-    } else {
-        CollectionDetailStep(
-            collection  = openCollection,
-            gamesFlow   = { viewModel.gamesIn(openCollection.id) },
-            onRename    = { dialog = CollectionDialog(title = "Rename Collection", renameId = openCollection.id, initial = openCollection.name) },
-            onChangeIcon = { iconPickerFor = openCollection.id },
-            onMoveUp    = { viewModel.moveUp(openCollection.id) },
-            onMoveDown  = { viewModel.moveDown(openCollection.id) },
-            onDelete    = { viewModel.delete(openCollection.id); openCollectionId = null },
-            onRemoveGame = { game -> viewModel.removeGame(openCollection.id, game.id) },
-            onBack      = handleBack,
-            modifier    = modifier,
-        )
-    }
-
-    // Show text dialog for name entry (new or rename)
-    if (selectedCategoryForNewCollection == null) {
-        dialog?.let { d ->
-            CollectionTextDialog(
-                title = d.title,
-                initial = d.initial,
-                onConfirm = { name ->
-                    if (d.renameId != null) {
-                        // Rename existing collection
-                        viewModel.rename(d.renameId, name)
-                        dialog = null
-                    } else {
-                        // Creating new collection — ask which category to add to
-                        d.pendingName = name
-                        selectedCategoryForNewCollection = gamingCategories.firstOrNull()?.id ?: "games"
-                    }
-                },
-                onCancel = { dialog = null },
-            )
-        }
-    }
-
-    // Show category picker for new collection
-    dialog?.pendingName?.let { name ->
-        if (selectedCategoryForNewCollection != null) {
-            CollectionCategoryPickerDialog(
-                categories = gamingCategories,
-                selectedCategoryId = selectedCategoryForNewCollection ?: "games",
-                onCategorySelected = { categoryId ->
-                    viewModel.create(name, categoryId)
-                    selectedCategoryForNewCollection = null
-                    dialog = null
-                },
-                onCancel = { selectedCategoryForNewCollection = null },
-            )
-        }
-    }
-
-    // Icon picker for the open collection.
-    iconPickerFor?.let { id ->
-        val current = collections.firstOrNull { it.id == id }?.iconKey
-        CollectionIconPickerDialog(
-            selectedIconKey = current,
-            onPick = { key -> viewModel.setIcon(id, key); iconPickerFor = null },
-            onCancel = { iconPickerFor = null },
-        )
-    }
-}
-
-private data class CollectionDialog(
+/**
+ * Collections' detail step and its dialogs. The list itself lives in [CategoryManagerScreen].
+ *
+ * Collections and Categories were two Settings entries, in two different sections, for what
+ * reads as one idea: the groups the crossbar is made of. They are one screen now -- the rows
+ * moved, the flows did not, and everything below still takes plain parameters, so the merged
+ * screen drives them exactly as this file used to.
+ */
+internal data class CollectionDialog(
     val title: String,
     val renameId: Long? = null,
     val initial: String = "",
-    var pendingName: String? = null,  // Temporarily holds name while category is selected
+    var pendingName: String? = null,  // Temporarily holds name while a category is chosen
 )
 
 @Composable
-private fun CollectionListStep(
-    collections: List<GameCollection>,
-    onCreate: () -> Unit,
-    onOpen: (GameCollection) -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SettingsPageScaffold(subtitle = "Collections", onBack = onBack, modifier = modifier) {
-        val scrollState = rememberScrollState()
-        LocalSettingsScrollStateRegistrar.current(scrollState)
-        Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
-            SettingsGroup("Manage")
-            SettingsRow(
-                label    = "Create New Collection",
-                sublabel = "e.g. RPGs, Currently Playing, Best PSP Games",
-                onClick  = onCreate,
-            )
-
-            SettingsGroup("Your Collections")
-            if (collections.isEmpty()) {
-                SettingsRow(
-                    label    = "No collections yet",
-                    sublabel = "Create one above, or add a game from its Options menu.",
-                )
-            } else {
-                collections.forEach { collection ->
-                    SettingsRow(
-                        label    = collection.name,
-                        sublabel = "${collection.gameCount} ${if (collection.gameCount == 1) "game" else "games"}",
-                        onClick  = { onOpen(collection) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CollectionDetailStep(
+internal fun CollectionDetailStep(
     collection: GameCollection,
     gamesFlow: () -> kotlinx.coroutines.flow.Flow<List<Game>>,
     onRename: () -> Unit,
@@ -257,7 +118,7 @@ private fun CollectionDetailStep(
 }
 
 @Composable
-private fun CollectionTextDialog(
+internal fun CollectionTextDialog(
     title: String,
     initial: String,
     onConfirm: (String) -> Unit,
@@ -275,7 +136,7 @@ private fun CollectionTextDialog(
 }
 
 @Composable
-private fun CollectionCategoryPickerDialog(
+internal fun CollectionCategoryPickerDialog(
     categories: List<Category>,
     selectedCategoryId: String,
     onCategorySelected: (String) -> Unit,
@@ -293,7 +154,7 @@ private fun CollectionCategoryPickerDialog(
 // Icon picker for a collection: a "Default (Memory Card)" option plus the shared category icon
 // catalog. Picking null resets to the default art. Mirrors the category icon picker.
 @Composable
-private fun CollectionIconPickerDialog(
+internal fun CollectionIconPickerDialog(
     selectedIconKey: String?,
     onPick: (String?) -> Unit,
     onCancel: () -> Unit,

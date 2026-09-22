@@ -69,7 +69,6 @@ val SETTINGS_CATALOG: List<SettingsEntry> = listOf(
     SettingsEntry("settings_overview", "Overview", "Library, artwork & build", SettingsSectionId.OVERVIEW),
 
     SettingsEntry("settings_library", "Library Manager", "ROM sources & scanning", SettingsSectionId.LIBRARY),
-    SettingsEntry("settings_collections", "Collections", "Create & manage game collections", SettingsSectionId.LIBRARY),
     SettingsEntry("settings_artwork", "Artwork", "Your art, scraping & cache", SettingsSectionId.LIBRARY),
     SettingsEntry("settings_artwork_sources", "Scraping Sources", "Source priority & service accounts", SettingsSectionId.LIBRARY),
     SettingsEntry("settings_app_visibility", "Hidden Items", "Review apps & games you've hidden", SettingsSectionId.LIBRARY),
@@ -85,7 +84,7 @@ val SETTINGS_CATALOG: List<SettingsEntry> = listOf(
     SettingsEntry("settings_boot", "Boot", "Boot sequence, boot video & GameBoot", SettingsSectionId.APPEARANCE),
 
     SettingsEntry("settings_audio", "Sound", "Menu & boot sounds", SettingsSectionId.INTERFACE),
-    SettingsEntry("settings_categories", "Categories", "Manage XMB categories", SettingsSectionId.INTERFACE),
+    SettingsEntry("settings_categories", "Categories", "XMB categories & the collections inside them", SettingsSectionId.INTERFACE),
     SettingsEntry("settings_controller", "Controller", "Button mapping", SettingsSectionId.INTERFACE),
     SettingsEntry("settings_touch", "Touch", "On-screen button, swipe & hints", SettingsSectionId.INTERFACE),
     SettingsEntry("settings_performance", "Performance", "Thermal, battery saver & direct launch", SettingsSectionId.INTERFACE),

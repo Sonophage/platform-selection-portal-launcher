@@ -35,7 +35,6 @@ val SETTINGS_SCREEN_ROUTES: Set<String> = setOf(
     "settings_emulators_retroarch",
     "settings_emulators_assign",
     "settings_themes",
-    "settings_collections",
     "settings_display",
     // Display's groups, each reachable on its own. The screen is one file; these pick which part
     // of it renders, the same way the emulator rows do.
@@ -134,6 +133,8 @@ fun SettingsNavHost(
             "settings_video"      -> VideoSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_photo"      -> PhotoSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_books"      -> BooksSettingsScreen(onBack = onBack, modifier = modifier)
+            // Collections merged in here; "settings_collections" is gone from both the
+            // catalog and this table.
             "settings_categories" -> CategoryManagerScreen(onBack = onBack, modifier = modifier)
             "settings_artwork"    -> ArtworkSettingsScreen(
                 onBack = onBack, section = ArtworkSection.ARTWORK, modifier = modifier,
@@ -152,7 +153,6 @@ fun SettingsNavHost(
                 onOpenColorSchemePicker = onOpenColorSchemePicker,
                 modifier = modifier,
             )
-            "settings_collections" -> CollectionsSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_display"    -> DisplaySettingsScreen(
                 onBack = onBack,
                 onOpenXmbLayoutAdjust = onOpenXmbLayoutAdjust,

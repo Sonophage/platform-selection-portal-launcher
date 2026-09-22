@@ -85,7 +85,7 @@ class SettingsHierarchyTest {
     @Test fun `each section exposes its screens in the planned order`() {
         assertEquals(
             // Windows is a card inside Library Manager, not a row beside it.
-            listOf("settings_library", "settings_collections", "settings_artwork", "settings_artwork_sources", "settings_app_visibility"),
+            listOf("settings_library", "settings_artwork", "settings_artwork_sources", "settings_app_visibility"),
             settingsEntriesIn(SettingsSectionId.LIBRARY).map { it.id },
         )
         assertEquals(
@@ -164,7 +164,7 @@ class SettingsHierarchyTest {
         // to activeSettingsScreen — they must keep resolving in SettingsNavHost.
         listOf(
             "settings_library", "settings_import_pc", "settings_music", "settings_video",
-            "settings_photo", "settings_categories", "settings_collections", "settings_artwork",
+            "settings_photo", "settings_categories", "settings_artwork",
             "settings_artwork_import", "settings_emulators",
             "settings_themes", "settings_display", "settings_controller", "settings_backup",
             "settings_logs", "settings_about", "settings_credits",
