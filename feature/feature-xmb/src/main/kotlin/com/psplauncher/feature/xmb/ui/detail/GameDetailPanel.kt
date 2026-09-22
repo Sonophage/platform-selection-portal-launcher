@@ -74,9 +74,8 @@ private fun DetailPanelPage.icon(): ImageVector = when (this) {
  * A pill, not a rounded rectangle.
  *
  * At 4dp with the padding it had, a tab read as a small BUTTON -- a box with a fill, competing
- * with the Play legend a few rows down. A capsule with almost nothing in it reads as a tab: the
- * outline is the whole shape, and the current one is said by a slightly brighter edge rather than
- * by a panel.
+ * with the Play legend a few rows down. A soft capsule behind the current label, and nothing at
+ * all behind the others, reads as a tab row.
  */
 private val StripTabShape = RoundedCornerShape(percent = 50)
 private val StripTabGap: Dp = 6.dp
@@ -127,13 +126,12 @@ fun DetailPanelStrip(
                     // Very light, or nothing. The selected tab's fill is a hint that it is
                     // filled at all; what actually says "you are here" is the brighter edge and
                     // the brighter label.
+                    // No outline at all. The current tab is a soft capsule of light and the
+                    // rest are bare labels -- a border on every tab drew five boxes across the
+                    // artwork, and a border on only the current one was a second way of saying
+                    // what its fill and its label already say.
                     .background(
-                        if (selected) Color.White.copy(alpha = 0.07f) else Color.Transparent,
-                        StripTabShape,
-                    )
-                    .border(
-                        1.dp,
-                        Color.White.copy(alpha = if (selected) 0.45f else 0.18f),
+                        if (selected) Color.White.copy(alpha = 0.12f) else Color.Transparent,
                         StripTabShape,
                     )
                     .then(

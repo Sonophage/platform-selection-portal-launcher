@@ -1,5 +1,11 @@
 package com.psplauncher.feature.xmb.ui
 
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -83,6 +89,14 @@ fun LastPlayedPage(
     directLaunch: Boolean,
     /** Which media the shelf is showing. Named on screen because X cycles it blind otherwise. */
     filter: RecentFilter,
+    /**
+     * Whether the column of other recents is in.
+     *
+     * Hidden is the default and the cursor walks the recents either way: what this changes is
+     * whether the cards are DRAWN, never what UP and DOWN do. A hidden rail that also froze the
+     * cursor would make the page a dead end until you found the gesture that opens it.
+     */
+    railVisible: Boolean,
     onPageTapped: (DetailPanelPage) -> Unit,
     onCardTapped: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -91,30 +105,42 @@ fun LastPlayedPage(
 
     // Keep the focused card on screen. The column is laid out, not scrolled by the user, so
     // nothing else would bring a card back into view once the cursor walked past the edge.
-    LaunchedEffect(selectedIndex) {
-        if (selectedIndex in items.indices) listState.animateScrollToItem(selectedIndex)
+    // Keyed on both: with the rail away the LazyColumn is not composed, so a scroll issued while
+    // it was hidden goes nowhere and the cards come back showing the wrong window. Re-running it
+    // when the rail arrives is what puts the focused card under the cursor.
+    LaunchedEffect(selectedIndex, railVisible) {
+        if (railVisible && selectedIndex in items.indices) listState.animateScrollToItem(selectedIndex)
     }
 
     Column(modifier.fillMaxSize().padding(horizontal = 32.dp)) {
         Row(Modifier.fillMaxWidth().weight(1f)) {
             // The other recents, newest first. The focused one wears the app's menu cursor, the
             // same bright edge every other focused thing in the shell wears.
-            if (items.size > 1) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.width(CardWidth).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(vertical = 12.dp),
-                ) {
-                    itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
-                        RecentCard(
-                            item = item,
-                            focused = index == selectedIndex,
-                            onClick = { onCardTapped(index) },
-                        )
+            // Slides in from the edge it lives on rather than fading: a fade would have the
+            // cards appear on top of the artwork, and the point of the gesture is that a column
+            // comes IN from the left.
+            AnimatedVisibility(
+                visible = railVisible && items.size > 1,
+                enter = slideInHorizontally(tween(220)) { -it } + fadeIn(tween(220)),
+                exit = slideOutHorizontally(tween(180)) { -it } + fadeOut(tween(180)),
+            ) {
+                Row {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.width(CardWidth).fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp),
+                    ) {
+                        itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
+                            RecentCard(
+                                item = item,
+                                focused = index == selectedIndex,
+                                onClick = { onCardTapped(index) },
+                            )
+                        }
                     }
+                    Spacer(Modifier.width(28.dp))
                 }
-                Spacer(Modifier.width(28.dp))
             }
 
             Column(Modifier.weight(1f).fillMaxHeight()) {

@@ -822,6 +822,15 @@ data class XMBUiState(
      */
     /** Which media the home shelf is showing. Cycled with X — see RecentFilter. */
     val recentFilter: RecentFilter = RecentFilter.ALL,
+    /**
+     * Whether the home shelf's column of other recents is on screen.
+     *
+     * Away by default. The page's subject is the thing you last opened, and a permanent column of
+     * smaller copies of the same idea beside it is the launcher talking over its own screen.
+     * LEFT brings it in, RIGHT or BACK puts it away, and the cursor walks the recents either way
+     * -- hidden, the cards are still there, they are just not drawn.
+     */
+    val recentRailVisible: Boolean = false,
     val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
     val panelPageGameId: Long? = null,
     val librarySetupComplete: Boolean = false,
@@ -5705,11 +5714,25 @@ class XMBViewModel @Inject constructor(
                     backOutOfDrill(state)
                     return
                 }
+                // The home shelf is the leftmost column, so LEFT has nothing to step to and has
+                // always been a dead press there. It brings the recents rail in instead.
+                if (state.onLastPlayedHome && !state.recentRailVisible) {
+                    menuSound.play(MenuSound.SYSTEM_BROWSE)
+                    _uiState.update { it.copy(recentRailVisible = true) }
+                    return
+                }
                 val next = (state.selectedCategoryIndex - 1).coerceAtLeast(0)
                 if (next != state.selectedCategoryIndex) onCategorySelected(next)
                 else gamepadInputHandler.cancelRepeat()
             }
             GamepadAction.NAVIGATE_RIGHT -> {
+                // ...and RIGHT puts it away before it steps to the next category, so the gesture
+                // that opened it is the one that closes it.
+                if (state.onLastPlayedHome && state.recentRailVisible) {
+                    menuSound.play(MenuSound.SYSTEM_BROWSE)
+                    _uiState.update { it.copy(recentRailVisible = false) }
+                    return
+                }
                 if (state.isInSubItem) { gamepadInputHandler.cancelRepeat(); return }
                 val max  = (state.categories.size - 1).coerceAtLeast(0)
                 val next = (state.selectedCategoryIndex + 1).coerceAtMost(max)
@@ -5719,6 +5742,13 @@ class XMBViewModel @Inject constructor(
             GamepadAction.SELECT     -> onItemSelected(state.selectedItemIndex)
             GamepadAction.BACK       -> {
                 menuSound.play(MenuSound.BACK)
+                // The rail collapses first. It is a thing that is open, and BACK closes the
+                // innermost open thing before it does anything larger -- reaching the App Drawer
+                // past an open rail would be a surprise.
+                if (state.onLastPlayedHome && state.recentRailVisible) {
+                    _uiState.update { it.copy(recentRailVisible = false) }
+                    return
+                }
                 // One level up, or the App Drawer when there is no level left to leave.
                 if (!backOutOfDrill(state)) onOpenAppDrawer()
             }
@@ -7142,7 +7172,9 @@ class XMBViewModel @Inject constructor(
         // activeAppDrawerFilter is cleared as an invariant: landing on a category always shows the
         // plain XMB (the drawer can't normally be open here, but this keeps the contextual button
         // state correct no matter which path selected the category).
-        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = 0, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, activeAppDrawerFilter = null) }
+        // The rail is per-visit, not remembered: leaving the shelf and coming back should show
+        // the thing you last opened, which is the page's whole subject.
+        _uiState.update { it.copy(selectedCategoryIndex = index, selectedItemIndex = 0, recentRailVisible = false, selectedPlatformId = null, selectedCollectionId = null, musicNav = MusicNav.Root, videoNav = VideoNav.Root, photoNav = PhotoNav.Root, activeAppDrawerFilter = null) }
         tintWaveForCategory(category)
         loadItemsForCategory(category)
     }
