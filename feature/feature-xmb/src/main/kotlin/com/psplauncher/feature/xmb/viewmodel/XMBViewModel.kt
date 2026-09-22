@@ -1470,6 +1470,20 @@ data class XMBItem(
             .filter { it.isNotBlank() && it != XMBViewModel.MEMORY_CARD_ASSET_URI }
 
     /**
+     * The art the home shelf's card draws, best first, or null when the row has none.
+     *
+     * Same SET of slots as [backdropArt], different ORDER, and that is the whole point of them
+     * sitting together. backdropArt is choosing a landscape background so it leads with
+     * artworkUri; this is choosing a portrait cover so it leads with the two cover slots. When a
+     * new art slot is added to this row, both want it — and only one of them having it is how a
+     * music track and a video ended up drawing their titles as text while their covers sat
+     * unread on the row.
+     */
+    val shelfCoverArt: String?
+        get() = listOfNotNull(boxArtUri, coverUri, artworkUri, heroUri, iconUri)
+            .firstOrNull { it.isNotBlank() && it != XMBViewModel.MEMORY_CARD_ASSET_URI }
+
+    /**
      * A clear logo will actually be drawn for this row.
      *
      * ONE predicate, read by both halves of a pair that used to disagree. The row hid its title

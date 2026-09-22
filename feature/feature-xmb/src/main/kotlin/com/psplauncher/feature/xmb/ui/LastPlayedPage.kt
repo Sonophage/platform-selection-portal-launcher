@@ -185,9 +185,9 @@ fun LastPlayedPage(
 private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {
     val palette = detailPalette()
     val shape = RoundedCornerShape(10.dp)
-    // Box art first: this column is a stack of covers, and the landscape grid art the crossbar
-    // tiles use reads as a screenshot at this size. Falls back to whatever the row does have.
-    val art = item.boxArtUri ?: item.artworkUri ?: item.heroUri ?: item.iconUri
+    // Covers first, and EVERY art slot: see XMBItem.shelfCoverArt, which lives beside the
+    // backdrop list it has to stay level with.
+    val art = item.shelfCoverArt
     Box(
         modifier = Modifier
             .width(CardWidth)
