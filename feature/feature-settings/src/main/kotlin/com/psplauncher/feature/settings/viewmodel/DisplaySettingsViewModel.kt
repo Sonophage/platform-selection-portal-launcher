@@ -59,6 +59,11 @@ private val KEY_SHOW_BOOT          = booleanPreferencesKey("display_show_boot")
 private val KEY_BOOT_ON_RESUME     = booleanPreferencesKey("display_boot_on_resume")
 private val KEY_THERMAL_AWARE      = booleanPreferencesKey("display_thermal_aware")
 private val KEY_RESPECT_BATTERY    = booleanPreferencesKey("display_battery_saver")
+// The wave normally gives way to a wallpaper entirely — see XmbBackground. This keeps it, drawn
+// over the picture. Off by default: the existing behaviour is what every current install has, and
+// a setting that changes how someone's home screen looks on upgrade is a setting that arrives
+// broken.
+private val KEY_WAVE_OVER_WALLPAPER = booleanPreferencesKey("display_wave_over_wallpaper")
 // Must match XMBViewModel.KEY_TOUCH_NAV_BUTTON — both read/write this same pref.
 private val KEY_TOUCH_NAV_BUTTON   = stringPreferencesKey("interface_touch_nav_button")
 // Must match XMBViewModel.KEY_CONTEXT_MENU_HINT — both read/write this same pref.
@@ -140,6 +145,8 @@ data class DisplaySettingsUiState(
     val showBootOnResume: Boolean = false,
     val thermalThrottleAware: Boolean = true,
     val respectBatterySaver: Boolean = true,
+    /** Draw the wave on top of a custom wallpaper instead of letting the wallpaper replace it. */
+    val waveOverWallpaper: Boolean = false,
     val touchNavButtonMode: TouchNavButtonMode = TouchNavButtonMode.AUTO,
     // Icon legibility treatment for XMB silhouette glyphs (None / Offset Shadow / Contour…).
     val iconLegibility: IconLegibilityStyle = IconLegibilityStyle.DEFAULT,
@@ -252,6 +259,7 @@ class DisplaySettingsViewModel @Inject constructor(
             showBootOnResume     = prefs[KEY_BOOT_ON_RESUME]  ?: false,
             thermalThrottleAware = prefs[KEY_THERMAL_AWARE]   ?: true,
             respectBatterySaver  = prefs[KEY_RESPECT_BATTERY] ?: true,
+            waveOverWallpaper    = prefs[KEY_WAVE_OVER_WALLPAPER] ?: false,
             touchNavButtonMode   = TouchNavButtonMode.fromName(prefs[KEY_TOUCH_NAV_BUTTON]),
             iconLegibility       = IconLegibilityStyle.fromName(prefs[KEY_ICON_LEGIBILITY]),
             solidUnfocusedIcons  = prefs[KEY_SOLID_UNFOCUSED_ICONS] ?: false,
@@ -462,6 +470,7 @@ class DisplaySettingsViewModel @Inject constructor(
     fun setShowBootOnResume(v: Boolean)      = save { it[KEY_BOOT_ON_RESUME]  = v }
     fun setThermalThrottleAware(v: Boolean)  = save { it[KEY_THERMAL_AWARE]   = v }
     fun setRespectBatterySaver(v: Boolean)   = save { it[KEY_RESPECT_BATTERY] = v }
+    fun setWaveOverWallpaper(v: Boolean)     = save { it[KEY_WAVE_OVER_WALLPAPER] = v }
     fun setDirectLaunch(v: Boolean)          = save { it[KEY_DIRECT_LAUNCH]   = v }
     fun setContextMenuHintEnabled(v: Boolean) = save { it[KEY_CONTEXT_MENU_HINT] = v }
     fun setContextMenuHintDelaySeconds(v: Float) = save {

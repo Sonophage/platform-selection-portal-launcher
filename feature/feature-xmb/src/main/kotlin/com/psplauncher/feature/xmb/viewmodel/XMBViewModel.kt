@@ -591,6 +591,8 @@ data class XMBUiState(
     // in battery-saver mode / thermally throttling — the wave is a non-essential flourish, so it
     // shouldn't compete for power when the device is trying to conserve it.
     val respectBatterySaver: Boolean = true,
+    /** Draw the wave over a custom wallpaper rather than letting the wallpaper replace it. */
+    val waveOverWallpaper: Boolean = false,
     val thermalThrottleAware: Boolean = true,
     val customWallpaperPath: String? = null,
     // Looping motion wallpaper (MP4/WebM/GIF) behind the XMB. Only meaningful together with
@@ -8890,6 +8892,7 @@ class XMBViewModel @Inject constructor(
                     it.copy(
                         waveStyle            = style,
                         respectBatterySaver  = prefs[KEY_RESPECT_BATTERY] ?: true,
+                        waveOverWallpaper    = prefs[KEY_WAVE_OVER_WALLPAPER] ?: false,
                         thermalThrottleAware = prefs[KEY_THERMAL_AWARE] ?: true,
                     )
                 }
@@ -8920,6 +8923,11 @@ class XMBViewModel @Inject constructor(
         private val KEY_WAVE_STYLE        = stringPreferencesKey("display_wave_style")
         // Must match DisplaySettingsViewModel — both read/write these wave power-throttle prefs.
         private val KEY_RESPECT_BATTERY   = booleanPreferencesKey("display_battery_saver")
+        // The wave normally gives way to a wallpaper entirely — see XmbBackground. This keeps it, drawn
+        // over the picture. Off by default: the existing behaviour is what every current install has, and
+        // a setting that changes how someone's home screen looks on upgrade is a setting that arrives
+        // broken.
+        private val KEY_WAVE_OVER_WALLPAPER = booleanPreferencesKey("display_wave_over_wallpaper")
         private val KEY_THERMAL_AWARE     = booleanPreferencesKey("display_thermal_aware")
         private val KEY_COLOR_SCHEME      = stringPreferencesKey("display_color_scheme")
         // Custom-theme cascade (docs/xmb-theme-creator-plan.md): when set, this ARGB accent

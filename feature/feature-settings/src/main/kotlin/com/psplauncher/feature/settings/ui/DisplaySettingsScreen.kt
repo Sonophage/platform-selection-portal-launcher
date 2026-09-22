@@ -282,12 +282,26 @@ fun DisplaySettingsScreen(
                     }
                 }
 
-                // ── Wave Style — only relevant when no wallpaper is set. When a MOTION wallpaper
-                // is set, the same cycle shows as "Background Motion" (one setting governs "how
-                // lively is my background" regardless of which background is active — both write
-                // KEY_WAVE_STYLE, so a user who set Static for the wave gets a still poster the
-                // moment they pick a video).
-                if (state.customWallpaperPath == null) {
+                // Only offered when there IS a wallpaper: with no wallpaper the wave is already
+                // the background and this would be a switch that does nothing.
+                if (state.customWallpaperPath != null) {
+                    SettingsToggleRow(
+                        label    = "Wave Over Wallpaper",
+                        sublabel = "Keep the wave, drawn on top of your wallpaper",
+                        checked  = state.waveOverWallpaper,
+                        onToggle = { viewModel.setWaveOverWallpaper(it) },
+                    )
+                }
+
+                // ── Wave Style — relevant when no wallpaper is set, AND when a wallpaper is set
+                // but the wave is being kept over it. That second case is new: the row used to be
+                // hidden the moment a wallpaper existed, which with Wave Over Wallpaper on would
+                // have left a visible wave whose style could not be reached. When a MOTION
+                // wallpaper is set the same cycle shows as "Background Motion" (one setting
+                // governs "how lively is my background" regardless of which background is active —
+                // both write KEY_WAVE_STYLE, so a user who set Static for the wave gets a still
+                // poster the moment they pick a video).
+                if (state.customWallpaperPath == null || state.waveOverWallpaper) {
                     SettingsPickerRow(
                         label    = "Wave Style",
                         options  = viewModel.waveStyleOptions.map { SettingsPickerOption(it.second) },

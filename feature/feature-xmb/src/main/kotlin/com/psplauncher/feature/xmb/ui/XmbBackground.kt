@@ -72,19 +72,55 @@ fun XmbBackground(
     customWallpaperPath: String? = null,
     motionWallpaperPath: String? = null,
     motionDecision: MotionWallpaperPolicy.Decision = MotionWallpaperPolicy.Decision.PLAY,
+    /**
+     * Settings ▸ Display ▸ Wave Over Wallpaper. Keeps the wave, drawn on top of the picture,
+     * instead of the picture replacing it.
+     *
+     * Off by default, and the OFF path is unchanged on purpose: it is what every existing install
+     * has, and it is the one that allocates no shader, no frame loop and no decoder. Turning this
+     * on is choosing to pay for the wave again on top of the wallpaper.
+     */
+    waveOverWallpaper: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    when {
-        customWallpaperPath != null && motionWallpaperPath != null && motionDecision != MotionWallpaperPolicy.Decision.POSTER ->
-            MotionWallpaperBackground(
-                posterPath = customWallpaperPath,
-                motionPath = motionWallpaperPath,
+    val hasWallpaper = customWallpaperPath != null
+    val motionPlaying = hasWallpaper && motionWallpaperPath != null &&
+        motionDecision != MotionWallpaperPolicy.Decision.POSTER
+
+    Box(modifier.fillMaxSize()) {
+        when {
+            motionPlaying -> MotionWallpaperBackground(
+                posterPath = customWallpaperPath!!,
+                motionPath = motionWallpaperPath!!,
                 decision = motionDecision,
-                modifier = modifier,
+                modifier = Modifier.fillMaxSize(),
             )
-        customWallpaperPath != null -> WallpaperBackground(customWallpaperPath, modifier)
-        else -> WaveBackground(waveStyle, modifier)
+            hasWallpaper -> WallpaperBackground(customWallpaperPath!!, Modifier.fillMaxSize())
+            else -> WaveBackground(waveStyle, Modifier.fillMaxSize())
+        }
+
+        // The wave a second time, over the picture — and ONLY over a picture. With no wallpaper
+        // the branch above already drew it, and drawing it twice would double every strand.
+        //
+        // No gradient underneath it here: that is the wallpaper's job now. WaveBackground paints
+        // the theme gradient as its base, which would hide the picture entirely, so this draws
+        // the wave alone over whatever is behind it.
+        if (hasWallpaper && waveOverWallpaper) {
+            WaveOverlay(waveStyle, Modifier.fillMaxSize())
+        }
     }
+}
+
+/**
+ * The wave with no background of its own, for drawing over a wallpaper.
+ *
+ * Shares every part of WaveBackground except the gradient it normally sits on — same shader, same
+ * frame clock, same style handling — because two wave renderers would be two things to keep in
+ * step and only one of them would ever get fixed.
+ */
+@Composable
+private fun WaveOverlay(waveStyle: WaveStyle, modifier: Modifier) {
+    Box(modifier) { WaveLayers(waveStyle) }
 }
 
 /**
@@ -159,12 +195,15 @@ private fun WallpaperBackground(
     }
 }
 
+/**
+ * The wave itself: the strands and the bloom, with NO background of its own.
+ *
+ * Split out so the two places that draw a wave — on the theme gradient, and over a wallpaper —
+ * are one renderer with one frame clock. Two copies would be two things to keep in step, and
+ * only one of them would ever get the next fix.
+ */
 @Composable
-private fun WaveBackground(
-    waveStyle: WaveStyle,
-    modifier: Modifier,
-) {
-    val colors = LocalPFPColors.current
+private fun WaveLayers(waveStyle: WaveStyle) {
     val alphaScale = if (waveStyle.reduced) 0.5f else 1f
     val ampScale   = if (waveStyle.reduced) 0.65f else 1f
 
@@ -187,6 +226,30 @@ private fun WaveBackground(
         }
     }
 
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ShaderWave(time, alphaScale, ampScale)
+    } else {
+        FallbackWave(time, alphaScale, ampScale)
+    }
+    // Soft off-centre light bloom — the same gentle highlight the XMB has near the crossbar.
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(Color.White.copy(alpha = 0.10f), Color.Transparent),
+                center = center.copy(x = size.width * 0.48f, y = size.height * 0.30f),
+                radius = size.minDimension * 0.62f,
+            )
+        )
+    }
+}
+
+@Composable
+private fun WaveBackground(
+    waveStyle: WaveStyle,
+    modifier: Modifier,
+) {
+    val colors = LocalPFPColors.current
+
     // Monthly-tinted vertical gradient: deep top (keeps the status strip legible) easing to the pale
     // bottom the wave sits against.
     val gradient = Brush.linearGradient(
@@ -199,21 +262,7 @@ private fun WaveBackground(
     )
 
     Box(modifier = modifier.fillMaxSize().background(gradient)) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ShaderWave(time, alphaScale, ampScale)
-        } else {
-            FallbackWave(time, alphaScale, ampScale)
-        }
-        // Soft off-centre light bloom — the same gentle highlight the XMB has near the crossbar.
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.10f), Color.Transparent),
-                    center = center.copy(x = size.width * 0.48f, y = size.height * 0.30f),
-                    radius = size.minDimension * 0.62f,
-                )
-            )
-        }
+        WaveLayers(waveStyle)
     }
 }
 

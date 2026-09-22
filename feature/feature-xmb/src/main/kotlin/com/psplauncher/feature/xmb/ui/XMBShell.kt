@@ -545,6 +545,7 @@ fun XMBShell(
             XmbBackground(
                 waveStyle           = effectiveWaveStyle,
                 customWallpaperPath = uiState.customWallpaperPath,
+                waveOverWallpaper   = uiState.waveOverWallpaper,
                 motionWallpaperPath = uiState.motionWallpaperPath,
                 motionDecision      = motionDecision,
                 modifier            = Modifier.fillMaxSize(),
