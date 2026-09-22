@@ -1474,7 +1474,14 @@ private fun SettingsSectionRail(
                     // The page you are on stays bright whether or not the cursor is in the rail:
                     // it is answering "where am I", not "what am I pointing at". The cursor plate
                     // answers the second question, and the two are allowed to be on different rows.
-                    color = if (isCurrent) SettingsText else SettingsSubtext,
+                    //
+                    // Everything else drops to SETTINGS_RAIL_INACTIVE_ALPHA. Measured, not chosen:
+                    // in the PS5 Settings reference the active rail item peaks at 241 and the
+                    // inactive ones at 113 — a little under half. Secondary text alone was not
+                    // enough of a gap, which is why the active row was hard to pick out of a
+                    // thirteen-row tree at a glance.
+                    color = if (isCurrent) SettingsText
+                            else SettingsText.copy(alpha = SETTINGS_RAIL_INACTIVE_ALPHA),
                     fontSize = if (row.isSection) 14.sp else 13.sp,
                     fontWeight = when {
                         isCurrent -> FontWeight.SemiBold
@@ -1489,6 +1496,16 @@ private fun SettingsSectionRail(
         }
     }
 }
+
+/**
+ * How far the rail's non-current rows drop.
+ *
+ * The rail is navigation, not content: its job is to make the page you are on obvious, and a row
+ * you are not on is a landmark rather than something to read. WCAG's body-text floor does not
+ * apply to it for the same reason it does not apply to a disabled control — but the CURRENT row,
+ * the one you actually read, keeps full primary text and is unaffected by this.
+ */
+private const val SETTINGS_RAIL_INACTIVE_ALPHA = 0.42f
 
 @Composable
 fun SettingsGroup(title: String) {

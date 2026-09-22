@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
@@ -27,30 +25,28 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
  * [SettingsScaffold], which already takes `header`, `footer` and `lightScrim`. So this is the same
  * trick pointed at the other twenty-eight screens, not a second scaffold to keep in step.
  *
- * What it adds over a bare [SettingsScaffold]:
+ * Measured off the PS5 Settings reference rather than guessed. Sampling peak text luminance in
+ * that capture:
  *
- *  - **The light scrim**, so the wallpaper and the wave are part of the page instead of behind it.
- *  - **A centred heading and a line saying what the page is for.** That line is the
- *    [com.psplauncher.core.domain.model.SettingsEntry.subtitle] the catalog has always carried and
- *    nothing has ever drawn — 36 written strings with no reader. This is the reader.
+ *  - The page title is the brightest thing on screen (254) and sits at the OUTER margin, x=84,
+ *    left of and above the rail, whose items start at x=168. It is a title, not a breadcrumb:
+ *    there is no eyebrow above it, no back chevron beside it and no rule under it.
+ *  - The rail's active item reads 241; its inactive items read 113. Inactive is not "slightly
+ *    quieter", it is a little under half, which is what makes the active one findable at a glance.
+ *  - A row's description appears for the FOCUSED row only, inside its plate, at full brightness
+ *    (240) — every other row in the capture shows a label and a value and nothing else.
  *
- * What it deliberately does NOT change: the breadcrumb header, the focus engine, the rail, the
- * footer prompts. Those are shared with every screen and with the wizard, and a skin that forked
- * them would be a second navigation model.
+ * So what this adds over a bare [SettingsScaffold] is the title treatment and the light scrim. The
+ * rail's dimming is in [SettingsScaffold] itself, because the rail is shared.
+ *
+ * What it deliberately does NOT change: the focus engine, the rail's structure, the footer
+ * prompts. Those are shared with every screen and with the wizard, and a skin that forked them
+ * would be a second navigation model.
  */
 @Composable
 fun SettingsPageScaffold(
-    /** The breadcrumb's second line — the screen's name, as the rail lists it. */
+    /** The page's name, drawn large at the top-left. */
     subtitle: String,
-    /** The centred heading. Defaults to [subtitle]; pass a fuller sentence where one reads better. */
-    heading: String = subtitle,
-    /**
-     * The centred line under the heading: what this page is for.
-     *
-     * Pass the catalog's subtitle for the screen. Null draws no line, which is right for a page
-     * whose heading already says everything.
-     */
-    hint: String? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     restoreFocusKey: String? = null,
@@ -70,9 +66,12 @@ fun SettingsPageScaffold(
         // the page. TextLegibilityStyle is what protects the text there — see the note in
         // SettingsScaffold's scrim block on why these anchors are NOT solved like the dark ones.
         lightScrim = true,
+        header = { SettingsPageTitle(subtitle) },
+        // The reference has no rule under the title. The rail and the content are separated by
+        // their own columns; a horizontal line across both only adds a second boundary.
+        showDivider = false,
     ) {
         Column(Modifier.fillMaxWidth()) {
-            SettingsPageHeading(heading, hint)
             content()
             Spacer(Modifier.height(24.dp))
         }
@@ -80,35 +79,21 @@ fun SettingsPageScaffold(
 }
 
 /**
- * The centred heading block.
+ * The page title: one line, top-left, at the outer margin.
  *
  * `canFocus = false` for the same reason the wizard's header carries it: this is display chrome,
- * and UP from the first row must go to the rail, never into a paragraph the cursor cannot use.
+ * and UP from the first row must go to the rail, never into a title the cursor cannot use.
  */
 @Composable
-private fun SettingsPageHeading(heading: String, hint: String?) {
-    Column(
+private fun SettingsPageTitle(title: String) {
+    Text(
+        text = title,
+        color = Color.White,
+        fontSize = 30.sp,
+        fontWeight = FontWeight.Normal,
         modifier = Modifier
             .fillMaxWidth()
             .focusProperties { canFocus = false }
-            .padding(start = 48.dp, end = 48.dp, top = 6.dp, bottom = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = heading,
-            color = Color.White,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Light,
-            textAlign = TextAlign.Center,
-        )
-        if (!hint.isNullOrBlank()) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = hint,
-                color = Color.White.copy(alpha = 0.72f),
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
+            .padding(start = 40.dp, end = 40.dp, top = 18.dp, bottom = 10.dp),
+    )
 }

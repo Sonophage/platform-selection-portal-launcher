@@ -50,8 +50,6 @@ fun OverviewSettingsScreen(
     // page proving the look.
     SettingsPageScaffold(
         subtitle = "Overview",
-        heading = "Overview",
-        hint = "Library, artwork & build",
         onBack = onBack,
         modifier = modifier,
     ) {
