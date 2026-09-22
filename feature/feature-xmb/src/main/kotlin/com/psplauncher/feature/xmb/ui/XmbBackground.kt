@@ -371,11 +371,12 @@ half4 main(float2 fragCoord) {
         // with every strand inside it; spreading them over a quarter of the screen was what made
         // this read as stacked sheets instead of a bundle of hairs.
         float seat = 0.50 + f * 0.055;
-        // Each strand runs on its own clock as well as its own z phase: 0.80x at the front to
-        // 1.28x at the back. Their pipeline gets this from the kernel walking at row * 0.93,
-        // which advances a different distance per row; here it is stated directly.
-        float ts   = t * (0.80 + f * 0.48);
-        float h    = waveHeight(px, z, ts, ampScale);
+        // ONE clock for every strand. They were each given their own rate, 0.80x to 1.28x, and
+        // the bundle came apart — strands overtaking one another reads as interference rather
+        // than as a ribbon. They still differ, by the z phase inside waveHeight, which offsets
+        // them in space without letting them drift apart in time; that is what makes the bundle
+        // travel as one object with depth in it.
+        float h = waveHeight(px, z, t, ampScale);
         float sy   = seat + h;
 
         float d = uv.y - sy;
@@ -386,8 +387,8 @@ half4 main(float2 fragCoord) {
         // full waveHeight call. That finite difference cost as much as the strand itself, and
         // paying it fourteen times buys less than spending the same budget on fourteen strands
         // instead of seven. Two trig calls in place of eight.
-        float flowS = ts * flowSpeed;
-        float dMain = -2.0 * sin(px * 2.0 - ts * 0.5) * waveCosAmp * waveHeightScale;
+        float flowS = t * flowSpeed;
+        float dMain = -2.0 * sin(px * 2.0 - t * 0.5) * waveCosAmp * waveHeightScale;
         float dBandT = 0.5 * 6.2 * cos(flowS * 0.25 + z * 1.7 + (px * 0.5 + 0.5) * 6.2)
                      * bandAmplitude * 0.10;
         float slope = abs(dMain + dBandT) * ampScale;
