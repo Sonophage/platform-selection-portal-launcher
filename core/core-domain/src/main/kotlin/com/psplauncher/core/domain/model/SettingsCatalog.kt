@@ -18,6 +18,10 @@ enum class SettingsSectionId(
     val title: String,
     val subtitle: String,
 ) {
+    // FIRST in the enum, because settingsRailRows walks the enum: this is the rail's top group,
+    // which is where Settings now lands. A section further down would have opened Settings with
+    // the rail's cursor at the bottom of a tree the user had not scrolled to.
+    OVERVIEW("settings_section_overview", "Overview", "Library, artwork & build"),
     LIBRARY("settings_section_library", "Library", "Library Manager, collections, artwork & hidden games"),
     EMULATORS("settings_section_emulators", "Emulators", "Launch profiles & RetroArch cores"),
     APPEARANCE("settings_section_appearance", "Appearance", "Theme, wallpaper, layout & boot"),
@@ -43,6 +47,11 @@ data class SettingsEntry(
  * elsewhere and are not places you navigate to from a sibling list.
  */
 val SETTINGS_CATALOG: List<SettingsEntry> = listOf(
+    // FIRST on purpose. The crossbar's Settings row opens SETTINGS_CATALOG.first(), so whatever
+    // sits here is where Settings lands — and that used to be Library Manager, which dropped the
+    // user inside one screen's ROM roots before they had chosen anything.
+    SettingsEntry("settings_overview", "Overview", "Library, artwork & build", SettingsSectionId.OVERVIEW),
+
     SettingsEntry("settings_library", "Library Manager", "ROM sources & scanning", SettingsSectionId.LIBRARY),
     SettingsEntry("settings_windows_games", "Windows Games", "PC games, launchers & imports", SettingsSectionId.LIBRARY),
     SettingsEntry("settings_collections", "Collections", "Create & manage game collections", SettingsSectionId.LIBRARY),

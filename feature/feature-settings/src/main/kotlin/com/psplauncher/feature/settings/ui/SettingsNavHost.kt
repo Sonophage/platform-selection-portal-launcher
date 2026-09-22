@@ -11,6 +11,7 @@ import com.psplauncher.core.domain.model.GamepadAction
 // literals) so the settings-hierarchy tests can verify that every L2 row id and every legacy
 // direct-caller id resolves here. New screens MUST be added to both this set and the `when`.
 val SETTINGS_SCREEN_ROUTES: Set<String> = setOf(
+    "settings_overview",
     "settings_initial_setup",
     "settings_initial_setup_first",
     "settings_library",
@@ -187,6 +188,7 @@ fun SettingsNavHost(
             "settings_controller" -> ControllerSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_backup"     -> BackupSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_logs"       -> LogsSettingsScreen(onBack = onBack, modifier = modifier)
+            "settings_overview"   -> OverviewSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_about"      -> AboutSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_credits"    -> CreditsSettingsScreen(onBack = onBack, modifier = modifier)
             "settings_app_visibility" -> AppVisibilitySettingsScreen(onBack = onBack, modifier = modifier)
