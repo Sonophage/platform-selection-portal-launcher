@@ -9,6 +9,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.psplauncher.core.data.datastore.pfpDataStore
 import com.psplauncher.core.data.wallpaper.WallpaperLuminanceProbe
 import com.psplauncher.core.data.wallpaper.WallpaperLuminanceProbe.clearWallpaperLuma
+import com.psplauncher.core.data.wallpaper.ThemeAccent
+import com.psplauncher.core.data.wallpaper.ThemeAccent.KEY_ACCENT_OVERRIDE
 import com.psplauncher.core.data.wallpaper.WallpaperLuminanceProbe.setWallpaperLuma
 import com.psplauncher.themekit.AccentDeriver
 import com.psplauncher.themekit.BmpImage
@@ -189,6 +191,8 @@ class PfpThemeStore @Inject constructor(
             if (motionDest != null) prefs[KEY_MOTION_WALLPAPER] = motionDest.absolutePath else prefs.remove(KEY_MOTION_WALLPAPER)
             if (wallpaperOk) prefs[KEY_CUSTOM_WALLPAPER] = dest.absolutePath else prefs.remove(KEY_CUSTOM_WALLPAPER)
             prefs.setWallpaperLuma(luma)
+            // AFTER setWallpaperLuma, which may have pointed the accent at the new
+            // wallpaper: applying a theme is choosing its colour, so the theme wins.
             if (accent != null) prefs[KEY_ACCENT_OVERRIDE] = accent else prefs.remove(KEY_ACCENT_OVERRIDE)
             if (iconColor != null) prefs[KEY_ICON_COLOR] = iconColor else prefs.remove(KEY_ICON_COLOR)
             if (textColor != null) prefs[KEY_TEXT_COLOR] = textColor else prefs.remove(KEY_TEXT_COLOR)
@@ -214,6 +218,9 @@ class PfpThemeStore @Inject constructor(
             prefs.remove(KEY_MOTION_WALLPAPER)
             prefs.clearWallpaperLuma()
             prefs.remove(KEY_ACCENT_OVERRIDE)
+            // Back to stock means the accent comes from the colour scheme again, not from
+            // whatever picture is set next.
+            prefs.remove(ThemeAccent.KEY_ACCENT_FROM_WALLPAPER)
             prefs.remove(KEY_ICON_COLOR)
             prefs.remove(KEY_TEXT_COLOR)
             prefs.remove(KEY_WAVE_STYLE)
@@ -632,7 +639,6 @@ class PfpThemeStore @Inject constructor(
         // previously-applied one must not survive a theme apply/reset.
         private val KEY_MOTION_WALLPAPER = stringPreferencesKey("display_motion_wallpaper")
         private val KEY_WAVE_STYLE = stringPreferencesKey("display_wave_style")
-        private val KEY_ACCENT_OVERRIDE = longPreferencesKey("theme_accent_override")
         private val KEY_ICON_COLOR = longPreferencesKey("theme_icon_color")
         // Must match DisplaySettingsViewModel / XMBViewModel — the user's font colour, which a
         // theme bundle can also carry.

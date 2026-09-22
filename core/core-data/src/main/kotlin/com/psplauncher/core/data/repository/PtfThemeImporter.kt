@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import com.psplauncher.core.data.datastore.pfpDataStore
+import com.psplauncher.core.data.wallpaper.ThemeAccent.KEY_ACCENT_OVERRIDE
 import com.psplauncher.themekit.AccentDeriver
 import com.psplauncher.themekit.PtfParser
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -91,6 +92,5 @@ class PtfThemeImporter @Inject constructor(
     }
 
     private companion object {
-        val KEY_ACCENT_OVERRIDE = longPreferencesKey("theme_accent_override")
     }
 }

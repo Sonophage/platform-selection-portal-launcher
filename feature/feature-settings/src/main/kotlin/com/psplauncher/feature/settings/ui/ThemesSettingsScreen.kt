@@ -82,7 +82,7 @@ fun ThemesSettingsScreen(
         onBack = onBack,
         onOpenColorSchemePicker = onOpenColorSchemePicker,
         onImportPtfTheme = { viewModel.importPtfTheme(it) },
-        onCreateThemeFromPhoto = { viewModel.createThemeFromPhoto(it) },
+        onSetAccentFromWallpaper = { viewModel.setAccentFromWallpaper(it) },
         onImportPfpTheme = { viewModel.importPfpTheme(it) },
         onApplySavedTheme = { viewModel.applySavedTheme(it) },
         onShareSavedTheme = { viewModel.shareSavedTheme(it) },
@@ -102,7 +102,7 @@ private fun ThemesSettingsContent(
     onBack: () -> Unit,
     onOpenColorSchemePicker: () -> Unit,
     onImportPtfTheme: (Uri) -> Unit,
-    onCreateThemeFromPhoto: (Uri) -> Unit,
+    onSetAccentFromWallpaper: (Boolean) -> Unit,
     onImportPfpTheme: (Uri) -> Unit,
     onApplySavedTheme: (String) -> Unit,
     onShareSavedTheme: (String) -> Unit,
@@ -115,7 +115,6 @@ private fun ThemesSettingsContent(
     modifier: Modifier = Modifier,
 ) {
     val ptfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { onImportPtfTheme(it) } }
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { onCreateThemeFromPhoto(it) } }
     val pfpPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { onImportPfpTheme(it) } }
 
     // "Save Current Look as Theme" name entry, drawn in the launcher's own window like every other
@@ -258,7 +257,11 @@ private fun ThemesSettingsContent(
                     onClick  = onOpenColorSchemePicker,
                 )
 
-                state.accentOverrideArgb?.let { accent ->
+                // Hidden while the colour is following the wallpaper: the toggle below is the
+                // control then, and this row would be a second one for the same value that
+                // clears it without turning the toggle off -- which is exactly the
+                // two-things-for-one-setting confusion this screen is losing.
+                state.accentOverrideArgb.takeIf { !state.accentFromWallpaper }?.let { accent ->
                     SettingsRow(
                         label    = "Custom Theme Color",
                         sublabel = "From an imported theme — tap to remove and return to the color scheme",
@@ -289,12 +292,21 @@ private fun ThemesSettingsContent(
                     )
                 }
 
-                SettingsGroup("My Themes")
-                SettingsRow(
-                    label    = "New Theme from Photo",
-                    sublabel = "Pick a picture — wallpaper and color are set from it",
-                    onClick  = if (state.isInstalling) null else ({ photoPicker.launch(arrayOf("image/*")) }),
+                // Was "New Theme from Photo", which opened a second picture picker to set a
+                // second wallpaper. The wallpaper is chosen one screen over, under Wallpaper &
+                // Text; all this ever wanted to say is whether the colour comes from it.
+                SettingsToggleRow(
+                    label    = "Color from Wallpaper",
+                    sublabel = when {
+                        !state.hasWallpaper -> "Set a wallpaper under Wallpaper & Text first"
+                        state.accentFromWallpaper -> "Following your wallpaper — changes with it"
+                        else -> "Take the accent colour from your wallpaper"
+                    },
+                    checked  = state.accentFromWallpaper,
+                    onToggle = onSetAccentFromWallpaper,
                 )
+
+                SettingsGroup("My Themes")
 
                 if (state.savedThemes.isNotEmpty()) {
                     FocusableStrip(
@@ -505,7 +517,7 @@ fun ThemesSettingsScreenPreview() {
             onBack = {},
             onOpenColorSchemePicker = {},
             onImportPtfTheme = {},
-            onCreateThemeFromPhoto = {},
+            onSetAccentFromWallpaper = {},
             onImportPfpTheme = {},
             onApplySavedTheme = {},
             onShareSavedTheme = {},

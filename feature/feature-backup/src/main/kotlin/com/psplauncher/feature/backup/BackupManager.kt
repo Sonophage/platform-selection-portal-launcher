@@ -614,6 +614,10 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("display_thermal_aware"),
             booleanPreferencesKey("display_battery_saver"),
             booleanPreferencesKey("display_wave_over_wallpaper"),
+            // Whether the accent follows the wallpaper. The accent VALUE is carried in the long
+            // list; this is the rule that produced it, and without it a restore would keep the
+            // colour but stop tracking the picture.
+            booleanPreferencesKey("theme_accent_from_wallpaper"),
             booleanPreferencesKey("interface_context_menu_hint"),
             // Font colour opt-outs — see the string list above for why these are spelled out.
             booleanPreferencesKey("display_text_color_exact"),

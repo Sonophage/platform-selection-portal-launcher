@@ -11,6 +11,10 @@ import androidx.lifecycle.viewModelScope
 import com.psplauncher.core.data.datastore.pfpDataStore
 import com.psplauncher.core.data.repository.PfpThemeStore
 import com.psplauncher.core.data.repository.PtfThemeImporter
+import com.psplauncher.core.data.wallpaper.ThemeAccent
+import com.psplauncher.core.data.wallpaper.ThemeAccent.KEY_ACCENT_OVERRIDE
+import com.psplauncher.core.data.wallpaper.ThemeAccent.followWallpaperAccent
+import com.psplauncher.core.data.wallpaper.WallpaperLuminanceProbe
 import com.psplauncher.core.domain.model.PFPTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -32,6 +36,11 @@ data class ThemesSettingsUiState(
     // Custom-theme cascade state (docs/xmb-theme-creator-plan.md): the imported/custom accent
     // that supersedes the preset scheme, and the unified icon tint (null = default white).
     val accentOverrideArgb: Long? = null,
+    // "Color from Wallpaper": the accent is re-derived from the wallpaper rather than picked.
+    val accentFromWallpaper: Boolean = false,
+    // Whether there is a wallpaper for it to come from. The toggle stays usable without one --
+    // it simply has nothing to derive yet -- but the row says so instead of looking broken.
+    val hasWallpaper: Boolean = false,
     val iconColorArgb: Long? = null,
     // The user's saved .pfptheme library (imports + Quick Create).
     val savedThemes: List<PfpThemeStore.SavedTheme> = emptyList(),
@@ -56,6 +65,8 @@ class ThemesSettingsViewModel @Inject constructor(
         extra.copy(
             activeThemeName    = prefs[PfpThemeStore.KEY_APPLIED_THEME_NAME] ?: "Default",
             accentOverrideArgb = prefs[KEY_ACCENT_OVERRIDE],
+            accentFromWallpaper = prefs[ThemeAccent.KEY_ACCENT_FROM_WALLPAPER] == true,
+            hasWallpaper       = prefs[WallpaperLuminanceProbe.KEY_WALLPAPER_ACCENT] != null,
             iconColorArgb      = prefs[KEY_ICON_COLOR],
             savedThemes        = saved,
         )
@@ -96,6 +107,26 @@ class ThemesSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             context.pfpDataStore.edit { prefs ->
                 if (argb != null) prefs[KEY_ACCENT_OVERRIDE] = argb else prefs.remove(KEY_ACCENT_OVERRIDE)
+            }
+        }
+    }
+
+    /**
+     * Turns "Color from Wallpaper" on or off.
+     *
+     * Applies immediately rather than waiting for the next wallpaper change: a toggle that does
+     * nothing until you go and change something else reads as broken. Turning it OFF clears the
+     * override outright — what is there was derived, not chosen, so there is nothing to keep.
+     *
+     * The ON branch goes through the same [followWallpaperAccent] the wallpaper writer uses, so
+     * "what this setting does" has one definition and cannot drift between the two entry points.
+     */
+    fun setAccentFromWallpaper(enabled: Boolean) {
+        viewModelScope.launch {
+            context.pfpDataStore.edit { prefs ->
+                prefs[ThemeAccent.KEY_ACCENT_FROM_WALLPAPER] = enabled
+                if (enabled) prefs.followWallpaperAccent(prefs[WallpaperLuminanceProbe.KEY_WALLPAPER_ACCENT])
+                else prefs.remove(KEY_ACCENT_OVERRIDE)
             }
         }
     }
@@ -210,7 +241,6 @@ class ThemesSettingsViewModel @Inject constructor(
 
     private companion object {
         // Must match XMBViewModel — shared prefs contract for the theme cascade.
-        val KEY_ACCENT_OVERRIDE = longPreferencesKey("theme_accent_override")
         val KEY_ICON_COLOR      = longPreferencesKey("theme_icon_color")
     }
 }

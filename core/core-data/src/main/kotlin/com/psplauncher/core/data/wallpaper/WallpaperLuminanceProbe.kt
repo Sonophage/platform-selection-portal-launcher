@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.psplauncher.core.data.wallpaper.ThemeAccent.followWallpaperAccent
 import com.psplauncher.themekit.AccentDeriver
 import com.psplauncher.themekit.BmpImage
 import com.psplauncher.themekit.WallpaperLuminanceMap
@@ -119,11 +120,15 @@ object WallpaperLuminanceProbe {
         if (json != null) this[KEY_WALLPAPER_LUMA] = json else this.remove(KEY_WALLPAPER_LUMA)
         val accent = survey?.accentArgb
         if (accent != null) this[KEY_WALLPAPER_ACCENT] = accent else this.remove(KEY_WALLPAPER_ACCENT)
+        // Same transaction, never a follow-up write: see ThemeAccent.followWallpaperAccent.
+        followWallpaperAccent(accent)
     }
 
     /** Drop the survey. Pair this with every site that clears the wallpaper itself. */
     fun MutablePreferences.clearWallpaperLuma() {
         this.remove(KEY_WALLPAPER_LUMA)
         this.remove(KEY_WALLPAPER_ACCENT)
+        // The wallpaper is gone, so a theme accent derived from it has nothing behind it.
+        followWallpaperAccent(null)
     }
 }
