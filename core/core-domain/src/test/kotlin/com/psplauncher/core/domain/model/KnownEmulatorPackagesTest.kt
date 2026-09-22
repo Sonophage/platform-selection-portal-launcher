@@ -33,6 +33,28 @@ class KnownEmulatorPackagesTest {
     }
 
     @Test
+    fun `every PC runtime is tagged as an emulator, by name and by family`() {
+        // PcRuntimes is the one list; KnownEmulatorPackages folds it in. They were the same
+        // literals written twice, and the drawer's EMU badge is what silently went missing when
+        // one gained an entry. Winlator is deliberately not in the map -- every fork renames
+        // itself, so it needs the prefix rule, which the map cannot express.
+        PcRuntimes.PACKAGES.keys.forEach {
+            assertTrue(KnownEmulatorPackages.isEmulator(it), it)
+        }
+        assertTrue(KnownEmulatorPackages.isEmulator(PcRuntimes.WINLATOR_FAMILY))
+        assertTrue(KnownEmulatorPackages.isEmulator("com.winlator.cmod"))
+        assertFalse(PcRuntimes.WINLATOR_FAMILY in PcRuntimes.PACKAGES)
+    }
+
+    @Test
+    fun `every PC runtime has a name to show`() {
+        // The Emulators screen prints these. A blank one is a row that says nothing.
+        PcRuntimes.PACKAGES.forEach { (pkg, name) ->
+            assertTrue(name.isNotBlank(), "$pkg has no display name")
+        }
+    }
+
+    @Test
     fun `streaming clients and frontends are not emulators`() {
         listOf(
             "com.limelight",                    // Moonlight

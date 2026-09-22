@@ -145,6 +145,21 @@ fun EmulatorsSettingsScreen(
                 }
             }
 
+            // PC runtimes, when any are installed. They have no profile to edit and take no
+            // ROM -- a PC game is imported into the Windows Memory Card and launched from
+            // there -- so this is an acknowledgement plus a signpost, not a settings group.
+            // Without it the honest answer to "where is GameNative" was nowhere.
+            if ((section == null || section == EmulatorSettingsSection.INSTALLED) && state.pcRuntimes.isNotEmpty()) {
+                SettingsGroup("PC Runtimes")
+                state.pcRuntimes.forEach { name ->
+                    SettingsRow(label = name, sublabel = "Installed")
+                }
+                EmulatorHint(
+                    "PC games run through these rather than through an emulator profile. Import " +
+                        "them in Settings ▸ Library ▸ Library Manager, on the Windows card.",
+                )
+            }
+
             if (section == null || section == EmulatorSettingsSection.INSTALLED) {
                 val availableNonRetroArch = state.availableProfiles.filterNot(::isRetroArchProfile)
                 SettingsGroup("Available (Not Installed)")

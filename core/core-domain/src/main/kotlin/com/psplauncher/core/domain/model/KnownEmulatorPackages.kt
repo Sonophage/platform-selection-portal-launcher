@@ -12,12 +12,39 @@ package com.psplauncher.core.domain.model
  * spoof packages (AnTuTu, PUBG, ...) are too: they are the genuine names of real apps, so only
  * the launcher-owned names are listed.
  */
+/**
+ * The Windows/PC runtimes, and what to call them.
+ *
+ * Separate from the emulator launch catalog on purpose: these do not take a ROM. A PC game is
+ * imported into the Windows Memory Card and launched by the PC subsystem, and GameNative in
+ * particular carries an INT extra that [com.psplauncher.feature.launcher.KnownEmulator] cannot
+ * express at all. So they are emulators for the drawer's badge and for Settings ▸ Emulators to
+ * acknowledge, and nothing for the launch catalog.
+ *
+ * One definition: these package names were a bare list inside [KnownEmulatorPackages] with no
+ * names attached, so the Emulators screen had nothing to show and GameNative looked unsupported.
+ * Winlator is deliberately absent — it is a `family` prefix below, matching com.winlator.cmod and
+ * every other fork, which a flat map cannot do.
+ */
+object PcRuntimes {
+    val PACKAGES: Map<String, String> = mapOf(
+        "app.gamenative"      to "GameNative",
+        "gamehub.lite"        to "GameHub Lite",
+        "banner.hub"          to "BannerHub",
+        "com.xiaoji.egggame"  to "EggNS",
+        "org.force9.starboard" to "Starboard",
+    )
+
+    /** The Winlator family prefix, which [PACKAGES] cannot carry — every fork renames itself. */
+    const val WINLATOR_FAMILY = "com.winlator"
+}
+
 object KnownEmulatorPackages {
 
     // Matched as the package itself or any `<family>.` variant (com.retroarch.aarch64, ...).
     private val families = setOf(
         "com.retroarch",
-        "com.winlator",
+        PcRuntimes.WINLATOR_FAMILY,
         "xyz.aethersx2",
         "org.ppsspp",
     )
@@ -66,10 +93,7 @@ object KnownEmulatorPackages {
         "com.izzy2lost.x1box", "emu.x360.mobile", "aenu.ax360e", "aenu.ax360e.free",
         // Other systems
         "com.github.eka2l1", "org.scummvm.scummvm", "io.wip.pico8", "com.rfandango.haku_x",
-        // PC runtimes (Winlator is a family above)
-        "app.gamenative", "gamehub.lite", "banner.hub", "com.xiaoji.egggame",
-        "org.force9.starboard",
-    )
+    ) + PcRuntimes.PACKAGES.keys
 
     fun isEmulator(packageName: String): Boolean =
         packageName in packages ||

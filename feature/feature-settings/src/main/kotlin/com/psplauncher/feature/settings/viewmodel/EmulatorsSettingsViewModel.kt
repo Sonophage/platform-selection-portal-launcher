@@ -20,6 +20,7 @@ import com.psplauncher.core.data.repository.CoreInventory
 import com.psplauncher.core.data.repository.RetroArchLink
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.psplauncher.core.domain.model.PcRuntimes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -127,6 +128,10 @@ data class EmulatorsSettingsUiState(
     val retroArchCoreCount: Int? = null,
     val retroArchCores: List<String> = emptyList(),
     val isDetectingCores: Boolean = false,
+    // Installed Windows/PC runtimes, by display name. They take no ROM and have no profile to
+    // edit — the screen lists them so "PFP doesn't know about GameNative" stops being the
+    // reasonable conclusion from an Emulators screen that never mentions it.
+    val pcRuntimes: List<String> = emptyList(),
 )
 
 @HiltViewModel
@@ -148,6 +153,7 @@ class EmulatorsSettingsViewModel @Inject constructor(
     private var testIntent: Intent? = null
 
     init {
+        detectPcRuntimes()
         observeProfiles()
         refreshRetroArchStatus()
     }
@@ -202,6 +208,34 @@ class EmulatorsSettingsViewModel @Inject constructor(
             retroArchLink.clear()
             autoConfig.runOnStartup()
             _uiState.update { it.copy(retroArchLinked = false, retroArchCoreCount = null, retroArchCores = emptyList()) }
+        }
+    }
+
+    /**
+     * Which Windows/PC runtimes are actually installed.
+     *
+     * Read once, not observed: the set of installed apps does not change while a settings screen
+     * is open, and the alternative is a PackageManager query per recomposition.
+     *
+     * Winlator is matched by prefix because every fork renames itself (com.winlator.cmod and
+     * friends); the rest are exact. Both rules come from [PcRuntimes], which is also what tags
+     * these packages as emulators for the app drawer — one list, two readers.
+     */
+    private fun detectPcRuntimes() {
+        viewModelScope.launch {
+            val installed = withContext(Dispatchers.IO) {
+                runCatching {
+                    appContext.packageManager.getInstalledPackages(0).mapNotNull { pkg ->
+                        val name = pkg.packageName
+                        when {
+                            name == PcRuntimes.WINLATOR_FAMILY || name.startsWith("${PcRuntimes.WINLATOR_FAMILY}.") ->
+                                appContext.packageManager.getApplicationLabel(pkg.applicationInfo!!).toString()
+                            else -> PcRuntimes.PACKAGES[name]
+                        }
+                    }
+                }.getOrDefault(emptyList()).distinct().sorted()
+            }
+            _uiState.update { it.copy(pcRuntimes = installed) }
         }
     }
 
