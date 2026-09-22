@@ -5,6 +5,55 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-22
+
+### Added
+- **The launch ceremony.** Selecting a game, film, book or track spins a disc before the thing
+  opens, and the window transition is suppressed (`ActivityOptions.makeCustomAnimation(ctx, 0, 0)`
+  plus `FLAG_ACTIVITY_NO_ANIMATION`) so the launched app takes the screen without sliding PFP away
+  underneath it. The tail holds on black rather than revealing the XMB: the hand-off lands
+  somewhere in that hold, and black is the only thing that can be under a hand-off without being
+  the wrong thing. A launch that fails reveals the page immediately, so its error is never trapped
+  behind an invisible screen.
+
+- **Search activates instead of describing.** A game or film opened from search plays, rather than
+  landing on its detail page for a second press of A. Tracks already did. The detail page still
+  opens underneath and is what backing out returns to. Books and photos are unchanged — their
+  detail page *is* the reader and the viewer.
+
+- **Finished background work says so on screen.** Scans, imports and their failures draw a
+  notification pill in the top left for a few seconds. Progress does not: a music scan reports once
+  per file. The pill is deliberately not gated on `POST_NOTIFICATIONS`, which governs the system
+  notification and has nothing to do with drawing inside our own window.
+
+- **Music gains Artists and Albums**, and the Artists list splits a joint credit line using the
+  library's own evidence: a name becomes its own act when some track credits it alone, and
+  consecutive unproven fragments rejoin into the one name they are. So "Kendrick Lamar, SZA"
+  becomes two artists, "Tyler, The Creator, Kali Uchis" becomes two and not three, and
+  "Earth, Wind & Fire" stays one band. `album_artist` is scanned and migrated (schema 51); it is
+  not backfilled, so an un-rescanned library reads exactly as it did.
+
+### Changed
+- **The Recent shelf is the reference layout.** A thin status bar with the filters or the sort mode
+  centred in it, the art rail hidden until LEFT brings it back, page tabs as capsules, the toolbar
+  at half size, and Play moved out of the middle of the page to a spine down the right edge in the
+  focused item's own colour, with the word itself shimmering.
+
+- **ScreenScraper uses the account's thread allowance.** `maxthreads` was parsed and printed in
+  Settings and never acted on; the gate was a mutex with a comment that guessed the value. Threads
+  and request spacing are now enforced separately, so an account allowed more than one gets more
+  than one. Clamped to 1..8 — the field arrives from a server, and an allowance of "0" is not a
+  rate limit but a hang.
+
+- **Touch controls live in the footer** with the controller prompts, rather than competing with
+  them, and are selectable so both routes behave the same way.
+
+### Fixed
+- A quick music rescan reused rows wholesale and so never filled `album_artist`; the reuse check
+  now requires the column to be present.
+- The music browser's Sort pill read "Sort: Sort: Title".
+- A on a book, track or video row on the Recent shelf did nothing.
+
 ### Removed
 - **TheGamesDB is gone as a provider.** The API client, its key (storage, Settings field, first-run
   wizard card, debug credentials file entry and backup entry), its place in the capability table
