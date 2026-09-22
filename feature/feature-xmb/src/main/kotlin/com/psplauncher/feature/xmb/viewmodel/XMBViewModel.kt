@@ -2179,8 +2179,7 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    private fun currentCategory(): Category? =
-        _uiState.value.categories.getOrNull(_uiState.value.selectedCategoryIndex)
+    private fun currentCategory(): Category? = _uiState.value.currentCategoryOrNull()
 
     // App-populated categories are everything except Settings and Games.
     private fun isAppCategory(categoryId: String): Boolean =
@@ -2885,11 +2884,7 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    private fun categoryDisplayName(id: String): String = when (id) {
-        MUSIC_APPS_CATEGORY_ID -> "Music Apps"
-        VIDEO_APPS_CATEGORY_ID -> "Video Apps"
-        else -> _uiState.value.categories.firstOrNull { it.id == id }?.name ?: id
-    }
+    private fun categoryDisplayName(id: String): String = _uiState.value.categoryDisplayNameOf(id)
 
     // The location a GAME row is currently being shown in (for "Hide from here"), or null when the
     // current view doesn't support per-location hiding (the Games root).
@@ -6044,84 +6039,16 @@ class XMBViewModel @Inject constructor(
     }
 
     private fun openGameContextMenuCore(item: XMBItem, discCount: Int, onRecentShelf: Boolean = false) {
-        val inCollection = _uiState.value.selectedCollectionId != null
+        val state = _uiState.value
         val currentCat = currentCategory()
         val inGamingCategory = currentCat?.isGamingCategory == true
-        val inMissingBucket = _uiState.value.selectedPlatformId == MISSING_PLATFORM_ID
-
-        val items = buildList {
-            // The explicit path to the edit surface, essential when direct launch makes
-            // confirm skip straight into the game. Launch/title/note/scrape actions all live
-            // in Game Detail — the menu stays navigational.
-            add(XMBContextMenuItem("game_details", "View Game Details"))
-            // Multi-disc sets: pick which disc to boot — the only way to reach a non-primary
-            // disc when direct launch skips Game Detail's picker. Launches the chosen disc.
-            if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))
-            if (item.platformId == WINDOWS_PLATFORM_ID) {
-                // Writes this game's .pfpgame file so a fresh install can bring it back with its
-                // artwork (C18 task X.7). Offered on every PC game; the exporter explains a refusal.
-                add(XMBContextMenuItem("export_game", "Export Game"))
-            }
-            // No "Edit App Details" here: package-backed GAME entries (PC shortcuts, Android
-            // gaming apps) are games — art/title/note editing lives in Game Detail and the
-            // game rows below, never the slim standard-app editor.
-            add(XMBContextMenuItem(
-                id    = if (item.isFavorite) "unfavorite" else "favorite",
-                label = if (item.isFavorite) "Remove from Favorites" else "Add to Favorites",
-            ))
-            // Only for a game that is actually on the shelf: see openGameContextMenu.
-            if (onRecentShelf) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent"))
-            add(XMBContextMenuItem("add_to_collection", "Add to Collection"))
-            // Only offer removal when viewing the game from inside a collection.
-            if (inCollection) add(XMBContextMenuItem("remove_from_collection", "Remove from Collection"))
-            add(XMBContextMenuItem("manage_collections", "Manage Collections"))
-
-            // Gaming category options. Games in the Main Game category can only be COPIED into
-            // another category (never moved out or removed); custom gaming categories allow
-            // move / remove / pin. Move/Add only appear when a real destination exists — a
-            // custom gaming category other than the current one (Main Game is never a target).
-            if (inGamingCategory) {
-                val hasOtherCustomCategory = _uiState.value.categories.any {
-                    it.isGamingCategory && it.id != BuiltInCategory.GAMES && it.id != currentCat.id
-                }
-                if (currentCat.id == BuiltInCategory.GAMES) {
-                    if (hasOtherCustomCategory) add(XMBContextMenuItem("add_category", "Add to Category"))
-                } else {
-                    if (hasOtherCustomCategory) add(XMBContextMenuItem("move_category", "Move to Category"))
-                    add(XMBContextMenuItem("remove_category", "Remove from Category"))
-                    val pinned = item.subtitle == "Pinned"
-                    add(XMBContextMenuItem(
-                        if (pinned) "unpin_category" else "pin_category",
-                        if (pinned) "Unpin" else "Pin",
-                    ))
-                }
-            }
-
-            // Emulator choice only applies to ROM-backed games; package-backed gaming apps
-            // launch via their package/shortcut handle.
-            if (!item.isAndroidApp) add(XMBContextMenuItem("change_emulator", "Change Emulator"))
-            add(XMBContextMenuItem("icon_display", "Icon Display"))
-            add(XMBContextMenuItem("file_location",    "View File Location"))
-            // Per-location hide for the spot this game is shown in (recoverable in Hidden Items).
-            currentHideLocation()?.let { (_, _, label) -> add(XMBContextMenuItem("hide_here", "Hide from $label")) }
-            // Android-library apps are user-curated, so let the user remove one like any game,
-            // or demote it to a standard app without losing its art/collections.
-            if (inMissingBucket) {
-                // The plan's explicit user delete, and the only destructive action anywhere in the
-                // missing-ROM flow. Mechanically identical to "Remove from Library" (delete row,
-                // file untouched), but labelled for what it means here: this bucket is the entry's
-                // last visible trace, so removing it ends the line rather than dropping it from one
-                // view. Everything else is recoverable by putting the file back.
-                add(XMBContextMenuItem("remove_missing", "Remove permanently", isDestructive = true))
-            } else if (item.platformId == ANDROID_PLATFORM_ID && item.packageName != null && !inCollection) {
-                add(XMBContextMenuItem("unmark_game", "Unmark as Game"))
-                add(XMBContextMenuItem("remove_app", "Remove from Library", isDestructive = true))
-            } else if (!inCollection) {
-                // Every other game gets full delete too (confirmed first). Deleting a scanned ROM
-                // entry leaves the file untouched — the next scan re-discovers it.
-                add(XMBContextMenuItem("remove_game", "Remove from Library", isDestructive = true))
-            }
-        }
+        val items = gameContextMenuItems(
+            item = item,
+            state = state,
+            discCount = discCount,
+            onRecentShelf = onRecentShelf,
+            hideLocation = currentHideLocation(),
+        )
 
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
@@ -6168,25 +6095,8 @@ class XMBViewModel @Inject constructor(
     private fun openAppContextMenu(item: XMBItem, categoryIdOverride: String? = null) {
         val pkg = item.packageName ?: return
         val categoryId = categoryIdOverride ?: currentCategory()?.id
-        val items = buildList {
-            add(XMBContextMenuItem("launch",   "Launch"))
-            add(XMBContextMenuItem("edit_app", "Edit App Details"))
-            // Promotes the app into the Android Memory Card as a real game.
-            add(XMBContextMenuItem("mark_game", "Mark as Game"))
-            // Shortcut actions — these materialize a launch shortcut (a games-table row that
-            // references the app by package) so it can live in Favorites / Collections without
-            // duplicating the app's metadata. Works for every Android app, GameHub included.
-            add(XMBContextMenuItem("favorite",          "Add to Favorites"))
-            add(XMBContextMenuItem("add_to_collection", "Add to Collection"))
-            add(XMBContextMenuItem("move",     "Move to Category"))
-            add(XMBContextMenuItem("add",      "Add to Category"))
-            if (categoryId != null) add(XMBContextMenuItem("remove", "Remove from Category"))
-            if (categoryId != null) add(XMBContextMenuItem("pin",    "Pin to Category"))
-            // Per-location hide (recoverable in Settings ▸ Hidden Items) + global hide-everywhere.
-            if (categoryId != null) add(XMBContextMenuItem("hide_from_category", "Hide from ${categoryDisplayName(categoryId)}"))
-            add(XMBContextMenuItem("hide_everywhere", "Hide Everywhere"))
-            add(XMBContextMenuItem("rename",   "Rename Shortcut"))
-        }
+        val items = appContextMenuItems(_uiState.value, categoryId)
+
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
                 title           = item.title,
@@ -9316,9 +9226,9 @@ class XMBViewModel @Inject constructor(
         private const val ALL_GAMES_ITEM_ID = "all_games"
         private const val ALL_GAMES_PLATFORM_ID = "__all_games__"
         private const val FAVORITES_ITEM_ID = "favorites_folder"
-        private const val FAVORITES_PLATFORM_ID = "__favorites__"
+        internal const val FAVORITES_PLATFORM_ID = "__favorites__"
         private const val MISSING_ITEM_ID = "missing_folder"
-        private const val MISSING_PLATFORM_ID = "__missing__"
+        internal const val MISSING_PLATFORM_ID = "__missing__"
         private const val EMPTY_MISSING_ITEM_ID = "empty_missing"
         // Shown as each missing row's subtitle. Phrased around the scan rather than the file
         // ("File not found" alone reads as permanent) because dropping the file back reactivates it.
@@ -9327,13 +9237,13 @@ class XMBViewModel @Inject constructor(
         private const val ADD_GAMES_ITEM_ID = "add_games"
         private const val FIND_GAMES_ITEM_ID = "find_games"
         // Platform id whose library is built from installed apps (picker) instead of ROM scans.
-        private const val ANDROID_PLATFORM_ID = "android"
+        internal const val ANDROID_PLATFORM_ID = "android"
         // Sentinel platform for app rows that merely BACK a category app's artwork / favorite /
         // collection membership. They reference an app by package but are NOT in the Android
         // library, so they use this id instead of "android" to stay out of observeByPlatform.
         private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
         // Virtual card holding PC-launcher game imports (harvest / folder scan / add-by-ID).
-        private const val WINDOWS_PLATFORM_ID = "windows"
+        internal const val WINDOWS_PLATFORM_ID = "windows"
 
         // Music category synthetic rows / drill ids.
         private const val ADD_MUSIC_FOLDER_ITEM_ID = "add_music_folder"
@@ -9348,7 +9258,7 @@ class XMBViewModel @Inject constructor(
         // categories — not hidden pseudo-categories. Apps auto-populate from the classifier
         // (installed music / video / photo apps) and any manual picks live in the same real
         // category, so there is nothing hidden for users to tamper with in Category settings.
-        private const val MUSIC_APPS_CATEGORY_ID = "music"
+        internal const val MUSIC_APPS_CATEGORY_ID = "music"
         // Video root item ids.
         private const val ALL_VIDEOS_ITEM_ID = "all_videos"
         private const val VIDEO_COLLECTIONS_ITEM_ID = "video_collections"
@@ -9359,7 +9269,7 @@ class XMBViewModel @Inject constructor(
         private const val VIDEO_LIBRARIES_ITEM_ID = "video_libraries"
         private const val ADD_VIDEOS_ITEM_ID = "add_videos"
         private const val ADD_VIDEO_APPS_ITEM_ID = "add_video_apps"
-        private const val VIDEO_APPS_CATEGORY_ID = "videos"
+        internal const val VIDEO_APPS_CATEGORY_ID = "videos"
         // Photo root item ids.
         private const val ALL_PHOTOS_ITEM_ID = "all_photos"
         private const val CAMERA_ITEM_ID = "photo_camera"
