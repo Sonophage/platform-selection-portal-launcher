@@ -412,7 +412,17 @@ sealed interface MusicBrowserView {
     data object AllMusic : MusicBrowserView
     data object Playlists : MusicBrowserView
     data class Playlist(val id: Long, val name: String) : MusicBrowserView
+    // Artists and Albums list groups; Artist and Album list one group's tracks. [key] is what the
+    // tracks were grouped on, which is what the drill-in filters by -- never the display name.
+    data object Artists : MusicBrowserView
+    data object Albums : MusicBrowserView
+    data class Artist(val name: String, val key: String) : MusicBrowserView
+    data class Album(val name: String, val key: String) : MusicBrowserView
 }
+
+/** True for the two views that list groups rather than tracks. */
+internal val MusicBrowserView.listsGroups: Boolean
+    get() = this == MusicBrowserView.Artists || this == MusicBrowserView.Albums
 
 data class MusicBrowserState(
     val view: MusicBrowserView,
@@ -1020,7 +1030,11 @@ enum class XMBItemType {
     MISSING,
     MEMORY_CARD,
     COLLECTION,
-    MUSIC_FOLDER,
+    // An artist or an album in the music browser: a row standing for a set of tracks.
+    MUSIC_GROUP,
+    // The "Artists" and "Albums" section rows at the Music root.
+    MUSIC_ARTISTS,
+    MUSIC_ALBUMS,
     MUSIC_TRACK,
     PLAYLIST,
     VIDEO_LIBRARY,
@@ -1512,8 +1526,12 @@ data class XMBItem(
     val shortcutId: String? = null,
     // Captured legacy INSTALL_SHORTCUT launch intent (Intent.toUri); launched by parsing it.
     val launchIntentUri: String? = null,
-    // Music: folder id (on MUSIC_FOLDER rows) and the track's SAF uri + mime (on MUSIC_TRACK rows).
+    // Music: the owning folder's id, and the track's SAF uri + mime (all on MUSIC_TRACK rows).
     val musicFolderId: String? = null,
+    // What a MUSIC_GROUP row was grouped on -- see MusicGroup.key. Carried rather than parsed
+    // back out of the row id, because an artist called "Unknown" and the unknown-artist bucket
+    // would then be the same string.
+    val musicGroupKey: String? = null,
     val mediaUri: String? = null,
     val mimeType: String? = null,
     // Square album-cover art (on MUSIC_TRACK rows); a file:// uri cached during scan, may be null.
@@ -3796,9 +3814,13 @@ class XMBViewModel @Inject constructor(
     private fun openMusicBrowser(view: MusicBrowserView) {
         musicBrowserJob?.cancel()
         val title = when (view) {
-            MusicBrowserView.AllMusic    -> "Music"
+            MusicBrowserView.AllMusic    -> "Songs"
             MusicBrowserView.Playlists   -> "Playlists"
+            MusicBrowserView.Artists     -> "Artists"
+            MusicBrowserView.Albums      -> "Albums"
             is MusicBrowserView.Playlist -> view.name
+            is MusicBrowserView.Artist   -> view.name
+            is MusicBrowserView.Album    -> view.name
         }
         _uiState.update { it.copy(musicBrowser = MusicBrowserState(view = view, title = title)) }
         musicBrowserJob = viewModelScope.launch {
@@ -3811,6 +3833,21 @@ class XMBViewModel @Inject constructor(
                 }
                 MusicBrowserView.Playlists -> musicRepository.observePlaylists().collect { playlists ->
                     browserRawPlaylists = playlists; rebuildBrowserPlaylistRows()
+                }
+                // Artists and Albums are the same query as All Music, grouped. No second DAO
+                // method: the browser already holds every track, and a phone-sized library
+                // groups in memory faster than it would round-trip the database.
+                MusicBrowserView.Artists, MusicBrowserView.Albums ->
+                    musicRepository.observeAllTracks().collect { tracks ->
+                        browserRawTracks = tracks; rebuildBrowserGroupRows()
+                    }
+                is MusicBrowserView.Artist -> musicRepository.observeAllTracks().collect { tracks ->
+                    browserRawTracks = tracks.filter { it.artist.musicGroupKey() == view.key }
+                    rebuildBrowserTrackRows()
+                }
+                is MusicBrowserView.Album -> musicRepository.observeAllTracks().collect { tracks ->
+                    browserRawTracks = tracks.filter { it.album.musicGroupKey() == view.key }
+                    rebuildBrowserTrackRows()
                 }
             }
         }
@@ -3843,6 +3880,41 @@ class XMBViewModel @Inject constructor(
         )) }
     }
 
+    /**
+     * The Artists / Albums list: one row per group, filtered by the search box on the group name.
+     *
+     * No sort pill. The sort modes are Title / Artist / Album / Date Added, none of which means
+     * anything to a list that is already one row per artist, so [sortLabel] stays null and the
+     * pill and the X prompt disappear with it.
+     */
+    private fun rebuildBrowserGroupRows() {
+        val state = _uiState.value.musicBrowser ?: return
+        val q = state.query.trim().lowercase()
+        val prefix = if (state.view == MusicBrowserView.Artists) "art" else "alb"
+        val groups = if (state.view == MusicBrowserView.Artists) browserRawTracks.artistGroups()
+                     else browserRawTracks.albumGroups()
+        val filtered = if (q.isBlank()) groups else groups.filter { it.name.lowercase().contains(q) }
+        val rows = when {
+            filtered.isNotEmpty() -> filtered.map { it.toBrowserItem(prefix) }
+            q.isNotBlank()        -> listOf(browserNoResultsItem())
+            else                  -> listOf(emptyAllMusicItem())
+        }
+        _uiState.update { it.copy(musicBrowser = it.musicBrowser?.copy(
+            rows = rows,
+            selectedIndex = state.selectedIndex.coerceIn(0, (rows.size - 1).coerceAtLeast(0)),
+            sortLabel = null,
+        )) }
+    }
+
+    private fun MusicGroup.toBrowserItem(prefix: String): XMBItem = XMBItem(
+        id            = "mg_${prefix}_$key",
+        title         = name,
+        subtitle      = subtitle,
+        coverUri      = artUri,
+        musicGroupKey = key,
+        type          = XMBItemType.MUSIC_GROUP,
+    )
+
     private fun rebuildBrowserPlaylistRows() {
         val state = _uiState.value.musicBrowser ?: return
         val q = state.query.trim().lowercase()
@@ -3868,7 +3940,11 @@ class XMBViewModel @Inject constructor(
             query = query, selectedIndex = 0,
             scrollToTopToken = state.scrollToTopToken + 1,
         )) }
-        if (state.view is MusicBrowserView.Playlists) rebuildBrowserPlaylistRows() else rebuildBrowserTrackRows()
+        when {
+            state.view is MusicBrowserView.Playlists -> rebuildBrowserPlaylistRows()
+            state.view.listsGroups -> rebuildBrowserGroupRows()
+            else -> rebuildBrowserTrackRows()
+        }
     }
 
     // ── Library search ──────────────────────────────────────────────────────────
@@ -4142,6 +4218,14 @@ class XMBViewModel @Inject constructor(
                 menuSound.play(MenuSound.SELECT)
                 openMusicBrowser(MusicBrowserView.Playlist(item.playlistId, item.title))
             }
+            item.type == XMBItemType.MUSIC_GROUP && item.musicGroupKey != null -> {
+                menuSound.play(MenuSound.SELECT)
+                openMusicBrowser(
+                    if (_uiState.value.musicBrowser?.view == MusicBrowserView.Artists)
+                        MusicBrowserView.Artist(item.title, item.musicGroupKey)
+                    else MusicBrowserView.Album(item.title, item.musicGroupKey)
+                )
+            }
             item.type == XMBItemType.MUSIC_TRACK -> { menuSound.play(MenuSound.SELECT); openMusicPlayerForItem(item) }
         }
     }
@@ -4167,8 +4251,10 @@ class XMBViewModel @Inject constructor(
         val b = _uiState.value.musicBrowser ?: return
         menuSound.play(MenuSound.BACK)
         when (b.view) {
-            // A playlist's tracks back out to the playlists list; everything else closes the browser.
+            // A drilled-in view backs out to the list it came from; everything else closes.
             is MusicBrowserView.Playlist -> openMusicBrowser(MusicBrowserView.Playlists)
+            is MusicBrowserView.Artist -> openMusicBrowser(MusicBrowserView.Artists)
+            is MusicBrowserView.Album -> openMusicBrowser(MusicBrowserView.Albums)
             else -> closeMusicBrowser()
         }
     }
@@ -4183,6 +4269,8 @@ class XMBViewModel @Inject constructor(
         if (currentCategory()?.id == BuiltInCategory.MUSIC && _uiState.value.musicNav == MusicNav.Root) {
             val targetId = when (view) {
                 is MusicBrowserView.Playlists, is MusicBrowserView.Playlist -> PLAYLISTS_ITEM_ID
+                is MusicBrowserView.Artists, is MusicBrowserView.Artist -> MUSIC_ARTISTS_ITEM_ID
+                is MusicBrowserView.Albums, is MusicBrowserView.Album -> MUSIC_ALBUMS_ITEM_ID
                 else -> ALL_MUSIC_ITEM_ID
             }
             val idx = _uiState.value.currentItems.indexOfFirst { it.id == targetId }
@@ -4222,6 +4310,8 @@ class XMBViewModel @Inject constructor(
         // "Music" and "Playlist" open the fullscreen, searchable browser instead of the inline list.
         item.id == PLAYLISTS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openMusicBrowser(MusicBrowserView.Playlists); true }
         item.id == ALL_MUSIC_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openMusicBrowser(MusicBrowserView.AllMusic); true }
+        item.id == MUSIC_ARTISTS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openMusicBrowser(MusicBrowserView.Artists); true }
+        item.id == MUSIC_ALBUMS_ITEM_ID -> { menuSound.play(MenuSound.SELECT); openMusicBrowser(MusicBrowserView.Albums); true }
         item.id == ADD_MUSIC_FOLDER_ITEM_ID -> {
             menuSound.play(MenuSound.SELECT)
             _uiState.update { it.copy(activeSettingsScreen = "settings_music") }
@@ -4609,7 +4699,7 @@ class XMBViewModel @Inject constructor(
     private fun cycleSort() {
         // The fullscreen music browser sorts its own track views (not the playlists list).
         _uiState.value.musicBrowser?.let { browser ->
-            if (browser.view is MusicBrowserView.Playlists) return
+            if (browser.view is MusicBrowserView.Playlists || browser.view.listsGroups) return
             val next = MUSIC_SORTS[(MUSIC_SORTS.indexOf(_uiState.value.musicSortMode).coerceAtLeast(0) + 1) % MUSIC_SORTS.size]
             menuSound.play(MenuSound.SYSTEM_BROWSE)
             _uiState.update { it.copy(
@@ -8978,6 +9068,8 @@ class XMBViewModel @Inject constructor(
         internal const val ALL_MUSIC_ITEM_ID = "all_music"
         internal const val NOW_PLAYING_ITEM_ID = "now_playing"
         internal const val PLAYLISTS_ITEM_ID = "playlists"
+        internal const val MUSIC_ARTISTS_ITEM_ID = "music_artists"
+        internal const val MUSIC_ALBUMS_ITEM_ID = "music_albums"
         private const val ADD_MUSIC_APPS_ITEM_ID = "add_music_apps"
         private const val CREATE_PLAYLIST_ITEM_ID = "create_playlist"
         private const val ADD_TRACKS_ITEM_ID = "add_tracks"

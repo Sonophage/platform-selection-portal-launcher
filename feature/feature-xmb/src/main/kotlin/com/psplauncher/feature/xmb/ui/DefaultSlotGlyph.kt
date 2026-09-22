@@ -3,6 +3,8 @@ package com.psplauncher.feature.xmb.ui
 import androidx.annotation.DrawableRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
@@ -125,6 +127,8 @@ private val ITEM_VECTORS: Map<String, ImageVector> = mapOf(
     "item_camera" to Icons.Filled.PhotoCamera,
     "item_search" to Icons.Filled.Search,
     "item_music_track" to Icons.Filled.MusicNote,
+    "item_music_artists" to Icons.Filled.Person,
+    "item_music_albums" to Icons.Filled.Album,
     "item_playlist" to Icons.AutoMirrored.Filled.QueueMusic,
 )
 

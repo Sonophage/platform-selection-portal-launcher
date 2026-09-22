@@ -48,9 +48,10 @@ class MediaColumnsTest {
     // ── Music ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `music root is playlist then all music, in that order`() {
+    fun `music root is songs, artists, albums, playlists, in that order`() {
+        // Everything first, then the two ways of cutting it, then the lists you build yourself.
         assertEquals(
-            listOf("playlists", "all_music"),
+            listOf("all_music", "music_artists", "music_albums", "playlists"),
             ids(XMBUiState().musicRootSections()),
         )
     }
@@ -81,9 +82,9 @@ class MediaColumnsTest {
     // ── Video ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `video root is collections, libraries, then all videos`() {
+    fun `video root leads with every video, the same order music reads in`() {
         assertEquals(
-            listOf("video_collections", "video_libraries", "all_videos"),
+            listOf("all_videos", "video_collections", "video_libraries"),
             ids(XMBUiState().videoRootSections()),
         )
     }
@@ -106,9 +107,9 @@ class MediaColumnsTest {
     }
 
     @Test
-    fun `photo root is albums then all photos once the camera is out of the way`() {
+    fun `photo root is all photos then albums once the camera is out of the way`() {
         assertEquals(
-            listOf("photo_albums", "all_photos"),
+            listOf("all_photos", "photo_albums"),
             ids(XMBUiState().photoRootSections(false)),
         )
     }
@@ -168,5 +169,100 @@ class MediaColumnsTest {
         // The submenu's contents, minus the "Add " every one of them starts with -- the row
         // already says Add, and repeating it makes the subtitle read as a stutter.
         assertEquals("Music Folder  ·  Music Apps", collapsed.single().subtitle)
+    }
+
+    // ── Artists and Albums ────────────────────────────────────────────────
+
+    private fun track(
+        id: String, title: String, artist: String? = null, album: String? = null,
+        artUri: String? = null,
+    ) = MusicTrack(
+        id = id, folderId = "f1", uri = "content://$id", displayName = "$id.mp3",
+        title = title, artist = artist, album = album, artUri = artUri,
+    )
+
+    @Test
+    fun `an artist is one row however many tracks it has`() {
+        val groups = listOf(
+            track("1", "Aerith's Theme", artist = "Nobuo Uematsu"),
+            track("2", "One-Winged Angel", artist = "Nobuo Uematsu"),
+            track("3", "Snake Eater", artist = "Norihiko Hibino"),
+        ).artistGroups()
+        assertEquals(listOf("Nobuo Uematsu", "Norihiko Hibino"), groups.map { it.name })
+        assertEquals(listOf(2, 1), groups.map { it.trackCount })
+        assertEquals("2 tracks", groups.first().subtitle)
+    }
+
+    @Test
+    fun `case and whitespace do not split an artist in two`() {
+        // Tags come from whatever wrote the file. "The Beatles" and "the beatles " are one band,
+        // and two rows for them is the library reporting a difference the listener does not have.
+        val groups = listOf(
+            track("1", "Come Together", artist = "The Beatles"),
+            track("2", "Something", artist = " the beatles "),
+        ).artistGroups()
+        assertEquals(1, groups.size)
+        assertEquals("The Beatles", groups.single().name)   // the first spelling wins
+        assertEquals(2, groups.single().trackCount)
+    }
+
+    @Test
+    fun `a missing tag, a blank one and an empty one are the same bucket, and it sorts last`() {
+        val groups = listOf(
+            track("1", "Untitled"),
+            track("2", "Untitled II", artist = ""),
+            track("3", "Untitled III", artist = "   "),
+            track("4", "Zoo Station", artist = "U2"),
+        ).artistGroups()
+        assertEquals(listOf("U2", "Unknown Artist"), groups.map { it.name })
+        assertEquals(3, groups.last().trackCount)
+    }
+
+    @Test
+    fun `an album keeps its compilation together and says so`() {
+        // Grouping on album AND artist would turn one compilation into one row per artist. The
+        // subtitle is what makes the merge legible.
+        val groups = listOf(
+            track("1", "Song A", artist = "Artist A", album = "Now That's What I Call Music"),
+            track("2", "Song B", artist = "Artist B", album = "Now That's What I Call Music"),
+            track("3", "Song C", artist = "Solo", album = "Just Mine"),
+        ).albumGroups()
+        assertEquals(listOf("Just Mine", "Now That's What I Call Music"), groups.map { it.name })
+        assertEquals("Solo  ·  1 track", groups.first().subtitle)
+        assertEquals("Various Artists  ·  2 tracks", groups.last().subtitle)
+    }
+
+    @Test
+    fun `a group carries the first cover any of its tracks has`() {
+        // The row is the only thing standing for the album, so it borrows art from whichever
+        // track was tagged with it rather than showing a placeholder because track one was not.
+        val groups = listOf(
+            track("1", "Intro", album = "Kid A"),
+            track("2", "Idioteque", album = "Kid A", artUri = "file:///art/kida.png"),
+        ).albumGroups()
+        assertEquals("file:///art/kida.png", groups.single().artUri)
+    }
+
+    @Test
+    fun `the group key is what the drill-in filters by, not the display name`() {
+        // The browser re-reads every track and keeps the ones matching the key. If the key were
+        // the display name, the filter would miss every differently-cased copy of the tag.
+        val group = listOf(
+            track("1", "Come Together", artist = "The Beatles"),
+            track("2", "Something", artist = "the beatles"),
+        ).artistGroups().single()
+        assertEquals("the beatles", group.key)
+        val tracks = listOf(
+            track("1", "Come Together", artist = "The Beatles"),
+            track("2", "Something", artist = "the beatles"),
+            track("3", "Kashmir", artist = "Led Zeppelin"),
+        ).filter { it.artist.musicGroupKey() == group.key }
+        assertEquals(listOf("1", "2"), tracks.map { it.id })
+    }
+
+    @Test
+    fun `no tracks means no groups at all`() {
+        assertEquals(emptyList<MusicGroup>(), emptyList<MusicTrack>().artistGroups())
+        assertEquals(emptyList<MusicGroup>(), emptyList<MusicTrack>().albumGroups())
     }
 }

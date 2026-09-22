@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Collections
@@ -54,6 +55,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -343,6 +345,8 @@ private fun SiblingIcon(item: XMBItem, selected: Boolean, solidUnfocusedIcons: B
         XMBItemType.PHOTO_FOLDER    -> Icons.Filled.Folder
         XMBItemType.PHOTO_ALBUMS    -> Icons.Filled.PhotoLibrary
         XMBItemType.SEARCH          -> Icons.Filled.Search
+        XMBItemType.MUSIC_ARTISTS   -> Icons.Filled.Person
+        XMBItemType.MUSIC_ALBUMS    -> Icons.Filled.Album
         // The video "Playlists" section row (PLAYLIST type with no playlistId) uses a playlist glyph.
         XMBItemType.PLAYLIST        -> Icons.AutoMirrored.Filled.QueueMusic
         else                        -> null
@@ -407,6 +411,8 @@ internal fun itemSlotKeyFor(type: XMBItemType): String? = when (type) {
     XMBItemType.CAMERA -> "item_camera"
     XMBItemType.SEARCH -> "item_search"
     XMBItemType.MUSIC_TRACK -> "item_music_track"
+    XMBItemType.MUSIC_ARTISTS -> "item_music_artists"
+    XMBItemType.MUSIC_ALBUMS -> "item_music_albums"
     XMBItemType.PLAYLIST -> "item_playlist"
     else -> null
 }
@@ -766,6 +772,17 @@ private fun XmbItemLeadingIcon(
                         )
                     }
                 }
+            }
+        }
+        // The Music root's "Artists" and "Albums" section rows.
+        item.type == XMBItemType.MUSIC_ARTISTS -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Person, null, iconTint, Modifier.size(48.dp))
+            }
+        }
+        item.type == XMBItemType.MUSIC_ALBUMS -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                ThemedGlyph(itemSlotKeyFor(item.type) ?: "", Icons.Filled.Album, null, iconTint, Modifier.size(48.dp))
             }
         }
         // Playlist rows (and the static "Playlist" item) use a queue-music glyph.

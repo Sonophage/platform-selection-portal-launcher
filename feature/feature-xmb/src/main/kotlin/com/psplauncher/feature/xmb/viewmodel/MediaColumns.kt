@@ -7,8 +7,11 @@ import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.ALL_PHOTOS_I
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.ALL_VIDEOS_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.BOOK_SERIES_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.BOOK_SHELVES_ITEM_ID
+import com.psplauncher.core.domain.model.MusicTrack
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.CAMERA_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.MEMORY_CARD_ASSET_URI
+import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.MUSIC_ALBUMS_ITEM_ID
+import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.MUSIC_ARTISTS_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.NOW_PLAYING_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.OPEN_READER_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.PHOTO_ALBUMS_ITEM_ID
@@ -55,23 +58,41 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
                 )
             )
         }
-        add(
-            XMBItem(
-                id       = PLAYLISTS_ITEM_ID,
-                title    = "Playlist",
-                subtitle = "Build and play your own track lists",
-                type     = XMBItemType.PLAYLIST,
-            )
-        )
-        // All scanned music collapses into one memory-card item (like All Games). Uses the
-        // physical-media "_default.png" memory-card art rather than the blank console fallback.
+        // Songs leads: every scanned track, collapsed into one memory-card item (like All
+        // Games), wearing the physical-media "_default.png" art rather than the blank console
+        // fallback. Artists and Albums are the same tracks grouped, so they follow it rather
+        // than the other way round -- the whole library first, then two ways of cutting it.
         add(
             XMBItem(
                 id       = ALL_MUSIC_ITEM_ID,
-                title    = "Music",
+                title    = "Songs",
                 subtitle = countLabel(totalTracks, "track", "tracks"),
                 coverUri = MEMORY_CARD_ASSET_URI,
                 type     = XMBItemType.MEMORY_CARD,
+            )
+        )
+        add(
+            XMBItem(
+                id       = MUSIC_ARTISTS_ITEM_ID,
+                title    = "Artists",
+                subtitle = "Browse by who made it",
+                type     = XMBItemType.MUSIC_ARTISTS,
+            )
+        )
+        add(
+            XMBItem(
+                id       = MUSIC_ALBUMS_ITEM_ID,
+                title    = "Albums",
+                subtitle = "Browse by release",
+                type     = XMBItemType.MUSIC_ALBUMS,
+            )
+        )
+        add(
+            XMBItem(
+                id       = PLAYLISTS_ITEM_ID,
+                title    = "Playlists",
+                subtitle = "Build and play your own track lists",
+                type     = XMBItemType.PLAYLIST,
             )
         )
     }
@@ -86,6 +107,16 @@ internal fun XMBUiState.videoRootSections(): List<XMBItem> {
     val libraries = videoLibraries
     val totalVideos = libraries.sumOf { it.videoCount }
     return buildList {
+        // Everything first, then the ways of narrowing it -- the same order Music reads in.
+        add(
+            XMBItem(
+                id       = ALL_VIDEOS_ITEM_ID,
+                title    = "Videos",
+                subtitle = countLabel(totalVideos, "video", "videos"),
+                coverUri = MEMORY_CARD_ASSET_URI,
+                type     = XMBItemType.MEMORY_CARD,
+            )
+        )
         // The three curated views collapse into one "Collections" entry (drills into
         // Recently Watched / Favorites / Playlists) to keep the Video root uncluttered.
         add(
@@ -102,15 +133,6 @@ internal fun XMBUiState.videoRootSections(): List<XMBItem> {
                 title    = "Video Libraries",
                 subtitle = countLabel(libraries.size, "library", "libraries"),
                 type     = XMBItemType.VIDEO_LIBRARY,
-            )
-        )
-        add(
-            XMBItem(
-                id       = ALL_VIDEOS_ITEM_ID,
-                title    = "Videos",
-                subtitle = countLabel(totalVideos, "video", "videos"),
-                coverUri = MEMORY_CARD_ASSET_URI,
-                type     = XMBItemType.MEMORY_CARD,
             )
         )
     }
@@ -137,14 +159,8 @@ internal fun XMBUiState.photoRootSections(cameraAvailable: Boolean): List<XMBIte
                 )
             )
         }
-        add(
-            XMBItem(
-                id       = PHOTO_ALBUMS_ITEM_ID,
-                title    = "Albums",
-                subtitle = countLabel(libraries.size, "album", "albums"),
-                type     = XMBItemType.PHOTO_ALBUMS,
-            )
-        )
+        // Camera stays at the top -- it is the one row here that is an action rather than a
+        // view of the library. Then everything, then the way of narrowing it.
         add(
             XMBItem(
                 id       = ALL_PHOTOS_ITEM_ID,
@@ -152,6 +168,14 @@ internal fun XMBUiState.photoRootSections(cameraAvailable: Boolean): List<XMBIte
                 subtitle = countLabel(totalPhotos, "photo", "photos"),
                 coverUri = MEMORY_CARD_ASSET_URI,
                 type     = XMBItemType.MEMORY_CARD,
+            )
+        )
+        add(
+            XMBItem(
+                id       = PHOTO_ALBUMS_ITEM_ID,
+                title    = "Albums",
+                subtitle = countLabel(libraries.size, "album", "albums"),
+                type     = XMBItemType.PHOTO_ALBUMS,
             )
         )
     }
@@ -235,3 +259,74 @@ internal fun collapseAddRows(rows: List<XMBItem>): List<XMBItem> = when {
         )
     )
 }
+
+// ── Artists and Albums ────────────────────────────────────────────────────────
+
+/**
+ * An artist or an album, as one row.
+ *
+ * [key] is what the tracks were grouped on -- trimmed and lowercased -- and is what the drill-in
+ * filters by. [name] is what the row says, taken from the first track in the group, so "The
+ * Beatles" and "the beatles" are one artist spelled the way the first file spells it.
+ */
+data class MusicGroup(
+    val key: String,
+    val name: String,
+    val subtitle: String,
+    val trackCount: Int,
+    val artUri: String?,
+)
+
+/**
+ * The grouping value for a tag, with every way of saying "absent" folded into one bucket.
+ *
+ * A missing tag, an empty one and one that is only spaces are the same thing to a listener, and
+ * three separate "Unknown Artist" rows is what happens if they are not.
+ */
+internal fun String?.musicGroupKey(): String = this?.trim()?.lowercase().orEmpty()
+
+/** Every artist in a set of tracks, alphabetical, each carrying the first cover it can find. */
+internal fun List<MusicTrack>.artistGroups(): List<MusicGroup> =
+    musicGroups({ it.artist }, "Unknown Artist") { tracks ->
+        countLabel(tracks.size, "track", "tracks")
+    }
+
+/**
+ * Every album in a set of tracks, alphabetical, subtitled with who is on it.
+ *
+ * Grouped on the album name alone, not on name-and-artist. A compilation is one album by a dozen
+ * artists, and keying on both would shatter it into a dozen rows of one track each; the cost is
+ * that two different records both called "Greatest Hits" merge, which the "Various Artists"
+ * subtitle at least makes visible.
+ */
+internal fun List<MusicTrack>.albumGroups(): List<MusicGroup> =
+    musicGroups({ it.album }, "Unknown Album") { tracks ->
+        val artists = tracks.mapNotNull { it.artist?.trim()?.ifBlank { null } }.distinct()
+        listOfNotNull(
+            when (artists.size) {
+                0    -> null
+                1    -> artists.single()
+                else -> "Various Artists"
+            },
+            countLabel(tracks.size, "track", "tracks"),
+        ).joinToString("  ·  ")
+    }
+
+private fun List<MusicTrack>.musicGroups(
+    tag: (MusicTrack) -> String?,
+    unknownName: String,
+    subtitle: (List<MusicTrack>) -> String,
+): List<MusicGroup> =
+    groupBy { tag(it).musicGroupKey() }
+        .map { (key, tracks) ->
+            MusicGroup(
+                key = key,
+                name = tracks.firstNotNullOfOrNull { tag(it)?.trim()?.ifBlank { null } } ?: unknownName,
+                subtitle = subtitle(tracks),
+                trackCount = tracks.size,
+                artUri = tracks.firstNotNullOfOrNull { it.artUri },
+            )
+        }
+        // The unknown bucket sorts last whatever it is called: it is not a name, and an "Unknown
+        // Artist" row landing between Tom Waits and Townes Van Zandt reads as one.
+        .sortedWith(compareBy({ it.key.isEmpty() }, { it.name.lowercase() }))

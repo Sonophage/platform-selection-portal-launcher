@@ -85,6 +85,8 @@ object IconSlots {
         item("item_camera", "Camera"),
         item("item_search", "Search"),
         item("item_music_track", "Music track"),
+        item("item_music_artists", "Artists"),
+        item("item_music_albums", "Albums"),
         item("item_playlist", "Playlist"),
 
 

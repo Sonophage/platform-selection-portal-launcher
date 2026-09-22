@@ -125,7 +125,9 @@ fun MusicBrowserScreen(
                         Text(
                             when (state.view) {
                                 is com.psplauncher.feature.xmb.viewmodel.MusicBrowserView.Playlist -> "Music  ›  Playlists"
-                                com.psplauncher.feature.xmb.viewmodel.MusicBrowserView.Playlists -> "Music"
+                                is com.psplauncher.feature.xmb.viewmodel.MusicBrowserView.Artist -> "Music  ›  Artists"
+                                is com.psplauncher.feature.xmb.viewmodel.MusicBrowserView.Album -> "Music  ›  Albums"
+                                com.psplauncher.feature.xmb.viewmodel.MusicBrowserView.Playlists, com.psplauncher.feature.xmb.viewmodel.MusicBrowserView.Artists, com.psplauncher.feature.xmb.viewmodel.MusicBrowserView.Albums -> "Music"
                                 com.psplauncher.feature.xmb.viewmodel.MusicBrowserView.AllMusic -> "All Tracks"
                             },
                             color = SecondaryText, fontSize = 12.sp,
