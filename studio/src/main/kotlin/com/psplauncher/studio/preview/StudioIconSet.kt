@@ -46,16 +46,23 @@ import androidx.compose.ui.res.painterResource
  */
 object StudioIconSet {
 
-    /** Classpath resources for the raster/XML-vector slots. StudioIconSetTest covers keys. */
+    /**
+     * Classpath resources for the raster/XML-vector slots. StudioIconSetTest covers keys.
+     *
+     * The catbar_* glyphs are copies of the launcher's, and the Studio previews the same bar the
+     * launcher draws — so when that set is redrawn, these have to be replaced in the same commit
+     * or the Studio previews a bar the device does not have. They became vectors when the set was
+     * redrawn as one matched family; the PNGs they replaced are gone from both sides.
+     */
     internal val RESOURCE_SLOTS: Map<String, String> = mapOf(
-        "catbar_games" to "xmb/catbar_games.png",
-        "catbar_music" to "xmb/catbar_music.png",
-        "catbar_video" to "xmb/catbar_video.png",
-        "catbar_photos" to "xmb/catbar_photos.png",
-        "catbar_settings" to "xmb/catbar_settings.png",
-        "catbar_network" to "xmb/catbar_network.png",
+        "catbar_games" to "xmb/catbar_games.xml",
+        "catbar_music" to "xmb/catbar_music.xml",
+        "catbar_video" to "xmb/catbar_video.xml",
+        "catbar_photos" to "xmb/catbar_photos.xml",
+        "catbar_settings" to "xmb/catbar_settings.xml",
+        "catbar_network" to "xmb/catbar_network.xml",
         "catbar_appstore" to "xmb/catbar_appstore.png",
-        "catbar_favorites" to "xmb/catbar_favorites.png",
+        "catbar_favorites" to "xmb/catbar_favorites.xml",
         "catbar_library" to "xmb/catbar_library.xml",
         // Default memory-card art (launcher: systems/physical-media/_default.png) — one
         // asset, four semantic slots so themes can diverge per category.
