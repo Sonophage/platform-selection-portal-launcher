@@ -45,8 +45,7 @@ fun LogsSettingsScreen(
 
     Box(modifier = modifier) {
 
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Logs",
         onBack   = onBack,
         modifier = Modifier.fillMaxSize(),

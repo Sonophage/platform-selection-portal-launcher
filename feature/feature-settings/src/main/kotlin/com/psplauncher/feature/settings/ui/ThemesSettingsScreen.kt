@@ -175,8 +175,7 @@ private fun ThemesSettingsContent(
     }
 
     Box(modifier = modifier) {
-        SettingsScaffold(
-            title    = "Settings",
+        SettingsPageScaffold(
             subtitle = "Themes",
             onBack   = onBack,
             modifier = Modifier.fillMaxSize(),

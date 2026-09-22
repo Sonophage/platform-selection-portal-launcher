@@ -159,8 +159,7 @@ fun DisplaySettingsScreen(
         )
     }
 
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         // The header names the entry point, not the file. Five rows open this one screen, and a
         // breadcrumb reading "Display" for the row you picked called Layout is its own small lie.
         subtitle = when (section) {
@@ -192,7 +191,7 @@ fun DisplaySettingsScreen(
                     GamepadAction.BACK -> pspConfirmFocus = null
                     else -> Unit
                 }
-                return@SettingsScaffold true
+                return@SettingsPageScaffold true
             }
             // Fullscreen wallpaper preview swallows Confirm/Back — either dismisses it, same
             // as tapping, and the focused row underneath can never be activated through it.
@@ -200,11 +199,11 @@ fun DisplaySettingsScreen(
                 if (action == GamepadAction.SELECT || action == GamepadAction.BACK) {
                     viewModel.hideWallpaperPreview()
                 }
-                return@SettingsScaffold true
+                return@SettingsPageScaffold true
             }
             // North resets the focused media row, west previews it — the same physical buttons
             // doing the same jobs as on the Sound screen. Only consumed over a media row.
-            val slot = focusedSlot ?: return@SettingsScaffold false
+            val slot = focusedSlot ?: return@SettingsPageScaffold false
             when {
                 MediaRowShortcuts.isNorthFace(action, state.xyLayout) && slot.isAssignedIn(state) -> {
                     // Advertised only while the row has a custom assignment, so this is consumed
@@ -217,7 +216,7 @@ fun DisplaySettingsScreen(
                     when (slot) {
                         UiMediaSlot.BOOT_VIDEO -> onPreviewBootSequence()
                         UiMediaSlot.GAMEBOOT_VIDEO -> onPreviewGameBoot()
-                        else -> return@SettingsScaffold false
+                        else -> return@SettingsPageScaffold false
                     }
                     true
                 }

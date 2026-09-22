@@ -32,8 +32,7 @@ fun BackupSettingsScreen(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? -> uri?.let { viewModel.setBackupFolder(it) } }
 
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Backup & Restore",
         onBack   = onBack,
         modifier = modifier,

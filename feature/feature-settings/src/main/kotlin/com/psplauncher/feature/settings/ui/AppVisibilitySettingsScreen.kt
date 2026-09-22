@@ -38,8 +38,7 @@ fun AppVisibilitySettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Hidden Items",
         onBack   = onBack,
         modifier = modifier,
@@ -48,7 +47,7 @@ fun AppVisibilitySettingsScreen(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = SettingsAccent)
             }
-            return@SettingsScaffold
+            return@SettingsPageScaffold
         }
 
         val scrollState = rememberScrollState()

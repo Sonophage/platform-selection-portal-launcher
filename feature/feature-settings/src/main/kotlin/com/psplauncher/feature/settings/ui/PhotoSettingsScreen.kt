@@ -82,8 +82,7 @@ fun PhotoSettingsContent(
     onClearCache: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Photo",
         onBack   = onBack,
         modifier = modifier,

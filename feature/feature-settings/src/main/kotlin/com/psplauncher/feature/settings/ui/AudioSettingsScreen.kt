@@ -104,15 +104,14 @@ fun AudioSettingsScreen(
     var focusedSlot by remember { mutableStateOf<UiMediaSlot?>(null) }
 
     Box(modifier = modifier) {
-        SettingsScaffold(
-            title = "Settings",
+        SettingsPageScaffold(
             subtitle = "Sound",
             onBack = onBack,
             helperFooterItems = focusedSlot?.let { slot ->
                 MediaRowShortcuts.promptsFor(state.xyLayout, isAssigned = slot in state.assignedSlots)
             } ?: emptyList(),
             onInterceptAction = { action ->
-                val slot = focusedSlot ?: return@SettingsScaffold false
+                val slot = focusedSlot ?: return@SettingsPageScaffold false
                 when {
                     MediaRowShortcuts.isNorthFace(action, state.xyLayout) &&
                         slot in state.assignedSlots -> {

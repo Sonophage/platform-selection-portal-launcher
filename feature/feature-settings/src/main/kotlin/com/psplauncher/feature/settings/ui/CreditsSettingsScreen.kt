@@ -29,8 +29,7 @@ fun CreditsSettingsScreen(
     val scope = rememberCoroutineScope()
     val stepPx = with(LocalDensity.current) { 120.dp.toPx() }
 
-    SettingsScaffold(
-        title = "Settings",
+    SettingsPageScaffold(
         subtitle = "Credits",
         onBack = onBack,
         modifier = modifier,

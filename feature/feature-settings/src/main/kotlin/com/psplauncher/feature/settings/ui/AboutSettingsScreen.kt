@@ -26,8 +26,7 @@ fun AboutSettingsScreen(
     val versionCode = packageInfo?.longVersionCode?.toString() ?: "unknown"
     // Value rows are focusable, so the cursor walks the list and focus-driven scrolling brings
     // each row into view — no manual scroll interception needed.
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "About",
         onBack   = onBack,
         modifier = modifier,

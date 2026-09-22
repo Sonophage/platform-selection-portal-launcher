@@ -74,8 +74,7 @@ fun EmulatorProfileEditorScreen(
     var intentHelpPinned  by remember { mutableStateOf(false) }
     var intentHelpFocused by remember { mutableStateOf(false) }
 
-    SettingsScaffold(
-        title    = "Emulators",
+    SettingsPageScaffold(
         subtitle = subtitle,
         onBack   = onCancel,
         modifier = modifier,

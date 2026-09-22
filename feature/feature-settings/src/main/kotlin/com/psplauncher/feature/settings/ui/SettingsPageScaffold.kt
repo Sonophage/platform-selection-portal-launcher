@@ -47,8 +47,21 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
  */
 @Composable
 fun SettingsPageScaffold(
-    /** The page's name, drawn large at the top-left. */
+    /** What the scaffold knows this screen as — the name the rail lists it under. */
     subtitle: String,
+    /**
+     * The large top-left heading, when the section's name is not the right one.
+     *
+     * Null means the section's name, which is right for a screen you reach from the rail. A step
+     * inside a flow is not that: "Add Emulator" and "Add Console" name the thing you are doing,
+     * and the section they happen to live in ("Emulators", "Library") would say less. Those pass
+     * their own.
+     *
+     * What does NOT belong here is the old breadcrumb's top line. That line said which section you
+     * were in, which is exactly what the default already does — passing it as a heading only hides
+     * the section behind a restatement of it.
+     */
+    heading: String? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     restoreFocusKey: String? = null,
@@ -77,7 +90,7 @@ fun SettingsPageScaffold(
             val section = remember(screenId) {
                 screenId?.let { settingsSectionFor(it) }
             }
-            SettingsPageTitle(section?.title ?: subtitle)
+            SettingsPageTitle(heading ?: section?.title ?: subtitle)
         },
         // The reference has no rule under the title. The rail and the content are separated by
         // their own columns; a horizontal line across both only adds a second boundary.

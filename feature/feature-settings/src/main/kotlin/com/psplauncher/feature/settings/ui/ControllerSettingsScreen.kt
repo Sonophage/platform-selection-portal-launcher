@@ -29,8 +29,7 @@ fun ControllerSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Controller",
         onBack   = onBack,
         modifier = modifier,

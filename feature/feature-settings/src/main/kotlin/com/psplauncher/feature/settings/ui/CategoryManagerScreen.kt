@@ -78,8 +78,7 @@ private fun CategoryListContent(
     onBack: () -> Unit,
     modifier: Modifier,
 ) {
-    SettingsScaffold(
-        title = "Settings",
+    SettingsPageScaffold(
         subtitle = "Categories",
         onBack = onBack,
         modifier = modifier,
@@ -120,7 +119,7 @@ private fun PickIconContent(
     modifier: Modifier,
 ) {
     val subtitle = if (state.pickingIconForCreate) "Choose Icon" else "Change Icon"
-    SettingsScaffold(title = "Category", subtitle = subtitle, onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(heading = "Category", subtitle = subtitle, onBack = onBack, modifier = modifier) {
         // Registered like the list screens: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
         // the body itself is unchanged.
@@ -148,7 +147,7 @@ private fun PickTypeContent(
     onBack: () -> Unit,
     modifier: Modifier,
 ) {
-    SettingsScaffold(title = "Category", subtitle = "Content Type", onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(heading = "Category", subtitle = "Content Type", onBack = onBack, modifier = modifier) {
         // Registered like the list screens: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
         // the body itself is unchanged.
@@ -184,7 +183,7 @@ private fun CategoryDetailContent(
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    SettingsScaffold(title = "Categories", subtitle = cat.name, onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(heading = "Categories", subtitle = cat.name, onBack = onBack, modifier = modifier) {
         // Registered like the list screens: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
         // the body itself is unchanged.

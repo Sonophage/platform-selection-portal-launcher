@@ -215,8 +215,7 @@ private fun LibraryListContent(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> relinkTarget?.let { onRelinkRomRoot(it, uri) }; relinkTarget = null }
 
-    SettingsScaffold(
-        title = "Settings",
+    SettingsPageScaffold(
         subtitle = "Library Manager",
         onBack = onBack,
         modifier = modifier,
@@ -317,7 +316,7 @@ private fun PickPlatformContent(
     onPlatformChosen: (PlatformOption) -> Unit,
     modifier: Modifier,
 ) {
-    SettingsScaffold(title = "Add Console", subtitle = "Choose Platform", onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(heading = "Add Console", subtitle = "Choose Platform", onBack = onBack, modifier = modifier) {
         // Registered like the list screens: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
         // the body itself is unchanged.
@@ -345,7 +344,7 @@ private fun PickEmulatorContent(
     onEmulatorChosen: (EmulatorOption) -> Unit,
     modifier: Modifier,
 ) {
-    SettingsScaffold(title = "Add Console", subtitle = "Assign Emulator", onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(heading = "Add Console", subtitle = "Assign Emulator", onBack = onBack, modifier = modifier) {
         // Registered like the list screens: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
         // the body itself is unchanged.
@@ -372,7 +371,7 @@ private fun ScanPromptContent(
     onConfirmAddConsole: (Boolean) -> Unit,
     modifier: Modifier,
 ) {
-    SettingsScaffold(title = "Add Console", subtitle = "Scan Now?", onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(heading = "Add Console", subtitle = "Scan Now?", onBack = onBack, modifier = modifier) {
         // Registered like the list screens: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
         // the body itself is unchanged.
@@ -428,8 +427,7 @@ private fun CardDetailContent(
     // no way to tell a missing console from a broken screen.
     val card = state.detailCard
     if (card == null) {
-        SettingsScaffold(
-            title = "Library Manager",
+        SettingsPageScaffold(
             subtitle = "Not in your library",
             onBack = onBack,
             modifier = modifier,
@@ -467,7 +465,7 @@ private fun CardDetailContent(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> uri?.let { onSetVita3KFolder(it) } }
 
-    SettingsScaffold(title = "Library Manager", subtitle = card.displayName, onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(subtitle = card.displayName, onBack = onBack, modifier = modifier) {
         // Registered like the list screens: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
         // the body itself is unchanged.
@@ -678,7 +676,7 @@ private fun ImportPcGamesContent(
         ActivityResultContracts.StartActivityForResult()
     ) { onRefreshHomeStatus() }
 
-    SettingsScaffold(title = "Library", subtitle = "Import PC Games", onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(subtitle = "Import PC Games", onBack = onBack, modifier = modifier) {
         // Registered like the list screens: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
         // the body itself is unchanged.

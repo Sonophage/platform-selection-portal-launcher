@@ -89,8 +89,7 @@ fun VideoSettingsContent(
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Video",
         onBack   = onBack,
         modifier = modifier,

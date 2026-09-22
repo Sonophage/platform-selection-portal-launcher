@@ -74,8 +74,7 @@ fun ArtworkSettingsScreen(
         uri?.let { viewModel.loadDebugCredentials(it) }
     }
 
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = when (section) {
             ArtworkSection.SOURCES -> "Scraping Sources"
             else                   -> "Artwork"

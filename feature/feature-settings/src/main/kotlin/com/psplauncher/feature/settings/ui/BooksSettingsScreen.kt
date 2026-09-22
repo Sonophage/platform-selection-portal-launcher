@@ -86,8 +86,7 @@ fun BooksSettingsContent(
     onChooseReader: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Books",
         onBack   = onBack,
         modifier = modifier,

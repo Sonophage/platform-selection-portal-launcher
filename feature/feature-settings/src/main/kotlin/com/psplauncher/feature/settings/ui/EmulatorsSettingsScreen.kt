@@ -105,14 +105,13 @@ fun EmulatorsSettingsScreen(
 
     // Brief loading windows: scanning apps, or inspecting the chosen app.
     if (state.isInspecting) {
-        SettingsScaffold(title = "Add Emulator", subtitle = "Detecting…", onBack = viewModel::cancelWizard, modifier = modifier) {
+        SettingsPageScaffold(heading = "Add Emulator", subtitle = "Detecting…", onBack = viewModel::cancelWizard, modifier = modifier) {
             EmulatorHint("Inspecting installed apps…")
         }
         return
     }
 
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = when (section) {
             EmulatorSettingsSection.INSTALLED -> "Emulator · Installed"
             EmulatorSettingsSection.CUSTOM -> "Emulator · Custom"
@@ -259,8 +258,8 @@ private fun WizardPickAppStep(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title    = "Add Emulator",
+    SettingsPageScaffold(
+        heading    = "Add Emulator",
         subtitle = "Pick an App",
         onBack   = onBack,
         modifier = modifier,
@@ -301,7 +300,7 @@ private fun TestLaunchFlow(
 ) {
     // Step A — pick a ROM from the scanned library.
     if (test.selectedRom == null) {
-        SettingsScaffold(title = "Test Launch", subtitle = "Pick a ROM", onBack = onBack, modifier = modifier) {
+        SettingsPageScaffold(heading = "Test Launch", subtitle = "Pick a ROM", onBack = onBack, modifier = modifier) {
             // Registered like the list screen above: the scaffold needs a scroll owner here for its
             // chrome drag-to-scroll and for controller keep-in-view.
             val scrollState = rememberScrollState()
@@ -327,7 +326,7 @@ private fun TestLaunchFlow(
     }
 
     // Step B — intent preview + launch + result.
-    SettingsScaffold(title = "Test Launch", subtitle = test.selectedRom.title, onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(heading = "Test Launch", subtitle = test.selectedRom.title, onBack = onBack, modifier = modifier) {
         // Registered like the list screen above: the scaffold needs a scroll owner here for its
         // chrome drag-to-scroll and for controller keep-in-view.
         val scrollState = rememberScrollState()

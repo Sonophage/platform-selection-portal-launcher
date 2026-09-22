@@ -45,8 +45,7 @@ fun ArtworkImportScreen(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? -> uri?.let { viewModel.startExport(it) } }
 
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Artwork Folder & Import",
         onBack   = onBack,
         modifier = modifier,

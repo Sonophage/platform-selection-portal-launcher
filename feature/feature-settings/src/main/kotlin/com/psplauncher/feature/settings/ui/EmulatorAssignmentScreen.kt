@@ -77,8 +77,7 @@ private fun AssignmentListContent(
     onOpenDetail: (String) -> Unit,
     modifier: Modifier,
 ) {
-    SettingsScaffold(
-        title           = "Emulators",
+    SettingsPageScaffold(
         subtitle        = "Per-System Defaults",
         onBack          = onBack,
         modifier        = modifier,
@@ -149,8 +148,7 @@ private fun AssignmentDetailContent(
     onDismissMessage: () -> Unit,
     modifier: Modifier,
 ) {
-    SettingsScaffold(
-        title    = "Emulators",
+    SettingsPageScaffold(
         subtitle = row.platformName,
         onBack   = onBack,
         modifier = modifier,

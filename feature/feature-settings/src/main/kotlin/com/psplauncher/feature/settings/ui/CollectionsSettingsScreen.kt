@@ -177,7 +177,7 @@ private fun CollectionListStep(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = "Settings", subtitle = "Collections", onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(subtitle = "Collections", onBack = onBack, modifier = modifier) {
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -222,7 +222,7 @@ private fun CollectionDetailStep(
 ) {
     val games by remember(collection.id) { gamesFlow() }.collectAsState(initial = emptyList())
 
-    SettingsScaffold(title = "Settings", subtitle = collection.name, onBack = onBack, modifier = modifier) {
+    SettingsPageScaffold(subtitle = collection.name, onBack = onBack, modifier = modifier) {
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {

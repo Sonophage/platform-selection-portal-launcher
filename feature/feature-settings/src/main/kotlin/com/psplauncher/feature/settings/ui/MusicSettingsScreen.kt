@@ -82,8 +82,7 @@ fun MusicSettingsContent(
     onDismissMessage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(
-        title    = "Settings",
+    SettingsPageScaffold(
         subtitle = "Music",
         onBack   = onBack,
         modifier = modifier,
