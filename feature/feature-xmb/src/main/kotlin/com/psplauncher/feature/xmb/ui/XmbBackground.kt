@@ -310,7 +310,12 @@ float sparkles(float2 uv, float t) {
         float fl = float(layer);
         float scale = 26.0 + fl * 17.0;
         float2 sp = uv * float2(scale, scale * 0.45);
-        sp.x += t * (0.05 + fl * 0.03);
+        // Real drift. This was 0.05 cells/sec, which over a 26-cell grid is about a pixel a
+        // second — moving, but not observably. Each layer travels at its own rate so they
+        // separate instead of sliding as one sheet, and a slow vertical crawl stops the field
+        // reading as a rigid grid being panned.
+        sp.x += t * (0.34 + fl * 0.21);
+        sp.y += t * (0.06 + fl * 0.04);
         float2 cell = floor(sp);
         float2 f = fract(sp) - 0.5;
         float h = hash21(cell + fl * 31.7);
@@ -319,7 +324,8 @@ float sparkles(float2 uv, float t) {
             float d = length(f - jitter * 0.6);
             // Each one keeps its own rate and phase off its hash, so they do not blink together.
             float twinkle = 0.45 + 0.55 * sin(t * (1.1 + h * 2.4) + h * 40.0);
-            acc += smoothstep(0.17, 0.0, d) * twinkle;
+            // Half the previous radius: these were soft blobs rather than points of light.
+            acc += smoothstep(0.085, 0.0, d) * twinkle;
         }
     }
     return acc;
@@ -355,8 +361,13 @@ half4 main(float2 fragCoord) {
         float F = fresnelScale * pow(edgeOn, 1.0 / fresnelPower);
 
         // The sheet's body below its crest, and the bright line riding the crest itself.
-        float body = smoothstep(0.0, 0.20, d) * 0.055;
-        float line = exp(-pow(d * 34.0, 2.0)) * (0.10 + 0.22 * F);
+        //
+        // Both are half as soft as they were: the body's ramp 0.20 -> 0.10, and the crest's
+        // falloff 34 -> 68, which is the same halving written the other way round because one is
+        // a width and the other is its reciprocal. The wave read as a smear rather than as a
+        // surface with an edge.
+        float body = smoothstep(0.0, 0.10, d) * 0.055;
+        float line = exp(-pow(d * 68.0, 2.0)) * (0.10 + 0.22 * F);
 
         acc += (body + line) * (1.0 - f * 0.35);
     }
