@@ -20,11 +20,43 @@ const val GRID_COLUMNS = 6
 private const val ANDROID_PLATFORM_ID = "android"
 private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
 
-enum class AppFilter(val label: String) {
-    ALL("All Apps"),
-    GAMES("Games"),
-    EMULATORS("Emulators"),
-    RECENT("Recently Used"),
+/**
+ * The app menu's sections, in the order they are shown.
+ *
+ * Declaration order IS the order of the drawer's tabs and of the Android column's rows, because
+ * both are built from `entries` — see AppDrawerCategoryTabs and XMBViewModel.ANDROID_ITEMS. The
+ * column's row ids are "drawer_" + name.lowercase(), which is how a row round-trips back to the
+ * filter it opens, so a new entry here reaches both surfaces with nothing else to remember.
+ *
+ * [APPS] is apps ONLY — not emulators, not games. It is the owner's distinction and the reason
+ * this enum has five entries instead of four: [ALL] answers "everything installed", which is a
+ * different question from "the things that are just apps".
+ *
+ * A single app can appear under more than one section, and that is deliberate: an emulator the
+ * user has also marked as a game is listed under both Emulators and Games, because it genuinely
+ * is both and hiding it from one of them would make that section a lie.
+ */
+enum class AppFilter(val label: String, val subtitle: String) {
+    RECENT("Recently Used", "Apps you've used lately"),
+    APPS("Apps", "Everything that is not a game or an emulator"),
+    EMULATORS("Emulators", "RetroArch, PPSSPP, Dolphin and more"),
+    GAMES("Games", "Apps categorized as games"),
+    ALL("All Apps", "Browse every installed app");
+
+    /**
+     * Whether [app] belongs in this section.
+     *
+     * ONE definition. The drawer filtered its grid with one `when` over this enum and counted its
+     * tabs with a second copy of the same `when`, so a section could have shown a count that did
+     * not match the list underneath it — and the count is the half nobody checks.
+     */
+    fun matches(app: InstalledApp): Boolean = when (this) {
+        ALL -> true
+        APPS -> !app.isGame && !app.isEmulator
+        GAMES -> app.isGame
+        EMULATORS -> app.isEmulator
+        RECENT -> app.lastUsedAt > 0L
+    }
 }
 
 // One row in an app's long-press mini menu.
@@ -323,12 +355,7 @@ class AppDrawerViewModel @Inject constructor(
 
         val filtered = state.allApps
             .filter { app ->
-                when (state.activeFilter) {
-                    AppFilter.ALL       -> true
-                    AppFilter.GAMES     -> app.isGame
-                    AppFilter.EMULATORS -> app.isEmulator
-                    AppFilter.RECENT    -> app.lastUsedAt > 0L
-                }
+                state.activeFilter.matches(app)
             }
             .filter { app ->
                 query.isEmpty() || app.label.lowercase().contains(query)
@@ -344,12 +371,7 @@ class AppDrawerViewModel @Inject constructor(
         // Compute per-filter counts (unfiltered by search query) for the category rail.
         val counts = AppFilter.values().associateWith { filter ->
             state.allApps.count { app ->
-                when (filter) {
-                    AppFilter.ALL       -> true
-                    AppFilter.GAMES     -> app.isGame
-                    AppFilter.EMULATORS -> app.isEmulator
-                    AppFilter.RECENT    -> app.lastUsedAt > 0L
-                }
+                filter.matches(app)
             }
         }
 

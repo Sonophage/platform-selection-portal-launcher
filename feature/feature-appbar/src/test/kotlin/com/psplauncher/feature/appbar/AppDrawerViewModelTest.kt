@@ -226,34 +226,18 @@ class AppDrawerViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // L1 leaves the empty RECENT section (PREV in enum order → EMULATORS, which has apps).
-        viewModel.handleGamepadAction(GamepadAction.PREV_CATEGORY)
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertEquals(AppFilter.EMULATORS, state.activeFilter)
-            assertEquals(2, state.visibleApps.size)
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // R1 walks back into the empty RECENT section and can leave it again via L1.
+        // R1 leaves the empty RECENT section. RECENT is FIRST in the enum now, so the escape is
+        // NEXT rather than PREV — the destination was always an artefact of the order, the thing
+        // being proven is that an empty section is never a dead end.
         viewModel.handleGamepadAction(GamepadAction.NEXT_CATEGORY)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
-            val state = awaitItem()
-            assertEquals(AppFilter.RECENT, state.activeFilter)
-            assertTrue(state.visibleApps.isEmpty())
-            cancelAndIgnoreRemainingEvents()
-        }
-        viewModel.handleGamepadAction(GamepadAction.PREV_CATEGORY)
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.uiState.test {
-            assertEquals(AppFilter.EMULATORS, awaitItem().activeFilter)
+            assertEquals(AppFilter.APPS, awaitItem().activeFilter)
             cancelAndIgnoreRemainingEvents()
         }
 
-        // NEXT from EMULATORS moves into the empty RECENT section again — that's a valid move.
-        viewModel.handleGamepadAction(GamepadAction.NEXT_CATEGORY)
+        // L1 walks back into the empty section, and R1 gets out again.
+        viewModel.handleGamepadAction(GamepadAction.PREV_CATEGORY)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
             val state = awaitItem()
@@ -262,18 +246,19 @@ class AppDrawerViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // RECENT is the last filter — NEXT clamps (no wrap), staying on the still-empty section
-        // as a harmless no-op rather than a crash, and PREV leaves it once more.
-        viewModel.handleGamepadAction(GamepadAction.NEXT_CATEGORY)
+        // RECENT is the first filter — PREV clamps (no wrap), staying on the still-empty section
+        // as a harmless no-op rather than a crash. Clamping is only safe BECAUSE the other
+        // direction always works; that is the pair, and both halves are asserted here.
+        viewModel.handleGamepadAction(GamepadAction.PREV_CATEGORY)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
             assertEquals(AppFilter.RECENT, awaitItem().activeFilter)
             cancelAndIgnoreRemainingEvents()
         }
-        viewModel.handleGamepadAction(GamepadAction.PREV_CATEGORY)
+        viewModel.handleGamepadAction(GamepadAction.NEXT_CATEGORY)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
-            assertEquals(AppFilter.EMULATORS, awaitItem().activeFilter)
+            assertEquals(AppFilter.APPS, awaitItem().activeFilter)
             cancelAndIgnoreRemainingEvents()
         }
     }

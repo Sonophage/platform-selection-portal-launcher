@@ -880,12 +880,8 @@ fun StorefrontAppDrawerPreview() {
         InstalledApp("com.google.android.youtube", "YouTube", mockIcon, isGame = false, isEmulator = false),
         InstalledApp("com.psplauncher.launcher", "PSPLauncher", mockIcon, isGame = false, isEmulator = false),
     )
-    val mockCounts = AppFilter.values().associateWith { when (it) {
-        AppFilter.ALL -> 42
-        AppFilter.GAMES -> 28
-        AppFilter.EMULATORS -> 9
-        AppFilter.RECENT -> 12
-    } }
+    // Counted from the fixture, not typed — see AppDrawerScreen's preview.
+    val mockCounts = AppFilter.entries.associateWith { filter -> mockApps.count(filter::matches) }
     val mockState = AppDrawerUiState(
         visibleApps = mockApps,
         activeFilter = AppFilter.ALL,

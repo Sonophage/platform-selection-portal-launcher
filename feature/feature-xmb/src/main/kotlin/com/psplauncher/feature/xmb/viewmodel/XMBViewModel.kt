@@ -9097,12 +9097,22 @@ class XMBViewModel @Inject constructor(
         val FALLBACK_CATEGORIES: List<Category> =
             com.psplauncher.core.domain.model.BUILT_IN_CATEGORIES
 
-        private val ANDROID_ITEMS = listOf(
-            XMBItem(id = "drawer_all",       title = "All Apps",      subtitle = "Browse every installed app"),
-            XMBItem(id = "drawer_games",     title = "Games",         subtitle = "Apps categorized as games"),
-            XMBItem(id = "drawer_emulators", title = "Emulators",     subtitle = "RetroArch, PPSSPP, Dolphin and more"),
-            XMBItem(id = "drawer_recent",    title = "Recently Used", subtitle = "Apps you've used lately"),
-        )
+        /**
+         * The Android column's rows, built FROM AppFilter rather than beside it.
+         *
+         * They were a hand-kept copy: the same four sections, in a different order, with their
+         * own labels and subtitles. The row id is "drawer_" + the filter's name, which is how a
+         * row round-trips back to the filter it opens (see the ANDROID branch of onItemSelected),
+         * so the two were already joined by a string convention with nothing checking it. Now the
+         * list, the order and the wording all come from one place.
+         */
+        private val ANDROID_ITEMS = com.psplauncher.feature.appbar.AppFilter.entries.map { filter ->
+            XMBItem(
+                id = "drawer_${filter.name.lowercase()}",
+                title = filter.label,
+                subtitle = filter.subtitle,
+            )
+        }
 
         // First item opens the device's own Settings app (not a PFP screen).
         internal const val ANDROID_SETTINGS_ITEM_ID = "settings_android_system"

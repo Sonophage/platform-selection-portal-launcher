@@ -486,14 +486,10 @@ private fun AppDrawerPreviewContent() {
             isEmulator = false
         ),
     )
-    val mockCounts = AppFilter.entries.associateWith {
-        when (it) {
-            AppFilter.ALL -> 42
-            AppFilter.GAMES -> 28
-            AppFilter.EMULATORS -> 9
-            AppFilter.RECENT -> 12
-        }
-    }
+    // Counted from the fixture rather than typed. The numbers used to be literals that had
+    // drifted away from the apps beside them, and a preview showing counts its own list
+    // contradicts is worse than one showing none.
+    val mockCounts = AppFilter.entries.associateWith { filter -> mockApps.count(filter::matches) }
     val mockState = AppDrawerUiState(
         visibleApps = mockApps,
         activeFilter = AppFilter.ALL,
