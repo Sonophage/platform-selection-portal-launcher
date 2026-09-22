@@ -63,6 +63,9 @@ interface GameRepository {
     suspend fun clearPreferredEmulatorForPlatform(platformId: String)
     /** Selects the disc used when the logical multi-disc game is launched. */
     suspend fun setPreferredDisc(id: Long, discId: Long)
+
+    /** Takes the game off the Last Played shelf. Its recorded play time is kept — see GameDao. */
+    suspend fun clearLastPlayed(id: Long)
     suspend fun recordPlaySession(session: PlaySession)
     suspend fun getMissingRoms(): List<Game>
     suspend fun updateScrapedTitle(id: Long, scrapedTitle: String?)

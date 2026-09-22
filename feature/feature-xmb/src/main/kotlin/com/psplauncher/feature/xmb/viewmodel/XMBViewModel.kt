@@ -5772,15 +5772,19 @@ class XMBViewModel @Inject constructor(
         // Whether the game belongs to a multi-disc set is a DB read, so the "Choose Disc" entry
         // (and only that) is decided asynchronously — the rest of the menu builds unchanged.
         viewModelScope.launch {
+            val game = runCatching { gameRepository.getById(gameId) }.getOrNull()
             val discCount = runCatching {
-                val game = gameRepository.getById(gameId)
                 game?.discSetKey?.let { gameRepository.getDiscSetMembers(it).size } ?: 0
             }.getOrDefault(0)
-            openGameContextMenuCore(item, discCount)
+            // Read off the same fetch as the disc set rather than a second query, and off the
+            // stamp itself rather than off "are we on the Last Played shelf" — the entry means
+            // the same thing wherever the game is being looked at, and offering it on a game
+            // that was never played would be a menu row that does nothing.
+            openGameContextMenuCore(item, discCount, onRecentShelf = game?.lastPlayedAt != null)
         }
     }
 
-    private fun openGameContextMenuCore(item: XMBItem, discCount: Int) {
+    private fun openGameContextMenuCore(item: XMBItem, discCount: Int, onRecentShelf: Boolean = false) {
         val inCollection = _uiState.value.selectedCollectionId != null
         val currentCat = currentCategory()
         val inGamingCategory = currentCat?.isGamingCategory == true
@@ -5806,6 +5810,8 @@ class XMBViewModel @Inject constructor(
                 id    = if (item.isFavorite) "unfavorite" else "favorite",
                 label = if (item.isFavorite) "Remove from Favorites" else "Add to Favorites",
             ))
+            // Only for a game that is actually on the shelf: see openGameContextMenu.
+            if (onRecentShelf) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent"))
             add(XMBContextMenuItem("add_to_collection", "Add to Collection"))
             // Only offer removal when viewing the game from inside a collection.
             if (inCollection) add(XMBContextMenuItem("remove_from_collection", "Remove from Collection"))
@@ -6237,6 +6243,14 @@ class XMBViewModel @Inject constructor(
                 "edit_app"               -> openAppDetail(menu.gameId, menu.packageName ?: return)
                 "favorite"               -> toggleGameFavorite(menu.gameId, true)
                 "unfavorite"             -> toggleGameFavorite(menu.gameId, false)
+                // No explicit reload: the shelf is a Room Flow (observeRecentlyPlayed) and
+                // invalidates itself on the write. Reloading by hand raced the collector and left
+                // the page reading "Nothing played yet." with a game still on the shelf, until a
+                // relaunch showed the truth — seen on the device. Same shape as toggleGameFavorite.
+                "remove_from_recent"     -> {
+                    val gid = menu.gameId
+                    appAction { gameRepository.clearLastPlayed(gid) }
+                }
                 "add_to_collection"      -> openCollectionPicker(menu.gameId)
                 "remove_from_collection" -> {
                     val gid = menu.gameId   // local val so it smart-casts inside the lambda

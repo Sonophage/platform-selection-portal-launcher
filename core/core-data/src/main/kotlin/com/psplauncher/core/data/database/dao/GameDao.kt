@@ -231,6 +231,16 @@ interface GameDao {
     )
     suspend fun addPlayTime(id: Long, durationMillis: Long, playedAt: Long)
 
+    /**
+     * Drops the game off the Last Played shelf without forgetting it was played.
+     *
+     * total_play_time_millis is deliberately untouched: the shelf asks "when", the counter asks
+     * "how long", and a user taking a game off the shelf has not asked to lose their hours. The
+     * next launch writes a fresh stamp through addPlayTime and the game comes back.
+     */
+    @Query("UPDATE games SET last_played_at = NULL WHERE id = :id")
+    suspend fun clearLastPlayed(id: Long)
+
     @Query(
         """
         UPDATE games SET emulator_package = :emulatorPackage WHERE id = :id
