@@ -152,6 +152,8 @@ data class XMBContextMenu(
     val videoLibraryId: String? = null,
     // Set on the "Add to Playlist" submenu opened for a video (marks that submenu).
     val videoPlaylistPickerVideoId: String? = null,
+    // Set on a book row's options menu.
+    val bookFileId: String? = null,
     // Set on a photo row's options menu.
     val photoFileId: String? = null,
     // Set on a photo library (Album) card's options menu.
@@ -1191,6 +1193,9 @@ fun XMBItem.hasContextMenu(state: XMBUiState): Boolean {
                 (type == XMBItemType.VIDEO_FOLDER && id.startsWith("vlib_")) ||
                 (type == XMBItemType.PLAYLIST && playlistId != null)
         ) -> true
+        // Books. The Library column and, through owningCategory, wherever else a book is listed.
+        categoryId == BuiltInCategory.LIBRARY &&
+            type == XMBItemType.LIBRARY_BOOK && id.startsWith("book_") -> true
         // Photo files / libraries / photo-apps.
         categoryId == BuiltInCategory.PHOTO && (
             (type == XMBItemType.PHOTO_FILE && id.startsWith("pho_")) ||
@@ -3853,6 +3858,44 @@ class XMBViewModel @Inject constructor(
 
     // Opens the △ options menu for a Photo row. Returns true when [item] is a photo row it owns
     // (a photo file or an Album card), so the generic menus don't also fire.
+    /**
+     * A book's options menu. Books had none at all — not on the Last Played shelf and not in the
+     * Library column either — so Y simply did nothing on them anywhere in the app.
+     *
+     * Deliberately short. Everything here is an operation BookRepository already exposes; a menu
+     * that offers what a library cannot do is worse than a menu with four rows in it.
+     */
+    private fun openBookContextMenu(item: XMBItem): Boolean {
+        if (item.menuHostCategory(currentCategory()?.id) != BuiltInCategory.LIBRARY) return false
+        if (item.type != XMBItemType.LIBRARY_BOOK || !item.id.startsWith("book_")) return false
+        val bookId = item.id.removePrefix("book_")
+        viewModelScope.launch {
+            // Read for the same reason the music and video menus do: whether the row carries a
+            // stamp decides whether Remove from Recent is offered at all.
+            val onShelf = runCatching { bookRepository.getBook(bookId) }
+                .getOrNull()?.lastOpenedAt != null
+            val items = buildList {
+                add(XMBContextMenuItem("book_open", "Read"))
+                if (onShelf) add(XMBContextMenuItem("book_remove_recent", "Remove from Recent"))
+                add(XMBContextMenuItem("book_remove", "Remove From Library", isDestructive = true))
+            }
+            _uiState.update {
+                it.copy(activeContextMenu = XMBContextMenu(item.title, items, bookFileId = bookId))
+            }
+        }
+        return true
+    }
+
+    private fun handleBookAction(bookId: String, itemId: String) {
+        when (itemId) {
+            "book_open" -> openBook(bookId)
+            // No explicit reload: observeRecentlyOpenedBooks is a Room Flow and invalidates itself
+            // on the write, the same as the game and track paths.
+            "book_remove_recent" -> appAction { bookRepository.clearBookLastOpened(bookId) }
+            "book_remove" -> appAction { bookRepository.removeBook(bookId) }
+        }
+    }
+
     private fun openPhotoContextMenu(item: XMBItem): Boolean {
         // The ROW's library, not the cursor's — see XMBItem.menuHostCategory.
         if (item.menuHostCategory(currentCategory()?.id) != BuiltInCategory.PHOTO) return false
@@ -5748,6 +5791,7 @@ class XMBViewModel @Inject constructor(
                 when {
                     item != null && openMusicContextMenu(item) -> Unit
                     item != null && openVideoContextMenu(item) -> Unit
+                    item != null && openBookContextMenu(item) -> Unit
                     item != null && openPhotoContextMenu(item) -> Unit
                     item?.gameId != null -> openGameContextMenu(item)
                     item?.collectionId != null && item.type == XMBItemType.COLLECTION -> openCollectionRowContextMenu(item.collectionId)
@@ -6256,6 +6300,10 @@ class XMBViewModel @Inject constructor(
         // ── Video file / library / playlist row options menus ───────────────────
         if (menu.videoFileId != null) {
             handleVideoFileAction(menu.videoFileId, itemId)
+            return
+        }
+        if (menu.bookFileId != null) {
+            handleBookAction(menu.bookFileId, itemId)
             return
         }
         if (menu.videoLibraryId != null) {
@@ -7622,6 +7670,7 @@ class XMBViewModel @Inject constructor(
         when {
             item != null && openMusicContextMenu(item) -> Unit
             item != null && openVideoContextMenu(item) -> Unit
+            item != null && openBookContextMenu(item) -> Unit
             item != null && openPhotoContextMenu(item) -> Unit
             item?.gameId != null -> openGameContextMenu(item)
             item?.collectionId != null && item.type == XMBItemType.COLLECTION -> openCollectionRowContextMenu(item.collectionId)
