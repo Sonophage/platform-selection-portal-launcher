@@ -1631,6 +1631,14 @@ class XMBViewModel @Inject constructor(
 
     init {
         gamepadInputHandler.scope = viewModelScope
+        // The player tells us when a track actually starts; the stamp is written here, where the
+        // repositories live. See MusicPlayerController.onTrackStarted for why it is not setQueue.
+        musicPlayer.onTrackStarted = { track ->
+            viewModelScope.launch {
+                runCatching { musicRepository.markTrackPlayed(track.id, System.currentTimeMillis()) }
+                    .onFailure { Timber.w(it, "Could not stamp ${track.displayTitle} as played") }
+            }
+        }
         observeContextMenuHintIdle()
         observeIconDisplayMode()
         observeFocusedGameVideo()
@@ -3484,7 +3492,11 @@ class XMBViewModel @Inject constructor(
             val error = bookIntentResolver.launch(book, _uiState.value.defaultReader)
             if (error != null) {
                 _uiState.update { it.copy(infoDialog = InfoDialogState(title = book.displayTitle, message = error)) }
+                return@launch
             }
+            // Only once the reader actually took it. A book whose reader is missing or refused the
+            // intent was not opened, and a shelf that listed it would be pointing at a dead end.
+            bookRepository.markBookOpened(bookId, System.currentTimeMillis())
         }
     }
 

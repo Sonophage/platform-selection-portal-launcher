@@ -29,6 +29,13 @@ interface MusicRepository {
     /** Atomically replaces the tracks of one folder only; other folders' tracks are untouched. */
     suspend fun replaceTracksForFolder(folderId: String, tracks: List<MusicTrack>, scannedAt: Long)
 
+    // ── Recency ───────────────────────────────────────────────────────────────
+    /** Stamps a track as played now. Called when playback actually starts, not when it is queued. */
+    suspend fun markTrackPlayed(trackId: String, playedAt: Long)
+    /** Takes the track off the recents shelf. */
+    suspend fun clearTrackLastPlayed(trackId: String)
+    fun observeRecentlyPlayedTracks(limit: Int): Flow<List<MusicTrack>>
+
     // ── Default player (DataStore-backed) ───────────────────────────────────────
     /** Package name of the chosen external player, or null for the system default chooser. */
     fun observeDefaultPlayerPackage(): Flow<String?>

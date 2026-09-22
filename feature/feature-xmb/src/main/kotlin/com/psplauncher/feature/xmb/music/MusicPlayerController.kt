@@ -48,6 +48,19 @@ class MusicPlayerController @Inject constructor(
     private val _state = MutableStateFlow(MusicPlaybackState())
     val state: StateFlow<MusicPlaybackState> = _state
 
+    /**
+     * Called once each time a track actually begins playing.
+     *
+     * The hook is here rather than in setQueue because queueing is not playing: a 200-track album
+     * is queued in one call and played one track at a time, and the recents shelf should say what
+     * was listened to. Every path — setQueue, next, previous, and the queue advancing on
+     * completion — funnels through playCurrent, so this is the one place that sees them all. A
+     * track that fails to load never reaches it, which is correct.
+     *
+     * A callback rather than a repository dependency: this class owns a MediaPlayer, not storage.
+     */
+    var onTrackStarted: ((MusicTrack) -> Unit)? = null
+
     /** Load [tracks] as the queue and start playing at [startIndex]. */
     fun setQueue(tracks: List<MusicTrack>, startIndex: Int) {
         queue = tracks
@@ -114,6 +127,7 @@ class MusicPlayerController @Inject constructor(
                 runCatching { mp.start() }
                 startTicker()
                 emit()
+                onTrackStarted?.invoke(track)
             }
             runCatching {
                 setDataSource(context, Uri.parse(track.uri))

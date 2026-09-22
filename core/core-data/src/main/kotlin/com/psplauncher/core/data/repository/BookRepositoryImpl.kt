@@ -79,6 +79,14 @@ class BookRepositoryImpl @Inject constructor(
     override fun observeBooksByLibrary(libraryId: String): Flow<List<Book>> =
         bookDao.observeByLibrary(libraryId).map { list -> list.map { it.toDomain() } }
 
+    override suspend fun markBookOpened(bookId: String, openedAt: Long) =
+        bookDao.markOpened(bookId, openedAt)
+
+    override suspend fun clearBookLastOpened(bookId: String) = bookDao.clearLastOpened(bookId)
+
+    override fun observeRecentlyOpenedBooks(limit: Int): Flow<List<Book>> =
+        bookDao.observeRecentlyOpened(limit).map { list -> list.map { it.toDomain() } }
+
     override suspend fun getBook(id: String): Book? = bookDao.getById(id)?.toDomain()
 
     override suspend fun getBooksForLibrary(libraryId: String): List<Book> =

@@ -27,6 +27,13 @@ interface BookRepository {
     // ── Books ─────────────────────────────────────────────────────────────────
     fun observeAllBooks(): Flow<List<Book>>
     fun observeBooksByLibrary(libraryId: String): Flow<List<Book>>
+
+    // ── Recency ───────────────────────────────────────────────────────────────
+    /** Stamps a book as opened now. */
+    suspend fun markBookOpened(bookId: String, openedAt: Long)
+    /** Takes the book off the recents shelf. */
+    suspend fun clearBookLastOpened(bookId: String)
+    fun observeRecentlyOpenedBooks(limit: Int): Flow<List<Book>>
     suspend fun getBook(id: String): Book?
     suspend fun getBooksForLibrary(libraryId: String): List<Book>
     /** Atomically replaces the books of one library only; other libraries are untouched. */
