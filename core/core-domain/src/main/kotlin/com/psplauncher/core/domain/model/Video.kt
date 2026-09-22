@@ -32,7 +32,12 @@ data class Video(
     val isFavorite: Boolean = false,
 ) {
     /** Best label for display: user title when set, else the file name. */
-    val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: displayName
+    /**
+     * What the UI shows: the user's own title when they have set one, otherwise the filename
+     * cleaned up — see MovieFileName. It used to be the raw filename, so a library of scene
+     * releases listed itself as "Dune.2021.1080p.BluRay.1600MB.DD2.0.x264-GalaxyRG.mkv".
+     */
+    val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: MovieFileName.titleOf(displayName)
 
     /** The thumbnail to show: user custom art first, then the generated frame grab. */
     val effectiveThumbnailUri: String? get() = customThumbnailUri?.takeIf { it.isNotBlank() } ?: thumbnailUri
