@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
+import com.psplauncher.core.ui.components.PfpMediaCard
 import com.psplauncher.core.ui.detail.detailPalette
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
@@ -66,7 +67,6 @@ import com.psplauncher.feature.xmb.viewmodel.XMBItem
 // A portrait gutter, not a shelf. Narrow enough that the hero keeps the rest of the 1920px width
 // and the column shows two and a half covers on the owner's 462 dp-tall screen.
 private val CardWidth: Dp = 104.dp
-private val CardHeight: Dp = 146.dp
 
 @Composable
 fun LastPlayedPage(
@@ -183,41 +183,15 @@ fun LastPlayedPage(
 
 @Composable
 private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {
-    val palette = detailPalette()
-    val shape = RoundedCornerShape(10.dp)
-    // Covers first, and EVERY art slot: see XMBItem.shelfCoverArt, which lives beside the
-    // backdrop list it has to stay level with.
-    val art = item.shelfCoverArt
-    Box(
-        modifier = Modifier
-            .width(CardWidth)
-            .height(CardHeight)
-            .clip(shape)
-            .background(palette.rowFill)
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = if (focused) menuCursorEdge() else palette.rowEdge,
-                shape = shape,
-            )
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (art != null) {
-            AsyncImage(
-                model = rememberArtworkModel(art),
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Text(
-                text = item.title,
-                color = palette.textMuted,
-                fontSize = 12.sp,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(10.dp),
-            )
-        }
-    }
+    // The shared card. This used to be its own renderer with its own focus edge, its own art
+    // chain and its own missing-art fallback — three things the search grid and the app menu each
+    // had a second copy of.
+    PfpMediaCard(
+        title = item.title,
+        art = item.shelfCoverArt,
+        subtitle = null,   // the hero above already names what this is
+        focused = focused,
+        onClick = onClick,
+        width = CardWidth,
+    )
 }

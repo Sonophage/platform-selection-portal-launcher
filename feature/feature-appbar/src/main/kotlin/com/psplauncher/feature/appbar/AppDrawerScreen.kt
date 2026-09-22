@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,7 +57,6 @@ import com.psplauncher.feature.appbar.appdrawer.AppDrawerHeader
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHintBar
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerOptions
 import com.psplauncher.feature.appbar.appdrawer.UninstallConfirmDialog
-import com.psplauncher.feature.appbar.appdrawer.adaptiveArtworkSize
 
 // ── PSP-era grid App Drawer ───────────────────────────────────────────────────
 //
@@ -230,8 +228,8 @@ internal fun AppDrawerContent(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // Deep upper (header) region easing into the rich midtone grid region — accent
-            // derived, at ~0.94 alpha so the XMB wave still reads through.
+            // The same scrim Settings draws: theme-hued, solved for contrast, and translucent
+            // enough that the XMB wave still reads through. See storefrontColorsFor.
             .background(
                 Brush.verticalGradient(
                     listOf(sf.backgroundDeep, sf.backgroundMid),
@@ -268,11 +266,10 @@ internal fun AppDrawerContent(
             )
 
             // ── Grid area ───────────────────────────────────────────────
-            // BoxWithConstraints puts the viewport height in composition scope, so the adaptive
-            // artwork size is resolved BEFORE the first tile composes — tiles render at their
-            // final size on frame one, no resize jump.
-            BoxWithConstraints(modifier = Modifier.weight(1f)) {
-                val artworkSize = adaptiveArtworkSize(maxHeight)
+            // A plain Box now. This was BoxWithConstraints so the viewport height could be fed to
+            // adaptiveArtworkSize before the first tile composed; the shared card is a fixed 2:3
+            // and measures itself, so nothing here needs to know how tall the viewport is.
+            Box(modifier = Modifier.weight(1f)) {
                 when {
                     state.isLoading -> {
                         CircularProgressIndicator(
@@ -297,7 +294,6 @@ internal fun AppDrawerContent(
                             apps = state.visibleApps,
                             selectedIndex = state.selectedIndex,
                             usingTouch = state.usingTouch,
-                            artworkSize = artworkSize,
                             onAppTapped = onAppTapped,
                             onAppLaunched = onAppLaunched,
                             onAppMenu = onAppMenu,

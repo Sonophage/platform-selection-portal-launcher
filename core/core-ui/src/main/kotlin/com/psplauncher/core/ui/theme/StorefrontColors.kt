@@ -155,10 +155,14 @@ fun storefrontColorsFor(pfp: PFPColors): StorefrontColors {
     val bgTop = pfp.backgroundTop
     val bgBottom = pfp.backgroundBottom
 
-    // ── Background ── deep upper (header) region easing into a rich midtone (grid) region, at
-    // ~0.88 alpha so the XMB wave reads through more strongly. No blur, no frosted glass, no blobs.
-    val backgroundDeep = bgTop.copy(alpha = 0.88f)
-    val backgroundMid = lerp(bgTop, bgBottom, 0.55f).copy(alpha = 0.88f)
+    // ── Background ── the SAME scrim Settings draws over the XMB wave, because the App Drawer is
+    // the same thing: a full-screen overlay with the wave behind it. It used to be the raw theme
+    // gradient at a flat 0.88 alpha, which made the two surfaces read as different apps — and left
+    // the drawer the unguarded half of the pair, since only Settings' anchors were ever pinned.
+    //
+    // The anchors are solved for contrast, not chosen, so white text clears 4.5:1 even over a
+    // white wallpaper while the gradient keeps the theme's hue and the wave still reads through.
+    val (backgroundDeep, backgroundMid) = xmbScrimAnchors(bgTop, bgBottom)
 
     // ── Header chrome (preserved storefront) ──────────────────────────────
     val chromeTop = bgTop.copy(alpha = 0.96f)

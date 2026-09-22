@@ -47,13 +47,15 @@ class TextLegibilityTest {
 
     @Test
     fun `solved scrim anchors clear AA over a worst-case white wallpaper`() {
+        // Asks xmbScrimAnchors rather than re-solving with its own copy of the two alphas. The
+        // copy was the flaw: Settings, the App Drawer and this test each held their own 0.72/0.90,
+        // so the test would have kept passing about a scrim nobody was drawing any more. It now
+        // measures the anchors both surfaces actually paint.
         val (top, bottom) = ColorCascade.lightBackgroundAnchors(classicBlueWave)
+        val (solvedTop, solvedBottom) = xmbScrimAnchors(argb(top), argb(bottom))
 
-        val solvedTop = solveScrimColor(argb(top), alpha = 0.72f)
-        val solvedBottom = solveScrimColor(argb(bottom), alpha = 0.90f)
-
-        val topBg = composite(solvedTop.copy(alpha = 0.72f), Color.White)
-        val bottomBg = composite(solvedBottom.copy(alpha = 0.90f), Color.White)
+        val topBg = composite(solvedTop, Color.White)
+        val bottomBg = composite(solvedBottom, Color.White)
 
         assertTrue(contrastRatio(Color.White, topBg) >= 4.5)
         assertTrue(contrastRatio(Color.White, bottomBg) >= 4.5)

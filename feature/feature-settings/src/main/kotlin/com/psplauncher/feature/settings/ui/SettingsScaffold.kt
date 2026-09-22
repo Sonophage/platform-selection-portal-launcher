@@ -108,7 +108,7 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.gesture.dragToScroll
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
-import com.psplauncher.core.ui.theme.solveScrimColor
+import com.psplauncher.core.ui.theme.xmbScrimAnchors
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -488,12 +488,11 @@ fun SettingsScaffold(
     // the XMB wave uses), so settings screens match the theme instead of a flat black panel.
     val pfpColors = LocalPFPColors.current
 
-    // Solved once per theme, not per recomposition: each anchor is bisected 12 times.
-    val scrimTop = remember(pfpColors.backgroundTop) {
-        solveScrimColor(pfpColors.backgroundTop, alpha = 0.72f)
-    }
-    val scrimBottom = remember(pfpColors.backgroundBottom) {
-        solveScrimColor(pfpColors.backgroundBottom, alpha = 0.90f)
+    // Solved once per theme, not per recomposition: each anchor is bisected 12 times. The App
+    // Drawer draws the same two anchors (via storefrontColorsFor), which is why they are derived
+    // in one place rather than repeated here.
+    val (scrimTop, scrimBottom) = remember(pfpColors.backgroundTop, pfpColors.backgroundBottom) {
+        xmbScrimAnchors(pfpColors.backgroundTop, pfpColors.backgroundBottom)
     }
 
     // Tracks the onclick of whichever row currently has controller focus
@@ -1030,10 +1029,7 @@ fun SettingsScaffold(
                             1f to pfpColors.backgroundBottom.copy(alpha = 0.55f),
                         )
                     } else {
-                        Brush.verticalGradient(
-                            0f to scrimTop.copy(alpha = 0.72f),
-                            1f to scrimBottom.copy(alpha = 0.90f),
-                        )
+                        Brush.verticalGradient(0f to scrimTop, 1f to scrimBottom)
                     }
                 ),
         ) {

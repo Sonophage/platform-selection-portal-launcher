@@ -23,8 +23,13 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * Three-rows guarantee on a small viewport (Robolectric JVM Compose test — the same pattern as
  * feature-settings): render the real [AppDrawerContent] with 20 apps on a w480dp-h640dp screen and
- * assert the third row of tiles fits fully above the permanent footer slot. Guards the
- * [adaptiveArtworkSize] contract: nothing clipped, nothing hidden under the footer.
+ * assert the third row of tiles fits fully above the permanent footer slot: nothing clipped,
+ * nothing hidden under the footer.
+ *
+ * It used to guard adaptiveArtworkSize, which shrank the icon until three rows fit. The tile is
+ * now the shared [PfpMediaCard] at a FIXED 2:3, so nothing adapts and the row height falls out of
+ * the column count instead — which is exactly why this test still has to exist. It was re-checked
+ * against the new tile rather than assumed: forcing the card's aspect taller does still fail it.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

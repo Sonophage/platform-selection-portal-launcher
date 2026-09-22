@@ -977,6 +977,19 @@ data class XMBUiState(
             showWindowsSetupPrompt
 }
 
+/**
+ * How many result cards a search row holds.
+ *
+ * Lives here, not in SearchScreen, because the ViewModel's cursor has to step by exactly the
+ * number the grid draws — up and down move a row. Two copies of this number is a cursor that
+ * jumps two rows or half of one, and it would only be wrong on one axis.
+ *
+ * Seven, not five, because the card is a fixed 2:3 and so the column count IS the row height: at
+ * five the covers were 475px tall on this screen, which pushed the second line of a long title
+ * and the whole subtitle off the bottom of the panel. Widen the grid and the cards get shorter.
+ */
+const val SEARCH_GRID_COLUMNS = 7
+
 enum class XMBItemType {
     STANDARD,
     ALL_GAMES,
@@ -4168,6 +4181,13 @@ class XMBViewModel @Inject constructor(
     private fun searchNoticeItem(title: String, subtitle: String): XMBItem =
         XMBItem(id = EMPTY_CATEGORY_ITEM_ID, title = title, subtitle = subtitle, type = XMBItemType.EMPTY)
 
+    /**
+     * Moves the search cursor by [delta] cells, clamped.
+     *
+     * Clamped rather than wrapped, and deliberately NOT row-aware: stepping right off the end of
+     * a row lands on the first cell of the next one, which is how reading order works and what a
+     * flat index gives for free. The clamp at both ends is what stops it running off the grid.
+     */
     private fun moveSearch(delta: Int) {
         val state = _uiState.value.search ?: return
         if (state.rows.isEmpty()) return
@@ -4241,6 +4261,11 @@ class XMBViewModel @Inject constructor(
         id = "search_game_$id",
         title = title,
         subtitle = listOfNotNull("Game", platformCache[platformId]?.name).joinToString("  ·  "),
+        // Both art slots, because the card and the shell want different ones: shelfCoverArt reads
+        // boxArtUri first for a PORTRAIT cover, backdropArt reads artworkUri first for a LANDSCAPE
+        // background. Carrying only artworkUri was why every search result drew the wide grid art
+        // squeezed into a 2:3 tile -- the row simply never carried the cover for the card to find.
+        boxArtUri = boxArtUri,
         coverUri = artworkUri,
         gameId = id,
         platformId = platformId,
@@ -5598,8 +5623,13 @@ class XMBViewModel @Inject constructor(
         //    nothing rather than restart the search you are halfway through typing. ────────────
         if (state.search != null) {
             when (action) {
-                GamepadAction.NAVIGATE_UP   -> moveSearch(-1)
-                GamepadAction.NAVIGATE_DOWN -> moveSearch(+1)
+                // The results are a GRID now, so up and down move by a row and left and right by
+                // one. A list only ever needed two of these; carrying that over would have left
+                // the grid walkable one cell per press in one dimension only.
+                GamepadAction.NAVIGATE_UP    -> moveSearch(-SEARCH_GRID_COLUMNS)
+                GamepadAction.NAVIGATE_DOWN  -> moveSearch(+SEARCH_GRID_COLUMNS)
+                GamepadAction.NAVIGATE_LEFT  -> moveSearch(-1)
+                GamepadAction.NAVIGATE_RIGHT -> moveSearch(+1)
                 GamepadAction.SELECT        -> onSearchActivatedAt(state.search.selectedIndex)
                 GamepadAction.BACK          -> closeSearch()
                 else -> Unit

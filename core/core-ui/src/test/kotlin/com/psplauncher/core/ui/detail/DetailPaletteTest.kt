@@ -7,6 +7,7 @@ import com.psplauncher.core.ui.theme.PFPColors
 import com.psplauncher.core.ui.theme.composite
 import com.psplauncher.core.ui.theme.contrastRatio
 import com.psplauncher.core.ui.theme.relativeLuminance
+import com.psplauncher.core.ui.theme.XMB_SCRIM_TOP_ALPHA
 import com.psplauncher.core.ui.theme.storefrontColorsFor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -63,8 +64,11 @@ class DetailPaletteTest {
             assertEquals(drawer.backgroundDeep, page.pageTop)
             assertEquals(drawer.backgroundMid, page.pageBottom)
         }
-        // 0.88 stored in 8 bits reads back as 0.878.
-        assertEquals(0.88f, detailPaletteFor(classicBlue).pageTop.alpha, 0.005f)
+        // Derived, not transcribed. This line held the drawer's alpha as the literal 0.88, and
+        // when the drawer moved to the shared scrim it was the only thing in the file that broke —
+        // the two assertions above, which compare the pair to each other, stayed correctly green.
+        // A copy of a number is not a guard on it.
+        assertEquals(XMB_SCRIM_TOP_ALPHA, detailPaletteFor(classicBlue).pageTop.alpha, 0.005f)
     }
 
     @Test

@@ -153,6 +153,26 @@ fun solveScrimColor(
     return lerp(base, Color.Black, hi)
 }
 
+/**
+ * The two anchors of the full-screen scrim drawn over the live XMB wave, top and bottom, already
+ * carrying the alpha they are to be painted at.
+ *
+ * ONE definition because these are a guarded pair that had come apart. Settings and the App
+ * Drawer are the same surface — a full-screen overlay with the wave behind it — and were solving
+ * it differently: Settings bisected both anchors for contrast, the drawer used the raw theme
+ * gradient at a flat 0.88 alpha. Only Settings was pinned by TextLegibilityTest, so only Settings
+ * stayed correct, and the two read as different apps.
+ *
+ * Alphas are 0.72 at the top and 0.90 at the bottom: the wave is strongest where the eye starts
+ * and the list is densest where it ends.
+ */
+fun xmbScrimAnchors(backgroundTop: Color, backgroundBottom: Color): Pair<Color, Color> =
+    solveScrimColor(backgroundTop, alpha = XMB_SCRIM_TOP_ALPHA).copy(alpha = XMB_SCRIM_TOP_ALPHA) to
+        solveScrimColor(backgroundBottom, alpha = XMB_SCRIM_BOTTOM_ALPHA).copy(alpha = XMB_SCRIM_BOTTOM_ALPHA)
+
+const val XMB_SCRIM_TOP_ALPHA = 0.72f
+const val XMB_SCRIM_BOTTOM_ALPHA = 0.90f
+
 // -- HSL lightness clamp ------------------------------------------------------
 
 /**

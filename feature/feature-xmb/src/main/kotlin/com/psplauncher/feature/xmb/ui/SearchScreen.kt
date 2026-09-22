@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,9 +17,10 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -40,6 +42,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -52,6 +55,8 @@ import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursor
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.xmb.viewmodel.SearchState
+import com.psplauncher.core.ui.components.PfpMediaCard
+import com.psplauncher.feature.xmb.viewmodel.SEARCH_GRID_COLUMNS
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
 import androidx.compose.runtime.ReadOnlyComposable
@@ -76,6 +81,8 @@ private val CoverPlaceholder = Color(0xFF1B1B27)
  * Stateless: it renders [state] and forwards intents. The cursor lives in the ViewModel, because
  * the D-pad reaches the ViewModel and not this composable.
  */
+
+
 @Composable
 fun SearchScreen(
     state: SearchState,
@@ -84,10 +91,14 @@ fun SearchScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
     LaunchedEffect(state.selectedIndex, state.scrollToTopToken) {
         if (state.rows.isNotEmpty()) {
-            listState.animateScrollToItem((state.selectedIndex - 1).coerceIn(0, state.rows.lastIndex))
+            // A ROW back, not an item back. The list scrolled to selectedIndex - 1 to keep one
+            // entry visible above the cursor; in a grid that is one column to the left, which is
+            // usually the same row and scrolls nothing.
+            val target = (state.selectedIndex - SEARCH_GRID_COLUMNS).coerceIn(0, state.rows.lastIndex)
+            gridState.animateScrollToItem(target)
         }
     }
 
@@ -177,13 +188,36 @@ fun SearchScreen(
             // there is. It also used to sit ON the last result rather than under it, because the
             // list had no room to give it.
             Column(modifier = Modifier.weight(1f).fillMaxWidth().imePadding()) {
-                LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    itemsIndexed(state.rows, key = { _, row -> row.id }) { index, row ->
-                        SearchResultRow(
-                            row = row,
-                            selected = index == state.selectedIndex,
-                            onClick = { onActivateAt(index) },
-                        )
+                // One mixed grid, best matches first — not grouped by medium. A list showed four
+                // results and left the right half of the screen empty; the grid shows five to a
+                // row, so a search for "final" is answered without scrolling.
+                //
+                // The EMPTY row (the "nothing found" placeholder) is still a full-width line: a
+                // message is not a result and putting it in a cell would look like one.
+                val empty = state.rows.singleOrNull()?.takeIf { it.type == XMBItemType.EMPTY }
+                if (empty != null) {
+                    SearchResultRow(row = empty, selected = false, onClick = {})
+                    Spacer(Modifier.weight(1f))
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(SEARCH_GRID_COLUMNS),
+                        state = gridState,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        contentPadding = PaddingValues(vertical = 6.dp),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    ) {
+                        itemsIndexed(state.rows, key = { _, row -> row.id }) { index, row ->
+                            PfpMediaCard(
+                                title = row.title,
+                                art = row.shelfCoverArt,
+                                subtitle = row.subtitle,
+                                focused = index == state.selectedIndex,
+                                onClick = { onActivateAt(index) },
+                                width = Dp.Unspecified,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
                 if (imeUp) return@Column
