@@ -136,11 +136,13 @@ fun MusicBrowserScreen(
                 }
                 Spacer(Modifier.weight(1f))
                 if (showTouchControls) {
-                    // Sort applies to track views only (the ViewModel ignores it for playlists, so the
-                    // pill is hidden there); the label shows the active sort.
+                    // Sort applies to track views only (the ViewModel ignores it for playlists and
+                    // for the Artists/Albums lists, so the pill is hidden there). The label arrives
+                    // already reading "Sort: Title" -- the same string the XMB status bar shows --
+                    // so the pill prints it as it is rather than prefixing it a second time.
                     state.sortLabel?.let { label ->
                         HeaderPill(onClick = onSortTapped) {
-                            Text("Sort: $label", color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text(label, color = PrimaryText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         }
                         Spacer(Modifier.width(10.dp))
                     }
