@@ -8521,10 +8521,28 @@ class XMBViewModel @Inject constructor(
 
     private fun launchAppWithDisc(packageName: String, art: Any?) {
         viewModelScope.launch {
-            awaitDiscHandOff(art)
+            awaitDiscHandOff(art ?: appLauncherIcon(packageName))
             appCategoryRepository.launch(packageName)
         }
     }
+
+    /**
+     * The disc's face for an app that has no artwork of its own.
+     *
+     * [XMBItem.shelfCoverArt] is a list of URI columns, and an app row only has any of them when
+     * the user has assigned artwork to that package. Most have not — so the art handed to the
+     * ceremony was null and the disc spun up blank, while the row it was launched from showed the
+     * app's icon perfectly well. The row draws that icon from the package manager, not from a
+     * URI, which is why the two disagreed.
+     *
+     * The gate takes `Any?` and the ceremony passes anything that is not a String straight to the
+     * image, so a Drawable is already a face it can draw. Nothing new is needed but the lookup.
+     *
+     * Null on failure rather than throwing: an app that cannot even be asked for its icon is one
+     * that is probably about to fail to launch, and the launch should be what reports that.
+     */
+    private fun appLauncherIcon(packageName: String): Any? =
+        runCatching { context.packageManager.getApplicationIcon(packageName) }.getOrNull()
 
     /** The disc has started fading out: whatever was waiting on it may now open. */
     fun onDiscCeremonyHandOff() = mediaLaunchGate.onHandOff()
