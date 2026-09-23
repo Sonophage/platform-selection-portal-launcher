@@ -67,6 +67,15 @@ interface GameRepository {
     /** Takes the game off the Last Played shelf. Its recorded play time is kept — see GameDao. */
     suspend fun clearLastPlayed(id: Long)
     suspend fun recordPlaySession(session: PlaySession)
+
+    /**
+     * Stamps a game as opened at [playedAt] without touching the play counter.
+     *
+     * Separate from [recordPlaySession] because the two answer different questions and survive
+     * different things: the session is measured, and only exists if the launcher saw the emulator
+     * cover it and saw the user come back. This is the bare fact that the game was opened.
+     */
+    suspend fun markOpened(id: Long, playedAt: Long)
     suspend fun getMissingRoms(): List<Game>
     suspend fun updateScrapedTitle(id: Long, scrapedTitle: String?)
 

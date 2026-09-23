@@ -137,6 +137,8 @@ class GameRepositoryImpl @Inject constructor(
 
     override suspend fun clearLastPlayed(id: Long) = gameDao.clearLastPlayed(id)
 
+    override suspend fun markOpened(id: Long, playedAt: Long) = gameDao.markOpened(id, playedAt)
+
     override suspend fun recordPlaySession(session: PlaySession) {
         playSessionDao.insert(session.toEntity())
         gameDao.addPlayTime(

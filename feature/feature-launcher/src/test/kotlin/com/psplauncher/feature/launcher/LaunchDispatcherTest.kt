@@ -121,6 +121,56 @@ class LaunchDispatcherTest {
         }
     }
 
+    // ── The Last Played stamp ────────────────────────────────────────────────
+
+    @Test
+    fun `a dispatched launch stamps the shelf before the emulator has even opened`() = runTest {
+        // The stamp used to ride along with the play session, which needs `pending` and
+        // `hostStopped` to still be in memory when the user returns. A big game is exactly what
+        // evicts the launcher, so the return is a cold start and the whole hand-off is gone --
+        // and with it the one fact the Last Played shelf reads.
+        val h = harness()
+        coEvery { h.recorder.record(any()) } returns Unit
+        h.now = 1_234L
+
+        h.dispatcher.launch(game, resolved, h.intent)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { h.gameRepository.markOpened(7L, 1_234L) }
+    }
+
+    @Test
+    fun `a launch the process never returns from is still on the shelf`() = runTest {
+        // The actual failure, played out: dispatched, the launcher is covered, and nothing ever
+        // reports back because the process died. No session is recorded, and that is correct --
+        // the duration is genuinely unknown. The stamp must survive it anyway.
+        val h = harness()
+        coEvery { h.recorder.record(any()) } returns Unit
+        h.now = 5_000L
+
+        h.dispatcher.launch(game, resolved, h.intent)
+        h.dispatcher.onHostStopped()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { h.gameRepository.markOpened(7L, 5_000L) }
+        coVerify(exactly = 0) { h.gameRepository.recordPlaySession(any()) }
+    }
+
+    @Test
+    fun `a launch that never reached startActivity does not stamp`() = runTest {
+        // Same rule the core-memory write follows: after startActivity, so a launch that did not
+        // happen cannot claim the top of the shelf. Preflight refusals never get here at all.
+        val h = harness()
+        coEvery { h.recorder.record(any()) } returns Unit
+        every { h.context.startActivity(any(), any()) } throws
+            android.content.ActivityNotFoundException("no such activity")
+
+        h.dispatcher.launch(game, resolved, h.intent)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { h.gameRepository.markOpened(any(), any()) }
+    }
+
     @Test
     fun `standalone launch does not write core memory`() = runTest {
         val h = harness()
@@ -134,7 +184,7 @@ class LaunchDispatcherTest {
     @Test
     fun `intent failure records INTENT_FAILED and offers recovery`() = runTest {
         val h = harness()
-        every { h.context.startActivity(any()) } throws android.content.ActivityNotFoundException("nope")
+        every { h.context.startActivity(any(), any()) } throws android.content.ActivityNotFoundException("nope")
 
         val result = h.dispatcher.launch(game, resolved, h.intent)
 
@@ -151,7 +201,7 @@ class LaunchDispatcherTest {
     @Test
     fun `a failed dispatch plays the error sound and offers recovery`() = runTest {
         val h = harness()
-        every { h.context.startActivity(any()) } throws android.content.ActivityNotFoundException("nope")
+        every { h.context.startActivity(any(), any()) } throws android.content.ActivityNotFoundException("nope")
 
         val result = h.dispatcher.launch(game, resolved, h.intent)
 
@@ -286,7 +336,7 @@ class LaunchDispatcherTest {
             outcome(LaunchOutcomeStatus.SUCCEEDED),
             outcome(LaunchOutcomeStatus.NEVER_FOREGROUNDED),
         )
-        every { h.context.startActivity(any()) } throws android.content.ActivityNotFoundException("x")
+        every { h.context.startActivity(any(), any()) } throws android.content.ActivityNotFoundException("x")
 
         h.dispatcher.launch(game, resolved, h.intent)
 
@@ -315,7 +365,7 @@ class LaunchDispatcherTest {
     @Test
     fun `dismiss clears the recovery request`() = runTest {
         val h = harness()
-        every { h.context.startActivity(any()) } throws android.content.ActivityNotFoundException("x")
+        every { h.context.startActivity(any(), any()) } throws android.content.ActivityNotFoundException("x")
         coEvery { h.recorder.record(any()) } returns Unit
 
         h.dispatcher.launch(game, resolved, h.intent)
@@ -389,7 +439,7 @@ class LaunchDispatcherTest {
     @Test
     fun `a failed startActivity is not play time`() = runTest {
         val h = Harness(this)
-        every { h.context.startActivity(any()) } throws android.content.ActivityNotFoundException()
+        every { h.context.startActivity(any(), any()) } throws android.content.ActivityNotFoundException()
         coEvery { h.recorder.record(any()) } returns Unit
 
         h.dispatcher.launch(game, null, h.intent)

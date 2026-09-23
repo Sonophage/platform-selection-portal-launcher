@@ -28,9 +28,24 @@ import android.os.Bundle
  */
 object LaunchTransition {
 
-    /** The options bundle for [Context.startActivity] and `LauncherApps.startShortcut`. */
-    fun options(context: Context): Bundle =
-        ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
+    /**
+     * The options bundle for [Context.startActivity] and `LauncherApps.startShortcut`, or null
+     * when this device will not build one.
+     *
+     * Nullable, and swallowing, because the bundle is a nicety and the launch is not. Both of
+     * those call sites accept a null bundle and simply use the system transition. An exception
+     * escaping from here instead travelled all the way out to the user as "Could not open
+     * emulator: Method makeCustomAnimation ..." — the game did not start at all, and the reason
+     * given named something that has nothing to do with the game.
+     *
+     * That is not hypothetical. It is what LaunchDispatcher's own tests started reporting the
+     * moment this object was introduced: a JVM unit test has no Android framework behind
+     * [ActivityOptions], so the call throws, and the dispatcher's catch-all turned a cosmetic
+     * failure into a refused launch. A device that throws here for its own reasons would have
+     * done exactly the same to a real launch.
+     */
+    fun options(context: Context): Bundle? =
+        runCatching { ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle() }.getOrNull()
 
     /** The intent flag half. Returns the same intent so it can be chained onto a builder. */
     fun Intent.withoutTransition(): Intent = addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)

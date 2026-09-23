@@ -109,12 +109,32 @@ class LaunchDispatcher @Inject constructor(
             resolved?.profile?.takeIf { it.isRetroArchProfile() }?.let { profile ->
                 autoCoreMemory.remember(game.platformId, profile.id)
             }
+            val dispatchedAt = clock.now()
+            // The Last Played stamp, written NOW rather than on the way back.
+            //
+            // It used to ride along with the play session, which is only recorded if the launcher
+            // is still in memory when the user returns — `pending` and `hostStopped` are plain
+            // fields on this singleton. A big game is exactly what evicts the launcher: Skyrim
+            // through GameNative takes the device, Android reclaims PFP, and the return is a cold
+            // start with no pending launch to classify. The session is genuinely lost at that
+            // point, and so, until now, was the one fact the shelf needs.
+            //
+            // Same rule as the AutoCoreMemory write above: after startActivity, so a launch that
+            // never happened cannot stamp. A launch that opened and then failed still counts —
+            // the shelf asks what you last opened, not what went well.
+            //
+            // recordPlaySession stamps the same instant again on a clean return (it passes
+            // session.launchedAt, which is this value), so the two cannot disagree.
+            scope.launch {
+                runCatching { gameRepository.markOpened(game.id, dispatchedAt) }
+                    .onFailure { Timber.w(it, "Could not stamp gameId=${game.id} on the Last Played shelf") }
+            }
             acceptPending(
                 PendingLaunch(
                     game         = game,
                     resolved     = resolved,
                     intentSummary = intent.toUri(Intent.URI_INTENT_SCHEME),
-                    dispatchedAtMs = clock.now(),
+                    dispatchedAtMs = dispatchedAt,
                 )
             )
             LaunchDispatchResult.Accepted
