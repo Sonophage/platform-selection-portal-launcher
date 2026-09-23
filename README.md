@@ -29,6 +29,22 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 *Captured on an AYN Thor unless noted. Game artwork and app icons shown belong to their
 respective owners.*
 
+### In development
+
+*On `main`, not on the Releases page yet — the newest published build is 1.5.0. Shot on the
+AYANEO Pocket FIT Elite at 1920x1080.*
+
+| | |
+|:---:|:---:|
+| <img src="docs/screenshots/launch-disc.jpg" width="420"> | <img src="docs/screenshots/settings-launch-cues.jpg" width="420"> |
+| The launch ceremony — the thing you picked becomes a disc wearing its own cover, sinks and spins, and hands over as it leaves | Its two cues are yours to assign, alongside every other sound |
+| <img src="docs/screenshots/setup-splash.jpg" width="420"> | <img src="docs/screenshots/setup-welcome.jpg" width="420"> |
+| Setup opens on the mark and the wave, and one press takes you in — first run only | The wizard is a place now: black, no settings rail, nothing borrowed from whatever wallpaper is set |
+| <img src="docs/screenshots/setup-permissions.jpg" width="420"> | <img src="docs/screenshots/setup-personalize.jpg" width="420"> |
+| Three optional grants, together, because all three are system screens | Theme, sound, boot logo and layout as four doors that open the real screens and come back |
+| <img src="docs/screenshots/setup-retroarch-cores.jpg" width="420"> | <img src="docs/screenshots/settings-menu-music.jpg" width="420"> |
+| RetroArch's page, which only appears when RetroArch is installed — and now finds it whichever ABI it ships as | Menu music: one track, looping, that gives way the moment anything else wants the speaker |
+
 ### New in 1.5
 
 *Shot on the AYANEO Pocket FIT Elite at 1920x1080, on a real 148-game library.*
