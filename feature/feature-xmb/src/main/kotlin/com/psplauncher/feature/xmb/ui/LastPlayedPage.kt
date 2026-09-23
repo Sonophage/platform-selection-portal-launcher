@@ -246,24 +246,33 @@ fun RecentFilterRow(
     onFilterTapped: (RecentFilter) -> Unit = {},
 ) {
     Row(
-        modifier = modifier,
+        modifier = modifier.fillMaxHeight(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RecentFilter.entries.forEach { entry ->
             val active = entry == filter
-            Text(
-                text = entry.label,
-                // The names are 8sp chrome, which is far too small to hit, so the touch target
-                // is padded out around each one rather than the text being grown to meet it.
+            // The target is the full height of the strip and no more.
+            //
+            // It was `padding(vertical = 8.dp)` for one build, which is the obvious way to make
+            // 8sp chrome hittable and is wrong here: the strip is a fixed 18.dp Box, so padding
+            // grew each name past its container and the labels came out clipped to a few pixels
+            // of glyph on a tablet. Filling the height gets the same press out of the space that
+            // actually exists, and widening happens sideways, where there is room.
+            Box(
                 modifier = Modifier
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(4.dp))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = { onFilterTapped(entry) },
                     )
-                    .padding(horizontal = 6.dp, vertical = 8.dp),
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+            Text(
+                text = entry.label,
                 // White either way, dimmed rather than recoloured. These sit over whatever
                 // artwork the focused item brought, and the theme is re-tinted from that same
                 // artwork -- a themed colour here is drawn FROM the picture it must be read
@@ -274,6 +283,7 @@ fun RecentFilterRow(
                 fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                 style = TextStyle(shadow = XmbTextShadow),
             )
+            }
         }
     }
 }
