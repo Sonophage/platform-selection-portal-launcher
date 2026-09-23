@@ -229,7 +229,7 @@ class PcGameExporter @Inject constructor(
     private suspend fun importFolder(): ImportFolder {
         val setup = runCatching { windowsLibrarySetup.ensure() }.getOrNull()
         if (setup is WindowsSetupState.NoRomRoot) {
-            return ImportFolder.Missing("Add a ROM Root first — PFP exports PC games into <root>/windows/import.")
+            return ImportFolder.Missing("Add a ROM Root first — PSP exports PC games into <root>/windows/import.")
         }
         val (treeUri, docId) = windowsLibrarySetup.importFolders().firstOrNull()
             ?: return ImportFolder.Missing("Couldn't open <windows>/import. Relink the ROM Root and try again.")

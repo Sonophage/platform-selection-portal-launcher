@@ -49,10 +49,10 @@ fun MediaAssignmentRow(
     /** Null on a slot with no reset. See [resetLabel] for slots whose reset is not a default. */
     onUseDefault: (() -> Unit)? = null,
     /**
-     * What the reset action says it does. "Use the PFP default" is right for a slot that HAS one;
+     * What the reset action says it does. "Use the PSP default" is right for a slot that HAS one;
      * Menu Music does not, so for it the same action is honestly a removal.
      */
-    resetLabel: String = "Use the PFP default for $label",
+    resetLabel: String = "Use the PSP default for $label",
     sublabel: String? = null,
 ) {
     SettingsRow(

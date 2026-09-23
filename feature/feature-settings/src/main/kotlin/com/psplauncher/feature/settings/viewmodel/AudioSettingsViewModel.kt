@@ -13,6 +13,7 @@ import com.psplauncher.core.domain.model.UiMediaKind
 import com.psplauncher.core.domain.model.UiMediaSlot
 import com.psplauncher.core.domain.model.XYLayout
 import com.psplauncher.core.ui.media.UiMediaAudioPlayer
+import com.psplauncher.core.ui.media.bundledDefaultRes
 import com.psplauncher.core.ui.sound.MenuSound
 import com.psplauncher.core.ui.sound.MenuSoundPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,16 +33,19 @@ import kotlinx.coroutines.launch
 // inverting the polarity would make a restored old backup mean the opposite of what it said.
 private val KEY_MENU_SOUND = booleanPreferencesKey("sound_menu_enabled")
 
-/** The label shown when a slot has no user assignment. */
-const val PFP_DEFAULT_LABEL = "PFP Default"
+/**
+ * The label shown when a slot has no user assignment AND no bundled sample — the launch disc's
+ * opener is the only one, and calling it "PSP Default" would promise a sound that does not exist.
+ */
+const val NO_SOUND_LABEL = "None"
 
 data class AudioSettingsUiState(
     val menuSoundEnabled: Boolean = true,
     val menuMusicEnabled: Boolean = false,
     /** True once a track is assigned. The switch does nothing without one, and says so. */
     val menuMusicAssigned: Boolean = false,
-    val menuMusicLabel: String = PFP_DEFAULT_LABEL,
-    /** Per-sound-slot row summary: the imported file's name, or [PFP_DEFAULT_LABEL]. */
+    val menuMusicLabel: String = NO_SOUND_LABEL,
+    /** Per-sound-slot row summary: the imported file's name, [UI_MEDIA_DEFAULT_LABEL] or [NO_SOUND_LABEL]. */
     val soundLabels: Map<UiMediaSlot, String> = emptyMap(),
     /** Slots the user has actually assigned — drives whether "Use Default" is offered. */
     val assignedSlots: Set<UiMediaSlot> = emptySet(),
@@ -97,8 +101,11 @@ class AudioSettingsViewModel @Inject constructor(
         // or a clear re-runs this and the row summaries follow the directory.
         val assigned = store.assignments().keys
         val labels = SOUND_SLOTS.associateWith { slot ->
-            if (slot in assigned) prefs[UiMediaStore.displayNameKey(slot)] ?: "Custom sound"
-            else PFP_DEFAULT_LABEL
+            when {
+                slot in assigned -> prefs[UiMediaStore.displayNameKey(slot)] ?: "Custom sound"
+                slot.bundledDefaultRes() != null -> UI_MEDIA_DEFAULT_LABEL
+                else -> NO_SOUND_LABEL
+            }
         }
         AudioSettingsUiState(
             menuSoundEnabled = prefs[KEY_MENU_SOUND] ?: true,

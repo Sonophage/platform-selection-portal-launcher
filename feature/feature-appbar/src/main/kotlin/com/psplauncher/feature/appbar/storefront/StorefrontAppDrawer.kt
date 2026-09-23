@@ -841,7 +841,7 @@ private fun EmptyDrawerMessage(
                 hasQuery -> "Try a different search term"
                 filter == AppFilter.GAMES -> "Apps marked as games in the Play Store appear here"
                 filter == AppFilter.EMULATORS -> "Install RetroArch, PPSSPP, or another emulator"
-                filter == AppFilter.RECENT && !hasUsageAccess -> "Grant access so PFP can sort apps by last used time"
+                filter == AppFilter.RECENT && !hasUsageAccess -> "Grant access so PSP can sort apps by last used time"
                 else -> ""
             },
             color = colors.textSecondary.copy(alpha = 0.6f),

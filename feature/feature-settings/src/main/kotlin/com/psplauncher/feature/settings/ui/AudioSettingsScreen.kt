@@ -26,7 +26,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.UiMediaSlot
 import com.psplauncher.feature.settings.viewmodel.AudioSettingsViewModel
-import com.psplauncher.feature.settings.viewmodel.PFP_DEFAULT_LABEL
+import com.psplauncher.feature.settings.viewmodel.NO_SOUND_LABEL
 import com.psplauncher.themekit.UiMediaLimits
 
 /**
@@ -178,7 +178,8 @@ fun AudioSettingsScreen(
                 MediaAssignmentRow(
                     label = UiMediaSlot.MENU_MUSIC.displayName,
                     focusKey = "audio_${UiMediaSlot.MENU_MUSIC.key}",
-                    sublabel = "Up to five minutes, looped (MP3, WAV, OGG or M4A)",
+                    sublabel = "Up to ${UiMediaLimits.MENU_MUSIC.hardMaxMs / 60_000} minutes, " +
+                        "looped (MP3, WAV, OGG or M4A)",
                     value = state.menuMusicLabel,
                     isAssigned = state.menuMusicAssigned,
                     onPick = { pickFor(UiMediaSlot.MENU_MUSIC) },
@@ -206,7 +207,7 @@ fun AudioSettingsScreen(
                     )
                 }
                 AudioSettingsViewModel.SOUND_SLOTS.forEach { slot ->
-                    val label = state.soundLabels[slot] ?: PFP_DEFAULT_LABEL
+                    val label = state.soundLabels[slot] ?: NO_SOUND_LABEL
                     MediaAssignmentRow(
                         label = slot.displayName,
                         focusKey = "audio_${slot.key}",
@@ -220,7 +221,7 @@ fun AudioSettingsScreen(
                         resetLabel = if (slot == UiMediaSlot.LAUNCH_DISC_AUDIO) {
                             "Open the launch disc in silence again"
                         } else {
-                            "Use the PFP default for ${slot.displayName}"
+                            "Use the PSP default for ${slot.displayName}"
                         },
                         onUseDefault = {
                             requestSoundFocus(slot)
@@ -236,7 +237,7 @@ fun AudioSettingsScreen(
 
                 SettingsRow(
                     label = "Reset Sound to Defaults",
-                    sublabel = "Return every menu, boot and launch sound to the bundled PFP sample and turn Menu Sounds back on",
+                    sublabel = "Return every menu, boot and launch sound to the bundled PSP sample and turn Menu Sounds back on",
                     onFocusChangedExternal = { if (it) focusedSlot = null },
                     onClick = { viewModel.requestReset() },
                 )
@@ -256,7 +257,7 @@ fun AudioSettingsScreen(
     if (state.confirmResetVisible) {
         SettingsConfirmOverlay(
             title = "Reset Sound to Defaults?",
-            message = "Every menu and boot sound returns to the bundled PFP sample and Menu " +
+            message = "Every menu and boot sound returns to the bundled PSP sample and Menu " +
                 "Sounds is turned back on. Your Boot Video and GameBoot media are not affected.",
             confirmLabel = "Reset",
             onConfirm = viewModel::confirmReset,

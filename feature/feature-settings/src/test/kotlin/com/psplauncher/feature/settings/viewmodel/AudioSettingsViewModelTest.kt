@@ -213,6 +213,23 @@ class AudioSettingsViewModelTest {
             }
         }
 
+    @Test fun `an unassigned row says Default only when it has one to fall back to`() =
+        runTest(dispatcher) {
+            collectUiState()
+            eventually("the row summaries are built") {
+                vm.uiState.value.soundLabels.size == AudioSettingsViewModel.SOUND_SLOTS.size
+            }
+            val labels = vm.uiState.value.soundLabels
+
+            // Every other row has a bundled sample behind it.
+            assertEquals(UI_MEDIA_DEFAULT_LABEL, labels[UiMediaSlot.SOUND_SCROLL])
+            assertEquals(UI_MEDIA_DEFAULT_LABEL, labels[UiMediaSlot.BOOT_AUDIO])
+            assertEquals(UI_MEDIA_DEFAULT_LABEL, labels[UiMediaSlot.GAMEBOOT_AUDIO])
+            // The disc's opener does not: unassigned means silence, and saying "Default" there
+            // would promise a sound that no reset could ever produce.
+            assertEquals(NO_SOUND_LABEL, labels[UiMediaSlot.LAUNCH_DISC_AUDIO])
+        }
+
     @Test fun `the ceremony rows preview their own slot, not boot audio`() = runTest(dispatcher) {
         // preview() reaches the previewer through an overload whose slot parameter DEFAULTS to
         // BOOT_AUDIO, and an unassigned row passes null for the path — so a call that let the

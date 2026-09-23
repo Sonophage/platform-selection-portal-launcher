@@ -452,7 +452,7 @@ fun DisplaySettingsScreen(
                 MediaAssignmentRow(
                     label    = "Boot Video",
                     focusKey = "display_${UiMediaSlot.BOOT_VIDEO.key}",
-                    sublabel = "Play your own video instead of the PFP logo animation " +
+                    sublabel = "Play your own video instead of the PSP logo animation " +
                         "(MP4 or WebM, up to 10 seconds)",
                     value    = state.bootVideoLabel,
                     isAssigned = state.bootVideoAssigned,
@@ -516,7 +516,7 @@ fun DisplaySettingsScreen(
 
                 SettingsValueRow(
                     label    = "Screen Orientation",
-                    sublabel = "PFP is designed for landscape use",
+                    sublabel = "PSP is designed for landscape use",
                     value    = "Landscape (fixed)",
                 )
 

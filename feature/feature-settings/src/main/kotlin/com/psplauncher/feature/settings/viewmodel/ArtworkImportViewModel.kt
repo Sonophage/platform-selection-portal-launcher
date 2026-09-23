@@ -136,7 +136,7 @@ class ArtworkImportViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 notice = buildString {
                     append(
-                        if (result.existingLibrary) "Existing PFP artwork library reconnected."
+                        if (result.existingLibrary) "Existing PSP artwork library reconnected."
                         else "Artwork library created.",
                     )
                     if (scan != null && scan.gamesLinked > 0) {

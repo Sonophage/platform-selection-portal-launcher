@@ -202,7 +202,7 @@ data class DisplaySettingsUiState(
 }
 
 /** Row summary for a UI-media slot with no user assignment. */
-const val UI_MEDIA_DEFAULT_LABEL = "PFP Default"
+const val UI_MEDIA_DEFAULT_LABEL = "PSP Default"
 
 @HiltViewModel
 class DisplaySettingsViewModel @Inject constructor(

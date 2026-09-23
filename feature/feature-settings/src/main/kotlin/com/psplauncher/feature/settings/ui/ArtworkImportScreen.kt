@@ -63,7 +63,7 @@ fun ArtworkImportScreen(
             SettingsRow(
                 label    = "Folder",
                 sublabel = when {
-                    !state.folderLinked -> "Not set — tap to choose where PFP keeps artwork"
+                    !state.folderLinked -> "Not set — tap to choose where PSP keeps artwork"
                     !state.grantAlive   -> "${state.folderDisplay}  —  access lost, tap to re-link"
                     else                -> "${state.folderDisplay}  (tap to change)"
                 },
@@ -73,7 +73,7 @@ fun ArtworkImportScreen(
             if (state.folderLinked) {
                 SettingsRow(
                     label    = if (state.confirmForget) "Tap again to confirm" else "Forget Folder",
-                    sublabel = "Releases PFP's access. Nothing on disk is deleted — the artwork " +
+                    sublabel = "Releases PSP's access. Nothing on disk is deleted — the artwork " +
                         "stays yours in the folder.",
                     onClick  = { viewModel.forgetFolder() },
                 )

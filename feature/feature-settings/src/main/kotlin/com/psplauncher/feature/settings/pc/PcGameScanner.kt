@@ -82,7 +82,7 @@ class PcGameScanner @Inject constructor(
         if (overrideFolder == null && setup is WindowsSetupState.NoRomRoot) {
             return PcScanReport(
                 setup, 0, 0, 0,
-                message = "Add a ROM Root first — PFP creates <root>/windows/import for exported games.",
+                message = "Add a ROM Root first — PSP creates <root>/windows/import for exported games.",
             )
         }
 

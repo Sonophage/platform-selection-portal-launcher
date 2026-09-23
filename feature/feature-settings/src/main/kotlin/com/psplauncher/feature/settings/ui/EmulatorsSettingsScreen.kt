@@ -213,7 +213,7 @@ fun EmulatorsSettingsScreen(
 
             SettingsRow(
                 label    = if (state.retroArchLinked) "Re-link RetroArch Folder" else "Link RetroArch to Detect Cores",
-                sublabel = "In the picker, choose RetroArch's folder (grant access) so PFP can read its installed cores",
+                sublabel = "In the picker, choose RetroArch's folder (grant access) so PSP can read its installed cores",
                 focusKey = "retroarch_link",
                 onClick  = { retroArchPicker.launch(null) },
             )

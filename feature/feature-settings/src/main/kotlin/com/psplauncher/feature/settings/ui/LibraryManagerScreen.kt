@@ -262,7 +262,7 @@ private fun LibraryListContent(
             )
             SettingsRow(
                 label    = "Set Up ROM Folders (ES-DE)",
-                sublabel = "Pick an empty folder — PFP creates the standard ES-DE system folders " +
+                sublabel = "Pick an empty folder — PSP creates the standard ES-DE system folders " +
                     "(gba, snes, psx…) for you to copy games into. No guessing folder names",
                 onClick  = { onRequestRomFolderSetup() },
             )
@@ -475,7 +475,7 @@ private fun CardDetailContent(
                     label    = "Games Directory",
                     value    = card.romDirectory?.substringAfterLast('/') ?: "Not set",
                     sublabel = card.romDirectory
-                        ?: "Add a ROM Root — PFP creates and uses <root>/windows automatically",
+                        ?: "Add a ROM Root — PSP creates and uses <root>/windows automatically",
                 )
                 SettingsValueRow(label = "Games", value = card.gameCount.toString())
 
@@ -493,7 +493,7 @@ private fun CardDetailContent(
                     value    = state.vita3KFolderLabel ?: "Not set",
                     sublabel = state.vita3KFolderLabel
                         ?.let { "Reading installed titles from this ux0 folder" }
-                        ?: "Pick your Vita3K ux0 folder (e.g. Roms/vita/ux0) so PFP can find games",
+                        ?: "Pick your Vita3K ux0 folder (e.g. Roms/vita/ux0) so PSP can find games",
                     onClick  = { vitaFolderPicker.launch(null) },
                 )
                 SettingsValueRow(label = "Games", value = card.gameCount.toString())
@@ -689,15 +689,15 @@ private fun ImportPcGamesContent(
                 sublabel = if (state.isHomeLauncher)
                     "Using \"Add to home\" inside a supported launcher imports the game here automatically"
                 else
-                    "Set PFP as your Home app so a launcher's \"Add to home\" option imports the game into PFP",
+                    "Set PSP as your Home app so a launcher's \"Add to home\" option imports the game into PSP",
                 onClick  = { runCatching { homeLauncher.launch(homeRoleIntentProvider()) } },
             )
 
             SettingsGroup("Exported Games")
             SettingsRow(
                 label    = "Scan Import Folder",
-                sublabel = "Pick the folder your launcher exports to — PFP scans it for GameNative / " +
-                    "Winlator exports (.steam · .epic · .gog · .amazon · .pcgame · .desktop) and PFP's own " +
+                sublabel = "Pick the folder your launcher exports to — PSP scans it for GameNative / " +
+                    "Winlator exports (.steam · .epic · .gog · .amazon · .pcgame · .desktop) and PSP's own " +
                     ".pfpgame exports, and imports them",
                 onClick  = { importPicker.launch(null) },
             )

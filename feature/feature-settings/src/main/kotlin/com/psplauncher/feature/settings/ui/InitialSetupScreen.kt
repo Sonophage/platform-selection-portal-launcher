@@ -531,7 +531,7 @@ private fun VitaPage(
     if (folder == null) {
         WizardInfoText(
             "Vita3K is installed. Grant its data (ux0) folder — often shared-storage " +
-                "e.g. Roms/vita/ux0 — so PFP can discover installed Vita titles and read " +
+                "e.g. Roms/vita/ux0 — so PSP can discover installed Vita titles and read " +
                 "trophies without granting per game."
         )
     } else {

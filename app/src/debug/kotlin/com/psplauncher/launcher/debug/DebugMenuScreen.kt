@@ -173,7 +173,7 @@ private fun DebugHeader(onDismiss: () -> Unit) {
     ) {
         Column {
             Text(
-                text       = "PFP DEBUG MENU",
+                text       = "PSP DEBUG MENU",
                 color      = Color(0xFFFFCC00),
                 fontSize   = 16.sp,
                 fontWeight = FontWeight.Bold,

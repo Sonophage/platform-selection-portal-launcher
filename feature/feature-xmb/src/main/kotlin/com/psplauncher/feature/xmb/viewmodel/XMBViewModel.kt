@@ -1887,7 +1887,7 @@ class XMBViewModel @Inject constructor(
                 val request = _uiState.value.launchRecovery ?: return
                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 cm.setPrimaryClip(android.content.ClipData.newPlainText(
-                    "PFP launch diagnostic", request.diagnostic,
+                    "PSP launch diagnostic", request.diagnostic,
                 ))
                 taskNotifier.complete(
                     "launch_diag_${request.gameId}", request.gameTitle, "Diagnostic copied to clipboard",
