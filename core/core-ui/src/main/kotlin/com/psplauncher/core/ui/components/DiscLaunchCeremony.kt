@@ -85,7 +85,7 @@ fun DiscLaunchCeremony(
     val now = t.value
     val rise = phase(now, 0f, DiscCeremony.FadeInFraction)
     val sink = phase(now, DiscCeremony.FadeInFraction, DiscCeremony.SinkEndFraction)
-    val spin = phase(now, DiscCeremony.SinkEndFraction, DiscCeremony.FadeOutFraction)
+    val spin = phase(now, DiscCeremony.SinkEndFraction, DiscCeremony.DiscOutStartFraction)
     // Two movements, not one. The DISC leaves early; the ROOM stays dark until the very end.
     //
     // The whole tail runs after the hand-off, with another app cold-starting under it. Opening the
@@ -93,14 +93,14 @@ fun DiscLaunchCeremony(
     // the screen yet -- and then the app cut in over that. Black is what should be under a
     // hand-off, so black is what the tail holds; the reveal only happens if nothing ever arrived,
     // and it is still a slow open rather than a cut so a failed launch does not flash.
-    val discLeave = phase(now, DiscCeremony.FadeOutFraction, DiscCeremony.DiscGoneFraction)
+    val discLeave = phase(now, DiscCeremony.DiscOutStartFraction, DiscCeremony.DiscGoneFraction)
     val roomLeave = phase(now, DiscCeremony.RoomOpensFraction, 1f)
 
     val riseEase = LinearOutSlowInEasing.transform(rise)
     val sinkEase = FastOutSlowInEasing.transform(sink)
     // The vignette runs across the sink AND the spin as one movement, so the room keeps closing in
     // the whole time the disc is seated rather than stopping the moment it lands.
-    val closeEase = FastOutSlowInEasing.transform(phase(now, DiscCeremony.FadeInFraction, DiscCeremony.FadeOutFraction))
+    val closeEase = FastOutSlowInEasing.transform(phase(now, DiscCeremony.FadeInFraction, DiscCeremony.DiscOutStartFraction))
     val leaveEase = FastOutSlowInEasing.transform(roomLeave)
 
     BoxWithConstraints(
@@ -270,46 +270,64 @@ object DiscCeremony {
      */
     const val SpinMs = 2450
 
-    /** The iris opens back out from the disc and the app takes the screen. Slow, so it is a
-     *  transition rather than a cut. */
-    // The tail. Long, because almost all of it is a hold on black behind a cold-starting app
-    // and only the last stretch is ever seen -- and when it IS seen (a launch that never
-    // arrived) it is the slowest thing in the ceremony on purpose. At 900 the room snapped back
-    // in about a third of a second, which read as a cut rather than a reveal.
-    const val FadeOutMs = 1500
-
-    const val TotalMs = FadeInMs + SinkMs + SpinMs + FadeOutMs
+    /**
+     * The disc's own departure — it shrinks away and the iris closes behind it.
+     *
+     * BEFORE the hand-off, and that is the whole point of splitting the old single "fade out"
+     * into two. The disc used to start leaving at the same instant the caller was released, on
+     * the theory that the launched app needed a moment to appear and the fade was the overlap to
+     * spend. It does not need a moment: with the window transition suppressed the app's window
+     * simply appears, often inside a few hundred milliseconds, and it appeared ON TOP of a disc
+     * that was still visibly leaving. That is the "it gets cut off" -- not the ceremony being
+     * short, the last thing in it being interrupted.
+     *
+     * Nothing can now take the screen until the disc has finished going.
+     */
+    const val DiscOutMs = 650
 
     /**
-     * The moment the caller should actually start the thing — AFTER the spin, as the fade begins.
+     * Black, after the hand-off, while the launched app cold-starts underneath.
      *
-     * It used to fire at the top of the spin, on the theory that the app would load behind the
-     * disc. It does not: an activity's window takes the screen the moment it is ready, so the
-     * launcher and everything drawn on it were replaced mid-spin and the spin was never seen at
-     * all. The overlap that is actually available is the fade, which is why this sits here.
+     * The only part that is usually invisible, and the only part that may be. It has to stay long
+     * enough that a launch which never arrives reveals rather than snaps: at 900 in the old
+     * single-phase shape the room came back in about a third of a second and read as a cut.
      */
-    const val HandOffMs = FadeInMs + SinkMs + SpinMs
+    const val HoldMs = 900
+
+    const val TotalMs = FadeInMs + SinkMs + SpinMs + DiscOutMs + HoldMs
+
+    /**
+     * The moment the caller should actually start the thing — once the disc has GONE.
+     *
+     * It has moved twice, each time because an activity's window takes the screen the instant it
+     * is ready and nothing drawn by the launcher survives that. First it fired at the top of the
+     * spin, and the spin was never seen. Then at the top of the fade, and the disc's exit was cut
+     * in half. It now fires when there is nothing left on screen to interrupt: the disc is gone,
+     * the room is black, and the hold behind this is what the cold start happens under.
+     */
+    const val HandOffMs = FadeInMs + SinkMs + SpinMs + DiscOutMs
 
     /** Start of the spin: the disc has arrived and is about to be spun up. */
     val SinkEndFraction = (FadeInMs + SinkMs).toFloat() / TotalMs
 
-    /** Start of the fade, which is also when the caller is released — they are the same instant. */
-    val FadeOutFraction = HandOffMs.toFloat() / TotalMs
+    /** The disc starts leaving. The spin is over; the caller is still waiting. */
+    val DiscOutStartFraction = (FadeInMs + SinkMs + SpinMs).toFloat() / TotalMs
+
+    /** The disc is gone, and the caller is released. One instant, by construction. */
+    val DiscGoneFraction = HandOffMs.toFloat() / TotalMs
+    val HandOffFraction = DiscGoneFraction
 
     /**
-     * How much of the tail the disc takes to leave, and when the room starts opening again.
+     * When the room starts opening again, part-way through the hold.
      *
-     * The gap between them is a deliberate hold on black: the launched app usually takes the
-     * screen somewhere in here, and black is the only thing that can be under a hand-off without
-     * being the wrong thing. Only a launch that never arrives gets as far as the open.
+     * Only a launch that never arrives gets this far — anything that did arrive is already
+     * covering the screen. It is late in the hold on purpose, so the reveal reads as a slow open
+     * rather than a snap back to the XMB.
      */
-    private const val DiscLeaveShare = 0.38f
-    private const val RoomOpensShare = 0.45f
-    val DiscGoneFraction = FadeOutFraction + (1f - FadeOutFraction) * DiscLeaveShare
-    val RoomOpensFraction = FadeOutFraction + (1f - FadeOutFraction) * RoomOpensShare
+    private const val RoomOpensShare = 0.30f
+    val RoomOpensFraction = HandOffFraction + (1f - HandOffFraction) * RoomOpensShare
 
     val FadeInFraction = FadeInMs.toFloat() / TotalMs
-    val HandOffFraction = FadeOutFraction
 
     /** Disc diameter, against the screen's short edge. */
     const val SizeFraction = 0.72f
