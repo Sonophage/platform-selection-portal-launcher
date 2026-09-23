@@ -13,6 +13,14 @@ All notable changes to PSPLauncher are documented here. This project follows
   button cannot offer: X cycles, while every name is already on screen for a finger to pick
   outright. The cards and the launch spine were already pressable.
 
+- **The launch spine covered the Apps button.** The spine runs down the whole right edge and the
+  Filter / Search / Apps prompts sit in that same corner, so the spine was on top of Apps for 114
+  of its 139 pixels — a finger aiming at Apps pressed Play instead, which on a shelf with
+  anything on it launches a game rather than opening the drawer. It also meant Settings, which is
+  reached through the drawer, had an 18%-wide door. The spine now stops above the prompt row; the
+  bottom of its gradient had already faded to nothing down there, so nothing visible was given
+  up.
+
 ## [1.7.0] - 2026-09-23
 
 ### Added

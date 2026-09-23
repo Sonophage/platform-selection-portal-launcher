@@ -319,6 +319,17 @@ fun LaunchSpine(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
     Box(
         modifier = modifier
             .fillMaxHeight()
+            // Stop short of the prompt row. The spine runs down the whole right edge, and the
+            // Filter / Search / Apps pills sit in that same corner — so the spine was on top of
+            // the Apps pill for 114 of its 139 pixels, and a finger aiming at Apps pressed Play.
+            // Measured with uiautomator on a tablet: spine [2279,0][2400,1504] against Apps
+            // [2254,1413][2393,1504]. Nothing looked wrong, because the two do not overlap in
+            // ink — the spine's gradient has already faded to nothing down there.
+            //
+            // Which is why this shortens the spine rather than moving the pills: the bottom of
+            // the gradient is invisible anyway, so giving that band back costs no pixels the
+            // user can see and returns the corner to the row that has three controls in it.
+            .padding(bottom = SpinePromptClearance)
             .width(SpineWidth)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -374,6 +385,12 @@ private val SpineLabelRest = Color.White.copy(alpha = 0.55f)
 private val SpineLabelLength = 220.dp
 
 private val SpineWidth = 36.dp
+
+/**
+ * How far above the bottom edge the launch spine ends, so the prompt pills in that corner stay
+ * pressable. Sized to clear the hint bar, which is its glyph height plus its own small padding.
+ */
+private val SpinePromptClearance = 52.dp
 
 @Composable
 private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {
