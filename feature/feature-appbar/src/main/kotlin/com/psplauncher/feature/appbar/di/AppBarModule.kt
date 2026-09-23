@@ -17,5 +17,6 @@ object AppBarModule {
     @Singleton
     fun provideInstalledAppRepository(
         @ApplicationContext context: Context,
-    ): InstalledAppRepository = InstalledAppRepository(context)
+        gameDao: com.psplauncher.core.data.database.dao.GameDao,
+    ): InstalledAppRepository = InstalledAppRepository(context, gameDao)
 }

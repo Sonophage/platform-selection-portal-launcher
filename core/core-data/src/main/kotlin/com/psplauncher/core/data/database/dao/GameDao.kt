@@ -232,6 +232,21 @@ interface GameDao {
     suspend fun addPlayTime(id: Long, durationMillis: Long, playedAt: Long)
 
     /**
+     * Stamps a row as opened NOW, without touching the play counter.
+     *
+     * The mirror of [clearLastPlayed], and the app-shaped counterpart to [addPlayTime]. A game
+     * gets its stamp from [addPlayTime] once LaunchDispatcher has seen the emulator cover the
+     * launcher and the user come back, which also yields a duration. An Android app is started
+     * with a plain `startActivity` and there is no session to measure and no hand-off to verify,
+     * so the shelf gets the one fact there is: it was opened, at this time.
+     *
+     * Deliberately NOT [addPlayTime] with a zero duration. That reads as "played for no time",
+     * which is a claim about the counter this does not make.
+     */
+    @Query("UPDATE games SET last_played_at = :playedAt WHERE id = :id")
+    suspend fun markOpened(id: Long, playedAt: Long)
+
+    /**
      * Drops the game off the Last Played shelf without forgetting it was played.
      *
      * total_play_time_millis is deliberately untouched: the shelf asks "when", the counter asks

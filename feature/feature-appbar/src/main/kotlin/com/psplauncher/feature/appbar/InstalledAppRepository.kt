@@ -14,6 +14,9 @@ import android.os.Process
 import android.provider.Settings
 import com.psplauncher.core.domain.model.KnownEmulatorPackages
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
@@ -38,7 +41,13 @@ data class InstalledApp(
 @Singleton
 class InstalledAppRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val gameDao: com.psplauncher.core.data.database.dao.GameDao,
 ) {
+    // Fire-and-forget writes that must outlive the caller: a launch stamp is written as the
+    // launcher is being covered by the app it just started, and the ViewModel that asked for the
+    // launch may well be gone by the time the row is updated.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     suspend fun getInstalledApps(): List<InstalledApp> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val lastUsedByPackage = loadLastUsedTimestamps()
@@ -100,11 +109,38 @@ class InstalledAppRepository @Inject constructor(
 
     fun launchApp(packageName: String) {
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-        if (intent != null) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).withoutTransition()
-            context.startActivity(intent, LaunchTransition.options(context))
-        } else {
+        if (intent == null) {
             Timber.w("No launch intent for $packageName")
+            return
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).withoutTransition()
+        context.startActivity(intent, LaunchTransition.options(context))
+        markOpenedOnTheShelf(packageName)
+    }
+
+    /**
+     * Moves an app to the front of the Last Played shelf.
+     *
+     * HERE, and not at the call sites, because this is the one funnel every app launch passes
+     * through — the drawer, the XMB row, App Detail and the storefront drawer all end up on the
+     * line above. Nothing wrote this stamp at all before, so the shelf simply never reordered
+     * when you went back to an app: apps kept whatever position their first launch gave them,
+     * which on a shelf whose entire meaning is recency reads as the list being stuck.
+     *
+     * Games are not stamped here and must not be: LaunchDispatcher writes theirs once the
+     * emulator has demonstrably covered the launcher and the user has come back, which is a
+     * stronger claim than this one and comes with a duration. An app has no hand-off to verify —
+     * `startActivity` on a launcher intent either worked or threw — so "opened, now" is the whole
+     * of what is known, and the shelf only ever asked for that.
+     *
+     * Silent when the package is not in the library. An app opened from All Apps that was never
+     * added is not on the shelf, and putting it there would be a different feature.
+     */
+    private fun markOpenedOnTheShelf(packageName: String) {
+        scope.launch {
+            runCatching {
+                gameDao.getAppEntry(packageName)?.let { gameDao.markOpened(it.id, System.currentTimeMillis()) }
+            }.onFailure { Timber.w(it, "Could not stamp $packageName on the Last Played shelf") }
         }
     }
 
