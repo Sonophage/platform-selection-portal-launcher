@@ -13,6 +13,18 @@ All notable changes to PSPLauncher are documented here. This project follows
   button cannot offer: X cycles, while every name is already on screen for a finger to pick
   outright. The cards and the launch spine were already pressable.
 
+- **An empty Recent shelf was a dead end.** The shelf replaces the crossbar rather than sitting
+  beside it, and it did so even with nothing on it — so a fresh install landed on "Nothing played
+  yet." with no category bar, no Settings and no way out but a button you had to already know. It
+  now stands in for the bar only when it has something to stand in with. Filtering to a medium you
+  have none of still keeps the shelf and says "No recent games."; only "nothing played at all"
+  hands the screen back.
+
+- **The Recent shelf ignored swipes.** Every other part of the home screen steps category on a
+  horizontal drag and item on a vertical one, through one shared gesture layer — and the shelf,
+  the one screen that HIDES the crossbar, was the one screen that never got it. So the only way
+  off it was the D-pad. It has the same layer now.
+
 - **The launch spine covered the Apps button.** The spine runs down the whole right edge and the
   Filter / Search / Apps prompts sit in that same corner, so the spine was on top of Apps for 114
   of its 139 pixels — a finger aiming at Apps pressed Play instead, which on a shelf with

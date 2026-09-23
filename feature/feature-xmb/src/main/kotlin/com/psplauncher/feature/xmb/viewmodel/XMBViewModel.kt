@@ -959,9 +959,26 @@ data class XMBUiState(
      * page or the bar, and a drilled sub-item under a hidden bar would be a screen LEFT can no
      * longer back out of.
      */
+    /**
+     * True while the Recent shelf is standing in for the crossbar.
+     *
+     * It replaces the bar rather than sitting beside it — but only when it has something to
+     * replace it WITH. A shelf with nothing on it used to take the whole screen anyway, so a
+     * fresh install landed on "Nothing played yet." with no crossbar, no categories and no
+     * Settings in sight: a dead end you had to know a button to leave.
+     *
+     * Gated on the ALL filter being empty rather than on [currentItems], so filtering to a medium
+     * you have none of keeps the shelf and says "No recent games." Only "nothing played at all"
+     * hands the screen back to the bar.
+     *
+     * Every consequence follows from this one flag — input routing, the launch spine, the filter
+     * names — so the empty case gets the ordinary crossbar whole rather than a shelf wearing
+     * pieces of one.
+     */
     val onLastPlayedHome: Boolean
         get() = categories.getOrNull(selectedCategoryIndex)?.id == BuiltInCategory.RECENTLY_PLAYED &&
-            !isInSubItem
+            !isInSubItem &&
+            !(recentFilter == RecentFilter.ALL && currentItems.isEmpty())
 
     val hoverPanelContent: DetailPanelContent?
         get() = hoverPanelItem?.let { item ->

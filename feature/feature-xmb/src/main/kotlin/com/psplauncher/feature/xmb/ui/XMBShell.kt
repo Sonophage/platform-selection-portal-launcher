@@ -733,7 +733,19 @@ fun XMBShell(
                     onArtTapped = onRecentRailToggled,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = StripHeight),
+                        .padding(top = StripHeight)
+                        // The same gesture layer the crossbar has, which the shelf never got.
+                        // A horizontal swipe steps the category, and stepping off the shelf is
+                        // what brings the bar back — so the one screen that HIDES the crossbar
+                        // was the one screen with no touch way to reach it. Vertical walks the
+                        // recents, matching UP and DOWN. Taps still fall through to the cards,
+                        // the filter names and the spine.
+                        .xmbNavGestures(
+                            onStepCategory = onStepCategory,
+                            onStepItem = onStepItem,
+                            onEdgeBack = onTouchBack,
+                            stepScale = uiState.touchSensitivity.stepScale,
+                        ),
                 )
             } else {
 
