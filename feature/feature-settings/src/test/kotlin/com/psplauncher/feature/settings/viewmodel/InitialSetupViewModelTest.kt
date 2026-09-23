@@ -59,6 +59,10 @@ class InitialSetupViewModelTest {
     private val screenScraperApi = mockk<ScreenScraperApi>()
     private val scanRunner = mockk<com.psplauncher.feature.settings.media.WizardMediaScanRunner>(relaxed = true)
     private val romRootScanRunner = mockk<RomRootScanRunner>(relaxed = true)
+    private val installedApps =
+        mockk<com.psplauncher.feature.appbar.InstalledAppRepository>(relaxed = true)
+    private val launcherShortcuts =
+        mockk<com.psplauncher.feature.appbar.LauncherShortcutRepository>(relaxed = true)
     private lateinit var vm: InitialSetupViewModel
 
     private fun buildVm() = InitialSetupViewModel(
@@ -68,6 +72,8 @@ class InitialSetupViewModelTest {
         mockk(relaxed = true), // romScanner (B3 create-standard-folders)
         mockk(relaxed = true), // folderHintResolver
         mockk(relaxed = true), // memoryCardRepository
+        installedApps,
+        launcherShortcuts,
     )
 
     @Before fun setUp() {
@@ -93,6 +99,54 @@ class InitialSetupViewModelTest {
     // uiState is WhileSubscribed — tests that assert on it need an active collector.
     private fun TestScope.collectState() = launch { vm.uiState.collect {} }
 
+    // ── Book roots ──────────────────────────────────────────────────────────────
+
+    @Test fun `book roots reach the Books page and nothing else`() = runTest(dispatcher) {
+        // The one thing that can silently go wrong here: BOOK is joined by a SECOND combine on
+        // top of the inner five (combine's typed overload tops out at five), so a mis-wire lands
+        // the books in another section's list or drops them entirely — and either reads as an
+        // empty page rather than as an error.
+        every { mediaRoots.roots(MediaRootKind.BOOK) } returns
+            flowOf(listOf("content://tree/primary%3ABooks"))
+        vm = buildVm()
+
+        val job = collectState()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(1, state.bookRoots.size)
+        assertTrue(state.musicRoots.isEmpty())
+        assertTrue(state.videoRoots.isEmpty())
+        assertTrue(state.photoRoots.isEmpty())
+        assertTrue(state.romRoots.isEmpty())
+        job.cancel()
+    }
+
+    // ── Permission grants ───────────────────────────────────────────────────────
+
+    @Test fun `grants are re-read on demand, not cached from construction`() = runTest(dispatcher) {
+        // None of the three grants has a change broadcast, so the page re-reads them on every
+        // resume. If refreshGrants ever went back to a one-shot read, a user who granted usage
+        // access and came back would still be looking at "Grant…".
+        every { installedApps.hasUsageAccess() } returns false
+        every { launcherShortcuts.isDefaultLauncher() } returns false
+        vm = buildVm()
+        val job = collectState()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.hasUsageAccess)
+        assertFalse(vm.uiState.value.isHomeLauncher)
+
+        // The user leaves, grants both, comes back.
+        every { installedApps.hasUsageAccess() } returns true
+        every { launcherShortcuts.isDefaultLauncher() } returns true
+        vm.refreshGrants()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.hasUsageAccess)
+        assertTrue(vm.uiState.value.isHomeLauncher)
+        job.cancel()
+    }
+
     // ── Step navigation ─────────────────────────────────────────────────────────
 
     @Test fun `steps advance through every page, skipping conditional emulator pages when not installed`() =
@@ -100,9 +154,9 @@ class InitialSetupViewModelTest {
             val job = collectState()
             advanceUntilIdle()
             val expected = listOf(
-                SetupStep.WELCOME, SetupStep.ROM_ROOTS, SetupStep.MUSIC, SetupStep.VIDEO,
-                SetupStep.PHOTO, SetupStep.ARTWORK, SetupStep.SERVICES,
-                SetupStep.FINISH,
+                SetupStep.WELCOME, SetupStep.PERMISSIONS, SetupStep.ROM_ROOTS, SetupStep.MUSIC,
+                SetupStep.VIDEO, SetupStep.PHOTO, SetupStep.BOOKS, SetupStep.ARTWORK,
+                SetupStep.SERVICES, SetupStep.PERSONALIZE, SetupStep.FINISH,
             )
             expected.forEachIndexed { index, step ->
                 assertEquals("landing on step $index", step, vm.uiState.value.step)
@@ -122,7 +176,7 @@ class InitialSetupViewModelTest {
 
         vm.nextStep()
         advanceUntilIdle()
-        assertEquals(SetupStep.ROM_ROOTS, vm.uiState.value.step)
+        assertEquals(SetupStep.PERMISSIONS, vm.uiState.value.step)
 
         assertTrue(vm.previousStep())
         advanceUntilIdle()
@@ -144,9 +198,9 @@ class InitialSetupViewModelTest {
             assertTrue(vm.uiState.value.vita3KInstalled)
 
             listOf(
-                SetupStep.ROM_ROOTS, SetupStep.MUSIC, SetupStep.VIDEO, SetupStep.PHOTO,
-                SetupStep.ARTWORK, SetupStep.SERVICES,
-                SetupStep.VITA, SetupStep.RETROARCH, SetupStep.FINISH,
+                SetupStep.PERMISSIONS, SetupStep.ROM_ROOTS, SetupStep.MUSIC, SetupStep.VIDEO,
+                SetupStep.PHOTO, SetupStep.BOOKS, SetupStep.ARTWORK, SetupStep.SERVICES,
+                SetupStep.VITA, SetupStep.RETROARCH, SetupStep.PERSONALIZE, SetupStep.FINISH,
             ).forEach { step ->
                 vm.nextStep()
                 advanceUntilIdle()
@@ -170,9 +224,9 @@ class InitialSetupViewModelTest {
             assertFalse(vm.uiState.value.retroArchInstalled)
 
             listOf(
-                SetupStep.ROM_ROOTS, SetupStep.MUSIC, SetupStep.VIDEO, SetupStep.PHOTO,
-                SetupStep.ARTWORK, SetupStep.SERVICES,
-                SetupStep.VITA, SetupStep.FINISH,
+                SetupStep.PERMISSIONS, SetupStep.ROM_ROOTS, SetupStep.MUSIC, SetupStep.VIDEO,
+                SetupStep.PHOTO, SetupStep.BOOKS, SetupStep.ARTWORK, SetupStep.SERVICES,
+                SetupStep.VITA, SetupStep.PERSONALIZE, SetupStep.FINISH,
             ).forEach { step ->
                 vm.nextStep()
                 advanceUntilIdle()
@@ -183,12 +237,34 @@ class InitialSetupViewModelTest {
             job.cancel()
         }
 
+    @Test fun `parking survives exactly one reset, so an excursion keeps your place`() =
+        runTest(dispatcher) {
+            // Make It Yours opens a real settings screen, which disposes the wizard overlay and
+            // fires its onDispose reset. Without the park, opening the theme picker on step 10
+            // would put you back on page one.
+            val job = collectState()
+            repeat(3) { vm.nextStep() }
+            advanceUntilIdle()
+            val where = vm.uiState.value.step
+
+            vm.parkForExcursion()
+            vm.resetWizard()           // the overlay leaving for the excursion
+            advanceUntilIdle()
+            assertEquals("the parked reset must be a no-op", where, vm.uiState.value.step)
+
+            // And only one: the wizard genuinely closed still starts over next time.
+            vm.resetWizard()
+            advanceUntilIdle()
+            assertEquals(SetupStep.WELCOME, vm.uiState.value.step)
+            job.cancel()
+        }
+
     @Test fun `resetWizard returns to the welcome page for the next run`() = runTest(dispatcher) {
         val job = collectState()
         vm.nextStep()
         vm.nextStep()
         advanceUntilIdle()
-        assertEquals(SetupStep.MUSIC, vm.uiState.value.step)
+        assertEquals(SetupStep.ROM_ROOTS, vm.uiState.value.step)
 
         vm.resetWizard()
         advanceUntilIdle()

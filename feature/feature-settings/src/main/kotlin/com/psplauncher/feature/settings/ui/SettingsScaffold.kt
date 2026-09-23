@@ -509,6 +509,17 @@ fun SettingsScaffold(
     showDivider: Boolean = true,
     // Light scrim: the XMB wave reads through instead of sitting behind a dark overlay.
     lightScrim: Boolean = false,
+    // Replaces the scrim entirely — the screen brings its own background rather than tinting
+    // whatever the XMB happens to be showing. Only the wizard uses it, because only the wizard
+    // is a place you arrive at rather than a panel over the crossbar: a first run must not
+    // depend on the wallpaper behind it, and the wizard's own black + wave is that independence.
+    // [lightScrim] is ignored when this is set.
+    backdrop: (@Composable () -> Unit)? = null,
+    // The section rail, off for a screen that is a flow rather than a place in the catalog. The
+    // wizard is listed in the catalog (Settings ▸ System ▸ Setup Wizard) and therefore gets a
+    // rail by default — which on a first run is a column offering Logs and Credits to someone
+    // who has not finished telling the launcher where their games are.
+    showRail: Boolean = true,
     // Pinned footer override for the first-run wizard's themed Enter/Back chrome. Ordinary
     // fullscreen settings screens leave this null and receive the standard helper section.
     footer: (@Composable () -> Unit)? = null,
@@ -579,8 +590,8 @@ fun SettingsScaffold(
     // siblings to show, and an empty rail would be a column of nothing holding the content in.
     val screenId = LocalSettingsScreenId.current
     val openScreen = LocalSettingsOpenScreen.current
-    val railEntries = remember(screenId) {
-        com.psplauncher.core.domain.model.settingsRailRows(screenId)
+    val railEntries = remember(screenId, showRail) {
+        if (showRail) com.psplauncher.core.domain.model.settingsRailRows(screenId) else emptyList()
     }
     val railFocused = remember { mutableStateOf(false) }
     // Filled by SettingsOverlayInput while a screen has a prompt on top of itself. Provided by
@@ -1108,17 +1119,24 @@ fun SettingsScaffold(
                 // reach white's 0.183 luminance ceiling over a bright wallpaper, so darkening the
                 // anchors would only mute the wave without fixing anything. Per-text protection
                 // (TextLegibilityStyle) is the instrument for that surface.
-                .background(
-                    if (lightScrim) {
-                        Brush.verticalGradient(
-                            0f to pfpColors.backgroundTop.copy(alpha = 0.45f),
-                            1f to pfpColors.backgroundBottom.copy(alpha = 0.55f),
+                .then(
+                    if (backdrop != null) {
+                        Modifier
+                    } else if (lightScrim) {
+                        Modifier.background(
+                            Brush.verticalGradient(
+                                0f to pfpColors.backgroundTop.copy(alpha = 0.45f),
+                                1f to pfpColors.backgroundBottom.copy(alpha = 0.55f),
+                            )
                         )
                     } else {
-                        Brush.verticalGradient(0f to scrimTop, 1f to scrimBottom)
+                        Modifier.background(Brush.verticalGradient(0f to scrimTop, 1f to scrimBottom))
                     }
                 ),
         ) {
+            // Under everything the scaffold draws, and inside the same Box so it is clipped and
+            // sized identically to the scrim it replaces.
+            backdrop?.invoke()
             Column(
                 modifier = Modifier
                     .fillMaxSize()

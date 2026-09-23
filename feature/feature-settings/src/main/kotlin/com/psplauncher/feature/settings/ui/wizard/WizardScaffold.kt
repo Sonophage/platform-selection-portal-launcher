@@ -16,6 +16,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -29,7 +33,11 @@ import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.PfpControllerHints
+import com.psplauncher.core.ui.sound.LocalMenuSounds
+import com.psplauncher.core.ui.sound.MenuSound
 import com.psplauncher.core.ui.theme.menuCursorEdge
+import com.psplauncher.core.ui.wave.WaveLayers
+import com.psplauncher.core.ui.wave.WaveStyle
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.feature.settings.ui.LocalSettingsScrollStateRegistrar
 import com.psplauncher.feature.settings.ui.SettingsScaffold
@@ -86,15 +94,20 @@ fun WizardScaffold(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val menuSounds = LocalMenuSounds.current
     SettingsScaffold(
         title = title,
         subtitle = "",
         onBack = onBack,
         modifier = modifier,
-        // The settings scrim, not a lighter one. The wizard reading brighter than the screens it
-        // is about to hand you over to made it look like a different app, which for a first-run
-        // flow is precisely the wrong impression.
-        lightScrim = false,
+        // Its own backdrop rather than a scrim over the crossbar. A scrim is a panel opened on
+        // top of the launcher; the wizard is not that. It is the first thing a new install shows
+        // and the last place that should depend on what wallpaper happens to be set — so it
+        // brings black and the wave and owes the screen behind it nothing.
+        backdrop = { WizardBackdrop() },
+        // No rail. The wizard is a flow with one way forward; a column of the System section's
+        // other screens beside it is an invitation to leave halfway through.
+        showRail = false,
         header = { WizardHeader(stepNumber, stepCount, title) },
         footer = { WizardFooter(backEnabled, footerNote) },
         contentKey = contentKey,
@@ -110,9 +123,26 @@ fun WizardScaffold(
         // scrollTo, not animateScrollTo: a page turn is a cut, not a movement, and animating it
         // would race the scaffold's keep-in-view clamp as the new page's focus lands.
         LaunchedEffect(contentKey) { scrollState.scrollTo(0) }
+
+        // A page turn makes a noise of its own.
+        //
+        // The scaffold already ticks for cursor movement and clicks for the row you pressed, but
+        // the row's click and the page arriving are two different events and only the first was
+        // audible — so the longest beat in the wizard, the one where the screen actually changes,
+        // was the silent one. SYSTEM_BROWSE is the crossbar's "you are somewhere else now" cue,
+        // which is exactly what a page turn is.
+        //
+        // Skipped on the first composition: opening the wizard is not a page turn, and the boot
+        // of the flow already has the splash's own confirm behind it.
+        var pagesSeen by remember { mutableIntStateOf(0) }
+        LaunchedEffect(contentKey) {
+            if (pagesSeen > 0) menuSounds(MenuSound.SYSTEM_BROWSE)
+            pagesSeen++
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(horizontal = WizardEdgeInset)
                 .verticalScroll(scrollState),
         ) {
             WizardHeading(heading, hint)
@@ -125,6 +155,23 @@ fun WizardScaffold(
     }
 }
 
+/**
+ * Black, and the wave on it.
+ *
+ * Not the theme gradient: the wizard runs before the user has picked a theme, and on a fresh
+ * install that gradient is whatever the month happens to make it. Black is the one backdrop that
+ * is the same on every install, and it is what the wave was drawn to sit on.
+ *
+ * The wave is always [WaveStyle.ANIMATED] here. The power-throttle settings it normally obeys are
+ * two screens the user has not seen yet, and the wizard is minutes long, not hours.
+ */
+@Composable
+private fun WizardBackdrop() {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        WaveLayers(WaveStyle.ANIMATED)
+    }
+}
+
 @Composable
 private fun WizardHeader(stepNumber: Int?, stepCount: Int, title: String) {
     Column(
@@ -132,13 +179,16 @@ private fun WizardHeader(stepNumber: Int?, stepCount: Int, title: String) {
             .fillMaxWidth()
             // Header chrome is display-only — UP on the first row must never land here.
             .focusProperties { canFocus = false }
-            .padding(start = WizardGutter, end = WizardGutter, top = 18.dp, bottom = 8.dp),
+            .padding(start = 48.dp, end = 48.dp, top = 18.dp, bottom = 8.dp),
     ) {
         Text(
             text = title,
             color = Color.White,
             fontSize = 30.sp,
-            fontWeight = FontWeight.Normal,
+            // Light, not Normal. At 30sp over a black backdrop Normal reads heavy — the PS5
+            // reference this chrome came from sets its page titles in a thin face, and the
+            // weight was the last thing still speaking the older, denser skin.
+            fontWeight = FontWeight.Light,
         )
         if (stepNumber != null && stepCount > 0) {
             Spacer(Modifier.height(10.dp))
@@ -161,7 +211,7 @@ private fun WizardProgress(stepNumber: Int, stepCount: Int) {
             text = "STEP $stepNumber OF $stepCount",
             color = Color.White.copy(alpha = 0.55f),
             fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             letterSpacing = 1.4.sp,
         )
         Spacer(Modifier.width(14.dp))
@@ -196,7 +246,7 @@ private fun WizardHeading(heading: String, hint: String?) {
             text = heading,
             color = Color.White,
             fontSize = 19.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.Normal,
             textAlign = TextAlign.Start,
         )
         if (hint != null) {
@@ -247,8 +297,23 @@ private fun WizardFooter(backEnabled: Boolean, note: String?) {
     }
 }
 
+/**
+ * How far the focused row's plate stops short of the screen edge.
+ *
+ * Zero until the rail was taken away: with the rail there, the content column began after it and
+ * the plate had a margin for free. Without one the plate ran to x=0 and its left corner was
+ * clipped off the screen, which reads as a rendering fault rather than as a full-bleed row.
+ *
+ * It is subtracted from the gutters below rather than added to them, so the TEXT still lands on
+ * the same 48dp line as the page title in the header — the inset moves the plate, not the words.
+ */
+private val WizardEdgeInset = 16.dp
+
 /** The settings gutter. Header, heading and every page's rows start on the same line. */
-private val WizardGutter = 48.dp
+private val WizardGutter = 48.dp - WizardEdgeInset
+
+/** [WizardGutter] for a row that draws its own plate — the same line, inside the inset column. */
+internal val WizardRowGutter = 48.dp - WizardEdgeInset
 
 /** How wide the step rule runs. Long enough to read as progress, short enough to stay chrome. */
 private val WizardProgressWidth = 160.dp

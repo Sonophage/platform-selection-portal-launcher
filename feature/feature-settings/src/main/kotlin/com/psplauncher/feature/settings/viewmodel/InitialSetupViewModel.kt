@@ -36,8 +36,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** The pages of the first-run wizard, in order. RetroArch and Vita3K exist only when installed. */
-enum class SetupStep { WELCOME, ROM_ROOTS, MUSIC, VIDEO, PHOTO, ARTWORK, SERVICES, VITA, RETROARCH, FINISH }
+/**
+ * The pages of the first-run wizard, in order. RetroArch and Vita3K exist only when installed.
+ *
+ * [PERSONALIZE] is one page for four things — theme, sounds, boot logo and the XMB's sizing —
+ * because they are all the same question ("how should it look and sound?") and asking it four
+ * times in a row on a first run is four pages of someone not yet having any content to look at.
+ * Each row opens the real settings screen and comes back, so nothing here is a second copy of
+ * those screens.
+ */
+enum class SetupStep {
+    WELCOME, PERMISSIONS, ROM_ROOTS, MUSIC, VIDEO, PHOTO, BOOKS, ARTWORK, SERVICES,
+    VITA, RETROARCH, PERSONALIZE, FINISH,
+}
 
 /** A detected artwork source offered for the embedded quick-import (label + system count). */
 @Immutable
@@ -55,6 +66,13 @@ data class InitialSetupUiState(
     val musicRoots: List<RootFolderRow> = emptyList(),
     val videoRoots: List<RootFolderRow> = emptyList(),
     val photoRoots: List<RootFolderRow> = emptyList(),
+    val bookRoots: List<RootFolderRow> = emptyList(),
+    // Grants, read imperatively rather than observed: none of the three has a change broadcast we
+    // could subscribe to, so the page refreshes them when it opens and whenever the user comes
+    // back from the system screen it sent them to.
+    val hasNotifications: Boolean = false,
+    val hasUsageAccess: Boolean = false,
+    val isHomeLauncher: Boolean = false,
     // Artwork is a SINGLE folder; sources under its import/ folder license the quick-import row.
     val artworkFolderName: String? = null,
     val artworkSources: List<ArtworkSourceUi> = emptyList(),
@@ -114,6 +132,7 @@ private data class RootLists(
     val music: List<RootFolderRow>,
     val video: List<RootFolderRow>,
     val photo: List<RootFolderRow>,
+    val book: List<RootFolderRow>,
     val artwork: String?,   // artwork folder display name
     val vita: String?,      // Vita3K ux0 folder display name
 )
@@ -163,6 +182,11 @@ class InitialSetupViewModel @Inject constructor(
     private val romScanner: com.psplauncher.feature.library.scanner.RomScanner,
     private val folderHintResolver: com.psplauncher.core.data.platform.PlatformFolderHintResolver,
     private val memoryCardRepository: com.psplauncher.core.data.repository.MemoryCardRepository,
+    // The two grant-holders, borrowed rather than re-implemented: "is usage access on" and "are
+    // we the Home app" already have exactly one answer each in the app drawer's repositories, and
+    // a wizard that asked the platform itself would be a second one to keep in step.
+    private val installedAppRepository: com.psplauncher.feature.appbar.InstalledAppRepository,
+    private val launcherShortcuts: com.psplauncher.feature.appbar.LauncherShortcutRepository,
 ) : ViewModel() {
 
     // Wizard-local state (page + transient messages + RetroArch status); the folder/service rows
@@ -187,7 +211,33 @@ class InitialSetupViewModel @Inject constructor(
             }
             readRetroArchState()
         }
+        refreshGrants()
     }
+
+    /**
+     * Re-reads the three grants. Called when the Permissions page opens and every time the user
+     * returns from a system screen — none of these fires a broadcast we could observe, so the
+     * alternative is a page that keeps saying "Not granted" after the user has just granted it.
+     */
+    fun refreshGrants() {
+        scratch.update {
+            it.copy(
+                hasNotifications = hasNotificationPermission(),
+                hasUsageAccess = installedAppRepository.hasUsageAccess(),
+                isHomeLauncher = launcherShortcuts.isDefaultLauncher(),
+            )
+        }
+    }
+
+    /** The system role request (Q+) or the Home settings screen. */
+    fun homeRoleIntent(): android.content.Intent = launcherShortcuts.homeRoleRequestIntent()
+
+    private fun hasNotificationPermission(): Boolean =
+        // Below API 33 the permission is granted at install time, so there is nothing to ask for
+        // and the row must not offer to.
+        android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU ||
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
 
     // Display-name rows derive per-flow; grant status is snapshotted at emission time so a lost
     // grant (reinstall) reports ACCESS_LOST immediately, like the settings screens.
@@ -207,12 +257,21 @@ class InitialSetupViewModel @Inject constructor(
                 music   = music.toRows(persisted),
                 video   = video.toRows(persisted),
                 photo   = photo.toRows(persisted),
+                book    = emptyList(),
                 artwork = artwork?.let(::rootDisplayName),
                 vita    = null,
             )
         },
         vita3KLibrary.ux0TreeUriFlow,
-    ) { lists, vita -> lists.copy(vita = vita?.let(::rootDisplayName)) }
+        // Books joined here rather than inside: combine's typed overload tops out at five, and
+        // the inner one is already full.
+        mediaRootRepository.roots(MediaRootKind.BOOK),
+    ) { lists, vita, book ->
+        lists.copy(
+            vita = vita?.let(::rootDisplayName),
+            book = book.toRows(SafGrants.persistedReadUris(context.contentResolver)),
+        )
+    }
 
     private val serviceIdentities = combine(
         sgdbKeys.apiKeyFlow,
@@ -234,6 +293,7 @@ class InitialSetupViewModel @Inject constructor(
             musicRoots     = roots.music,
             videoRoots     = roots.video,
             photoRoots     = roots.photo,
+            bookRoots      = roots.book,
             artworkFolderName = roots.artwork,
             vitaFolderName    = roots.vita,
             hasSgdb           = services.hasSgdb,
@@ -261,8 +321,29 @@ class InitialSetupViewModel @Inject constructor(
 
     // ── Step navigation ───────────────────────────────────────────────────────
 
+    /**
+     * Set while the wizard has sent the user to a real settings screen and expects them back.
+     *
+     * The wizard's overlay leaves composition for the excursion, and its onDispose calls
+     * [resetWizard] — which would return a ten-step run to page one for the crime of opening the
+     * theme picker. This makes exactly the next reset a no-op; every other one still fires, so a
+     * wizard genuinely closed still starts over next time.
+     */
+    private var parkedForExcursion = false
+
+    /** Called immediately before Make It Yours opens one of the four screens. */
+    fun parkForExcursion() { parkedForExcursion = true }
+
     /** Back to Welcome with transient state cleared. See old resetWizard contract. */
-    fun resetWizard() = scratch.update {
+    fun resetWizard() {
+        if (parkedForExcursion) {
+            parkedForExcursion = false
+            return
+        }
+        doResetWizard()
+    }
+
+    private fun doResetWizard() = scratch.update {
         it.copy(
             step = SetupStep.WELCOME, message = null, igdbStatus = null, ssStatus = null,
             retroArchDetecting = false,

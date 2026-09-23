@@ -667,6 +667,19 @@ data class XMBUiState(
 
     // ── Overlay screens ───────────────────────────────────────────────────
     val activeSettingsScreen: String? = null,
+    /**
+     * Where Back should return to instead of the Settings root — set only when the setup wizard
+     * sent you to a real settings screen.
+     *
+     * Settings has no back stack: Back means "up to the root", which is right for a rail you
+     * walked in through. It is wrong for the wizard's Make It Yours page, whose four rows open
+     * Theme, Sound, Boot and Layout as an excursion — landing at the Settings root from there
+     * drops you out of a flow you are ten steps into.
+     *
+     * One level deep on purpose. A real stack is what the rail is deliberately not, and the only
+     * journey that needs to come back is this one.
+     */
+    val settingsReturnTo: String? = null,
     // The drilled-into Settings L1 section — non-null while its two-pane flyout shows the L2 rows,
     // null at the flat section root. Deliberately NOT part of hasBlockingOverlay: the flyout is
     // XMB foreground, so input keeps driving the item list exactly like every other drill.
@@ -7950,7 +7963,14 @@ class XMBViewModel @Inject constructor(
             return
         }
         Timber.d("Settings rail -> %s", screenId)
-        _uiState.update { it.copy(activeSettingsScreen = screenId) }
+        _uiState.update {
+            // Only the wizard earns a return address; every other screen keeps Back meaning
+            // "up to the root", and opening from anywhere else CLEARS a stale one.
+            it.copy(
+                activeSettingsScreen = screenId,
+                settingsReturnTo = returnAddressFor(it.activeSettingsScreen),
+            )
+        }
     }
 
     /**
@@ -7961,6 +7981,17 @@ class XMBViewModel @Inject constructor(
      * could only ever pass through on the way in.
      */
     fun onSettingsBack() {
+        // The wizard's excursion, returning. Consumed here so a second Back behaves normally.
+        _uiState.value.settingsReturnTo?.let { returnTo ->
+            _uiState.update {
+                it.copy(
+                    activeSettingsScreen = returnTo,
+                    settingsReturnTo = null,
+                    pendingSettingsAction = null,
+                )
+            }
+            return
+        }
         val current = _uiState.value.activeSettingsScreen
         if (current != null &&
             current != com.psplauncher.core.domain.model.SETTINGS_ROOT_SCREEN_ID &&
@@ -7982,10 +8013,12 @@ class XMBViewModel @Inject constructor(
         // Leaving the setup wizard by any deliberate path (Skip, Finish, back-out on a re-run)
         // stamps it as seen — see markInitialSetupSeen for why open time is the wrong moment.
         val closing = _uiState.value.activeSettingsScreen
-        if (closing == INITIAL_SETUP_SCREEN_ID || closing == INITIAL_SETUP_FIRST_RUN_SCREEN_ID) {
+        if (closing in WIZARD_SCREEN_IDS) {
             markInitialSetupSeen()
         }
-        _uiState.update { it.copy(activeSettingsScreen = null, pendingSettingsAction = null) }
+        _uiState.update {
+            it.copy(activeSettingsScreen = null, settingsReturnTo = null, pendingSettingsAction = null)
+        }
     }
 
     // Bridge from Library Settings → the shared installed-app picker. Closes the settings overlay
@@ -9132,6 +9165,22 @@ class XMBViewModel @Inject constructor(
         // First-run wizard: set the moment the wizard is shown (or silently seeded for installs
         // that already carry configuration), so it only ever auto-opens once.
         private val KEY_INITIAL_SETUP_SEEN = booleanPreferencesKey("initial_setup_seen")
+        /**
+         * The screen Back should come back to after an excursion out of [screenId], or null when
+         * Back keeps its ordinary "up to the Settings root" meaning.
+         *
+         * A pure function because it is the one decision in the settings navigation that a later
+         * change is most likely to get silently wrong: add a third wizard route and a return
+         * address computed inline here would quietly not apply to it, which shows up as the
+         * wizard dumping you at the root rather than as anything that looks like a bug.
+         */
+        internal fun returnAddressFor(screenId: String?): String? =
+            screenId.takeIf { it in WIZARD_SCREEN_IDS }
+
+        /** Every route that IS the setup wizard. The one list both the stamp and Back read. */
+        internal val WIZARD_SCREEN_IDS: Set<String>
+            get() = setOf(INITIAL_SETUP_SCREEN_ID, INITIAL_SETUP_FIRST_RUN_SCREEN_ID)
+
         internal const val INITIAL_SETUP_SCREEN_ID = "settings_initial_setup"
         // The automatic first-run variant of the wizard: Back cannot exit from its first page.
         internal const val INITIAL_SETUP_FIRST_RUN_SCREEN_ID = "settings_initial_setup_first"

@@ -10,7 +10,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import android.os.Build
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -24,6 +27,7 @@ import com.psplauncher.feature.settings.ui.wizard.WizardInfoText
 import com.psplauncher.feature.settings.ui.wizard.WizardRootRow
 import com.psplauncher.feature.settings.ui.wizard.WizardRow
 import com.psplauncher.feature.settings.ui.wizard.WizardScaffold
+import com.psplauncher.feature.settings.ui.wizard.WizardSplash
 import com.psplauncher.feature.settings.ui.wizard.WizardSectionHeader
 import com.psplauncher.feature.settings.ui.wizard.WizardTextField
 import com.psplauncher.feature.settings.ui.wizard.WizardValueRow
@@ -34,7 +38,7 @@ import com.psplauncher.feature.settings.viewmodel.RootFolderRow
 import com.psplauncher.feature.settings.viewmodel.SetupStep
 
 // Which root-kind the single "add" SAF picker is currently serving.
-private enum class AddSlot { ROM, MUSIC, VIDEO, PHOTO }
+private enum class AddSlot { ROM, MUSIC, VIDEO, PHOTO, BOOK }
 
 /**
  * First-run setup wizard, now one task per page (per the approved plan): Welcome → ROM Roots →
@@ -57,6 +61,14 @@ fun InitialSetupScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    // The front door, first run only — see [WizardSplash]. rememberSaveable so a rotation or a
+    // process restart mid-wizard does not put the ceremony back in front of a half-finished run.
+    var splashDone by rememberSaveable { mutableStateOf(!firstRun) }
+    if (!splashDone) {
+        WizardSplash(onBegin = { splashDone = true })
+        return
+    }
+
     // The ViewModel outlives this overlay — snap back to page one when the wizard closes, so a
     // later re-run from Settings starts at the beginning instead of resuming mid-flow.
     DisposableEffect(Unit) {
@@ -75,6 +87,7 @@ fun InitialSetupScreen(
             AddSlot.MUSIC -> viewModel.addMediaRoot(MediaRootKind.MUSIC, uri)
             AddSlot.VIDEO -> viewModel.addMediaRoot(MediaRootKind.VIDEO, uri)
             AddSlot.PHOTO -> viewModel.addMediaRoot(MediaRootKind.PHOTO, uri)
+            AddSlot.BOOK  -> viewModel.addMediaRoot(MediaRootKind.BOOK, uri)
         }
     }
 
@@ -108,6 +121,22 @@ fun InitialSetupScreen(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> if (uri != null) viewModel.linkVitaFolder(uri) }
 
+    // ── Permission grants ───────────────────────────────────────────────────────
+    //
+    // All three come back with no usable result — a permission dialog's answer is the grant
+    // itself, and the two system screens return nothing at all — so every one of them re-reads
+    // the grant rather than trusting what it was handed.
+    val notificationRequest = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { viewModel.refreshGrants() }
+    val systemScreen = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { viewModel.refreshGrants() }
+
+    // How Personalize hands you to a real settings screen and back. Provided by SettingsNavHost
+    // for every screen it hosts; the wizard is one of them, so there is nothing to thread.
+    val openSettingsScreen = LocalSettingsOpenScreen.current
+
     // ── Page chrome driven by the current step ─────────────────────────────────
     val step = state.step
     val stepNumber = state.stepNumber
@@ -130,6 +159,20 @@ fun InitialSetupScreen(
             SetupStep.WELCOME -> WelcomePage(
                 onStart = { viewModel.nextStep() },
                 onSkip = onBack,
+            )
+            SetupStep.PERMISSIONS -> PermissionsPage(
+                state = state,
+                onRefresh = viewModel::refreshGrants,
+                onGrantNotifications = {
+                    notificationRequest.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                },
+                onOpenUsageAccess = {
+                    systemScreen.launch(
+                        android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                    )
+                },
+                onSetAsHome = { systemScreen.launch(viewModel.homeRoleIntent()) },
+                onContinue = { viewModel.nextStep() },
             )
             SetupStep.ROM_ROOTS -> RootsPage(
                 roots = state.romRoots,
@@ -197,6 +240,23 @@ fun InitialSetupScreen(
                 onRemove = { viewModel.removeMediaRoot(MediaRootKind.PHOTO, it.treeUri) },
                 onRescan = { viewModel.rescanMediaRoot(MediaRootKind.PHOTO) },
                 onContinue = { viewModel.nextStep() },
+                nextLabel = "Books",
+            )
+            SetupStep.BOOKS -> MediaRootsPage(
+                roots = state.bookRoots,
+                kindLabel = "Books",
+                kind = MediaRootKind.BOOK,
+                emptyText = "No book roots yet. Add the folder where your EPUBs and comics live — several roots can span internal storage and an SD card.",
+                addLabel = "Add Book Root",
+                addSublabel = "Grant a root folder (e.g. /Books) — add several to span locations",
+                onAdd = { pendingAdd = AddSlot.BOOK; addPicker.launch(null) },
+                onRelink = { row ->
+                    pendingRelinkKind = MediaRootKind.BOOK to row.treeUri
+                    relinkMediaPicker.launch(runCatching { Uri.parse(row.treeUri) }.getOrNull())
+                },
+                onRemove = { viewModel.removeMediaRoot(MediaRootKind.BOOK, it.treeUri) },
+                onRescan = { viewModel.rescanMediaRoot(MediaRootKind.BOOK) },
+                onContinue = { viewModel.nextStep() },
                 nextLabel = "Artwork",
             )
             SetupStep.ARTWORK -> ArtworkPage(
@@ -233,9 +293,19 @@ fun InitialSetupScreen(
                 onUnlink = viewModel::unlinkRetroArch,
                 onContinue = { viewModel.nextStep() },
             )
+            SetupStep.PERSONALIZE -> PersonalizePage(
+                autoFit = state.autoFitXmbLayout,
+                onToggleAutoFit = viewModel::toggleAutoFitXmbLayout,
+                onOpenScreen = { id ->
+                    // Park first: opening the screen disposes this one, and the dispose is what
+                    // would otherwise reset the run to page one.
+                    viewModel.parkForExcursion()
+                    openSettingsScreen(id)
+                },
+                onContinue = { viewModel.nextStep() },
+            )
             SetupStep.FINISH -> FinishPage(
                 state = state,
-                onToggleAutoFit = viewModel::toggleAutoFitXmbLayout,
                 onOpenLibraryManager = onOpenLibraryManager,
                 onGoToLibrary = onGoToLibrary,
                 onFinish = {
@@ -249,18 +319,24 @@ fun InitialSetupScreen(
 
 private fun headingFor(step: SetupStep): String = when (step) {
     SetupStep.WELCOME     -> "Welcome to PSPLauncher."
+    SetupStep.PERMISSIONS -> "Let the launcher off its leash."
     SetupStep.ROM_ROOTS   -> "Choose your ROM folders."
     SetupStep.MUSIC       -> "Choose your music folders."
     SetupStep.VIDEO       -> "Choose your video folders."
     SetupStep.PHOTO       -> "Choose your photo folders."
+    SetupStep.BOOKS       -> "Choose your book folders."
     SetupStep.ARTWORK     -> "Choose your artwork folder."
     SetupStep.SERVICES    -> "Connect your artwork sources."
     SetupStep.VITA        -> "Set your Vita data folder."
     SetupStep.RETROARCH   -> "Link RetroArch's cores folder."
+    SetupStep.PERSONALIZE -> "Make it yours."
     SetupStep.FINISH      -> "You're all set!"
 }
 
 private fun hintFor(step: SetupStep): String? = when (step) {
+    SetupStep.PERMISSIONS -> "Three optional grants. Everything works without them — each one just turns something on."
+    SetupStep.BOOKS     -> "EPUBs and comics. Add several roots to span internal storage and an SD card."
+    SetupStep.PERSONALIZE -> "Each row opens the real screen and comes back here, so nothing you set is a wizard-only copy."
     SetupStep.WELCOME   -> "A few short steps to point the launcher at your stuff — every step is optional and can be changed later in Settings."
     SetupStep.ROM_ROOTS -> "Add one or more root folders — each console's games live in a subfolder under them."
     SetupStep.MUSIC     -> "Add several roots to span internal storage and an SD card."
@@ -273,6 +349,110 @@ private fun hintFor(step: SetupStep): String? = when (step) {
     SetupStep.FINISH    -> "Everything below can be adjusted anytime in Settings."
 }
 
+/**
+ * The three grants the launcher asks for, and none of them is required.
+ *
+ * Every one is a capability rather than a gate: without notifications a background scan finishes
+ * silently, without usage access the app drawer's Recently Used tab has nothing to sort by, and
+ * without the Home role the launcher is an app you open rather than the thing you come back to.
+ * They are asked for here, together, because all three are system screens — meeting them one at a
+ * time scattered through the wizard is what makes a first run feel like an interrogation.
+ *
+ * The rows re-read on every resume: the user leaves for a system screen and comes back, and a row
+ * still reading "Not granted" after they granted it is the whole failure mode of a page like this.
+ */
+@Composable
+private fun PermissionsPage(
+    state: InitialSetupUiState,
+    onRefresh: () -> Unit,
+    onGrantNotifications: () -> Unit,
+    onOpenUsageAccess: () -> Unit,
+    onSetAsHome: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    LifecycleResumeEffect(Unit) {
+        onRefresh()
+        onPauseOrDispose { }
+    }
+
+    // Below API 33 there is no runtime notification permission to ask for, so the row would be a
+    // control that cannot do anything.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        WizardValueRow(
+            label = "Notifications",
+            value = if (state.hasNotifications) "Granted" else "Grant…",
+            sublabel = "Lets a library scan or an artwork download tell you when it has finished",
+            focusKey = "perm_notifications",
+            onClick = { if (!state.hasNotifications) onGrantNotifications() },
+        )
+    }
+    WizardValueRow(
+        label = "Usage Access",
+        value = if (state.hasUsageAccess) "Granted" else "Grant…",
+        sublabel = "Lets the app drawer sort by what you actually opened last",
+        onClick = { if (!state.hasUsageAccess) onOpenUsageAccess() },
+    )
+    WizardValueRow(
+        label = "PSPLauncher as Home",
+        value = if (state.isHomeLauncher) "Active" else "Set…",
+        sublabel = if (state.isHomeLauncher) {
+            "Home takes you back here, and \"Add to home\" in another launcher imports the game"
+        } else {
+            "Makes Home come back here instead of the stock launcher"
+        },
+        onClick = { if (!state.isHomeLauncher) onSetAsHome() },
+    )
+    WizardContinueRow("ROM Folders", onContinue)
+}
+
+/**
+ * Look and sound, as four doors rather than four pages.
+ *
+ * Each row opens the settings screen that owns the thing and comes back to this page. That is the
+ * whole design: a wizard copy of the theme picker or the sound assignments would be a second
+ * version of each to keep in step, and the rows below are the four the answers to "make it mine"
+ * actually live behind. The one control that IS here is the XMB's sizing, because it is a single
+ * checkbox and opening a screen for one checkbox is worse than showing it.
+ */
+@Composable
+private fun PersonalizePage(
+    autoFit: Boolean,
+    onToggleAutoFit: (Boolean) -> Unit,
+    onOpenScreen: (String) -> Unit,
+    onContinue: () -> Unit,
+) {
+    WizardRow(
+        label = "Theme",
+        sublabel = "Colour scheme, accent and theme packs",
+        focusKey = "personalize_theme",
+        onClick = { onOpenScreen("settings_themes") },
+    )
+    WizardRow(
+        label = "Sound",
+        sublabel = "Menu sounds, menu music, and the boot and launch cues",
+        onClick = { onOpenScreen("settings_audio") },
+    )
+    WizardRow(
+        label = "Boot Logo",
+        sublabel = "The boot sequence, your own boot video, and GameBoot",
+        onClick = { onOpenScreen("settings_boot") },
+    )
+    WizardRow(
+        label = "Wallpaper & Layout",
+        sublabel = "Wallpaper, the wave, and where the crossbar sits",
+        onClick = { onOpenScreen("settings_layout") },
+    )
+
+    WizardSectionHeader("Screen Size")
+    WizardCheckboxRow(
+        label = "Auto-fit the XMB layout (PSP proportions) — changeable anytime in Settings",
+        checked = autoFit,
+        onToggle = onToggleAutoFit,
+        focusKey = "personalize_autofit",
+    )
+    WizardContinueRow("Finish", onContinue)
+}
+
 @Composable
 private fun WizardContinueRow(label: String, onClick: () -> Unit) {
     Spacer(Modifier.height(4.dp))
@@ -281,13 +461,15 @@ private fun WizardContinueRow(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun WelcomePage(onStart: () -> Unit, onSkip: () -> Unit) {
+    // The heading above already says "Welcome to PSPLauncher." — this used to open by saying it
+    // again, which is the first sentence of the product wasted on a restatement.
     WizardInfoText(
-        "Welcome to PSPLauncher. This quick setup points the launcher at your media " +
-            "folders and connects the online services used for artwork and achievements."
+        "This points the launcher at your media folders, asks for the few permissions it can use, " +
+            "and connects the online services that fetch artwork."
     )
     WizardRow(
         label = "Get Started",
-        sublabel = "Choose your ROM roots first",
+        sublabel = "Permissions first, then your folders",
         focusKey = "welcome_start",
         onClick = onStart,
     )
@@ -591,7 +773,6 @@ private fun RetroArchPage(
 @Composable
 private fun FinishPage(
     state: InitialSetupUiState,
-    onToggleAutoFit: (Boolean) -> Unit,
     onOpenLibraryManager: () -> Unit,
     onGoToLibrary: () -> Unit,
     onFinish: () -> Unit,
@@ -606,6 +787,7 @@ private fun FinishPage(
     WizardValueRow(label = "Music", value = rootsShortLabel(state.musicRoots))
     WizardValueRow(label = "Video", value = rootsShortLabel(state.videoRoots))
     WizardValueRow(label = "Photo", value = rootsShortLabel(state.photoRoots))
+    WizardValueRow(label = "Books", value = rootsShortLabel(state.bookRoots))
     WizardValueRow(label = "Artwork Library", value = state.artworkFolderName ?: "Not set")
     WizardValueRow(label = "SteamGridDB", value = if (state.hasSgdb) "Connected" else "Not set")
     WizardValueRow(label = "IGDB (Twitch)", value = state.igdbClientId.ifBlank { "Not set" })
@@ -623,16 +805,6 @@ private fun FinishPage(
     }
 
     Spacer(Modifier.height(4.dp))
-    // OPTIONAL XMB auto-fit — explicitly opt-in, never forced. Sizing the XMB's cross layout to
-    // the PSP-authentic proportions is a preference, not a default; skipping it leaves the
-    // launcher exactly as it renders today. Undoable later in Display settings.
-    WizardSectionHeader("XMB Layout")
-    WizardCheckboxRow(
-        label = "Auto-fit the XMB layout (PSP proportions) — changeable anytime in Settings",
-        checked = state.autoFitXmbLayout,
-        onToggle = onToggleAutoFit,
-        focusKey = "finish_autofit",
-    )
     if (state.romRoots.isNotEmpty()) {
         WizardRow(
             label = "Open Library Manager",
@@ -916,7 +1088,6 @@ private fun FinishPagePreview() {
                 retroArchLinked = true,
                 retroArchCoreCount = 42,
             ),
-            onToggleAutoFit = {},
             onOpenLibraryManager = {},
             onGoToLibrary = {},
             onFinish = {},

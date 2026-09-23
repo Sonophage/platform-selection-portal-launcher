@@ -139,7 +139,7 @@ fun WizardRow(
             }
             .menuCursor(highlighted)
             .focusable()
-            .padding(horizontal = 48.dp, vertical = 11.dp),
+            .padding(horizontal = WizardRowGutter, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -332,7 +332,7 @@ fun WizardTextField(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp, vertical = 8.dp),
+            .padding(horizontal = WizardRowGutter, vertical = 8.dp),
     ) {
         Text(
             text = label,
@@ -470,7 +470,7 @@ fun WizardMessageRow(
             }
             .menuCursor(isFocused)
             .focusable()
-            .padding(horizontal = 48.dp, vertical = 8.dp),
+            .padding(horizontal = WizardRowGutter, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -495,7 +495,7 @@ fun WizardSectionHeader(title: String, modifier: Modifier = Modifier) {
         letterSpacing = 1.6.sp,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp, vertical = 10.dp),
+            .padding(horizontal = WizardRowGutter, vertical = 10.dp),
     )
 }
 
@@ -509,6 +509,6 @@ fun WizardInfoText(text: String, modifier: Modifier = Modifier) {
         lineHeight = 19.sp,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp, vertical = 10.dp),
+            .padding(horizontal = WizardRowGutter, vertical = 10.dp),
     )
 }

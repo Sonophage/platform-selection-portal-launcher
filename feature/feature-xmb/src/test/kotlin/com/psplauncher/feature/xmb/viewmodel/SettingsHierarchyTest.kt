@@ -24,6 +24,36 @@ import org.junit.Test
  */
 class SettingsHierarchyTest {
 
+    // ── Back out of a wizard excursion ───────────────────────────────────────
+
+    @Test fun `only the wizard leaves a return address for Back`() {
+        // Make It Yours opens Theme, Sound, Boot and Layout and expects Back to come back. Every
+        // other screen keeps Back meaning "up to the Settings root" — a return address handed out
+        // more widely would turn the rail into a half-implemented back stack.
+        assertEquals(
+            XMBViewModel.INITIAL_SETUP_SCREEN_ID,
+            XMBViewModel.returnAddressFor(XMBViewModel.INITIAL_SETUP_SCREEN_ID),
+        )
+        assertEquals(
+            XMBViewModel.INITIAL_SETUP_FIRST_RUN_SCREEN_ID,
+            XMBViewModel.returnAddressFor(XMBViewModel.INITIAL_SETUP_FIRST_RUN_SCREEN_ID),
+        )
+        assertEquals(null, XMBViewModel.returnAddressFor("settings_themes"))
+        assertEquals(null, XMBViewModel.returnAddressFor(SETTINGS_ROOT_SCREEN_ID))
+        assertEquals(null, XMBViewModel.returnAddressFor(null))
+    }
+
+    @Test fun `both wizard routes are real screens, and the id list covers both`() {
+        // The pair that must agree: WIZARD_SCREEN_IDS drives BOTH the return address above and
+        // the "setup has been seen" stamp on close. A route added to one and not the other is a
+        // wizard that either never comes back or never stops offering itself on launch.
+        XMBViewModel.WIZARD_SCREEN_IDS.forEach {
+            assertTrue("$it has no route", it in SETTINGS_SCREEN_ROUTES)
+        }
+        assertTrue(XMBViewModel.INITIAL_SETUP_SCREEN_ID in XMBViewModel.WIZARD_SCREEN_IDS)
+        assertTrue(XMBViewModel.INITIAL_SETUP_FIRST_RUN_SCREEN_ID in XMBViewModel.WIZARD_SCREEN_IDS)
+    }
+
     // ── Crossbar root ────────────────────────────────────────────────────────
 
     @Test fun `the crossbar column is two rows, open settings and open Android's`() {
