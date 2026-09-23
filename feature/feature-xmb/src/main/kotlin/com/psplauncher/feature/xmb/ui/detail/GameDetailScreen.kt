@@ -462,6 +462,28 @@ private fun GameDetailContent(
             )
         }
 
+        // ── Why the last launch did not happen ────────────────────────────
+        //
+        // ABOVE the buttons, not below them. Below is where it was, and below is off the bottom
+        // of the screen: the action row is the last thing before the scaffold's rule, so a
+        // refused launch printed its reason into a strip nothing can see. What the user got was
+        // Play doing nothing at all — the one outcome the named-reason machinery exists to
+        // prevent, arriving with the reason already computed and recorded.
+        if (state.launchError != null) {
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(state.launchError, color = ActionFail, fontSize = 12.sp)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Get help",
+                    color = detailPalette().focus,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { viewModel.requestLaunchHelp() },
+                )
+            }
+        }
+
         // ── Footer: heart, gear, Play ─────────────────────────────────────
         // NeoStation's arrangement, and the owner's answer to where scrape and edit go: the gear
         // opens Options, which is where DetailAction already keeps Artwork, Update Metadata,
@@ -499,25 +521,19 @@ private fun GameDetailContent(
             )
         }
 
-        if (state.launchError != null) {
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(state.launchError, color = ActionFail, fontSize = 12.sp)
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    "Get help",
-                    color = detailPalette().focus,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { viewModel.requestLaunchHelp() },
-                )
+        // The transient messages stay below — they are progress, not a refusal, and a line that
+        // scrolls off under the buttons costs nothing when it says "Launching…".
+        if (state.launchError == null) {
+            (state.actionMessage ?: state.artworkMessage)?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = detailPalette().focus, fontSize = 12.sp)
             }
-        } else (state.actionMessage ?: state.artworkMessage)?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, color = detailPalette().focus, fontSize = 12.sp)
         }
 
-        Spacer(Modifier.height(DetailRowSpacing))
+        // The column already fills the plate, so the reason above had to come from somewhere:
+        // it comes from here. A refused launch trades the tail margin for the sentence that says
+        // why — and gets it back the moment the error clears.
+        Spacer(Modifier.height(if (state.launchError != null) 0.dp else DetailRowSpacing))
     }
 }
 

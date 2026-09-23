@@ -13,6 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -141,6 +142,29 @@ class EmulatorIntentResolverPreflightTest {
             failure.message.orEmpty().contains("RetroArch"),
             "the message must name the emulator that needs the path, got: ${failure.message}",
         )
+    }
+
+    @Test
+    fun `a path we cannot read is not a path the EMULATOR cannot read`() {
+        // Pokemon Unbound on the SD card. PSPLauncher holds no all-files access, so canRead() is
+        // false for everything under /storage/XXXX-XXXX — while RetroArch, targeting SDK 28 with
+        // READ_EXTERNAL_STORAGE, opens the same file without trouble. Preflight used to block on
+        // our answer and tell the user the emulator needed access it already had, so Play did
+        // nothing and said nothing.
+        //
+        // Robolectric reports no all-files access, which is the case being pinned: unreadable
+        // here is not evidence, and the launch must be allowed to reach the emulator.
+        val unreadable = File.createTempFile("rom", ".gba").apply {
+            deleteOnExit()
+            check(setReadable(false, false)) { "could not drop read permission on the fixture" }
+        }
+        check(!unreadable.canRead()) { "fixture is still readable; the test would prove nothing" }
+
+        val resolver = EmulatorIntentResolver(contextWith(), mockk(relaxed = true))
+        val game = Game(title = "Pokemon Unbound", platformId = "psx", romPath = unreadable.absolutePath)
+
+        // No throw: preflight defers to the emulator rather than guessing on our behalf.
+        runBlocking { resolver.validateBeforeLaunch(game, rawPathProfile()) }
     }
 
     @Test

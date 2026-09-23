@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Environment
 import android.net.Uri
 import android.os.Build
 import com.psplauncher.core.domain.model.EmulatorProfile
@@ -136,10 +137,34 @@ class EmulatorIntentResolver @Inject constructor(
                 )
             val file = File(romPath)
             if (!file.exists()) error("ROM file not found: $romPath")
+            // canRead() is about US, and the file is about to be opened by SOMEBODY ELSE.
+            //
+            // A ROM on a removable card is the case that exposes the difference. PSPLauncher
+            // targets a modern SDK and holds no broad file access, so File.canRead() under
+            // /storage/XXXX-XXXX is false for everything there — while RetroArch, which targets
+            // SDK 28 and holds READ_EXTERNAL_STORAGE, reads the same path without trouble (its
+            // own playlists index those exact files). Blocking on our own answer refused a launch
+            // that works, with a message blaming the emulator for our permission.
+            //
+            // So this only decides anything when we COULD have read it: with all-files access a
+            // failure is about the file. Without it, stat said the path is there and that is all
+            // the evidence we have — the emulator's own error is better than our guess.
             if (!file.canRead()) {
-                error(
-                    "PSPLauncher can see ${game.title} but cannot read it at $romPath. " +
-                        "${profile.name} needs direct file access to this folder."
+                // runCatching: isExternalStorageManager enumerates the storage volumes and can
+                // throw where they are not there to enumerate. Failing to answer means we do not
+                // know whether we could have read the file, and not knowing must never be the
+                // reason a launch is refused — so an unanswerable question reads as "no access".
+                val allFilesAccess =
+                    runCatching { Environment.isExternalStorageManager() }.getOrDefault(false)
+                if (allFilesAccess) {
+                    error(
+                        "PSPLauncher can see ${game.title} but cannot read it at $romPath. " +
+                            "${profile.name} needs direct file access to this folder."
+                    )
+                }
+                Timber.i(
+                    "Not readable by PSPLauncher, launching anyway: $romPath — no all-files " +
+                        "access here, so this says nothing about ${profile.name}"
                 )
             }
         } else if (!game.romUri.isNullOrBlank()) {
