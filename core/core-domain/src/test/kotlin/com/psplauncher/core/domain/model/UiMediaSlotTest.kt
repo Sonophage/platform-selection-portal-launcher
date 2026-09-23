@@ -49,14 +49,22 @@ class UiMediaSlotTest {
         assertFalse(UiMediaSlot.isValidKey("sound_systembrowse"))
     }
 
-    @Test fun `gameboot is one slot - the replaceable clip, with no separate sound`() {
-        // GameBoot is ONE thing: the built-in sequence with its own bundled sound, or a user clip
-        // that replaces the whole presentation. An invalid gameboot_audio key is what lets
-        // pruneOrphans sweep the retired slot's file and display name.
+    @Test fun `gameboot is two slots again - the clip, and the sound under the built-in one`() {
+        // This reverses an earlier decision, deliberately. GAMEBOOT_AUDIO was retired on the
+        // reasoning that GameBoot is ONE thing you replace wholesale; the case that brought it
+        // back is the opposite one — keep the built-in disc, change only what it sounds like.
+        //
+        // The wholesale rule survives inside resolveGameBootAudio: a custom VIDEO still silences
+        // this slot, because a clip brings its own track.
         assertEquals(UiMediaSlot.GAMEBOOT_VIDEO, UiMediaSlot.fromKey("gameboot_video"))
         assertEquals(UiMediaKind.VIDEO, UiMediaSlot.GAMEBOOT_VIDEO.kind)
-        assertNull(UiMediaSlot.fromKey("gameboot_audio"), "GAMEBOOT_AUDIO was retired")
-        assertFalse(UiMediaSlot.isValidKey("gameboot_audio"))
+        assertEquals(UiMediaSlot.GAMEBOOT_AUDIO, UiMediaSlot.fromKey("gameboot_audio"))
+        assertEquals(UiMediaKind.AUDIO_TRACK, UiMediaSlot.GAMEBOOT_AUDIO.kind)
+    }
+
+    @Test fun `the launch disc's opening cue is its own audio slot`() {
+        assertEquals(UiMediaSlot.LAUNCH_DISC_AUDIO, UiMediaSlot.fromKey("launch_disc_audio"))
+        assertEquals(UiMediaKind.AUDIO_TRACK, UiMediaSlot.LAUNCH_DISC_AUDIO.kind)
     }
 
     @Test fun `sound_scroll keeps its storage key through the rename to Navigation`() {

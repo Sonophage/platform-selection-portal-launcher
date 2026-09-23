@@ -57,12 +57,14 @@ data class AudioSettingsUiState(
 )
 
 /**
- * Interface ▸ Sound. Owns the Menu Sounds toggle (moved here from Display ▸ Sound) and the
- * SEVEN sound assignments — the six menu sounds plus Boot Sound, which lives here as its
- * seventh row while staying an AUDIO_TRACK slot (Display ▸ Boot Sequence reaches the same slot).
+ * Interface ▸ Sound. Owns the Menu Sounds toggle (moved here from Display ▸ Sound), the Menu
+ * Music toggle and track, and the sound assignments in [SOUND_SLOTS] — the six menu sounds plus
+ * three AUDIO_TRACK slots: Boot Sound (Display ▸ Boot Sequence reaches the same slot) and the
+ * launch ceremony's two cues.
  *
- * Every row previews: the six menu sounds through [MenuSoundPlayer], Boot Sound through
- * [UiMediaAudioPlayer] (no [MenuSound] exists for it — it is boot music, not a UI tick).
+ * Every row previews: the six menu sounds through [MenuSoundPlayer], the AUDIO_TRACK rows through
+ * [UiMediaAudioPlayer] (no [MenuSound] exists for any of them — they are seconds of presentation
+ * audio, not UI ticks).
  *
  * Boot VIDEO and GameBoot's clip are deliberately NOT reachable from here — they live with their
  * own presentations under Display, and [confirmReset] must never touch them.
@@ -171,7 +173,10 @@ class AudioSettingsViewModel @Inject constructor(
         if (event != null) {
             menuSound.play(event, ignoreMute = true)
         } else {
-            bootSoundPreviewer.play(customPath = store.pathFor(slot))
+            // slot, not the parameter's BOOT_AUDIO default: an unassigned row must audition its
+            // OWN bundled sample (GameBoot's cue) or nothing (the disc opener has none) — the
+            // default would have played the boot chime under three different row labels.
+            bootSoundPreviewer.play(slot = slot, customPath = store.pathFor(slot))
         }
     }
 
@@ -192,7 +197,9 @@ class AudioSettingsViewModel @Inject constructor(
         _confirmResetVisible.value = false
         menuSound.play(MenuSound.CONFIRM)
         store.clearAll(UiMediaKind.SOUND)
-        store.clear(UiMediaSlot.BOOT_AUDIO)
+        // Every AUDIO_TRACK row on this screen, by the same list that draws them — a reset that
+        // named its slots by hand is a reset that stops covering the next row added.
+        SOUND_SLOTS.filter { it.kind == UiMediaKind.AUDIO_TRACK }.forEach { store.clear(it) }
         context.pfpDataStore.edit { it[KEY_MENU_SOUND] = true }
     }
 
@@ -208,11 +215,20 @@ class AudioSettingsViewModel @Inject constructor(
 
     companion object {
         /**
-         * The seven customizable sound rows, in the order the screen lists them: the six
-         * [UiMediaKind.SOUND] slots in enum (roster) order, then Boot Sound last.
+         * The customizable sound rows, in the order the screen lists them: the six
+         * [UiMediaKind.SOUND] slots in enum (roster) order, then the three AUDIO_TRACK slots
+         * that are presentation audio rather than UI ticks — Boot Sound, and the launch
+         * ceremony's two cues (the disc's opener and the GameBoot sound that takes over from it).
+         *
+         * The ceremony's cues live here, not under Display ▸ Launch Disc, because this is the
+         * screen you come to when you want to change what the launcher SOUNDS like; Display owns
+         * whether the animations play at all.
          */
         val SOUND_SLOTS: List<UiMediaSlot> =
-            UiMediaSlot.ofKind(UiMediaKind.SOUND) + UiMediaSlot.BOOT_AUDIO
+            UiMediaSlot.ofKind(UiMediaKind.SOUND) +
+                UiMediaSlot.BOOT_AUDIO +
+                UiMediaSlot.LAUNCH_DISC_AUDIO +
+                UiMediaSlot.GAMEBOOT_AUDIO
 
         // Menu Music is on this screen too — it just is not a SOUND row, so it gets its own
         // toggle and assignment rather than joining the roster list above.

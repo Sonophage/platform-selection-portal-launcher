@@ -118,6 +118,7 @@ class GameBootGate @Inject constructor(
             val customVideo = uiMedia.pathFor(UiMediaSlot.GAMEBOOT_VIDEO)
             customVideo to resolveGameBootAudio(
                 customVideoPath = customVideo,
+                customAudioPath = uiMedia.pathFor(UiMediaSlot.GAMEBOOT_AUDIO),
                 defaultUri = gameBootDefaultAudioUri(context),
             )
         }

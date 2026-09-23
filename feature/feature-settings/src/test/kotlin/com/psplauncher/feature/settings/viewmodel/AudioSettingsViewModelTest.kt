@@ -143,15 +143,19 @@ class AudioSettingsViewModelTest {
 
     // ── the roster ───────────────────────────────────────────────────────────
 
-    @Test fun `the Sound screen lists the seven rows with boot last`() = runTest(dispatcher) {
-        assertEquals(
-            listOf(
-                "sound_scroll", "sound_back", "sound_confirm", "sound_error",
-                "sound_launch", "sound_notification", "boot_audio",
-            ),
-            AudioSettingsViewModel.SOUND_SLOTS.map { it.key },
-        )
-    }
+    @Test fun `the Sound screen lists the six menu sounds then the three presentation tracks`() =
+        runTest(dispatcher) {
+            // Order is the screen's reading order, not an implementation detail: the six ticks
+            // you hear constantly, then the three that only sound at a boundary.
+            assertEquals(
+                listOf(
+                    "sound_scroll", "sound_back", "sound_confirm", "sound_error",
+                    "sound_launch", "sound_notification",
+                    "boot_audio", "launch_disc_audio", "gameboot_audio",
+                ),
+                AudioSettingsViewModel.SOUND_SLOTS.map { it.key },
+            )
+        }
 
     // ── Boot Sound as an ordinary row ────────────────────────────────────────
 
@@ -208,6 +212,21 @@ class AudioSettingsViewModelTest {
                 bootPreviewer.play(UiMediaSlot.BOOT_AUDIO, mediaFile(UiMediaSlot.BOOT_AUDIO, "mp3").absolutePath)
             }
         }
+
+    @Test fun `the ceremony rows preview their own slot, not boot audio`() = runTest(dispatcher) {
+        // preview() reaches the previewer through an overload whose slot parameter DEFAULTS to
+        // BOOT_AUDIO, and an unassigned row passes null for the path — so a call that let the
+        // default stand would audition the opening chime under both of these labels while the
+        // launch actually played something else. Named per slot because that is what went wrong.
+        vm.preview(UiMediaSlot.LAUNCH_DISC_AUDIO)
+        vm.preview(UiMediaSlot.GAMEBOOT_AUDIO)
+        advanceUntilIdle()
+
+        verify(exactly = 1) { bootPreviewer.play(UiMediaSlot.LAUNCH_DISC_AUDIO, null) }
+        verify(exactly = 1) { bootPreviewer.play(UiMediaSlot.GAMEBOOT_AUDIO, null) }
+        verify(exactly = 0) { bootPreviewer.play(UiMediaSlot.BOOT_AUDIO, any()) }
+        verify(exactly = 0) { menuSound.play(any(), any()) }
+    }
 
     @Test fun `menu sound rows still preview through SoundPool, never the boot previewer`() =
         runTest(dispatcher) {

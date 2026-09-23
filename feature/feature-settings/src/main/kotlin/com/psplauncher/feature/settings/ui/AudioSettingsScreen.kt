@@ -214,6 +214,14 @@ fun AudioSettingsScreen(
                         isAssigned = slot in state.assignedSlots,
                         onPick = { pickFor(slot) },
                         onPreview = { viewModel.preview(slot) },
+                        // The disc's opener is the one row with no bundled sample, so "use the
+                        // PFP default" would be a lie there: clearing it returns the ceremony to
+                        // opening in silence.
+                        resetLabel = if (slot == UiMediaSlot.LAUNCH_DISC_AUDIO) {
+                            "Open the launch disc in silence again"
+                        } else {
+                            "Use the PFP default for ${slot.displayName}"
+                        },
                         onUseDefault = {
                             requestSoundFocus(slot)
                             viewModel.useDefault(slot)
@@ -228,7 +236,7 @@ fun AudioSettingsScreen(
 
                 SettingsRow(
                     label = "Reset Sound to Defaults",
-                    sublabel = "Return every menu and boot sound to the bundled PFP sample and turn Menu Sounds back on",
+                    sublabel = "Return every menu, boot and launch sound to the bundled PFP sample and turn Menu Sounds back on",
                     onFocusChangedExternal = { if (it) focusedSlot = null },
                     onClick = { viewModel.requestReset() },
                 )

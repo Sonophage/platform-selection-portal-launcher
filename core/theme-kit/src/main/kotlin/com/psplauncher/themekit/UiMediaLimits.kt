@@ -84,12 +84,15 @@ object UiMediaLimits {
     /**
      * Menu music loops, so it is the one slot where a long file is the POINT rather than abuse.
      *
-     * Five minutes is a track, not a presentation. The ceiling still exists because the staged
-     * copy is read into app storage and the import gate has to be able to refuse something before
-     * it becomes a problem — and because a two-hour file looping under a launcher is a battery
-     * bill the user did not ask for.
+     * Fifteen minutes. It was five, which was a guess, and the first real file offered to it was
+     * a ten-minute console menu loop — the exact thing this slot exists for. A ceiling that
+     * refuses the canonical case is not a safety limit, it is a bug with a polite error message.
+     *
+     * The ceiling still exists because the staged copy is read into app storage and the import
+     * gate has to be able to refuse something before it becomes a problem, and because an
+     * hour-long file looping under a launcher is a battery bill the user did not ask for.
      */
-    const val MENU_MUSIC_MAX_MS     = 300_000L
+    const val MENU_MUSIC_MAX_MS     = 900_000L
 
     // ── Byte caps ────────────────────────────────────────────────────────────
     /**
@@ -119,6 +122,11 @@ object UiMediaLimits {
     val GAMEBOOT_CLIP = Spec(Kind.VIDEO,      1_000L, 8_000L, GAMEBOOT_CLIP_MAX_MS, VIDEO_MAX_BYTES)
     val BOOT         = Spec(Kind.AUDIO_TRACK, 0L, 8_000L, BOOT_MAX_MS,    AUDIO_STAGE_MAX_BYTES)
     val MENU_MUSIC   = Spec(Kind.AUDIO_TRACK, 0L, 8_000L, MENU_MUSIC_MAX_MS, AUDIO_STAGE_MAX_BYTES)
+    // Two presentation cues, both bounded by the ceremony they play under rather than by taste:
+    // the opener runs from the first frame and the GameBoot cue from the disc's exit, and neither
+    // has anywhere to go once the launched thing has the screen.
+    val LAUNCH_DISC_AUDIO = Spec(Kind.AUDIO_TRACK, 0L, 8_000L, BOOT_MAX_MS, AUDIO_STAGE_MAX_BYTES)
+    val GAMEBOOT_AUDIO    = Spec(Kind.AUDIO_TRACK, 0L, 5_000L, BOOT_MAX_MS, AUDIO_STAGE_MAX_BYTES)
     val BOOT_CLIP    = Spec(Kind.VIDEO,       1_000L, 8_000L, BOOT_MAX_MS,    VIDEO_MAX_BYTES)
 
     /** Accepted audio containers. Audio MIME arrays come from this set verbatim. */

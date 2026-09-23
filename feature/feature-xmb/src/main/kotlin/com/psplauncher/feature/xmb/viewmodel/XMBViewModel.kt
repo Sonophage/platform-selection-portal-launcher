@@ -8626,6 +8626,9 @@ class XMBViewModel @Inject constructor(
                 val customVideo = uiMediaStore.pathFor(com.psplauncher.core.domain.model.UiMediaSlot.GAMEBOOT_VIDEO)
                 customVideo to resolveGameBootAudio(
                     customVideoPath = customVideo,
+                    customAudioPath = uiMediaStore.pathFor(
+                        com.psplauncher.core.domain.model.UiMediaSlot.GAMEBOOT_AUDIO,
+                    ),
                     defaultUri = com.psplauncher.core.ui.media.gameBootDefaultAudioUri(context.packageName),
                 )
             }

@@ -60,14 +60,25 @@ class UiMediaDefaultsTest {
         assertEquals(R.raw.sfx_opening, UiMediaSlot.BOOT_AUDIO.bundledDefaultRes())
     }
 
-    @Test fun `gameboot has no media slot of its own beyond the replaceable video`() {
-        // The whole point of the one-GameBoot shape: there is nothing to assign but the clip.
+    @Test fun `the gameboot sound slot defaults to the sample the sequence is timed to`() {
+        // GAMEBOOT_AUDIO's default and gameBootDefaultAudioUri must name the SAME sample: the
+        // built-in sequence's timeline is beat-matched to sfx_launch, so a row that auditioned
+        // one sound while the sequence played another would be a lie you could hear.
+        assertEquals(R.raw.sfx_launch, UiMediaSlot.GAMEBOOT_AUDIO.bundledDefaultRes())
+        assertEquals(
+            gameBootDefaultAudioUri("com.psplauncher.launcher"),
+            UiMediaSlot.GAMEBOOT_AUDIO.bundledDefaultUri("com.psplauncher.launcher"),
+        )
+        // The clip stays what it always was: nothing bundled, and none should be added.
         assertNull(UiMediaSlot.GAMEBOOT_VIDEO.bundledDefaultRes())
         assertNull(UiMediaSlot.GAMEBOOT_VIDEO.bundledDefaultUri("com.psplauncher.launcher"))
-        assertNull(
-            UiMediaSlot.fromKey("gameboot_audio"),
-            "the retired GameBoot audio slot must not come back",
-        )
+    }
+
+    @Test fun `the launch disc opener ships silent`() {
+        // The switch to an assignable cue must not put a sound into a ceremony that never had
+        // one: no bundled sample means the disc opens exactly as it did before the slot existed.
+        assertNull(UiMediaSlot.LAUNCH_DISC_AUDIO.bundledDefaultRes())
+        assertNull(UiMediaSlot.LAUNCH_DISC_AUDIO.bundledDefaultUri("com.psplauncher.launcher"))
     }
 
     @Test fun `the built-in gameboot sound resolves to the bundled launch sample`() {
@@ -113,12 +124,19 @@ class UiMediaDefaultsTest {
     // ── GameBoot presentation resolution ─────────────────────────────────────
 
     @Test fun `a custom gameboot clip keeps its own track`() {
-        // Do NOT play the built-in sound under someone's clip: it would score their video with
-        // audio they never asked for. Null means "the clip's own track".
-        assertNull(resolveGameBootAudio("/video.mp4", "/bundled"))
+        // Do NOT play anything under someone's clip: it would score their video with audio they
+        // never asked for. Null means "the clip's own track" — and it wins over an assigned
+        // GameBoot sound too, because replacing the presentation replaces all of it.
+        assertNull(resolveGameBootAudio("/video.mp4", null, "/bundled"))
+        assertNull(resolveGameBootAudio("/video.mp4", "/mine.mp3", "/bundled"))
     }
 
     @Test fun `no custom clip plays the built-in sound the sequence is timed to`() {
-        assertEquals("/bundled", resolveGameBootAudio(null, "/bundled"))
+        assertEquals("/bundled", resolveGameBootAudio(null, null, "/bundled"))
+    }
+
+    @Test fun `an assigned gameboot sound wins over the bundled one`() {
+        // The case the slot came back for: keep the built-in disc, change what it sounds like.
+        assertEquals("/mine.mp3", resolveGameBootAudio(null, "/mine.mp3", "/bundled"))
     }
 }

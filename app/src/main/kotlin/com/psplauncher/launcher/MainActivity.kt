@@ -57,6 +57,12 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var menuMusicPreferences: com.psplauncher.core.data.media.MenuMusicPreferences
 
+    // The launch disc's opening cue, and the GameBoot cue that takes over from it partway
+    // through — one shared one-shot player, which is what makes the second one replace the first
+    // rather than sound over it.
+    @Inject
+    lateinit var uiMediaAudioPlayer: com.psplauncher.core.ui.media.UiMediaAudioPlayer
+
     @Inject
     lateinit var libraryRescanCoordinator: LibraryRescanCoordinator
 
@@ -150,6 +156,26 @@ class MainActivity : ComponentActivity() {
                 // live bindings supplied here, so none of them can contradict the pad.
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.psplauncher.core.ui.sound.LocalMenuSounds provides { sound -> menuSoundPlayer.play(sound) },
+                    com.psplauncher.core.ui.sound.LocalLaunchDiscCue provides {
+                        // pathFor is one stat call against the ui-media directory, once per
+                        // launch; not worth a coroutine hop that would let the disc's first
+                        // frame beat its own sound onto the screen. No path means no sound: the
+                        // slot has no bundled sample, so the ceremony opens in silence as before.
+                        uiMediaStore.pathFor(
+                            com.psplauncher.core.domain.model.UiMediaSlot.LAUNCH_DISC_AUDIO,
+                        )?.let { track ->
+                            // Clipped to the hand-off, not to the slot's import ceiling. The cue
+                            // is scenery for the disc; on a launch with no GameBoot sound to take
+                            // over from it, an 8-second file would otherwise play on underneath
+                            // the app that just opened.
+                            uiMediaAudioPlayer.play(
+                                uri = track,
+                                clipEndMs =
+                                    com.psplauncher.core.ui.components.DiscCeremony.HandOffMs.toLong(),
+                                label = "launch-disc",
+                            )
+                        }
+                    },
                 ) {
                 ProvideControllerPrompts {
                     // AppXmbHost is defined per build variant: the debug source set wraps the shell so

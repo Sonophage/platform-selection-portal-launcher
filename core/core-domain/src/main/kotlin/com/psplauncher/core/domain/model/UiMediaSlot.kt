@@ -44,10 +44,19 @@ enum class UiMediaSlot(
     BOOT_VIDEO("boot_video", UiMediaKind.VIDEO, "Boot Animation", UiMediaLimits.BOOT_CLIP),
     BOOT_AUDIO("boot_audio", UiMediaKind.AUDIO_TRACK, "Boot Sound", UiMediaLimits.BOOT),
 
+    // ── The launch ceremony's two cues (Display ▸ Launch Disc / GameBoot) ────
+    //
+    // The opener plays as the disc rises; the GameBoot cue plays as it leaves. Two moments, so
+    // two slots — one sound stretched across both would have to be the length of the ceremony.
+    LAUNCH_DISC_AUDIO("launch_disc_audio", UiMediaKind.AUDIO_TRACK, "Launch Disc Sound", UiMediaLimits.LAUNCH_DISC_AUDIO),
+
     // ── GameBoot (Display ▸ GameBoot) ────────────────────────────────────────
-    // ONE slot: the GameBoot presentation is a single thing the user either keeps or replaces
-    // wholesale with their own clip, which brings its own audio. The retired `gameboot_audio`
-    // AUDIO_TRACK slot is swept from installs and restored backups by pruneOrphans().
+    // The video slot replaces the whole presentation and brings its own audio. The audio slot is
+    // for the other case, which is the common one: keep the built-in disc and change only what it
+    // sounds like. It was retired once on the theory that GameBoot is a single thing you replace
+    // wholesale — true of the clip, and not true of someone who likes the disc and wants their own
+    // chime under it.
+    GAMEBOOT_AUDIO("gameboot_audio", UiMediaKind.AUDIO_TRACK, "GameBoot Sound", UiMediaLimits.GAMEBOOT_AUDIO),
     GAMEBOOT_VIDEO("gameboot_video", UiMediaKind.VIDEO, "GameBoot Animation", UiMediaLimits.GAMEBOOT_CLIP),
 
     // ── Menu music (Interface ▸ Sound) ───────────────────────────────────────

@@ -30,8 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.psplauncher.core.ui.sound.MenuSound
-import com.psplauncher.core.ui.sound.LocalMenuSounds
+import com.psplauncher.core.ui.sound.LocalLaunchDiscCue
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import kotlinx.coroutines.delay
 
@@ -66,16 +65,10 @@ fun DiscLaunchCeremony(
     val handOff by rememberUpdatedState(onHandOff)
     val finished by rememberUpdatedState(onFinished)
 
-    // The opening cue, fired here rather than at the call site.
-    //
-    // The ceremony is what it announces, and it has six entry points — games, films, books,
-    // tracks, apps and the settings preview. A sound wired into the callers is a sound five of
-    // them have and the sixth quietly does not.
-    //
-    // SYSTEM_BROWSE is the crossbar's own "you have moved to another thing" cue, which is what
-    // this is: the screen is about to become somewhere else.
-    val menuSounds = LocalMenuSounds.current
-    LaunchedEffect(Unit) { menuSounds(MenuSound.SYSTEM_BROWSE) }
+    // The opening cue, fired here rather than at the call site — see [LocalLaunchDiscCue] for
+    // why it is ambient. Silent until the user assigns a track to the Launch Disc slot.
+    val discCue = LocalLaunchDiscCue.current
+    LaunchedEffect(Unit) { discCue() }
 
     val t = remember { Animatable(0f) }
     LaunchedEffect(Unit) {

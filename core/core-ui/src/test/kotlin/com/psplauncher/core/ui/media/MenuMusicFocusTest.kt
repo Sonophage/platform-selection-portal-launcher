@@ -47,10 +47,12 @@ class MenuMusicFocusTest {
         // This one deliberately does not: a launcher that starts playing music at a new user is
         // the reason the switch is off by default, and the two facts have to agree.
         assertNull(UiMediaSlot.MENU_MUSIC.bundledDefaultRes())
-        assertEquals(
-            "a loop is the one slot where a long file is the point",
-            300_000L,
-            UiMediaSlot.MENU_MUSIC.limits.hardMaxMs,
+        // Fifteen minutes, and the number has a reason: the first real file offered to this slot
+        // was a ten-minute console menu loop, which the original five-minute guess refused. A
+        // ceiling that rejects the canonical case is not a limit, it is a bug.
+        assertTrue(
+            "a ten-minute menu loop is the canonical case and must fit",
+            UiMediaSlot.MENU_MUSIC.limits.hardMaxMs >= 600_000L,
         )
     }
 }

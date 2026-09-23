@@ -27,6 +27,12 @@ fun UiMediaSlot.bundledDefaultRes(): Int? = when (this) {
     UiMediaSlot.SOUND_LAUNCH -> R.raw.sfx_launch
     UiMediaSlot.SOUND_NOTIFICATION -> R.raw.sfx_notification
     UiMediaSlot.BOOT_AUDIO -> R.raw.sfx_opening
+    // The sound the built-in GameBoot sequence is drawn against, now reachable as a default for
+    // the slot that can replace it rather than only through gameBootDefaultAudioUri().
+    UiMediaSlot.GAMEBOOT_AUDIO -> R.raw.sfx_launch
+    // The opener has no bundled cue: out of the box the ceremony opens in silence, as it always
+    // has, and a sound here is something the user brings.
+    UiMediaSlot.LAUNCH_DISC_AUDIO,
     UiMediaSlot.BOOT_VIDEO,
     UiMediaSlot.GAMEBOOT_VIDEO,
     // Menu music has no bundled track on purpose: the toggle is inert until the user assigns
@@ -80,20 +86,22 @@ fun UiMediaSlot.bundledDefaultUri(context: Context): String? =
     bundledDefaultUri(context.packageName)
 
 /**
- * What the GameBoot transition should actually play for audio, given the user's custom GameBoot
- * video and the built-in sequence's own sound:
+ * What the GameBoot transition should actually play for audio:
  *
- *  • a custom GameBoot video keeps its own audio track (null) — playing the built-in sound under
- *    someone's clip would score their video with a sound they never asked for;
- *  • no custom video → the built-in sequence plays with the sound it was timed against.
+ *  • a custom GameBoot video keeps its own audio track (null) — playing anything under someone's
+ *    clip would score their video with a sound they never asked for;
+ *  • otherwise the user's own GameBoot sound if they have assigned one;
+ *  • otherwise the built-in sequence's bundled cue.
  *
- * Two branches, no slot: unlike [resolveBootAudio] there is no separate GameBoot sound to assign,
- * which is the whole point of GameBoot being one replaceable thing.
+ * Same shape as [resolveBootAudio] now that GameBoot has a sound slot again. The video branch is
+ * what keeps the old rule intact: replacing the whole presentation still replaces the whole
+ * presentation.
  */
 fun resolveGameBootAudio(
     customVideoPath: String?,
+    customAudioPath: String?,
     defaultUri: String?,
-): String? = if (customVideoPath == null) defaultUri else null
+): String? = if (customVideoPath != null) null else customAudioPath ?: defaultUri
 
 /** Convenience overload for callers that already hold a [Context]. */
 fun gameBootDefaultAudioUri(context: Context): String = gameBootDefaultAudioUri(context.packageName)
