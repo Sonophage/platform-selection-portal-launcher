@@ -7,7 +7,7 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 (Winlator), native apps, and your music, video and photo libraries.
 
 <p align="center">
-  <img src="docs/screenshots/theme-vaporwave-home.jpg" alt="PSPLauncher — a themed crossbar with game covers" width="720">
+  <img src="docs/screenshots/recent-shelf.jpg" alt="PSPLauncher — the Recent shelf, cover rail and hero art" width="720">
 </p>
 
 <p align="center">
@@ -26,70 +26,49 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 
 ## Screenshots
 
-*Captured on an AYN Thor unless noted. Game artwork and app icons shown belong to their
-respective owners.*
+*Shot on an AYANEO Pocket FIT Elite at 1920x1080, on a real 151-game library, in September 2026.
+Every capture here is from the current `main`; older ones were deleted rather than left to drift.
+Game artwork and app icons belong to their respective owners.*
 
-### In development
+### The crossbar
 
-*On `main`, not on the Releases page yet — the newest published build is 1.5.0. Shot on the
-AYANEO Pocket FIT Elite at 1920x1080.*
+| | |
+|:---:|:---:|
+| <img src="docs/screenshots/recent-shelf.jpg" width="420"> | <img src="docs/screenshots/home-emulation.jpg" width="420"> |
+| The Recent shelf reorders on every visit, and its cover rail hides until LEFT brings it back | The Emulation column — All Games, Favourites, and the consoles under them |
+| <img src="docs/screenshots/library-column.jpg" width="420"> | <img src="docs/screenshots/video-column.jpg" width="420"> |
+| Books sit beside the reader that opens them | Video — scanned files, and collections of what you were watching |
+| <img src="docs/screenshots/music-column.jpg" width="420"> | <img src="docs/screenshots/photo-column.jpg" width="420"> |
+| Music — songs, and Artists split out of the library's own credit lines | Photos and albums |
+| <img src="docs/screenshots/network-column.jpg" width="420"> | <img src="docs/screenshots/search-typing.jpg" width="420"> |
+| Network — quick search and pinned sites | Search shows results while the keyboard is still up, and opening one plays it |
+
+### Launching
 
 | | |
 |:---:|:---:|
 | <img src="docs/screenshots/launch-disc.jpg" width="420"> | <img src="docs/screenshots/settings-launch-cues.jpg" width="420"> |
-| The launch ceremony — the thing you picked becomes a disc wearing its own cover, sinks and spins, and hands over as it leaves | Its two cues are yours to assign, alongside every other sound |
+| The thing you picked becomes a disc wearing its own cover, sinks and spins, and hands over as it leaves | Both of the ceremony's cues are yours to assign, alongside every other sound |
+
+### First run
+
+| | |
+|:---:|:---:|
 | <img src="docs/screenshots/setup-splash.jpg" width="420"> | <img src="docs/screenshots/setup-welcome.jpg" width="420"> |
-| Setup opens on the mark and the wave, and one press takes you in — first run only | The wizard is a place now: black, no settings rail, nothing borrowed from whatever wallpaper is set |
+| Setup opens on the mark and the wave, and one press takes you in — first run only | A place rather than a settings page: black, no rail, nothing borrowed from the wallpaper |
 | <img src="docs/screenshots/setup-permissions.jpg" width="420"> | <img src="docs/screenshots/setup-personalize.jpg" width="420"> |
 | Three optional grants, together, because all three are system screens | Theme, sound, boot logo and layout as four doors that open the real screens and come back |
-| <img src="docs/screenshots/setup-retroarch-cores.jpg" width="420"> | <img src="docs/screenshots/settings-menu-music.jpg" width="420"> |
-| RetroArch's page, which only appears when RetroArch is installed — and now finds it whichever ABI it ships as | Menu music: one track, looping, that gives way the moment anything else wants the speaker |
+| <img src="docs/screenshots/setup-retroarch-cores.jpg" width="420"> | |
+| RetroArch's page, which appears only when RetroArch is installed — whichever ABI it ships as | |
 
-### New in 1.5
-
-*Shot on the AYANEO Pocket FIT Elite at 1920x1080, on a real 148-game library.*
+### Settings
 
 | | |
 |:---:|:---:|
-| <img src="docs/screenshots/game-drill-covers.jpg" width="420"> | <img src="docs/screenshots/artwork-studio.jpg" width="420"> |
-| The drill flyout — covers, hero art, PIC0 logo and the metadata line | Artwork Studio, now with a status band: kinds filled, results found, requests used |
-| <img src="docs/screenshots/game-options-menu.jpg" width="420"> | <img src="docs/screenshots/search-typing.jpg" width="420"> |
-| Options panels take the artwork's hue at a surface's darkness, so nothing reads through | Search shows results while the keyboard is up |
-| <img src="docs/screenshots/settings-rail.jpg" width="420"> | <img src="docs/screenshots/home-memory-cards.jpg" width="420"> |
-| The settings rail centres on wherever you are, not just where the cursor went | Counts read one way everywhere now |
-
-### Themes
-
-| | |
-|:---:|:---:|
-| <img src="docs/screenshots/theme-vaporwave-home.jpg" width="420"> | <img src="docs/screenshots/theme-color-scheme-picker.jpg" width="420"> |
-| A custom `.pfptheme` — wallpaper + one derived color, icons follow | Color Scheme picker, previewing live on the real crossbar |
-
-### Game library
-
-| | |
-|:---:|:---:|
-| <img src="docs/screenshots/home-emulation.jpg" width="420"> | <img src="docs/screenshots/game-detail.jpg" width="420"> |
-| The Emulation column on the crossbar — All Games, Favourites and the consoles under them | Game detail — hero art, logo and one-tap Play |
-| <img src="docs/screenshots/custom-category.jpg" width="420"> | <img src="docs/screenshots/memory-card-menu.jpg" width="420"> |
-| A custom gaming category with its own icon and wallpaper | Memory Card options (△) — scan, refresh, pin, hide |
-| <img src="docs/screenshots/settings-library-manager.jpg" width="420"> | <img src="docs/screenshots/game-drill-windows.jpg" width="420"> |
-| Library Manager — ROM roots, per-console cards, scan-all passes | PC titles (Winlator / GameNative / Steam) sit next to console games |
-| <img src="docs/screenshots/artwork-manager.jpg" width="420"> | <img src="docs/screenshots/settings-one-row.jpg" width="420"> |
-| Artwork Manager — SteamGridDB / IGDB / local | Settings opens on its seven sections rather than a single long list |
-| <img src="docs/screenshots/last-played-bar.jpg" width="420"> | |
-| The Recent shelf, which reorders on every visit — the art rail hides until LEFT brings it back | |
-
-### Media & more
-
-| | |
-|:---:|:---:|
-| <img src="docs/screenshots/music-now-playing.jpg" width="420"> | <img src="docs/screenshots/music-player.jpg" width="420"> |
-| Music section — Now Playing surfaces on the crossbar | The in-app player (background service keeps it going) |
-| <img src="docs/screenshots/video-library.jpg" width="420"> | <img src="docs/screenshots/video-apps.jpg" width="420"> |
-| Video library — scanned files with thumbnails | Your installed players. **Older capture:** these now sit at the root of the Video column rather than behind a "Video Apps" row |
-| <img src="docs/screenshots/photo-section.jpg" width="420"> | |
-| Photo section — albums and a fullscreen viewer | |
+| <img src="docs/screenshots/settings-one-row.jpg" width="420"> | <img src="docs/screenshots/settings-library-manager.jpg" width="420"> |
+| Settings opens on its seven sections rather than one long list | Library Manager — ROM roots, per-console cards, scan-all passes |
+| <img src="docs/screenshots/settings-menu-music.jpg" width="420"> | <img src="docs/screenshots/theme-color-scheme-picker.jpg" width="420"> |
+| Menu music: one track, looping, that gives way the moment anything else wants the speaker | Colour Scheme, previewing live on the real crossbar |
 
 ---
 
