@@ -1475,7 +1475,6 @@ fun XMBShell(
                     autoPlay = uiState.activeVideoAutoPlay,
                     pendingGamepadAction = uiState.pendingVideoDetailAction,
                     onGamepadActionConsumed = onVideoDetailActionConsumed,
-                    showTouchControls = uiState.resolvedShowTouchButton,
                     onTouchInput = onTouchInput,
                     modifier = Modifier.fillMaxSize(),
                 )

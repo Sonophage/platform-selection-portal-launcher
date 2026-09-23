@@ -61,13 +61,16 @@ import coil3.compose.AsyncImage
 import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.Video
+import com.psplauncher.core.domain.model.ControllerIcon
+import com.psplauncher.core.ui.components.PfpControllerHints
+import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpMessageOverlay
 import com.psplauncher.core.ui.detail.PfpOverlayCard
 import com.psplauncher.core.ui.detail.PfpOverlayTitle
 import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
-import com.psplauncher.core.ui.components.XmbHeaderPill
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursor
 import com.psplauncher.core.ui.theme.menuCursorEdge
@@ -95,9 +98,6 @@ fun VideoDetailScreen(
     onBack: () -> Unit,
     pendingGamepadAction: GamepadAction? = null,
     onGamepadActionConsumed: () -> Unit = {},
-    // Touch Back pill shown only when the last input was touch (AUTO), like the XMB App Drawer
-    // button; any touch on the screen reports back via [onTouchInput].
-    showTouchControls: Boolean = true,
     onTouchInput: () -> Unit = {},
     // Direct-play mode (from search): fire the page's own primary action as soon as THIS film has
     // loaded, instead of waiting on a second A press. The page still opens underneath and is what
@@ -188,15 +188,18 @@ fun VideoDetailScreen(
     ) {
         Column(
             modifier = Modifier.fillMaxSize().widthIn(max = 920.dp).align(Alignment.Center)
+                // BEFORE the scroll, so it shrinks the viewport rather than adding scrollable
+                // space under the content. Padding inside a scroller is just more to scroll
+                // past: the Play button still came to rest under the prompt row, because the
+                // row is a fixed child of the same Box and does not move with the content.
+                .padding(bottom = PromptRowClearance)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp, vertical = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Clear the header pill row above.
-            Spacer(Modifier.height(56.dp))
-
-            // Prominent thumbnail card — sits below the pills, crisp (no fade), as the focal point.
+            // Prominent thumbnail card, crisp (no fade), as the focal point. The 56dp spacer that
+            // used to sit above it was clearing a header pill row that no longer exists.
             video.effectiveThumbnailUri?.let { thumb ->
                 AsyncImage(
                     model = thumb,
@@ -241,20 +244,24 @@ fun VideoDetailScreen(
             }
         }
 
-        // Header pills over the banner (touch only, per the last-input source) — hidden while the
-        // fullscreen player is up (it draws over everything). Back closes the Options menu when it's
-        // open, otherwise backs out; the Options pill opens the Options context menu (controller: Y).
-        if (!state.playing && showTouchControls) {
-            XmbHeaderPill(
-                label = "Back",
-                leadingGlyph = "◀",
-                onClick = { if (state.showOptions) viewModel.closeOptions() else onBack() },
-                modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
-            )
-            XmbHeaderPill(
-                label = "Options",
-                onClick = viewModel::openOptions,
-                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+        // One footer, and it is the touch surface too.
+        //
+        // This screen was the last one carrying big floating pills that said what a prompt row
+        // says. It kept them because it had no footer to move them into; it has one now. The
+        // prompts fire through handleGamepadAction — the same dispatcher the pad uses — so Back
+        // still closes the Options menu first and backs out second without a second copy of that
+        // rule living out here.
+        //
+        // Not conditional on input mode. A row that appears only for touch is a different screen
+        // for touch, which is the thing being undone.
+        if (!state.playing) {
+            PfpControllerHints(
+                items = videoDetailHelperItems(state),
+                style = ControllerHintStyle.INLINE,
+                onAction = viewModel::handleGamepadAction,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 14.dp),
             )
         }
 
@@ -495,3 +502,39 @@ private fun fmtTime(ms: Long): String {
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
 
+/** The prompt row's own height plus its gap from the edge — what the body must stay above. */
+private val PromptRowClearance = 44.dp
+
+// ── Helper footer ─────────────────────────────────────────────────────────────
+
+/**
+ * What the prompt row offers, for the context the page is actually in.
+ *
+ * Pure function of the state, like [gameDetailHelperItems], so the two screens' rows can be
+ * compared in a test rather than by eye — and so a row promising an action the dispatcher ignores
+ * in that context is catchable without a device.
+ *
+ * Every entry names exactly one action on purpose: a prompt naming two cannot be tapped, and this
+ * row is the touch surface.
+ */
+internal fun videoDetailHelperItems(state: VideoDetailUiState): List<ControllerPromptItem> = when {
+    state.launchError != null -> listOf(ControllerPromptItem(GamepadAction.SELECT, "Dismiss"))
+    state.confirmRemove -> listOf(
+        ControllerPromptItem(GamepadAction.SELECT, "Remove"),
+        ControllerPromptItem(GamepadAction.BACK, "Cancel"),
+    )
+    state.creatingPlaylist || state.isEditingTitle ->
+        listOf(ControllerPromptItem(GamepadAction.BACK, "Cancel"))
+    state.showPlaylistPicker || state.showOptions -> listOf(
+        ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Navigate"),
+        ControllerPromptItem(GamepadAction.SELECT, "Select"),
+        ControllerPromptItem(GamepadAction.BACK, "Close"),
+    )
+    state.infoVisible -> listOf(ControllerPromptItem(GamepadAction.BACK, "Close"))
+    else -> listOfNotNull(
+        // The lead action is named for what it does to THIS film: a part-watched one resumes.
+        state.primaryActions.firstOrNull()?.let { ControllerPromptItem(GamepadAction.SELECT, it.label) },
+        ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
+        ControllerPromptItem(GamepadAction.BACK, "Back"),
+    )
+}
