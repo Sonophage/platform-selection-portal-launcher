@@ -147,6 +147,9 @@ fun InitialSetupScreen(
         stepCount = state.stepCount,
         title = "Initial Setup",
         onBack = { if (!viewModel.previousStep() && !firstRun) onBack() },
+        // Leaving by Skip is leaving deliberately, which is what stamps the wizard as seen — the
+        // same door Finish uses, so a first run that is skipped does not come back on next launch.
+        onSkip = onBack,
         backEnabled = canGoBack,
         message = state.message,
         onDismissMessage = viewModel::dismissMessage,
@@ -156,10 +159,7 @@ fun InitialSetupScreen(
         modifier = modifier,
     ) {
         when (step) {
-            SetupStep.WELCOME -> WelcomePage(
-                onStart = { viewModel.nextStep() },
-                onSkip = onBack,
-            )
+            SetupStep.WELCOME -> WelcomePage(onStart = { viewModel.nextStep() })
             SetupStep.PERMISSIONS -> PermissionsPage(
                 state = state,
                 onRefresh = viewModel::refreshGrants,
@@ -381,7 +381,7 @@ private fun PermissionsPage(
         WizardValueRow(
             label = "Notifications",
             value = if (state.hasNotifications) "Granted" else "Grant…",
-            sublabel = "Lets a library scan or an artwork download tell you when it has finished",
+            sublabel = "Tells you when a scan or a download has finished",
             focusKey = "perm_notifications",
             onClick = { if (!state.hasNotifications) onGrantNotifications() },
         )
@@ -389,16 +389,16 @@ private fun PermissionsPage(
     WizardValueRow(
         label = "Usage Access",
         value = if (state.hasUsageAccess) "Granted" else "Grant…",
-        sublabel = "Lets the app drawer sort by what you actually opened last",
+        sublabel = "Sorts the app drawer by what you opened last",
         onClick = { if (!state.hasUsageAccess) onOpenUsageAccess() },
     )
     WizardValueRow(
         label = "PSPLauncher as Home",
         value = if (state.isHomeLauncher) "Active" else "Set…",
         sublabel = if (state.isHomeLauncher) {
-            "Home takes you back here, and \"Add to home\" in another launcher imports the game"
+            "Home comes back here, and \"Add to home\" elsewhere imports the game"
         } else {
-            "Makes Home come back here instead of the stock launcher"
+            "Makes Home come back here, not the stock launcher"
         },
         onClick = { if (!state.isHomeLauncher) onSetAsHome() },
     )
@@ -460,23 +460,18 @@ private fun WizardContinueRow(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WelcomePage(onStart: () -> Unit, onSkip: () -> Unit) {
-    // The heading above already says "Welcome to PSPLauncher." — this used to open by saying it
-    // again, which is the first sentence of the product wasted on a restatement.
-    WizardInfoText(
-        "This points the launcher at your media folders, asks for the few permissions it can use, " +
-            "and connects the online services that fetch artwork."
-    )
+private fun WelcomePage(onStart: () -> Unit) {
+    // One row.
+    //
+    // This page used to carry a paragraph that restated the heading, a second that restated the
+    // hint, and a Skip row — for a page whose only job is to start. Skip is a footer prompt on
+    // every page now, so keeping a row for it here made the way out look like a page-one choice
+    // rather than something always available.
     WizardRow(
         label = "Get Started",
         sublabel = "Permissions first, then your folders",
         focusKey = "welcome_start",
         onClick = onStart,
-    )
-    WizardRow(
-        label = "Skip Setup",
-        sublabel = "Go straight to the launcher — run Initial Setup from Settings anytime",
-        onClick = onSkip,
     )
 }
 
@@ -872,7 +867,7 @@ private fun WelcomePagePreview() {
         heading = "Welcome to PSPLauncher.",
         hint = "A few short steps to point the launcher at your stuff — every step is optional and can be changed later in Settings.",
     ) {
-        WelcomePage(onStart = {}, onSkip = {})
+        WelcomePage(onStart = {})
     }
 }
 

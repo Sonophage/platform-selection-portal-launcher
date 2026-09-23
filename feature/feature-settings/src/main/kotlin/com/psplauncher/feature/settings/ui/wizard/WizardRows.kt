@@ -86,7 +86,16 @@ fun WizardRow(
     modifier: Modifier = Modifier,
     sublabel: String? = null,
     focusKey: String? = null,
-    trailing: (@Composable () -> Unit)? = null,
+    /**
+     * The right-hand side of the row, in the row's own [RowScope].
+     *
+     * A RowScope so a value can pin itself to the LABEL's line with `Modifier.align(Top)`. A
+     * row's sublabel wraps to two lines often enough, and a centre-aligned value then floats
+     * halfway down beside it, pointing at nothing — which is what made the Permissions rows look
+     * loose. A checkbox still centres, because it is a control for the whole row rather than a
+     * reading of its first line.
+     */
+    trailing: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
     actions: List<SettingsRowAction> = emptyList(),
     // Root rows: while an inline action holds focus, the row-level cursor fill is suppressed so
     // the action's own background is the sole highlight (same rule as the settings DirectoryRow).
@@ -204,6 +213,9 @@ fun WizardValueRow(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.End,
+                // Top, plus the label's own optical offset: the value reads as the answer to the
+                // LABEL, so it belongs on the label's line whatever the sublabel does below it.
+                modifier = Modifier.align(Alignment.Top).padding(top = 2.dp),
             )
         },
     )

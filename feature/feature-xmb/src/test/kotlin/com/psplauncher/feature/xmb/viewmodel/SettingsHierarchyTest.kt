@@ -3,6 +3,7 @@ package com.psplauncher.feature.xmb.viewmodel
 import com.psplauncher.core.domain.model.SettingsSectionId
 import com.psplauncher.core.domain.model.SETTINGS_ROOT_SCREEN_ID
 import com.psplauncher.core.domain.model.settingsEntriesIn
+import com.psplauncher.core.domain.model.settingsEntryFor
 import com.psplauncher.core.domain.model.settingsRailRows
 import com.psplauncher.feature.settings.ui.SETTINGS_SCREEN_ROUTES
 import org.junit.Assert.assertEquals
@@ -52,6 +53,23 @@ class SettingsHierarchyTest {
         }
         assertTrue(XMBViewModel.INITIAL_SETUP_SCREEN_ID in XMBViewModel.WIZARD_SCREEN_IDS)
         assertTrue(XMBViewModel.INITIAL_SETUP_FIRST_RUN_SCREEN_ID in XMBViewModel.WIZARD_SCREEN_IDS)
+    }
+
+    @Test fun `only the re-run wizard route is in the catalog, which is what Skip depends on`() {
+        // Skip Setup is one callback on both routes, and onSettingsBack decides what it means by
+        // asking whether the current screen is a catalog entry:
+        //
+        //   settings_initial_setup       is one  -> Skip goes up to the Settings root
+        //   settings_initial_setup_first is not  -> Skip closes out to the launcher, and closing
+        //                                           is what stamps setup as seen
+        //
+        // That second line is the one that matters and the one nothing else states: a first run
+        // that skipped would otherwise land in Settings and offer itself again on next launch.
+        assertEquals(
+            null,
+            settingsEntryFor(XMBViewModel.INITIAL_SETUP_FIRST_RUN_SCREEN_ID),
+        )
+        assertTrue(settingsEntryFor(XMBViewModel.INITIAL_SETUP_SCREEN_ID) != null)
     }
 
     // ── Crossbar root ────────────────────────────────────────────────────────

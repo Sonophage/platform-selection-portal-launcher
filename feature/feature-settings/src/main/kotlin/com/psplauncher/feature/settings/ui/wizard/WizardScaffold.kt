@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,7 @@ import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.core.ui.wave.WaveLayers
 import com.psplauncher.core.ui.wave.WaveStyle
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.feature.settings.ui.LocalSettingsPromptAction
 import com.psplauncher.feature.settings.ui.LocalSettingsScrollStateRegistrar
 import com.psplauncher.feature.settings.ui.SettingsScaffold
 
@@ -84,6 +86,16 @@ fun WizardScaffold(
     onBack: () -> Unit,
     /** Dimmed, inert Back on the first page (no earlier step exists). */
     backEnabled: Boolean = true,
+    /**
+     * Leave the whole wizard, from any page. Null hides the prompt entirely.
+     *
+     * A footer prompt rather than a row, because a row is a thing you scroll to and this is a
+     * thing you want when you have decided you are not doing this now — which on a page whose
+     * rows run past the fold means scrolling to the bottom of a page you are trying to leave.
+     * It used to exist only on Welcome, so the moment you pressed Get Started the way out was
+     * eleven pages of Back.
+     */
+    onSkip: (() -> Unit)? = null,
     /** Transient wizard message — rendered as an amber row under the heading. */
     message: String? = null,
     onDismissMessage: (() -> Unit)? = null,
@@ -95,6 +107,7 @@ fun WizardScaffold(
     content: @Composable () -> Unit,
 ) {
     val menuSounds = LocalMenuSounds.current
+    val skip by rememberUpdatedState(onSkip)
     SettingsScaffold(
         title = title,
         subtitle = "",
@@ -109,7 +122,18 @@ fun WizardScaffold(
         // other screens beside it is an invitation to leave halfway through.
         showRail = false,
         header = { WizardHeader(stepNumber, stepCount, title) },
-        footer = { WizardFooter(backEnabled, footerNote) },
+        footer = { WizardFooter(backEnabled, onSkip != null, footerNote) },
+        // Intercepted before navigation, so it works with a row focused, a field being edited or
+        // nothing focused at all — the states a wizard is most likely to be abandoned from.
+        onInterceptAction = { action ->
+            if (action == GamepadAction.OPEN_CONTEXT_MENU && skip != null) {
+                menuSounds(MenuSound.BACK)
+                skip?.invoke()
+                true
+            } else {
+                false
+            }
+        },
         contentKey = contentKey,
     ) {
         // The wizard owns the shared scrollable column (registered with the scaffold so
@@ -274,7 +298,7 @@ private fun WizardHeading(heading: String, hint: String?) {
  * on page one — came out greyed beside it.
  */
 @Composable
-private fun WizardFooter(backEnabled: Boolean, note: String?) {
+private fun WizardFooter(backEnabled: Boolean, skippable: Boolean, note: String?) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -291,8 +315,13 @@ private fun WizardFooter(backEnabled: Boolean, note: String?) {
             items = listOfNotNull(
                 ControllerPromptItem(GamepadAction.SELECT, "Enter"),
                 ControllerPromptItem(GamepadAction.BACK, "Back").takeIf { backEnabled },
+                ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Skip Setup")
+                    .takeIf { skippable },
             ),
             style = ControllerHintStyle.INLINE,
+            // The same dispatcher every other settings footer uses, so the prompt is a control by
+            // touch as well as a label for a button.
+            onAction = LocalSettingsPromptAction.current,
         )
     }
 }
