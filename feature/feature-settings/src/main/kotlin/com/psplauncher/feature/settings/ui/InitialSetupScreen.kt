@@ -317,6 +317,16 @@ fun InitialSetupScreen(
     }
 }
 
+/**
+ * The one sentence that tells you where the cores actually are.
+ *
+ * Shared because the wizard and Settings ▸ Emulators both ask for this grant, and the wrong
+ * instruction in one of them is the whole failure: /RetroArch on internal storage is named
+ * RetroArch, is easy to find, and contains no cores at all.
+ */
+private const val RETROARCH_PICK_HINT =
+    "Open the picker's sidebar and choose RetroArch itself, not the /RetroArch folder"
+
 private fun headingFor(step: SetupStep): String = when (step) {
     SetupStep.WELCOME     -> "Welcome to PSPLauncher."
     SetupStep.PERMISSIONS -> "Let the launcher off its leash."
@@ -746,13 +756,20 @@ private fun RetroArchPage(
     if (state.retroArchLinked) {
         WizardValueRow(
             label = "Cores Folder",
-            value = if (state.retroArchCoreCount != null) {
-                "${state.retroArchCoreCount} cores detected"
-            } else {
-                "Linked"
+            value = when {
+                state.retroArchCoreCount == null -> "Linked"
+                state.retroArchCoreCount == 0 -> "No cores found"
+                else -> "${state.retroArchCoreCount} cores detected"
             },
+            // Zero is the mis-pick, not an empty RetroArch: see the same message in
+            // Settings ▸ Emulators ▸ RetroArch.
+            sublabel = "Wrong folder? $RETROARCH_PICK_HINT".takeIf { state.retroArchCoreCount == 0 },
         )
-        WizardRow(label = "Re-link Folder", sublabel = "Pick RetroArch's folder again", onClick = onLink)
+        WizardRow(
+            label = "Re-link Folder",
+            sublabel = RETROARCH_PICK_HINT,
+            onClick = onLink,
+        )
         WizardRow(label = "Re-check Cores", sublabel = "After installing new cores", onClick = onRedetect)
         WizardRow(label = "Unlink RetroArch", sublabel = "Fall back to offering every curated core", onClick = onUnlink)
     } else {
@@ -760,7 +777,7 @@ private fun RetroArchPage(
             "RetroArch is installed. Link its folder so only the cores you actually have are " +
                 "offered when launching games — otherwise every curated core is shown (unverified)."
         )
-        WizardRow(label = "Link RetroArch Folder", sublabel = "Pick the com.retroarch document tree", onClick = onLink)
+        WizardRow(label = "Link RetroArch", sublabel = RETROARCH_PICK_HINT, onClick = onLink)
     }
     WizardContinueRow("Finish", onContinue)
 }

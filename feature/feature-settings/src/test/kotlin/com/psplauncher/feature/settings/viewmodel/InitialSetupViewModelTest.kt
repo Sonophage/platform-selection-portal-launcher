@@ -82,6 +82,7 @@ class InitialSetupViewModelTest {
         // Default: RetroArch NOT installed (the tests below override to enable its page).
         every { packageManager.getPackageInfo(any<String>(), any<Int>()) } throws
             PackageManager.NameNotFoundException()
+        every { packageManager.getInstalledPackages(any<Int>()) } returns emptyList()
         every { romRoots.roots } returns flowOf(emptyList())
         every { mediaRoots.roots(any()) } returns flowOf(emptyList())
         every { artworkImport.folderTreeUri } returns flowOf(null)
@@ -98,6 +99,38 @@ class InitialSetupViewModelTest {
 
     // uiState is WhileSubscribed — tests that assert on it need an active collector.
     private fun TestScope.collectState() = launch { vm.uiState.collect {} }
+
+    private fun packageInfoFor(name: String) =
+        android.content.pm.PackageInfo().apply { packageName = name }
+
+    // ── RetroArch detection ─────────────────────────────────────────────────────
+
+    @Test fun `RetroArch is detected under its ABI-suffixed package, not just the bare one`() =
+        runTest(dispatcher) {
+            // This was an exact getPackageInfo("com.retroarch"), so a device with the aarch64
+            // build — which is what the great majority of them have — reported RetroArch absent
+            // and the wizard silently dropped its page. Found on a real device with the page
+            // missing and STEP n OF 11 where it should have been 12.
+            every { packageManager.getInstalledPackages(any<Int>()) } returns
+                listOf(packageInfoFor("com.retroarch.aarch64"))
+            vm = buildVm()
+            val job = collectState()
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.retroArchInstalled)
+            job.cancel()
+        }
+
+    @Test fun `a package that merely starts with the family name is not RetroArch`() =
+        runTest(dispatcher) {
+            // "com.retroarchive" is not a RetroArch build. The family match is on the dot.
+            every { packageManager.getInstalledPackages(any<Int>()) } returns
+                listOf(packageInfoFor("com.retroarchive.reader"))
+            vm = buildVm()
+            val job = collectState()
+            advanceUntilIdle()
+            assertFalse(vm.uiState.value.retroArchInstalled)
+            job.cancel()
+        }
 
     // ── Book roots ──────────────────────────────────────────────────────────────
 
@@ -188,8 +221,11 @@ class InitialSetupViewModelTest {
 
     @Test fun `RetroArch and Vita3K pages are included when both apps are installed`() =
         runTest(dispatcher) {
-            // Both RetroArch and Vita3K installed for this run (any getPackageInfo call succeeds).
+            // Vita3K by name lookup; RetroArch by listing, and under the ABI-suffixed package
+            // that is the one nearly every device actually has.
             every { packageManager.getPackageInfo(any<String>(), any<Int>()) } returns mockk()
+            every { packageManager.getInstalledPackages(any<Int>()) } returns
+                listOf(packageInfoFor("com.retroarch.aarch64"))
             vm = buildVm()
 
             val job = collectState()

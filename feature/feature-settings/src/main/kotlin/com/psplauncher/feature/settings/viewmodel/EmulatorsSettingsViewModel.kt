@@ -126,6 +126,15 @@ data class EmulatorsSettingsUiState(
     // a count = linked and this many installed cores were detected.
     val retroArchLinked: Boolean = false,
     val retroArchCoreCount: Int? = null,
+    /**
+     * The grant is live and the folder holds no cores — nearly always the visible `/RetroArch`
+     * folder rather than RetroArch's own storage.
+     *
+     * Carried separately because the count cannot say it: zero cores under a correctly picked
+     * tree and zero cores because the tree was wrong read identically as "0 core(s) detected",
+     * and only one of those is the user's problem to fix by installing cores.
+     */
+    val retroArchTreeHasNoCores: Boolean = false,
     val retroArchCores: List<String> = emptyList(),
     val isDetectingCores: Boolean = false,
     // Installed Windows/PC runtimes, by display name. They take no ROM and have no profile to
@@ -171,12 +180,17 @@ class EmulatorsSettingsViewModel @Inject constructor(
      */
     private suspend fun readRetroArchState() {
         val inventory = retroArchLink.inventory()
+        // The package is arbitrary HERE and only here: it builds each core's absolutePath, and
+        // this call throws every path away on the next line. The list is names for a settings
+        // screen. Anything that needs a path asks EmulatorDetector, which knows which RetroArch
+        // build is actually installed — do not copy this literal to a call whose result launches.
         val cores = RetroArchCoreScanner.coresFor("com.retroarch", inventory.coreFiles).map { it.name }
         _uiState.update {
             it.copy(
                 isDetectingCores   = false,
                 retroArchLinked    = inventory is CoreInventory.Verified || inventory is CoreInventory.EmptyTree,
                 retroArchCoreCount = if (inventory is CoreInventory.Unlinked) null else inventory.coreFiles.size,
+                retroArchTreeHasNoCores = inventory is CoreInventory.EmptyTree,
                 retroArchCores     = cores,
             )
         }
@@ -207,7 +221,14 @@ class EmulatorsSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             retroArchLink.clear()
             autoConfig.runOnStartup()
-            _uiState.update { it.copy(retroArchLinked = false, retroArchCoreCount = null, retroArchCores = emptyList()) }
+            _uiState.update {
+                it.copy(
+                    retroArchLinked = false,
+                    retroArchCoreCount = null,
+                    retroArchTreeHasNoCores = false,
+                    retroArchCores = emptyList(),
+                )
+            }
         }
     }
 

@@ -149,7 +149,17 @@ private data class ServiceIdentities(
 // Must match XMBViewModel.KEY_INITIAL_SETUP_SEEN — both read/write the same pref.
 private val KEY_INITIAL_SETUP_SEEN = booleanPreferencesKey("initial_setup_seen")
 
-private const val RETROARCH_PACKAGE = "com.retroarch"
+/**
+ * RetroArch ships one package per ABI — com.retroarch.aarch64 is the one nearly every device has,
+ * and plain com.retroarch is the legacy build almost none of them do.
+ *
+ * This was an exact-match getPackageInfo("com.retroarch"), so on a device carrying the aarch64
+ * build the wizard reported RetroArch absent and silently dropped its page from the flow. The
+ * rest of the codebase already matched by family (EmulatorLaunchPreference,
+ * EmulatorPlatformMapping, RetroArchCoreScanner, KnownEmulatorPackages) — this was the one place
+ * that did not, and a missing page is the failure that reports nothing.
+ */
+private const val RETROARCH_FAMILY = "com.retroarch"
 
 // Vita3K ships under one package name plus commonly-shared variants; any installed means its
 // data-folder (ux0) page should be offered. Same set as KnownEmulatorCatalog.
@@ -311,8 +321,12 @@ class InitialSetupViewModel @Inject constructor(
             )
         }
 
-    private fun isRetroArchInstalled(): Boolean =
-        runCatching { context.packageManager.getPackageInfo(RETROARCH_PACKAGE, 0) }.isSuccess
+    private fun isRetroArchInstalled(): Boolean = runCatching {
+        context.packageManager.getInstalledPackages(0).any {
+            // On the dot: com.retroarchive is not a RetroArch build.
+            it.packageName == RETROARCH_FAMILY || it.packageName.startsWith("$RETROARCH_FAMILY.")
+        }
+    }.getOrDefault(false)
 
     private fun isVita3KInstalled(): Boolean =
         VITA3K_PACKAGES.any {

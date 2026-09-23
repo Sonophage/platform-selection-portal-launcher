@@ -16,8 +16,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * A user-granted SAF link into RetroArch's own document tree (authority `com.retroarch.documents`),
- * used to discover which libretro cores are actually installed.
+ * A user-granted SAF link into RetroArch's own document tree, used to discover which libretro
+ * cores are actually installed.
+ *
+ * RetroArch's own tree, which is NOT the visible `/RetroArch` folder on shared storage. That
+ * folder holds config, saves, playlists and system files and has never held a core; the cores are
+ * in the app's private data directory, which is exactly why the DocumentsProvider exists. Picking
+ * the visible folder is the easy mistake — it is named RetroArch and it is right there — and it
+ * lands in [CoreInventory.EmptyTree], which the settings screen now names rather than reporting
+ * as "0 cores detected".
  *
  * Why this exists: RetroArch stores cores in private internal storage that no other app can read,
  * so PFP otherwise cannot tell an installed core from a missing one and drops the user into a
@@ -135,7 +142,11 @@ class RetroArchLink @Inject constructor(
     }
 
     companion object {
-        const val RETROARCH_DOCUMENTS_AUTHORITY = "com.retroarch.documents"
+        // RETROARCH_DOCUMENTS_AUTHORITY used to live here as "com.retroarch.documents". It was
+        // unused, and it was wrong: the authority is per build — the aarch64 package exposes
+        // com.retroarch.aarch64.documents — so anything that had started matching on it would
+        // have rejected the provider nearly every user actually has. The tree the user grants
+        // carries its own authority and nothing here needs to name one.
         private val KEY = stringPreferencesKey("retroarch_documents_tree_uri")
         private val KEY_CACHED_CORES = stringSetPreferencesKey("retroarch_cached_core_files")
     }

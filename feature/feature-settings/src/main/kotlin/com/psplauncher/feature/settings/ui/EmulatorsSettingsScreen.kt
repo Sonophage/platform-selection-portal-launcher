@@ -202,6 +202,12 @@ fun EmulatorsSettingsScreen(
                 when {
                     state.isDetectingCores ->
                         "Scanning RetroArch for installed cores…"
+                    // Before the count, because EmptyTree HAS a count — zero — and reporting it
+                    // as "0 core(s) detected" blames the user's RetroArch for a bad pick.
+                    state.retroArchTreeHasNoCores ->
+                        "Linked, but there are no cores under the folder you picked. That is almost " +
+                            "always /RetroArch on internal storage — it holds config and saves, never " +
+                            "cores. Re-link and choose RetroArch from the picker's sidebar instead."
                     state.retroArchLinked && state.retroArchCoreCount != null ->
                         "Linked — ${state.retroArchCoreCount} core(s) detected. Only installed cores are offered, so a missing core can't cause a black screen."
                     state.retroArchLinked ->
@@ -213,7 +219,8 @@ fun EmulatorsSettingsScreen(
 
             SettingsRow(
                 label    = if (state.retroArchLinked) "Re-link RetroArch Folder" else "Link RetroArch to Detect Cores",
-                sublabel = "In the picker, choose RetroArch's folder (grant access) so PSP can read its installed cores",
+                sublabel = "Open the picker's ☰ sidebar and choose RetroArch itself — not the " +
+                    "/RetroArch folder on internal storage, which holds no cores",
                 focusKey = "retroarch_link",
                 onClick  = { retroArchPicker.launch(null) },
             )
