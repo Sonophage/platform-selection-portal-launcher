@@ -39,6 +39,12 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var gamepadInputHandler: GamepadInputHandler
 
+    // Provided into the composition (LocalMenuSounds) so shared chrome with no ViewModel of its
+    // own -- the settings scaffold, which is one navigation dispatch for every settings screen --
+    // can make the same noises the XMB does.
+    @Inject
+    lateinit var menuSoundPlayer: com.psplauncher.core.ui.sound.MenuSoundPlayer
+
     @Inject
     lateinit var libraryRescanCoordinator: LibraryRescanCoordinator
 
@@ -130,11 +136,15 @@ class MainActivity : ComponentActivity() {
             PFPTheme {
                 // Controller prompts are ambient: every footer resolves its glyphs from the
                 // live bindings supplied here, so none of them can contradict the pad.
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.psplauncher.core.ui.sound.LocalMenuSounds provides { sound -> menuSoundPlayer.play(sound) },
+                ) {
                 ProvideControllerPrompts {
                     // AppXmbHost is defined per build variant: the debug source set wraps the shell so
                     // long-pressing Settings opens DebugMenuScreen; the release source set calls
                     // XMBShellContainer directly, keeping debug code out of the APK.
                     AppXmbHost()
+                }
                 }
             }
         }

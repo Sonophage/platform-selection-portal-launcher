@@ -4,8 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -36,12 +36,13 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 /**
- * Draws finished background work as a pill in the top-left, one at a time, then lets it go.
+ * Draws finished background work as a pill across the top centre, one at a time, then lets it go.
  *
- * Top-left because that is where the console this launcher is imitating puts its notifications,
- * and because every other corner of the XMB is already spoken for -- the clock and the status
- * icons own the top strip, the controller prompts own the bottom, and the launch spine owns the
- * right edge.
+ * It started in the top left, where the console this launcher is imitating puts its notifications,
+ * and that corner turned out to be the one place on the XMB with something in it: the item ABOVE
+ * the cursor sits there on every column page. The top centre is the only band that is reliably
+ * empty -- the clock and the status icons hold the two ends of the strip, the controller prompts
+ * hold the bottom, and the launch spine holds the right edge.
  *
  * Queued rather than stacked. Two scans finishing together produce two pills in sequence, not a
  * column of them: a stack has no natural height limit and this screen is 462dp tall.
@@ -74,9 +75,11 @@ fun SystemToastHost(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize()) {
         AnimatedVisibility(
             visible = shown && current != null,
-            enter = slideInHorizontally(tween(EnterMs)) { -it } + fadeIn(tween(EnterMs)),
-            exit = slideOutHorizontally(tween(ExitMs)) { -it } + fadeOut(tween(ExitMs)),
-            modifier = Modifier.align(Alignment.TopStart).padding(start = EdgeGap, top = TopGap),
+            // Down and back up, now that it is centred: a pill that slid in from the left edge
+            // while sitting in the middle would travel across the page to get to its own spot.
+            enter = slideInVertically(tween(EnterMs)) { -it } + fadeIn(tween(EnterMs)),
+            exit = slideOutVertically(tween(ExitMs)) { -it } + fadeOut(tween(ExitMs)),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = TopGap),
         ) {
             // The queue is not popped until ExitMs after `shown` goes false, so the toast this
             // reads is still there for the whole slide out.
@@ -140,7 +143,6 @@ private const val EnterMs = 260
 private const val ExitMs = 200
 
 private val MaxWidth = 260.dp
-private val EdgeGap = 12.dp
 // Clear of the status strip, which is 18dp tall and owns the very top of the screen.
 private val TopGap = 26.dp
 private val PillShape = RoundedCornerShape(9.dp)

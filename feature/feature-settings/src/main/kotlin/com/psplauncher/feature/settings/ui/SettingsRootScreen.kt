@@ -1,5 +1,16 @@
 package com.psplauncher.feature.settings.ui
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -60,9 +71,39 @@ fun SettingsRootScreen(
             // device's own density (the XMB's canvas scale does not reach it), so a dp inset
             // would be a different share of the page on a different panel.
             val inset = maxWidth * ROOT_LEFT_INSET_FRACTION
+
+            // Choosing a section slides the list over to where the rail is about to be, and fades
+            // it, before the section actually opens.
+            //
+            // The inset exists so the rows do not JUMP when a section opens. This is the other
+            // half of that: the list travels the width of the inset, so it comes to rest exactly
+            // on the rail's column and hands the page over rather than being replaced by it. The
+            // distance is the inset itself, which is why both read off the same measurement.
+            //
+            // The open is deferred until the slide has run. That is a real delay before the
+            // section appears, and it is the point -- a transition nobody waits for is a cut.
+            var leavingFor by remember { mutableStateOf<String?>(null) }
+            val travel by animateDpAsState(
+                targetValue = if (leavingFor != null) -inset else 0.dp,
+                animationSpec = tween(ROOT_SLIDE_MS),
+                label = "settingsRootSlide",
+            )
+            val fade by animateFloatAsState(
+                targetValue = if (leavingFor != null) 0f else 1f,
+                animationSpec = tween(ROOT_SLIDE_MS),
+                label = "settingsRootFade",
+            )
+            LaunchedEffect(leavingFor) {
+                val target = leavingFor ?: return@LaunchedEffect
+                delay(ROOT_SLIDE_MS.toLong())
+                onOpenSection(target)
+            }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .offset(x = travel)
+                .alpha(fade)
                 .verticalScroll(scrollState)
                 .padding(start = inset, top = ROOT_TOP_DROP),
         ) {
@@ -85,7 +126,9 @@ fun SettingsRootScreen(
                             modifier = Modifier.size(22.dp),
                         )
                     },
-                    onClick = opens?.let { { onOpenSection(it) } },
+                    // Null while the slide is running: a second press during it would queue a
+                    // second open, and the first one has not happened yet to be backed out of.
+                    onClick = opens?.takeIf { leavingFor == null }?.let { { leavingFor = it } },
                 )
             }
         }
@@ -103,6 +146,13 @@ private const val ROOT_LEFT_INSET_FRACTION = 0.20f
 
 /** How far below the title the first row starts. The title is 30sp and was nearly touching it. */
 private val ROOT_TOP_DROP = 28.dp
+
+/**
+ * How long the list takes to slide out of the way, and therefore how long the section waits.
+ *
+ * Short enough that it reads as the page handing over rather than as the launcher thinking.
+ */
+private const val ROOT_SLIDE_MS = 190
 
 /**
  * The row icon for a section.

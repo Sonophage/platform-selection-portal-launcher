@@ -100,6 +100,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.isDirectional
+import com.psplauncher.core.ui.sound.MenuSound
 import com.psplauncher.core.ui.components.ControllerHintBar
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.ControllerHintStyle
@@ -555,6 +556,10 @@ fun SettingsScaffold(
     // Declarative navigation model: owns the focused key, ordered movement and selection.
     // Rows feed it items via the ordered registration list below.
     val navigationState = remember { ControllerNavigationState() }
+    // Settings made no sound at all. Every other surface in the launcher ticks as the cursor
+    // moves and clicks when it opens something; this one dispatch is shared by every settings
+    // screen, so the noises belong here rather than in each of them.
+    val menuSounds = com.psplauncher.core.ui.sound.LocalMenuSounds.current
     // The slider currently in adjust mode (see LocalSettingsEnterSliderMode). Written by the
     // focused row's SELECT and read by the action handler below + the adjusting flag provided
     // down to rows so the active slider can paint itself.
@@ -934,6 +939,9 @@ fun SettingsScaffold(
             GamepadAction.NAVIGATE_UP -> {
                 val previous = navigationState.focusedKey
                 val target = navigationState.move(-1)
+                // Only when the cursor actually moved. At the top boundary the list scrolls back
+                // and focus stays, and a tick there would say something happened that did not.
+                if (target != null && target != previous) menuSounds(MenuSound.SCROLL)
                 // Clamped at the first navigable item: stay put but scroll back to the top.
                 if (target != null && target == previous) {
                     // Up at the first logical item is a deliberate top-boundary action. Always
@@ -951,7 +959,10 @@ fun SettingsScaffold(
             }
 
             GamepadAction.NAVIGATE_DOWN -> {
-                requestFocusFor(navigationState.move(1))
+                val previous = navigationState.focusedKey
+                val target = navigationState.move(1)
+                if (target != null && target != previous) menuSounds(MenuSound.SCROLL)
+                requestFocusFor(target)
             }
             // Inline trailing actions (e.g. a root row's Replace/Remove buttons) are reached
             // horizontally. On a row without them moveHorizontal returns null — LEFT was a silent
@@ -963,20 +974,23 @@ fun SettingsScaffold(
             GamepadAction.NAVIGATE_LEFT -> {
                 val target = navigationState.moveHorizontal(-1)
                 when {
-                    target != null -> requestFocusFor(target)
+                    target != null -> { menuSounds(MenuSound.SCROLL); requestFocusFor(target) }
                     // LEFT at the left edge of the content now steps INTO the rail, which is
                     // where the eye already is: the sibling screens are drawn there. Leaving the
                     // screen is one more LEFT, or BACK, from inside it.
-                    railEntries.isNotEmpty() -> railFocused.value = true
-                    leftBacksOut -> onBack()
+                    // Stepping into the rail is a change of column, not a step down a list --
+                    // the same thing the crossbar calls SYSTEM_BROWSE.
+                    railEntries.isNotEmpty() -> { menuSounds(MenuSound.SYSTEM_BROWSE); railFocused.value = true }
+                    leftBacksOut -> { menuSounds(MenuSound.BACK); onBack() }
                 }
             }
 
             GamepadAction.NAVIGATE_RIGHT -> {
-                navigationState.moveHorizontal(1)?.let { requestFocusFor(it) }
+                navigationState.moveHorizontal(1)?.let { menuSounds(MenuSound.SCROLL); requestFocusFor(it) }
             }
 
             GamepadAction.SELECT -> {
+                menuSounds(MenuSound.SELECT)
                 // The model dispatches to the focused item; the registered-click fallback only
                 // fires when the model has nothing to dispatch (e.g. no rows composed yet) and
                 // stays fresh through the focus tracker.
@@ -986,6 +1000,7 @@ fun SettingsScaffold(
             // screens that's "collapse a sub-step (else close)"; for leaf screens it closes
             // the overlay back to the XMB. Mirrors the on-screen Back button exactly.
             GamepadAction.BACK -> {
+                menuSounds(MenuSound.BACK)
                 onBack()
             }
 
