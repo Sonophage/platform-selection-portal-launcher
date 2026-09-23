@@ -70,13 +70,15 @@ AYANEO Pocket FIT Elite at 1920x1080.*
 | | |
 |:---:|:---:|
 | <img src="docs/screenshots/home-emulation.jpg" width="420"> | <img src="docs/screenshots/game-detail.jpg" width="420"> |
-| The crossbar, with Memory Cards under a custom category | Game detail — hero art, logo and one-tap Play |
+| The Emulation column on the crossbar — All Games, Favourites and the consoles under them | Game detail — hero art, logo and one-tap Play |
 | <img src="docs/screenshots/custom-category.jpg" width="420"> | <img src="docs/screenshots/memory-card-menu.jpg" width="420"> |
 | A custom gaming category with its own icon and wallpaper | Memory Card options (△) — scan, refresh, pin, hide |
 | <img src="docs/screenshots/settings-library-manager.jpg" width="420"> | <img src="docs/screenshots/game-drill-windows.jpg" width="420"> |
 | Library Manager — ROM roots, per-console cards, scan-all passes | PC titles (Winlator / GameNative / Steam) sit next to console games |
-| <img src="docs/screenshots/artwork-manager.jpg" width="420"> | |
-| Artwork Manager — SteamGridDB / IGDB / local | |
+| <img src="docs/screenshots/artwork-manager.jpg" width="420"> | <img src="docs/screenshots/settings-one-row.jpg" width="420"> |
+| Artwork Manager — SteamGridDB / IGDB / local | Settings opens on its seven sections rather than a single long list |
+| <img src="docs/screenshots/last-played-bar.jpg" width="420"> | |
+| The Recent shelf, which reorders on every visit — the art rail hides until LEFT brings it back | |
 
 ### Media & more
 
