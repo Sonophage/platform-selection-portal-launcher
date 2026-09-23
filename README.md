@@ -11,7 +11,7 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 </p>
 
 <p align="center">
-  <b>Latest: 1.5.0</b> &nbsp;·&nbsp;
+  <b>Latest: 1.7.0</b> &nbsp;·&nbsp;
   <a href="https://github.com/Sonophage/platform-selection-portal-launcher/releases">Releases</a>
   &nbsp;·&nbsp; Side-loaded APK (not on the Play Store)
   &nbsp;·&nbsp; Desktop <b>Theme Studio</b> companion
@@ -159,11 +159,11 @@ PFP is distributed as a **side-loaded APK** (it is not on the Google Play Store)
 1. Download `PSPLauncher-<version>.apk` from
    [Releases](https://github.com/Sonophage/platform-selection-portal-launcher/releases).
 
-   > **1.5.0 currently ships a debug build** (`PSPLauncher-1.5.0-debug.apk`). It installs under
+   > **1.7.0 ships a debug build** (`PSPLauncher-1.7.0-debug.apk`). It installs under
    > `com.psplauncher.launcher.debug`, so it sits *beside* an existing PSPLauncher with its own
    > library rather than upgrading it, it is marked debuggable, and it is signed with the Android
-   > SDK's public debug key. A signed release build replaces it when the key is available. Build
-   > it yourself instead: [For Developers](#7-for-developers).
+   > SDK's public debug key. Build a signed release yourself instead:
+   > [For Developers](#7-for-developers).
 2. Open the file on your device. Android will ask you to allow installs from your browser or file
    manager the first time — approve it.
 3. Tap **Install**.

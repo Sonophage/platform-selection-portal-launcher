@@ -5,6 +5,8 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-23
+
 ### Added
 - **Menu music.** One track, looping, for as long as the launcher is the thing on screen. It gives
   way the moment anything else wants the speaker — every kind of audio-focus loss stops it,
@@ -1164,7 +1166,10 @@ security hardening. (`versionName 1.0.0-alpha.2` / `versionCode 2`.)
 - Initial alpha: XMB launcher shell, ROM library scanning, artwork scraping, emulator launch,
   gaming categories/collections, controller mapping, and touch controls.
 
-[Unreleased]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/1.2.0...HEAD
+[Unreleased]: https://github.com/Sonophage/platform-selection-portal-launcher/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/Sonophage/platform-selection-portal-launcher/releases/tag/v1.7.0
+<!-- The definitions below point at PlayFieldPortal, the repository this project was renamed
+     from. They are left as they were written rather than rewritten to URLs nobody has checked. -->
 [1.2.0]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/1.0.3...1.1.0
 [1.0.0]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/v1.0.0-alpha.3...v1.0.0
