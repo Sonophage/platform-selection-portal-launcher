@@ -130,18 +130,28 @@ class EmulatorDetector @Inject constructor(
         val dataDir = app?.dataDir
         val apk = app?.sourceDir
         val sdcard = android.os.Environment.getExternalStorageDirectory().absolutePath
+        // RetroArch's config lives in its EXTERNAL files directory, not its private data dir.
+        //
+        // This is the whole bug and it cost an afternoon. We pointed CONFIGFILE at
+        // <dataDir>/retroarch.cfg, which on this build does not exist — so RetroArch started on
+        // compiled defaults with none of the user's settings and rendered nothing at all. Its
+        // real config is the 114 KB file under Android/data/<pkg>/files, which is also where its
+        // own launcher and every other frontend point. Passing that, the same intent boots
+        // straight into the game.
+        //
+        // Omitting CONFIGFILE is NOT the safe middle: with no config extra at all the launch is
+        // black too. The path has to be right.
+        val external = "$sdcard/Android/data/$packageName/files"
         return buildMap {
             put("ROM", "{rom_path}")
             put("LIBRETRO", corePath)
-            // Everything below is best-effort: a missing one is worse than the two above but far
-            // better than refusing to launch, so each is simply omitted when it cannot be read.
-            if (dataDir != null) {
-                put("CONFIGFILE", "$dataDir/retroarch.cfg")
-                put("DATADIR", dataDir)
-            }
-            if (apk != null) put("APK", apk)
+            put("CONFIGFILE", "$external/retroarch.cfg")
+            put("EXTERNAL", external)
             put("SDCARD", sdcard)
-            put("EXTERNAL", "$sdcard/Android/data/$packageName/files")
+            // Best-effort: these two come off the installed package and are simply omitted when
+            // it cannot be read, which is worse than sending them and far better than refusing.
+            if (dataDir != null) put("DATADIR", dataDir)
+            if (apk != null) put("APK", apk)
         }
     }
 

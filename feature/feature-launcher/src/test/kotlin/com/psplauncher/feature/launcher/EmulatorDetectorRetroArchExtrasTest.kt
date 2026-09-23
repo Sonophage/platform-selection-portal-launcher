@@ -63,15 +63,30 @@ class EmulatorDetectorRetroArchExtrasTest {
         assertEquals("{rom_path}", extras["ROM"])
         assertTrue(extras["LIBRETRO"].orEmpty().endsWith("mgba_libretro_android.so"))
 
-        // The five that were missing, and without which RetroArch has no config and no folders.
-        assertEquals("$dataDir/retroarch.cfg", extras["CONFIGFILE"])
+        // CONFIGFILE is the one that decides whether anything appears on screen, and it is NOT
+        // under the private data dir — RetroArch keeps its real config in its external files
+        // directory. Pointing at <dataDir>/retroarch.cfg gave it a file that does not exist, so
+        // it ran on compiled defaults and drew nothing.
+        val external = "${extras["SDCARD"]}/Android/data/$retroArchPackage/files"
+        assertEquals("$external/retroarch.cfg", extras["CONFIGFILE"])
+        assertEquals(external, extras["EXTERNAL"])
         assertEquals(dataDir, extras["DATADIR"])
         assertEquals(apk, extras["APK"])
         assertNotNull(extras["SDCARD"])
+    }
+
+    @Test
+    fun `the config path never points inside the private data dir`() {
+        // The specific mistake, named so it cannot come back: <dataDir>/retroarch.cfg is a file
+        // RetroArch does not have, and handing it one produces a running core with a black
+        // screen — audio, save file, everything except a picture.
+        val extras = assertNotNull(mgbaProfile()).intentExtras
+        val config = assertNotNull(extras["CONFIGFILE"])
         assertTrue(
-            extras["EXTERNAL"].orEmpty().endsWith("/Android/data/$retroArchPackage/files"),
-            "EXTERNAL must point at RetroArch's own external files dir, got: ${extras["EXTERNAL"]}",
+            !config.startsWith("$dataDir/"),
+            "CONFIGFILE must not be under the private data dir, got: $config",
         )
+        assertTrue(config.endsWith("/Android/data/$retroArchPackage/files/retroarch.cfg"))
     }
 
     @Test
