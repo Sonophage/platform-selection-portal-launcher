@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.psplauncher.core.ui.sound.MenuSound
+import com.psplauncher.core.ui.sound.LocalMenuSounds
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import kotlinx.coroutines.delay
 
@@ -63,6 +65,17 @@ fun DiscLaunchCeremony(
     // below — the animation is keyed on Unit deliberately: it must run exactly once per launch.
     val handOff by rememberUpdatedState(onHandOff)
     val finished by rememberUpdatedState(onFinished)
+
+    // The opening cue, fired here rather than at the call site.
+    //
+    // The ceremony is what it announces, and it has six entry points — games, films, books,
+    // tracks, apps and the settings preview. A sound wired into the callers is a sound five of
+    // them have and the sixth quietly does not.
+    //
+    // SYSTEM_BROWSE is the crossbar's own "you have moved to another thing" cue, which is what
+    // this is: the screen is about to become somewhere else.
+    val menuSounds = LocalMenuSounds.current
+    LaunchedEffect(Unit) { menuSounds(MenuSound.SYSTEM_BROWSE) }
 
     val t = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
@@ -268,7 +281,7 @@ object DiscCeremony {
      * slow. The spin is the part with no destination — it can run as long as the ceremony wants
      * and still read as a machine getting up to speed.
      */
-    const val SpinMs = 2450
+    const val SpinMs = 1850
 
     /**
      * The disc's own departure — it shrinks away and the iris closes behind it.
@@ -310,8 +323,15 @@ object DiscCeremony {
     /** Start of the spin: the disc has arrived and is about to be spun up. */
     val SinkEndFraction = (FadeInMs + SinkMs).toFloat() / TotalMs
 
-    /** The disc starts leaving. The spin is over; the caller is still waiting. */
-    val DiscOutStartFraction = (FadeInMs + SinkMs + SpinMs).toFloat() / TotalMs
+    /**
+     * The disc starts leaving. The spin is over; the caller is still waiting.
+     *
+     * Published in milliseconds as well as a fraction because GameBootGate schedules its sound
+     * against this moment, and a second copy of the sum living over there is exactly the pair
+     * that drifts the first time a phase is retuned.
+     */
+    const val DiscOutStartMs = FadeInMs + SinkMs + SpinMs
+    val DiscOutStartFraction = DiscOutStartMs.toFloat() / TotalMs
 
     /** The disc is gone, and the caller is released. One instant, by construction. */
     val DiscGoneFraction = HandOffMs.toFloat() / TotalMs

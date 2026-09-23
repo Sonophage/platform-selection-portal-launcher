@@ -70,7 +70,7 @@ class LaunchDispatcherTest {
             }
         val uiMediaStore: com.psplauncher.core.data.repository.UiMediaStore = mockk(relaxed = true)
         val gameBootAudioPlayer: com.psplauncher.core.ui.media.UiMediaAudioPlayer = mockk(relaxed = true)
-        val gameBootGate = GameBootGate(context, gameBootPreferences, uiMediaStore, gameBootAudioPlayer)
+        val gameBootGate = GameBootGate(context, gameBootPreferences, uiMediaStore, gameBootAudioPlayer, scope)
         val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer = mockk(relaxed = true)
         val autoCoreMemory: AutoCoreMemory = mockk(relaxed = true)
         val gameRepository: com.psplauncher.core.domain.repository.GameRepository = mockk(relaxed = true)

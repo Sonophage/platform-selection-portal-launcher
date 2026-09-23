@@ -462,13 +462,18 @@ fun DisplaySettingsScreen(
                     onFocusChanged = { focusedSlot = if (it) UiMediaSlot.BOOT_VIDEO else null },
                 )
 
-                SettingsGroup("Launch Disc")
+                // The two switches below are one animation behind two names, and saying so here
+                // is the whole point of this group heading. A user who turned GameBoot off found
+                // that films still spun a disc and games launched in silence, with nothing on
+                // either row connecting the two.
+                SettingsGroup("Launch Disc  ·  two switches, one animation")
 
                 SettingsToggleRow(
-                    label    = "Launch Disc",
+                    label    = "Launch Disc  (everything but games)",
                     sublabel = "The cover turns into a spinning disc between confirming something " +
-                        "and it opening — films, books, music and apps.  Games use GameBoot below " +
-                        "instead, so this does not govern them.  Off opens everything straight away.",
+                        "and it opening — films, books, music and apps.  Games have their own " +
+                        "switch, GameBoot, directly below: it plays the SAME disc, and turning " +
+                        "one off never affects the other.  Off opens these straight away.",
                     onFocusChangedExternal = { if (it) focusedSlot = null },
                     checked  = state.launchDiscEnabled,
                     onToggle = { viewModel.setLaunchDiscEnabled(it) },
@@ -477,10 +482,12 @@ fun DisplaySettingsScreen(
                 SettingsGroup("GameBoot")
 
                 SettingsToggleRow(
-                    label    = "GameBoot",
-                    sublabel = "The launch disc, for games — between confirming one and the " +
-                        "emulator opening, or up to ten seconds with your own clip instead.  " +
-                        "Off is a silent launch — no animation, no sound.",
+                    label    = "GameBoot  (games only)",
+                    sublabel = "The same disc as Launch Disc above, for games — between " +
+                        "confirming one and the emulator opening.  Two things only this switch " +
+                        "has: a sound as the disc leaves, and the option to replace the whole " +
+                        "thing with your own clip below.  Off is a silent launch, and it is why " +
+                        "a game can open with no animation while a film still gets one.",
                     onFocusChangedExternal = { if (it) focusedSlot = null },
                     checked  = state.gameBootEnabled,
                     onToggle = { viewModel.setGameBootEnabled(it) },

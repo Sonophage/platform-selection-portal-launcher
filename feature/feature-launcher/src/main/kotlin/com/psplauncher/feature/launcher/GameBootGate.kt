@@ -11,8 +11,12 @@ import com.psplauncher.themekit.UiMediaLimits
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,7 +71,20 @@ class GameBootGate @Inject constructor(
     private val preferences: GameBootPreferences,
     private val uiMedia: UiMediaStore,
     private val audioPlayer: UiMediaAudioPlayer,
+    // The same scope LaunchDispatcher takes, and injected for the same reason: building one here
+    // touches Dispatchers.Main at construction, which a plain JVM unit test has no answer for.
+    // Hilt provides Main.immediate; a test provides its own, and the delayed cue then runs on the
+    // test's virtual clock instead of a real 4.5 seconds.
+    @LaunchDispatcherScope private val scope: CoroutineScope,
 ) {
+    // The GameBoot sound is scheduled against the disc's exit and must not hold up the launch it
+    // belongs to, so it runs here rather than inline in awaitPresentation — which is suspended on
+    // the presentation's own completion at that point.
+    //
+    // Cancelled with the presentation: a cue for a ceremony that has been skipped or torn down by
+    // the watchdog would arrive over whatever came next.
+    private var pendingSound: Job? = null
+
     private val _active = MutableStateFlow<GameBootRequest?>(null)
 
     /** Non-null while a presentation should be on screen. */
@@ -104,14 +121,31 @@ class GameBootGate @Inject constructor(
                 defaultUri = gameBootDefaultAudioUri(context),
             )
         }
-        // Started before the request is raised so the sound is already going when the first
-        // frame lands — the sequence's timeline is measured against this sample. The overlay only
-        // draws, so it can never release the player mid-clip. A custom clip resolves to null here
-        // and keeps its own track.
-        audio?.let {
-            audioPlayer.play(uri = it, clipEndMs = UiMediaLimits.GAMEBOOT_SEQUENCE_MS, label = "gameboot")
-        }
         _active.value = GameBootRequest(gameTitle = gameTitle, videoPath = video, audioPath = audio, coverArt = coverArt)
+        // WHEN the GameBoot sound plays depends on what is presenting it.
+        //
+        // A custom clip carries its own audio and its own timing, so it starts with the first
+        // frame and `audio` is null for it anyway.
+        //
+        // The built-in disc does not. Its sound used to start with the first frame too, which put
+        // the whole cue under the fade-in and the spin and left the moment that actually matters
+        // -- the disc going, the screen handing over -- in silence. It is scheduled against the
+        // disc's exit instead: the ceremony opens on the crossbar's browse cue and this lands as
+        // the disc leaves.
+        //
+        // The delay is read from DiscCeremony rather than written out here. It is the one place
+        // the ceremony's phases are defined, and a second copy of that sum over here is the pair
+        // that drifts the first time a phase is retuned.
+        audio?.let { track ->
+            if (video != null) {
+                audioPlayer.play(uri = track, clipEndMs = UiMediaLimits.GAMEBOOT_SEQUENCE_MS, label = "gameboot")
+            } else {
+                pendingSound = scope.launch {
+                    delay(com.psplauncher.core.ui.components.DiscCeremony.DiscOutStartMs.toLong())
+                    audioPlayer.play(uri = track, clipEndMs = UiMediaLimits.GAMEBOOT_SEQUENCE_MS, label = "gameboot")
+                }
+            }
+        }
         try {
             withTimeout(TIMEOUT_MS) { done.await() }
         } catch (_: TimeoutCancellationException) {
@@ -143,6 +177,10 @@ class GameBootGate @Inject constructor(
     }
 
     private fun clear() {
+        // Before the state, so a cue scheduled for a presentation that is being torn down cannot
+        // arrive over whatever takes the screen next.
+        pendingSound?.cancel()
+        pendingSound = null
         completion = null
         _active.value = null
     }

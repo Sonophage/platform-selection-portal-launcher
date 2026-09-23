@@ -12,6 +12,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -44,7 +45,7 @@ class GameBootGateTest {
         }
         val player: UiMediaAudioPlayer = mockk(relaxed = true)
 
-        val gate = GameBootGate(context, prefs, store, player)
+        val gate = GameBootGate(context, prefs, store, player, scope)
     }
 
     /**
@@ -92,8 +93,16 @@ class GameBootGateTest {
             request.audioPath?.startsWith("android.resource://com.test/") == true,
             "No custom clip must resolve the built-in audio, got: ${request.audioPath}",
         )
-        // The audio is gate-owned: it starts before the first frame so the measured timeline
-        // stays in sync, and the draw-only overlay can never release the player mid-clip.
+        // The audio is gate-owned — the draw-only overlay can never release the player mid-clip
+        // — but it no longer starts with the first frame. It is scheduled against the disc's
+        // exit, so the cue lands as the disc leaves rather than being spent under the fade-in and
+        // the spin. Nothing has played yet at this point.
+        verify(exactly = 0) { h.player.play(any<String>(), any(), any()) }
+
+        // advanceTimeBy, not advanceUntilIdle: the file's own note explains that advancing to
+        // idle also fires the gate's 8 s watchdog and tears the presentation down.
+        advanceTimeBy(com.psplauncher.core.ui.components.DiscCeremony.DiscOutStartMs.toLong() + 1)
+        runCurrent()
         verify(exactly = 1) { h.player.play(any<String>(), any(), any()) }
         assertTrue(awaiting.isActive, "The launch must still be waiting")
 
