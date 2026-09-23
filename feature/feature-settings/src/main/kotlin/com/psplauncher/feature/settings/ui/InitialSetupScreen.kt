@@ -115,6 +115,7 @@ fun InitialSetupScreen(
 
     WizardScaffold(
         stepNumber = stepNumber,
+        stepCount = state.stepCount,
         title = "Initial Setup",
         onBack = { if (!viewModel.previousStep() && !firstRun) onBack() },
         backEnabled = canGoBack,
@@ -669,6 +670,7 @@ private fun rootsShortLabel(roots: List<RootFolderRow>): String =
 @Composable
 private fun WizardPagePreview(
     stepNumber: Int,
+    stepCount: Int = 9,
     heading: String,
     hint: String?,
     backEnabled: Boolean = true,
@@ -677,6 +679,7 @@ private fun WizardPagePreview(
     PfpScreenPreview {
         WizardScaffold(
             stepNumber = stepNumber,
+            stepCount = stepCount,
             title = "Initial Setup",
             onBack = {},
             backEnabled = backEnabled,

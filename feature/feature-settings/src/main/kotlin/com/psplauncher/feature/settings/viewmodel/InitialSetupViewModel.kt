@@ -82,16 +82,24 @@ data class InitialSetupUiState(
 ) {
     val hasIgdb: Boolean get() = igdbClientId.isNotBlank()
 
-    /** 1-based page number within the reachable (RetroArch/Vita3K-gated) flow — hidden pages skip. */
-    val stepNumber: Int
-        get() {
-            val order = SetupStep.entries.filter {
-                (it != SetupStep.RETROARCH || retroArchInstalled) &&
-                    (it != SetupStep.VITA || vita3KInstalled)
-            }
-            val idx = order.indexOf(step)
-            return if (idx >= 0) idx + 1 else 1
+    /**
+     * The pages this run of the wizard will actually show.
+     *
+     * [stepNumber] and [stepCount] are read off ONE list on purpose: "step 4 of 9" is a pair, and
+     * a header that counted the position through the gated flow while counting the total over
+     * every page would quietly promise a step that never arrives.
+     */
+    private val reachableSteps: List<SetupStep>
+        get() = SetupStep.entries.filter {
+            (it != SetupStep.RETROARCH || retroArchInstalled) &&
+                (it != SetupStep.VITA || vita3KInstalled)
         }
+
+    /** 1-based page number within the reachable (RetroArch/Vita3K-gated) flow — hidden pages skip. */
+    val stepNumber: Int get() = (reachableSteps.indexOf(step) + 1).coerceAtLeast(1)
+
+    /** How many pages this run has in total. The denominator of [stepNumber]. */
+    val stepCount: Int get() = reachableSteps.size
     val hasScreenScraper: Boolean get() = ssUsername.isNotBlank()
     val anyFolderSet: Boolean get() =
         romRoots.isNotEmpty() || musicRoots.isNotEmpty() || videoRoots.isNotEmpty() ||
