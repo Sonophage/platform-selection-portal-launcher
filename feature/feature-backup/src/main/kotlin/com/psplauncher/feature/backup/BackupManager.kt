@@ -650,6 +650,10 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("controller_left_backs_out"),
             // Sound
             booleanPreferencesKey("sound_menu_enabled"),
+            // The track itself is a ui-media file, and files under "ui-media" are bundled by
+            // BUNDLED_FILE_ROOTS — so the switch travelling with them is what makes a restore
+            // put the music back rather than leave a silent toggle on.
+            booleanPreferencesKey("sound_menu_music"),
             // Artwork download preferences
             booleanPreferencesKey("pref_dl_clear_logos"),
             booleanPreferencesKey("pref_dl_heroes"),

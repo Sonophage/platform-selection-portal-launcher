@@ -37,6 +37,10 @@ const val PFP_DEFAULT_LABEL = "PFP Default"
 
 data class AudioSettingsUiState(
     val menuSoundEnabled: Boolean = true,
+    val menuMusicEnabled: Boolean = false,
+    /** True once a track is assigned. The switch does nothing without one, and says so. */
+    val menuMusicAssigned: Boolean = false,
+    val menuMusicLabel: String = PFP_DEFAULT_LABEL,
     /** Per-sound-slot row summary: the imported file's name, or [PFP_DEFAULT_LABEL]. */
     val soundLabels: Map<UiMediaSlot, String> = emptyMap(),
     /** Slots the user has actually assigned — drives whether "Use Default" is offered. */
@@ -68,6 +72,7 @@ class AudioSettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val store: UiMediaStore,
     private val menuSound: MenuSoundPlayer,
+    private val menuMusicPreferences: com.psplauncher.core.data.media.MenuMusicPreferences,
     private val bootSoundPreviewer: UiMediaAudioPlayer,
     private val controllerLayout: ControllerLayoutRepository,
 ) : ViewModel() {
@@ -95,6 +100,13 @@ class AudioSettingsViewModel @Inject constructor(
         }
         AudioSettingsUiState(
             menuSoundEnabled = prefs[KEY_MENU_SOUND] ?: true,
+            menuMusicEnabled = com.psplauncher.core.data.media.MenuMusicPreferences.resolve(prefs),
+            menuMusicAssigned = UiMediaSlot.MENU_MUSIC in assigned,
+            menuMusicLabel = if (UiMediaSlot.MENU_MUSIC in assigned) {
+                prefs[UiMediaStore.displayNameKey(UiMediaSlot.MENU_MUSIC)] ?: "Custom track"
+            } else {
+                "None — pick a track"
+            },
             soundLabels = labels,
             // Not a kind filter anymore: BOOT_AUDIO is AUDIO_TRACK but IS a row on this screen,
             // while BOOT_VIDEO / GAMEBOOT_VIDEO are assignments on other screens' concerns. Filter
@@ -113,6 +125,10 @@ class AudioSettingsViewModel @Inject constructor(
 
     fun setMenuSoundEnabled(enabled: Boolean) = viewModelScope.launch {
         context.pfpDataStore.edit { it[KEY_MENU_SOUND] = enabled }
+    }
+
+    fun setMenuMusicEnabled(enabled: Boolean) = viewModelScope.launch {
+        menuMusicPreferences.setEnabled(enabled)
     }
 
     /** Records which row the picker was launched for. Called immediately before launching it. */
@@ -198,6 +214,8 @@ class AudioSettingsViewModel @Inject constructor(
         val SOUND_SLOTS: List<UiMediaSlot> =
             UiMediaSlot.ofKind(UiMediaKind.SOUND) + UiMediaSlot.BOOT_AUDIO
 
-        private val SCREEN_SLOTS: Set<UiMediaSlot> = SOUND_SLOTS.toSet()
+        // Menu Music is on this screen too — it just is not a SOUND row, so it gets its own
+        // toggle and assignment rather than joining the roster list above.
+        private val SCREEN_SLOTS: Set<UiMediaSlot> = SOUND_SLOTS.toSet() + UiMediaSlot.MENU_MUSIC
     }
 }

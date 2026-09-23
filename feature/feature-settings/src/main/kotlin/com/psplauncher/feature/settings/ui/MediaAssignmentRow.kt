@@ -40,9 +40,19 @@ fun MediaAssignmentRow(
     value: String,
     isAssigned: Boolean,
     onPick: () -> Unit,
-    onPreview: () -> Unit,
-    onUseDefault: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
+    /**
+     * Null on a slot with nothing to audition — Menu Music, whose assignment is a five-minute
+     * loop. An action that is drawn and does nothing is the thing this null exists to avoid.
+     */
+    onPreview: (() -> Unit)? = null,
+    /** Null on a slot with no reset. See [resetLabel] for slots whose reset is not a default. */
+    onUseDefault: (() -> Unit)? = null,
+    /**
+     * What the reset action says it does. "Use the PFP default" is right for a slot that HAS one;
+     * Menu Music does not, so for it the same action is honestly a removal.
+     */
+    resetLabel: String = "Use the PFP default for $label",
     sublabel: String? = null,
 ) {
     SettingsRow(
@@ -53,7 +63,7 @@ fun MediaAssignmentRow(
         onFocusChangedExternal = onFocusChanged,
         value = value,
         actions = buildList {
-            add(
+            if (onPreview != null) add(
                 SettingsRowAction(
                     "Preview $label", onPreview,
                     actionFocusBackgroundColor = lerp(SettingsAccent, Color.Black, 0.50f),
@@ -68,15 +78,15 @@ fun MediaAssignmentRow(
                     )
                 }
             )
-            if (isAssigned) {
+            if (isAssigned && onUseDefault != null) {
                 add(
                     SettingsRowAction(
-                        "Use the PFP default for $label", onUseDefault,
+                        resetLabel, onUseDefault,
                         actionFocusBackgroundColor = lerp(DangerRed, Color.Black, 0.50f),
                     ) {
                         Icon(
                             Icons.Default.Refresh,
-                            contentDescription = "Use the PFP default for $label",
+                            contentDescription = resetLabel,
                             tint = SettingsSubtext,
                             modifier = Modifier
                                 .background(Color.Black.copy(alpha = 0.1f), RoundedCornerShape(6.dp))

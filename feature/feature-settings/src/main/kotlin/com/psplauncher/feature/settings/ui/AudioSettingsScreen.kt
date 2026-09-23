@@ -162,6 +162,36 @@ fun AudioSettingsScreen(
                     onToggle = { viewModel.setMenuSoundEnabled(it) },
                 )
 
+                SettingsGroup("Menu Music")
+
+                SettingsToggleRow(
+                    label = "Menu Music",
+                    sublabel = "Loop a track of your own while the launcher is on screen.  It " +
+                        "stops the moment anything else plays audio — a game, a video, Spotify, " +
+                        "a call — and comes back when they are done.  Nothing plays until you " +
+                        "pick a track below.",
+                    checked = state.menuMusicEnabled,
+                    onFocusChangedExternal = { if (it) focusedSlot = null },
+                    onToggle = { viewModel.setMenuMusicEnabled(it) },
+                )
+
+                MediaAssignmentRow(
+                    label = UiMediaSlot.MENU_MUSIC.displayName,
+                    focusKey = "audio_${UiMediaSlot.MENU_MUSIC.key}",
+                    sublabel = "Up to five minutes, looped (MP3, WAV, OGG or M4A)",
+                    value = state.menuMusicLabel,
+                    isAssigned = state.menuMusicAssigned,
+                    onPick = { pickFor(UiMediaSlot.MENU_MUSIC) },
+                    // No preview: auditioning a five-minute loop from a settings row is a worse
+                    // control than the switch directly above it. The reset is a REMOVAL here,
+                    // because this slot has no bundled track to return to.
+                    onUseDefault = { viewModel.useDefault(UiMediaSlot.MENU_MUSIC) },
+                    resetLabel = "Remove the menu music track",
+                    onFocusChanged = { focused ->
+                        focusedSlot = if (focused) UiMediaSlot.MENU_MUSIC else null
+                    },
+                )
+
                 SettingsGroup("Sound Assignments")
 
                 // Keep the assignment rows composed while an import is in flight. Removing

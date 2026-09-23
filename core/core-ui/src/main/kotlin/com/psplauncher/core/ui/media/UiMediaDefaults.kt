@@ -29,6 +29,9 @@ fun UiMediaSlot.bundledDefaultRes(): Int? = when (this) {
     UiMediaSlot.BOOT_AUDIO -> R.raw.sfx_opening
     UiMediaSlot.BOOT_VIDEO,
     UiMediaSlot.GAMEBOOT_VIDEO,
+    // Menu music has no bundled track on purpose: the toggle is inert until the user assigns
+    // one, which is the difference between an option and a launcher that starts singing.
+    UiMediaSlot.MENU_MUSIC,
     -> null
 }
 

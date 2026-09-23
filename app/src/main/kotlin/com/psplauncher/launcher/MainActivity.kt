@@ -20,9 +20,11 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.psplauncher.core.ui.theme.PFPTheme
 import com.psplauncher.feature.library.scanner.LibraryRescanCoordinator
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import com.psplauncher.feature.xmb.gamepad.GamepadInputHandler
@@ -44,6 +46,16 @@ class MainActivity : ComponentActivity() {
     // can make the same noises the XMB does.
     @Inject
     lateinit var menuSoundPlayer: com.psplauncher.core.ui.sound.MenuSoundPlayer
+
+    // Menu music, and the two things that decide whether it plays: the user's switch and whether
+    // the launcher is the thing on screen. Driven from here rather than from a ViewModel because
+    // the second of those is an Activity fact — a ViewModel survives the launcher being covered
+    // by a game, which is exactly when the music must stop.
+    @Inject
+    lateinit var menuMusicPlayer: com.psplauncher.core.ui.media.MenuMusicPlayer
+
+    @Inject
+    lateinit var menuMusicPreferences: com.psplauncher.core.data.media.MenuMusicPreferences
 
     @Inject
     lateinit var libraryRescanCoordinator: LibraryRescanCoordinator
@@ -169,9 +181,42 @@ class MainActivity : ComponentActivity() {
             runCatching { libraryRescanCoordinator.onResume() }
                 .onFailure { Timber.e(it, "Resume-triggered library rescan failed") }
         }
+        startMenuMusicIfWanted()
+    }
+
+    /**
+     * Starts the music if the user wants it and has given it something to play.
+     *
+     * Collected for the whole time the launcher is resumed rather than read once, so toggling the
+     * switch or assigning a track in Settings takes effect where you did it instead of on the
+     * next cold start. The collection is cancelled by [onStop] tearing the scope down with the
+     * STARTED state.
+     */
+    private fun startMenuMusicIfWanted() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                // The switch, and the store's change stamp. pathFor is a synchronous read, so
+                // the stamp is what turns "the user just assigned a different track" into an
+                // emission — the same signal every other ui-media consumer re-reads on.
+                kotlinx.coroutines.flow.combine(
+                    menuMusicPreferences.enabledFlow,
+                    uiMediaStore.stamp,
+                ) { enabled, _ -> enabled }
+                    .collect { enabled ->
+                        val track = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            uiMediaStore.pathFor(com.psplauncher.core.domain.model.UiMediaSlot.MENU_MUSIC)
+                        }
+                        menuMusicPlayer.setWanted(enabled, track)
+                    }
+            }
+        }
     }
 
     override fun onStop() {
+        // Whatever covered the launcher gets the speaker. The repeatOnLifecycle collection above
+        // ends with RESUMED, but the player is told explicitly rather than left to a cancellation
+        // — a cancelled collector stops OBSERVING, it does not stop the music.
+        menuMusicPlayer.setWanted(wanted = false, track = null)
         // B1: another activity covered the launcher — the dispatched emulator came to front.
         launchDispatcher.onHostStopped()
         wasStopped = true

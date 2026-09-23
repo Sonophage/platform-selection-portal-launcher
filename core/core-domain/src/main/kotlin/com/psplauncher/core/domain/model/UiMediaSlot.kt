@@ -49,6 +49,12 @@ enum class UiMediaSlot(
     // wholesale with their own clip, which brings its own audio. The retired `gameboot_audio`
     // AUDIO_TRACK slot is swept from installs and restored backups by pruneOrphans().
     GAMEBOOT_VIDEO("gameboot_video", UiMediaKind.VIDEO, "GameBoot Animation", UiMediaLimits.GAMEBOOT_CLIP),
+
+    // ── Menu music (Interface ▸ Sound) ───────────────────────────────────────
+    // The only slot that LOOPS, and the only one with no bundled default: background music is
+    // something a user opts into with a track of their own, never something a launcher starts
+    // playing at you out of the box.
+    MENU_MUSIC("menu_music", UiMediaKind.AUDIO_TRACK, "Menu Music", UiMediaLimits.MENU_MUSIC),
     ;
 
     val isSound: Boolean get() = kind == UiMediaKind.SOUND

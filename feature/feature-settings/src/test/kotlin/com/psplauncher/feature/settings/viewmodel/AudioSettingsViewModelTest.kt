@@ -88,6 +88,7 @@ class AudioSettingsViewModelTest {
             context,
             store,
             menuSound,
+            com.psplauncher.core.data.media.MenuMusicPreferences(context),
             bootPreviewer,
             ControllerLayoutRepository(context, ControllerMappingRepository(context)),
         )

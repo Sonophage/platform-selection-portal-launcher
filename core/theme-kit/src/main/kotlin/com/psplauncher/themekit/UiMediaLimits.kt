@@ -81,6 +81,16 @@ object UiMediaLimits {
     const val GAMEBOOT_CLIP_MAX_MS  = 10_000L
     const val BOOT_MAX_MS           = 10_000L
 
+    /**
+     * Menu music loops, so it is the one slot where a long file is the POINT rather than abuse.
+     *
+     * Five minutes is a track, not a presentation. The ceiling still exists because the staged
+     * copy is read into app storage and the import gate has to be able to refuse something before
+     * it becomes a problem — and because a two-hour file looping under a launcher is a battery
+     * bill the user did not ask for.
+     */
+    const val MENU_MUSIC_MAX_MS     = 300_000L
+
     // ── Byte caps ────────────────────────────────────────────────────────────
     /**
      * VIDEO_MAX_BYTES is a real cap: video bytes are never held in memory (the staging copy
@@ -108,6 +118,7 @@ object UiMediaLimits {
     // not imported, and GAMEBOOT_SEQUENCE_MS is what the gate clips it to.
     val GAMEBOOT_CLIP = Spec(Kind.VIDEO,      1_000L, 8_000L, GAMEBOOT_CLIP_MAX_MS, VIDEO_MAX_BYTES)
     val BOOT         = Spec(Kind.AUDIO_TRACK, 0L, 8_000L, BOOT_MAX_MS,    AUDIO_STAGE_MAX_BYTES)
+    val MENU_MUSIC   = Spec(Kind.AUDIO_TRACK, 0L, 8_000L, MENU_MUSIC_MAX_MS, AUDIO_STAGE_MAX_BYTES)
     val BOOT_CLIP    = Spec(Kind.VIDEO,       1_000L, 8_000L, BOOT_MAX_MS,    VIDEO_MAX_BYTES)
 
     /** Accepted audio containers. Audio MIME arrays come from this set verbatim. */
