@@ -27,7 +27,10 @@ data class PendingLaunch(
     val game: Game,
     val resolved: ResolvedLaunch?,
     val intentSummary: String,
+    /** Elapsed realtime. For measuring how long the launch lasted, and nothing else. */
     val dispatchedAtMs: Long,
+    /** Wall clock. The instant that gets written down. See [LaunchWallClock]. */
+    val dispatchedAtWallMs: Long,
 )
 
 /** Result of handing an intent to the system. */
@@ -64,6 +67,7 @@ class LaunchDispatcher @Inject constructor(
     private val outcomeRecorder: LaunchOutcomeRecorder,
     @LaunchDispatcherScope private val scope: CoroutineScope,
     @LaunchRealtimeClock private val clock: LaunchClock,
+    @LaunchWallClock private val wallClock: LaunchClock,
     private val gameBootGate: GameBootGate,
     // A refused launch is the ERROR event's flagship home — the custom-vs-default decision
     // lives in MenuSoundPlayer; the dispatcher only says "this launch did not happen".
@@ -110,6 +114,7 @@ class LaunchDispatcher @Inject constructor(
                 autoCoreMemory.remember(game.platformId, profile.id)
             }
             val dispatchedAt = clock.now()
+            val dispatchedAtWall = wallClock.now()
             // The Last Played stamp, written NOW rather than on the way back.
             //
             // It used to ride along with the play session, which is only recorded if the launcher
@@ -126,7 +131,7 @@ class LaunchDispatcher @Inject constructor(
             // recordPlaySession stamps the same instant again on a clean return (it passes
             // session.launchedAt, which is this value), so the two cannot disagree.
             scope.launch {
-                runCatching { gameRepository.markOpened(game.id, dispatchedAt) }
+                runCatching { gameRepository.markOpened(game.id, dispatchedAtWall) }
                     .onFailure { Timber.w(it, "Could not stamp gameId=${game.id} on the Last Played shelf") }
             }
             acceptPending(
@@ -135,6 +140,7 @@ class LaunchDispatcher @Inject constructor(
                     resolved     = resolved,
                     intentSummary = intent.toUri(Intent.URI_INTENT_SCHEME),
                     dispatchedAtMs = dispatchedAt,
+                    dispatchedAtWallMs = dispatchedAtWall,
                 )
             )
             LaunchDispatchResult.Accepted
@@ -212,7 +218,7 @@ class LaunchDispatcher @Inject constructor(
                 outcomeRecorder.record(
                     outcomeFor(
                         p.game, p.resolved, LaunchOutcomeStatus.SUCCEEDED, reason = null,
-                    ).copy(returnedAtMs = clock.now())
+                    ).copy(returnedAtMs = wallClock.now())
                 )
                 // The play session, recorded HERE and nowhere else.
                 //
@@ -231,7 +237,10 @@ class LaunchDispatcher @Inject constructor(
                         com.psplauncher.core.domain.model.PlaySession(
                             gameId         = p.game.id,
                             platformId     = p.game.platformId,
-                            launchedAt     = p.dispatchedAtMs,
+                            // The wall-clock instant, not the monotonic one. This becomes
+                            // games.last_played_at, which the Last Played shelf sorts on against
+                            // rows stamped with currentTimeMillis by music, books and video.
+                            launchedAt     = p.dispatchedAtWallMs,
                             durationMillis = playedMs,
                         )
                     )

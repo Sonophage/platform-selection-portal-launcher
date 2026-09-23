@@ -57,6 +57,10 @@ class LaunchDispatcherTest {
         val recorder: LaunchOutcomeRecorder = mockk(relaxed = true)
         val intent: Intent = mockk(relaxed = true)
         var now = 0L
+        // Deliberately far apart and obviously different in kind: uptime is small, the wall clock
+        // is an epoch instant. A test that gave them the same value could not tell which one a
+        // write used, which is the entire bug this harness now has to be able to catch.
+        var wallNow = 1_790_000_000_000L
 
         // GameBoot switched off in every existing case: awaitPresentation returns immediately,
         // so these tests keep pinning the dispatcher's own behaviour rather than the gate's.
@@ -76,6 +80,7 @@ class LaunchDispatcherTest {
             outcomeRecorder = recorder,
             scope = scope,
             clock = LaunchClock { now },
+            wallClock = LaunchClock { wallNow },
             gameBootGate = gameBootGate,
             menuSound = menuSound,
             autoCoreMemory = autoCoreMemory,
@@ -132,11 +137,16 @@ class LaunchDispatcherTest {
         val h = harness()
         coEvery { h.recorder.record(any()) } returns Unit
         h.now = 1_234L
+        h.wallNow = 1_790_000_001_000L
 
         h.dispatcher.launch(game, resolved, h.intent)
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { h.gameRepository.markOpened(7L, 1_234L) }
+        // The WALL clock. Stamping the monotonic one put a few hours of uptime into a column the
+        // shelf sorts against epoch milliseconds, so the game just played sorted below every row
+        // in the library and landed at the BOTTOM of Last Played.
+        coVerify(exactly = 1) { h.gameRepository.markOpened(7L, 1_790_000_001_000L) }
+        coVerify(exactly = 0) { h.gameRepository.markOpened(7L, 1_234L) }
     }
 
     @Test
@@ -147,12 +157,13 @@ class LaunchDispatcherTest {
         val h = harness()
         coEvery { h.recorder.record(any()) } returns Unit
         h.now = 5_000L
+        h.wallNow = 1_790_000_005_000L
 
         h.dispatcher.launch(game, resolved, h.intent)
         h.dispatcher.onHostStopped()
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { h.gameRepository.markOpened(7L, 5_000L) }
+        coVerify(exactly = 1) { h.gameRepository.markOpened(7L, 1_790_000_005_000L) }
         coVerify(exactly = 0) { h.gameRepository.recordPlaySession(any()) }
     }
 
@@ -418,7 +429,11 @@ class LaunchDispatcherTest {
         assertEquals("psx", session.captured.platformId)
         // launchedAt is when the game STARTED, not when the user came back — it is what
         // `last_played_at` is set from, and a session must not be dated by its own end.
-        assertEquals(0L, session.captured.launchedAt)
+        //
+        // And it is the WALL clock, not the monotonic one the duration is measured with. This
+        // asserted 0L before, which was uptime-at-dispatch and looked perfectly reasonable right
+        // up until you noticed it was going into a column compared against epoch milliseconds.
+        assertEquals(1_790_000_000_000L, session.captured.launchedAt)
         assertEquals(1_800_000L, session.captured.durationMillis)
     }
 
