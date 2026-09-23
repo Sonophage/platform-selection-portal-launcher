@@ -68,28 +68,36 @@ class DiscCeremonyTimelineTest {
     }
 
     @Test
-    fun `the part you wait through lands in the three-to-four second window`() {
-        // The brief was 3-4 seconds, and the thing being measured is what the user WAITS for --
+    fun `the part you wait through lands in the intended window`() {
+        // The brief was 3-4 seconds and is now four and a half: three read as a wipe on the
+        // handheld rather than as a ceremony. The RANGE is what this test is for, not the exact
+        // number -- it exists so a phase tweak cannot quietly halve the thing or double it.
+        //
+        // The thing being measured is what the user WAITS for --
         // which ends at the hand-off. Everything after it runs behind an app that is already
         // taking the screen, so counting the tail here would force the visible ceremony shorter
         // every time the tail got slower, which is backwards: the tail got slower precisely
         // because the part nobody waits for was snapping rather than fading.
         assertTrue(
-            "the ceremony takes ${DiscCeremony.HandOffMs}ms to hand off, outside the intended 3-4s",
-            DiscCeremony.HandOffMs in 2_500..4_000,
+            "the ceremony takes ${DiscCeremony.HandOffMs}ms to hand off, outside the intended window",
+            DiscCeremony.HandOffMs in 3_800..5_200,
         )
     }
 
     @Test
-    fun `the tail is the slowest thing in the ceremony`() {
+    fun `the tail never shortens back into a cut`() {
         // Why this is pinned: the tail is the one stretch that is usually invisible, so it is the
         // one nobody notices getting quietly shortened -- and the only time it IS seen is a
         // launch that failed, where a snap back to the XMB is the worst reading available.
+        //
+        // This used to assert the tail was the LONGEST phase, which held only while the spin was
+        // short. The spin is now where the ceremony's length lives, so "longest" stopped tracking
+        // the property it was standing in for and started tracking the spin instead. What
+        // actually matters is a floor: at 900 the room snapped back in about a third of a second
+        // and read as a cut, which is the measurement this number came from.
         assertTrue(
-            "the tail (${DiscCeremony.FadeOutMs}ms) must outlast every other phase",
-            DiscCeremony.FadeOutMs > maxOf(
-                DiscCeremony.FadeInMs, DiscCeremony.SinkMs, DiscCeremony.SpinMs,
-            ),
+            "the tail (${DiscCeremony.FadeOutMs}ms) has shortened back toward a cut",
+            DiscCeremony.FadeOutMs >= 1_200,
         )
     }
 

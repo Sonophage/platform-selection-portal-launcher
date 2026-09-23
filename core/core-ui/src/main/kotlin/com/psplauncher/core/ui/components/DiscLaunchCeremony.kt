@@ -251,11 +251,24 @@ object DiscCeremony {
     /** Centre stage: the disc fades up and settles at full size. */
     const val FadeInMs = 850
 
-    /** It is drawn downward until its centre reaches the bottom edge — half in, half out. */
-    const val SinkMs = 950
+    // The whole thing runs about four and a half seconds to the hand-off now, up from under
+    // three. The brief when this was written was "three to four seconds"; watching it on the
+    // handheld, three was not a ceremony, it was a wipe. The number that matters is HandOffMs --
+    // what the user actually waits through -- and the tail behind it is unchanged.
 
-    /** Seated at the bottom, spinning up slow to fast, in a room that is still closing in. */
-    const val SpinMs = 1150
+    /** It is drawn downward until its centre reaches the bottom edge — half in, half out. */
+    const val SinkMs = 1150
+
+    /**
+     * Seated at the bottom, spinning up slow to fast, in a room that is still closing in.
+     *
+     * This is where the extra time goes when the ceremony is asked to be longer, and it is the
+     * only phase that can absorb it. The fade-in is the disc arriving and the sink is it being
+     * drawn under; both are movements with an end, and stretching either just makes the disc
+     * slow. The spin is the part with no destination — it can run as long as the ceremony wants
+     * and still read as a machine getting up to speed.
+     */
+    const val SpinMs = 2450
 
     /** The iris opens back out from the disc and the app takes the screen. Slow, so it is a
      *  transition rather than a cut. */
