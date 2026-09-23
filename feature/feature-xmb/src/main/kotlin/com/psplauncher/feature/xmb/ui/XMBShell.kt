@@ -102,6 +102,7 @@ import com.psplauncher.feature.xmb.ui.app.AppDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
+import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.XMBUiState
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel
 
@@ -193,6 +194,8 @@ fun XMBShellContainer(
         onTouchInput = viewModel::markTouchInput,
         onXmbSortTapped = viewModel::onSortLabelTapped,
         onPanelPageTapped = viewModel::onPanelPageTapped,
+        onRecentFilterTapped = viewModel::setRecentFilter,
+        onRecentRailToggled = viewModel::toggleRecentRail,
         onOpenAppDrawer = viewModel::onOpenAppDrawer,
         onItemTap = viewModel::onItemTap,
         onItemLongPress = viewModel::onItemLongPress,
@@ -326,6 +329,10 @@ fun XMBShell(
     onTouchInput: () -> Unit = {},
     onXmbSortTapped: () -> Unit = {},
     onPanelPageTapped: (DetailPanelPage) -> Unit = {},
+    // The Recent shelf by finger: pick a filter by name, and show or hide the cover rail. Both
+    // were D-pad only, which left touch on the shelf able to see one item and reach no others.
+    onRecentFilterTapped: (RecentFilter) -> Unit = {},
+    onRecentRailToggled: () -> Unit = {},
     onOpenAppDrawer: () -> Unit = {},
     // Row tap: move the cursor there, or activate if it's already selected (see XMBViewModel.onItemTap).
     onItemTap: (Int) -> Unit = {},
@@ -723,6 +730,7 @@ fun XMBShell(
                     railVisible = uiState.recentRailVisible,
                     onPageTapped = onPanelPageTapped,
                     onCardTapped = onItemTap,
+                    onArtTapped = onRecentRailToggled,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = StripHeight),
@@ -1072,7 +1080,13 @@ fun XMBShell(
                 // is the only column X filters, and a row of media names over the crossbar would
                 // be naming something that column does not have.
                 centre = if (uiState.onLastPlayedHome) {
-                    { RecentFilterRow(uiState.recentFilter, Modifier.align(Alignment.Center)) }
+                    {
+                        RecentFilterRow(
+                            filter = uiState.recentFilter,
+                            modifier = Modifier.align(Alignment.Center),
+                            onFilterTapped = onRecentFilterTapped,
+                        )
+                    }
                 } else null,
                 modifier = Modifier.align(Alignment.TopCenter),
             )

@@ -3,6 +3,7 @@ package com.psplauncher.feature.xmb.ui
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.rotate
@@ -22,6 +23,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -112,6 +114,8 @@ fun LastPlayedPage(
     railVisible: Boolean,
     onPageTapped: (DetailPanelPage) -> Unit,
     onCardTapped: (Int) -> Unit,
+    /** Tapping the artwork shows or hides the rail — touch's version of LEFT and RIGHT here. */
+    onArtTapped: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val focused = items.getOrNull(selectedIndex)
@@ -156,7 +160,21 @@ fun LastPlayedPage(
                 }
             }
 
-            Column(Modifier.weight(1f).fillMaxHeight()) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    // The artwork is the rail's touch handle. Without this the shelf is the one
+                    // screen a fresh install lands on where touch can see a single item and has
+                    // no way to reach the rest — the rail came in on LEFT and nothing else.
+                    // Deliberately NOT launch: Play has its own spine down the right edge, and a
+                    // page whose whole surface launches something is a page you cannot explore.
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onArtTapped,
+                    ),
+            ) {
                 Spacer(Modifier.height(10.dp))
                 if (content != null) {
                     GameDetailPanel(
@@ -218,7 +236,15 @@ fun LastPlayedPage(
  * changed.
  */
 @Composable
-fun RecentFilterRow(filter: RecentFilter, modifier: Modifier = Modifier) {
+fun RecentFilterRow(
+    filter: RecentFilter,
+    modifier: Modifier = Modifier,
+    /**
+     * Pick this filter. Every name is on screen at once, so a finger can go straight to the one
+     * it wants — X still cycles, and did so alone until these became pressable.
+     */
+    onFilterTapped: (RecentFilter) -> Unit = {},
+) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -228,6 +254,16 @@ fun RecentFilterRow(filter: RecentFilter, modifier: Modifier = Modifier) {
             val active = entry == filter
             Text(
                 text = entry.label,
+                // The names are 8sp chrome, which is far too small to hit, so the touch target
+                // is padded out around each one rather than the text being grown to meet it.
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { onFilterTapped(entry) },
+                    )
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
                 // White either way, dimmed rather than recoloured. These sit over whatever
                 // artwork the focused item brought, and the theme is re-tinted from that same
                 // artwork -- a themed colour here is drawn FROM the picture it must be read

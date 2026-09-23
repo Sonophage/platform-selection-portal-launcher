@@ -4747,9 +4747,33 @@ class XMBViewModel @Inject constructor(
      * sources, so the list rebuilds itself through the same merge rather than a second path. The
      * cursor goes back to the top because the row it was on usually is not in the new list.
      */
-    private fun cycleRecentFilter() {
+    private fun cycleRecentFilter() = setRecentFilter(_uiState.value.recentFilter.next())
+
+    /**
+     * Pick a filter outright, which is what a tap on its name means.
+     *
+     * X cycles, and cycling is the only thing a button can do — but the names are all on screen
+     * at once, so a finger can say "that one" and should not have to press X three times to get
+     * there. Same state change either way; [cycleRecentFilter] is now this with the next one
+     * worked out for it.
+     */
+    fun setRecentFilter(filter: RecentFilter) {
         menuSound.play(MenuSound.SCROLL)
-        _uiState.update { it.copy(recentFilter = it.recentFilter.next(), selectedItemIndex = 0) }
+        _uiState.update { it.copy(recentFilter = filter, selectedItemIndex = 0) }
+    }
+
+    /**
+     * Show or hide the recents rail — the touch equivalent of LEFT and RIGHT on this page.
+     *
+     * The rail was reachable by the D-pad alone, so on the one screen a new install lands on,
+     * touch could see a single item and had no way to reach the rest. Tapping the artwork opens
+     * it and tapping the artwork again puts it away, which is the same in-and-out the shoulder
+     * presses give.
+     */
+    fun toggleRecentRail() {
+        if (!_uiState.value.onLastPlayedHome) return
+        menuSound.play(MenuSound.SYSTEM_BROWSE)
+        _uiState.update { it.copy(recentRailVisible = !it.recentRailVisible) }
     }
 
     private fun cycleSort() {

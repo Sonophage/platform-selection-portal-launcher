@@ -5,6 +5,13 @@ mechanics lens, an emulation-frontend lens, and a visual-language lens. Scope wa
 Seth's: "this is good and a very solid baseline, right now it's polish and
 cohesiveness."
 
+> **The screenshots this document cites no longer exist.** `settings-rail.jpg`,
+> `game-detail.jpg`, `library-search.jpg`, `last-played-bar.jpg` and `memory-card-menu.jpg` were
+> deleted on 2026-09-23 when `docs/screenshots/` was refreshed — they were captures of the 1.4 and
+> 1.5 UI, which is the point of citing them here and also the reason they had to go. The
+> observations stand as written; the evidence for them is in the repository's history at
+> `v1.5.0`, not in the working tree.
+
 Every item below was re-checked against the source before it was written down.
 The **Verified** marker means I ran the grep or read the lines myself, not that a
 reviewer asserted it. Items without the marker are reviewer-reported and still

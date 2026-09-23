@@ -5,6 +5,14 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+### Fixed
+- **The Recent shelf was unreachable by touch.** Its cover rail came in on LEFT and went away on
+  RIGHT, and the media filter cycled on X — both D-pad only. So on the one screen a fresh install
+  lands on, a finger could see a single item and had no way to reach any of the others. Tapping
+  the artwork now shows and hides the rail, and each filter name is its own target, which a
+  button cannot offer: X cycles, while every name is already on screen for a finger to pick
+  outright. The cards and the launch spine were already pressable.
+
 ## [1.7.0] - 2026-09-23
 
 ### Added
@@ -1168,11 +1176,11 @@ security hardening. (`versionName 1.0.0-alpha.2` / `versionCode 2`.)
 
 [Unreleased]: https://github.com/Sonophage/platform-selection-portal-launcher/compare/v1.7.0...HEAD
 [1.7.0]: https://github.com/Sonophage/platform-selection-portal-launcher/releases/tag/v1.7.0
-<!-- The definitions below point at PlayFieldPortal, the repository this project was renamed
-     from. They are left as they were written rather than rewritten to URLs nobody has checked. -->
-[1.2.0]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/1.1.0...1.2.0
-[1.1.0]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/1.0.3...1.1.0
-[1.0.0]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/v1.0.0-alpha.3...v1.0.0
-[1.0.0-alpha.3]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/v1.0.0-alpha.2...v1.0.0-alpha.3
-[1.0.0-alpha.2]: https://github.com/JohnnyCollado/PlayFieldPortal/compare/v1.0.0-alpha.1...v1.0.0-alpha.2
-[1.0.0-alpha.1]: https://github.com/JohnnyCollado/PlayFieldPortal/releases/tag/v1.0.0-alpha.1
+[1.6.0]: https://github.com/Sonophage/platform-selection-portal-launcher/releases/tag/v1.6.0
+
+<!-- Only v1.4.0, v1.5.0, v1.6.0 and v1.7.0 exist as tags. The definitions that used to sit here
+     pointed at JohnnyCollado/PlayFieldPortal — the repository this was renamed from — and at
+     1.0.x/1.1.0/1.2.0 tags that exist in neither place, so every one of them was a 404. Deleted
+     rather than rewritten into new URLs that would 404 just as reliably.
+
+     Known gap: 1.3.0, 1.4.0 and 1.5.0 are tagged but have no section in this file. -->
