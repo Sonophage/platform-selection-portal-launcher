@@ -5,6 +5,83 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+- **Menu music.** One track, looping, for as long as the launcher is the thing on screen. It gives
+  way the moment anything else wants the speaker — every kind of audio-focus loss stops it,
+  including `LOSS_TRANSIENT_CAN_DUCK`, where the polite behaviour would be to keep playing quietly
+  underneath. Ducking is right for a navigation app talking over music; this *is* music. Off until
+  a track is assigned, and driven from the Activity rather than a ViewModel because "the launcher
+  is on screen" is an Activity fact and a ViewModel survives being covered by a game.
+
+- **The launch ceremony's two cues are assignable.** `LAUNCH_DISC_AUDIO` opens it and
+  `GAMEBOOT_AUDIO` sounds under the built-in disc. They share one one-shot player, so the second
+  takes over from the first at the disc's exit rather than playing on top of it. GAMEBOOT_AUDIO is
+  a slot that was retired once on the reasoning that GameBoot is one thing you replace wholesale;
+  the case that brought it back is the opposite one, keeping the built-in disc and changing only
+  what it sounds like. A custom GameBoot *video* still silences the slot, because a clip brings
+  its own track.
+
+- **A setup wizard you arrive at.** Black with the XMB wave on it, no settings rail, and no scrim
+  over whatever wallpaper happens to be set — a first run must not depend on a picture the user
+  has not chosen yet. It opens on the PSP mark and one press, which glows and shimmers its way
+  into step one; first run only, because re-running from Settings is a task rather than an
+  arrival. A page turn now makes a noise of its own.
+
+- **Three new wizard pages.** Permissions (notifications, usage access and the Home role, together,
+  because all three are system screens and meeting them one at a time is what makes a first run
+  feel like an interrogation; all three re-read on resume, since none has a broadcast to observe).
+  Books, which `MediaRootKind.BOOK` has supported for a while without the wizard ever asking. And
+  Make It Yours — theme, sound, boot logo and wallpaper/layout as four rows that open the real
+  screens, plus the XMB auto-fit checkbox moved off Finish.
+
+- **Skip Setup on every wizard page**, on the north face button and tappable, intercepted before
+  navigation so it works with a row focused, a field being edited, or nothing focused at all. It
+  existed only on Welcome, so the moment you pressed Get Started the way out was eleven presses
+  of Back.
+
+### Changed
+- **The launcher calls itself PSP.** Every user-facing "PFP" is now "PSP". Identifiers, theme and
+  database class names, the log tag and the on-disk artwork directories are untouched — renaming
+  those would move files that already exist on the device.
+
+- **The Recent shelf reorders on every visit**, including a game launched through GameNative or
+  any other app shelf entry.
+
+- **Settings ▸ Interface ▸ Sound lists nine rows**: the six menu sounds, then Boot Sound and the
+  two launch cues. A row with no bundled sample reads "None" rather than "PSP Default", which
+  promised a sound no reset could produce.
+
+### Fixed
+- **A launch was refused because *we* could not read the ROM.** Preflight called
+  `File.canRead()` on the path the emulator would open and blocked when it failed — but PSPLauncher
+  targets a modern SDK and holds no broad file access, so that is false for everything on a
+  removable card, while RetroArch targets SDK 28 with `READ_EXTERNAL_STORAGE` and reads the same
+  file without trouble. `canRead()` now decides anything only when we hold all-files access, where
+  a failure really is about the file.
+
+- **Every refused launch on Game Detail was invisible.** The reason was computed and recorded to
+  `launch_outcomes`, then rendered into a row placed after the action row — which is the last thing
+  before the scaffold's rule, so it drew off the bottom of the screen. Play appeared to do nothing
+  at all. The reason moves above the buttons.
+
+- **RetroArch launched to a black screen.** Three separate faults, each verified on a device:
+  the wizard detected RetroArch with an exact `getPackageInfo("com.retroarch")` and so reported the
+  aarch64 build absent, silently dropping its page from the flow; the cores link pointed at the
+  visible `/RetroArch` folder, which holds config and saves and has never held a core, reported as
+  "0 cores detected" rather than as the wrong folder; and `CONFIGFILE` was sent as
+  `<dataDir>/retroarch.cfg`, a file RetroArch does not have, so it started on compiled defaults and
+  drew nothing while the core ran, produced audio and wrote a save. Its real config is in its
+  external files directory. Omitting `CONFIGFILE` is not the safe middle — with no config extra at
+  all the launch is black too.
+
+- **The Last Played shelf sorted a launch to the bottom.** `last_played_at` was being stamped with
+  `SystemClock.elapsedRealtime()`, which is uptime, not a wall-clock instant. The dispatcher now
+  carries both clocks: the monotonic one for measuring the session, the wall clock for the stamp.
+
+- `resolveGameBootAudio`'s preview on the Sound screen auditioned the boot chime under three
+  different row labels, because it reached the previewer through an overload whose slot parameter
+  defaults to `BOOT_AUDIO`.
+
 ## [1.6.0] - 2026-09-22
 
 ### Added
