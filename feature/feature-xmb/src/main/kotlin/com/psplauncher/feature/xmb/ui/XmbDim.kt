@@ -53,4 +53,31 @@ internal object XmbDim {
     const val LastStep = 3
 
     fun ranked(distance: Int): Float = Ramp[distance.coerceIn(0, LastStep)]
+
+    /**
+     * The same ramp, stretched to cover a list of [span] steps instead of three.
+     *
+     * [ranked] is right for the crossbar and the item column, where three steps IS the visible
+     * range: the fourth row out is already at the edge of the screen. The right rail can be nine
+     * tall, and there the clamp reads as a cliff followed by a flat — rows three through eight all
+     * at exactly one alpha, which is what "steppy" looks like.
+     *
+     * SAME STOPS. This interpolates between the published numbers rather than introducing a second
+     * set of them, and it pins both ends: distance 1 lands exactly on the first faded stop and
+     * distance [span] lands exactly on the last, so a short rail is indistinguishable from what
+     * [ranked] would have drawn and a long one simply gets the in-between values the ramp always
+     * implied.
+     *
+     * The cursor's own stop is still exempt and still returns 1 before any of this runs.
+     */
+    fun smoothed(distance: Int, span: Int): Float {
+        if (distance <= 0) return 1f
+        // A one-row list has no gap to interpolate across; anything past the ends clamps.
+        val steps = span.coerceAtLeast(2)
+        val t = ((distance - 1).toFloat() / (steps - 1)).coerceIn(0f, 1f)
+        val pos = 1f + t * (LastStep - 1)
+        val lo = pos.toInt().coerceIn(1, LastStep - 1)
+        val f = pos - lo
+        return (Published[lo] + (Published[lo + 1] - Published[lo]) * f) * PanelScale
+    }
 }

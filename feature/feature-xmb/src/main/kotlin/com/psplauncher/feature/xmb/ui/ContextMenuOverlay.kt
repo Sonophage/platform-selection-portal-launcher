@@ -15,10 +15,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -55,20 +64,33 @@ fun ContextMenuOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The scrim, on the outer box: transparent to the middle, near-opaque at the right edge.
-    // Measured rather than eyeballed — (129,93,58) at x=960, (25,17,8) at x=1910 over album art.
-    // It was briefly believed to be broken, off a resized screenshot; it was not.
+    // The scrim grows with the rail instead of sitting at a fixed half-screen. Labels run as wide
+    // as they need to now, so a fixed scrim either cut the longest ones off its edge or was sized
+    // for the worst case on every menu — a black half-screen over a two-row menu.
+    //
+    // Measured, not guessed: the rail reports its own width, the scrim is solid across that plus a
+    // margin, and fades out over FadeSpan to the left of it. Capped so no menu can black out more
+    // than ScrimMaxFraction of the screen however long its longest label is.
+    var railWidthPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
     Box(
         modifier
             .fillMaxSize()
-            .background(
-                Brush.horizontalGradient(
-                    0f to Color.Transparent,
-                    RailScrimStart to Color.Transparent,
-                    RailScrimSolid to RailScrim,
-                    1f to RailScrim,
-                ),
-            ),
+            .drawBehind {
+                val solidFrom = (size.width - railWidthPx - with(density) { RailEdgeGap.toPx() })
+                val fadeFrom = solidFrom - with(density) { ScrimFadeSpan.toPx() }
+                val floor = size.width * (1f - ScrimMaxFraction)
+                val start = (fadeFrom.coerceAtLeast(floor) / size.width).coerceIn(0f, 1f)
+                val solid = (solidFrom.coerceAtLeast(floor) / size.width).coerceIn(start, 1f)
+                drawRect(
+                    Brush.horizontalGradient(
+                        0f to Color.Transparent,
+                        start to Color.Transparent,
+                        solid to RailScrim,
+                        1f to RailScrim,
+                    ),
+                )
+            },
     ) {
         // Catches the press that lands anywhere else, the same job the panel's own dim did.
         Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
@@ -80,7 +102,8 @@ fun ContextMenuOverlay(
             // under the status strip.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = RailEdgeGap),
+                .padding(end = RailEdgeGap)
+                .onSizeChanged { railWidthPx = it.width },
         ) {
             rows.forEachIndexed { index, row ->
                 RailAction(
@@ -90,7 +113,7 @@ fun ContextMenuOverlay(
                     // navigated and so it fades like every other list on this screen. One
                     // definition, in XmbDim; tuning it there tunes the crossbar and the column
                     // with it, which is the point.
-                    dim = XmbDim.ranked(kotlin.math.abs(index - selectedIndex)),
+                    dim = XmbDim.smoothed(kotlin.math.abs(index - selectedIndex), rows.lastIndex),
                     onClick = { onItemActivated(index) },
                 )
             }
@@ -101,6 +124,9 @@ fun ContextMenuOverlay(
 @Composable
 private fun RailAction(row: XMBContextMenuItem, focused: Boolean, dim: Float, onClick: () -> Unit) {
     val destructiveTint = if (row.isDestructive) DestructiveTint else null
+    // Animated, so a press slides the whole ramp instead of restamping it. The steps are what the
+    // ramp says; the smoothness is this.
+    val alpha by animateFloatAsState(targetValue = dim, animationSpec = tween(DimFadeMs), label = "railDim")
     if (!focused) {
         // Named, like the focused one, and faded by distance instead of hidden. A badge alone was
         // a letter with nothing to disambiguate it — a platform card's rail read S, I, U, S, I, U,
@@ -109,7 +135,7 @@ private fun RailAction(row: XMBContextMenuItem, focused: Boolean, dim: Float, on
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .alpha(dim)
+                .alpha(alpha)
                 .clip(RoundedCornerShape(RailCorner))
                 .clickable(onClick = onClick)
                 .padding(start = CapsulePadStart, end = CapsulePadEnd, top = CapsulePadV, bottom = CapsulePadV),
@@ -205,7 +231,12 @@ private val CapsulePadStart = 14.dp
 private val CapsulePadEnd = 4.dp
 private val CapsulePadV = 4.dp
 private val CapsuleGap = 10.dp
-private val CapsuleMaxText = 170.dp
+// Wide enough for the longest label in any menu ("Open in Library Manager", "Scrape Missing
+// Artwork") without truncation; the scrim widens to cover whatever is drawn.
+private val CapsuleMaxText = 300.dp
+private val ScrimFadeSpan = 180.dp
+private const val ScrimMaxFraction = 0.62f
+private const val DimFadeMs = 160
 private val CapsuleText = Color(0xFF1A0C03)
 private val DestructiveTint = Color(0xFFE2606A)
 
@@ -213,8 +244,5 @@ private val DestructiveTint = Color(0xFFE2606A)
 // sit on black rather than on a ramp. It was a 90%-alpha edge stop, which left the right THIRD
 // still showing the wallpaper through it — "make the gradient darker on the right of the screen".
 private val RailScrim = Color(0xFF080301)
-private const val RailScrimStart = 0.5f
-private const val RailScrimSolid = 0.82f
-
 /** Rounded squares, not circles, at the app drawer's own corner ratio — a quarter of the side. */
 private val RailCorner = 7.dp
