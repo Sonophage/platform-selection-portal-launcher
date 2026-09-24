@@ -5,12 +5,14 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -89,9 +92,35 @@ fun DiscLaunchCeremony(
     }
 
     val now = t.value
-    val rise = phase(now, 0f, DiscCeremony.FadeInFraction)
+    // The case arrives, then the disc comes out from behind it. Two movements inside the fade-in,
+    // where there used to be one: `caseIn` is the case alone on screen, `emerge` is the exchange.
+    val caseIn = LinearOutSlowInEasing.transform(phase(now, 0f, DiscCeremony.at(DiscCeremony.CaseInMs)))
+    val emerge = FastOutSlowInEasing.transform(
+        phase(now, DiscCeremony.at(DiscCeremony.CaseInMs), DiscCeremony.FadeInFraction)
+    )
+    val caseAlpha = caseIn * (1f - phase(
+        now,
+        DiscCeremony.at(DiscCeremony.CaseFadeStartMs),
+        DiscCeremony.FadeInFraction,
+    ))
+    // The disc is hidden BEHIND the case until it clears it, so this is an appearance, not a fade.
+    val discAlpha = phase(
+        now,
+        DiscCeremony.at(DiscCeremony.DiscAppearMs),
+        DiscCeremony.at(DiscCeremony.DiscOpaqueMs),
+    )
     val sink = phase(now, DiscCeremony.FadeInFraction, DiscCeremony.SinkEndFraction)
     val spin = phase(now, DiscCeremony.SinkEndFraction, DiscCeremony.DiscOutStartFraction)
+
+    // The tail, all measured from the moment the disc starts leaving.
+    val outAt = { ms: Int -> DiscCeremony.at(DiscCeremony.DiscOutStartMs + ms) }
+    val drop = phase(now, DiscCeremony.DiscOutStartFraction, outAt(DiscCeremony.DropMs))
+    val blackout = phase(now, DiscCeremony.DiscOutStartFraction, outAt(DiscCeremony.BlackoutMs))
+    val slitOpen = phase(now, outAt(DiscCeremony.SlitOpenStartMs), outAt(DiscCeremony.SlitOpenEndMs))
+    val slitClose = FastOutSlowInEasing.transform(
+        phase(now, outAt(DiscCeremony.SlitOpenEndMs), outAt(DiscCeremony.SlitCloseEndMs))
+    )
+    val slitFade = phase(now, outAt(DiscCeremony.SlitFadeStartMs), outAt(DiscCeremony.SlitFadeEndMs))
     // Two movements, not one. The DISC leaves early; the ROOM stays dark until the very end.
     //
     // The whole tail runs after the hand-off, with another app cold-starting under it. Opening the
@@ -99,10 +128,8 @@ fun DiscLaunchCeremony(
     // the screen yet -- and then the app cut in over that. Black is what should be under a
     // hand-off, so black is what the tail holds; the reveal only happens if nothing ever arrived,
     // and it is still a slow open rather than a cut so a failed launch does not flash.
-    val discLeave = phase(now, DiscCeremony.DiscOutStartFraction, DiscCeremony.DiscGoneFraction)
     val roomLeave = phase(now, DiscCeremony.RoomOpensFraction, 1f)
 
-    val riseEase = LinearOutSlowInEasing.transform(rise)
     val sinkEase = FastOutSlowInEasing.transform(sink)
     // The vignette runs across the sink AND the spin as one movement, so the room keeps closing in
     // the whole time the disc is seated rather than stopping the moment it lands.
@@ -158,24 +185,53 @@ fun DiscLaunchCeremony(
                 }
         )
 
+        // The last few percent to true black, under the disc.
+        //
+        // The iris stops at MaxDim, which is nearly black and was always enough when the ceremony
+        // ended on a disc dissolving. It is not enough now: a slit of LIGHT needs something
+        // absolute behind it, and 4% of grey across a whole screen is visible the moment there is
+        // a bright thing next to it. Still multiplied by the room's re-open, so a launch that
+        // never arrives reveals through this too rather than being held out by it.
+        if (blackout > 0f) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = blackout * (1f - leaveEase) }
+                    .background(Color(0xFF050302))
+            )
+        }
+
+        val dropPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+            minOf(maxWidth, maxHeight).toPx() * DiscCeremony.DropFraction
+        }
+        val arcPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+            maxWidth.toPx() * DiscCeremony.DiscArcFraction
+        }
+
         Box(
             modifier = Modifier
                 .size(discSize)
                 .graphicsLayer {
-                    alpha = riseEase * (1f - discLeave)
-                    val grow = DiscCeremony.EntryScale + (1f - DiscCeremony.EntryScale) * riseEase
+                    // No fade on the way out. It falls through the floor instead, so the only
+                    // thing that ends the disc is the disc leaving the frame.
+                    alpha = discAlpha
+                    val grow = DiscCeremony.EmergeScale + (1f - DiscCeremony.EmergeScale) * emerge
                     val shrink = 1f - (1f - DiscCeremony.RestScale) * sinkEase
                     scaleX = grow * shrink
                     scaleY = grow * shrink
+                    // Out to the right and back to centre: it comes ROUND the case, not past it.
+                    translationX = arcPx * kotlin.math.sin(Math.PI.toFloat() * emerge)
                     // Slow to fast, and only once it has been drawn in. Squaring the spin phase is
                     // constant angular ACCELERATION, so the disc is barely turning as it seats and
                     // is going properly by the time it fades -- a disc being spun up, not one that
                     // was already at speed. The sink contributes a token quarter-turn so the pull
                     // downward does not look completely rigid.
-                    rotationZ = sinkEase * DiscCeremony.SinkDegrees +
+                    rotationZ = emerge * DiscCeremony.EmergeDegrees +
+                        sinkEase * DiscCeremony.SinkDegrees +
                         spin * spin * DiscCeremony.SpinUpDegrees +
-                        discLeave * DiscCeremony.SpinOutDegrees
-                    translationY = driftPx * sinkEase
+                        drop * DiscCeremony.DropDegrees
+                    // Squared, so the fall accelerates the way a dropped thing does.
+                    translationY = driftPx * sinkEase + dropPx * drop * drop
                     // BlendMode.Clear needs its own layer, or it punches through the whole screen
                     // instead of through the disc.
                     compositingStrategy = CompositingStrategy.Offscreen
@@ -240,6 +296,84 @@ fun DiscLaunchCeremony(
                     }
             )
         }
+
+        // The case, declared AFTER the disc so it draws in FRONT of it.
+        //
+        // That order is the whole effect and it is the one thing here that cannot be swapped: the
+        // disc has to be hidden behind something for "coming out from behind it" to read as
+        // anything but a disc sliding sideways.
+        val caseSize = minOf(maxWidth, maxHeight) * DiscCeremony.CaseSizeFraction
+        val caseSlidePx = with(androidx.compose.ui.platform.LocalDensity.current) {
+            maxWidth.toPx() * DiscCeremony.CaseSlideFraction
+        }
+        if (caseAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .size(caseSize)
+                    .graphicsLayer {
+                        alpha = caseAlpha
+                        val s = (DiscCeremony.CaseEntryScale +
+                            (1f - DiscCeremony.CaseEntryScale) * caseIn) *
+                            (1f - DiscCeremony.CaseShrink * emerge)
+                        scaleX = s
+                        scaleY = s
+                        translationX = caseSlidePx * emerge
+                        shape = RoundedCornerShape(
+                            size.minDimension * DiscCeremony.CaseCornerFraction
+                        )
+                        clip = true
+                        shadowElevation = 30.dp.toPx()
+                    },
+            ) {
+                if (model != null) {
+                    AsyncImage(
+                        model = model,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().background(Color(0xFF15151C)))
+                }
+            }
+        }
+
+        // The drive slot.
+        //
+        // It opens where the disc went through the floor and shuts to a point exactly at the
+        // hand-off, so the last thing on screen is a slot closing rather than a disc dissolving.
+        // Drawn as one full-screen canvas rather than a laid-out Box because everything about it
+        // is a fraction of the screen, and a Canvas can say that without a layout pass.
+        if (slitOpen > 0f) {
+            Canvas(Modifier.fillMaxSize()) {
+                val a = slitOpen * (1f - slitFade)
+                val halfW = (size.width * DiscCeremony.SlitWidthFraction / 2f) *
+                    slitOpen * (1f - slitClose)
+                if (a <= 0f || halfW <= 0f) return@Canvas
+                val core = (size.height * DiscCeremony.SlitHeightFraction).coerceAtLeast(2f)
+                val y = size.height * DiscCeremony.SlitYFraction
+                val glow = core * DiscCeremony.SlitGlowSpread
+                // The bloom first, then the hard line on top of it.
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFFFECD6).copy(alpha = 0f),
+                            Color(0xFFFFECD6).copy(alpha = 0.55f * a),
+                            Color(0xFFFFECD6).copy(alpha = 0f),
+                        ),
+                        startY = y - glow / 2f,
+                        endY = y + glow / 2f,
+                    ),
+                    topLeft = Offset(size.width / 2f - halfW, y - glow / 2f),
+                    size = Size(halfW * 2f, glow),
+                )
+                drawRect(
+                    color = Color.White.copy(alpha = a),
+                    topLeft = Offset(size.width / 2f - halfW, y - core / 2f),
+                    size = Size(halfW * 2f, core),
+                )
+            }
+        }
     }
 }
 
@@ -254,8 +388,18 @@ private fun phase(now: Float, from: Float, to: Float): Float =
  * the hand-off pointing at the wrong moment.
  */
 object DiscCeremony {
-    /** Centre stage: the disc fades up and settles at full size. */
-    const val FadeInMs = 850
+    /**
+     * The case arrives and the disc comes out of it.
+     *
+     * Doubled from 850, which was the number the design bundle used and which read as correct on
+     * paper and too quick on the panel: "the timing of everything is perfect but the cover coming
+     * up and the cd sliding out. elongate the time if needed". Every sub-beat inside it doubled
+     * with it, so the shape is unchanged and only the pace moved.
+     *
+     * The time is ADDED rather than borrowed. Taking it from the spin would have kept the
+     * hand-off at six seconds and quietly retuned the one phase that was called perfect.
+     */
+    const val FadeInMs = 1700
 
     // The whole thing runs about six seconds to the hand-off now, up from four and a half. The
     // brief when this was written was "three to four seconds"; watching it on the handheld, three
@@ -349,11 +493,94 @@ object DiscCeremony {
 
     val FadeInFraction = FadeInMs.toFloat() / TotalMs
 
+    /**
+     * A millisecond on the timeline, as a fraction of it.
+     *
+     * The sub-phases below are written in milliseconds like every other number here and converted
+     * through this, so none of them can drift out of step with [TotalMs] when a phase is retuned.
+     */
+    fun at(ms: Int): Float = ms.toFloat() / TotalMs
+
+    // ── Inside FadeInMs: the case, and the disc coming out from behind it ────────────────────
+    //
+    // The disc used to simply fade up in the middle of an empty screen. It now arrives the way it
+    // would out of a shelf: the CASE appears first, then slides left while the disc rolls out from
+    // behind it on an arc, and the case is gone before the sink starts. The whole exchange fits
+    // inside the fade-in that was already there — 850ms, unchanged — so nothing downstream moves.
+
+    /** The case fades up on its own, before anything comes out of it. */
+    const val CaseInMs = 500
+
+    /** ...and starts going once the disc is clear of it, finishing exactly as the sink begins. */
+    const val CaseFadeStartMs = 1240
+
+    /** The disc is behind the case until here, so it appears rather than fades. */
+    const val DiscAppearMs = 500
+    const val DiscOpaqueMs = 760
+
+    /** Case edge, against the screen's short edge, and the corner it is cut with. */
+    const val CaseSizeFraction = 0.648f
+    const val CaseCornerFraction = 0.0343f
+
+    /** How far the case travels left, against the screen's WIDTH — it is a sideways move. */
+    const val CaseSlideFraction = -0.177f
+
+    /** The case's own arrival scale, and how much it shrinks as it carries the disc out. */
+    const val CaseEntryScale = 0.90f
+    const val CaseShrink = 0.20f
+
+    /**
+     * The disc's detour, against the screen's width.
+     *
+     * Taken as `sin` across the emergence, so it swings out to the right and comes back to centre
+     * rather than sliding across — the disc is coming round the case, not past it.
+     */
+    const val DiscArcFraction = 0.1875f
+
+    /** Scale the disc comes out at. It is behind the case, so it starts small. */
+    const val EmergeScale = 0.62f
+
+    /** The turn it makes on the way out, before the sink's token quarter-turn. */
+    const val EmergeDegrees = 160f
+
+    // ── Inside DiscOutMs: the drop, and the slit of light ───────────────────────────────────
+    //
+    // All measured from [DiscOutStartMs]. The disc no longer fades: it FALLS out of the bottom of
+    // the frame, and a slit of light opens where it went and closes to a point exactly at the
+    // hand-off. That is what the ceremony ends on now — not a disc dissolving, but a drive slot
+    // shutting.
+
+    /** The fall itself, squared, so it accelerates like something dropped. */
+    const val DropMs = 350
+    const val DropDegrees = 600f
+
+    /** How far it falls, against the short edge. Its centre is already at the bottom edge. */
+    const val DropFraction = 0.648f
+
+    /** The room goes the last of the way to true black as the disc leaves, so the slit reads. */
+    const val BlackoutMs = 200
+
+    /** The slit: opens as the disc clears the floor, then closes to a point at the hand-off. */
+    const val SlitOpenStartMs = 230
+    const val SlitOpenEndMs = 350
+    const val SlitCloseEndMs = 650
+
+    /** ...and goes out just behind the hand-off, so nothing is left lit under the launched app. */
+    const val SlitFadeStartMs = 600
+    const val SlitFadeEndMs = 670
+
+    /** Where the slot sits down the screen, how wide it opens, and how thick the light is. */
+    const val SlitYFraction = 0.935f
+    const val SlitWidthFraction = 0.573f
+    const val SlitHeightFraction = 0.0037f
+
+    /** How far past the core bar the glow around the slit reaches. */
+    const val SlitGlowSpread = 12f
+
     /** Disc diameter, against the screen's short edge. */
     const val SizeFraction = 0.72f
 
-    /** Scale it fades up from, and the scale it settles to once it has sunk. */
-    const val EntryScale = 0.86f
+    /** The scale it settles to once it has sunk. */
     const val RestScale = 0.88f
 
     /**
@@ -369,9 +596,8 @@ object DiscCeremony {
     /** A token turn while it is being drawn in, so the pull down is not rigid. */
     const val SinkDegrees = 70f
 
-    /** The spin-up itself, and the turn it keeps making while it fades. */
+    /** The spin-up itself. The turn it keeps making on the way down is [DropDegrees]. */
     const val SpinUpDegrees = 900f
-    const val SpinOutDegrees = 780f
 
     /** How dark the room gets behind the disc. */
     const val MaxDim = 0.96f

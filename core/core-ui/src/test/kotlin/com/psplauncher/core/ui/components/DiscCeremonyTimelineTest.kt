@@ -102,13 +102,18 @@ class DiscCeremonyTimelineTest {
         // ceiling — a guard touching the thing it guards catches nothing in one direction and
         // fires on the next honest nudge for the wrong reason.
         //
+        // Re-centred a second time when the case and the disc's exit from it were doubled on the
+        // panel. That is a change of INTENT, which is the only thing a guard like this may follow;
+        // widening it to 5_400..7_400 so both the old and the new number fit would have left it
+        // asserting nothing in particular.
+        //
         // What is being measured is what the user WAITS for, which ends at the hand-off.
         // Everything after it runs behind an app that is already taking the screen, so counting
         // the hold here would force the visible ceremony shorter every time the hold got longer,
         // which is backwards.
         assertTrue(
             "the ceremony takes ${DiscCeremony.HandOffMs}ms to hand off, outside the intended window",
-            DiscCeremony.HandOffMs in 5_400..6_600,
+            DiscCeremony.HandOffMs in 6_250..7_450,
         )
     }
 
@@ -132,6 +137,65 @@ class DiscCeremonyTimelineTest {
         assertTrue(
             "the hold (${DiscCeremony.HoldMs}ms) has shortened back toward a snap",
             DiscCeremony.HoldMs >= 700,
+        )
+    }
+
+    @Test
+    fun `the slit shuts exactly at the hand-off`() {
+        // THE pair in this file, and the one with only one side guarded until now.
+        //
+        // SlitCloseEndMs is 650 and DiscOutMs is 650, and nothing but this makes those the same
+        // number. Retune the disc's exit — the one phase anybody is likely to touch, since it is
+        // the one that was split out for feeling wrong — and the slot goes on closing after the
+        // launched app already owns the screen, or snaps shut early and leaves a dark gap the
+        // ceremony was rewritten to remove.
+        assertEquals(
+            "the slot must finish closing on the hand-off, not around it",
+            DiscCeremony.HandOffMs,
+            DiscCeremony.DiscOutStartMs + DiscCeremony.SlitCloseEndMs,
+        )
+    }
+
+    @Test
+    fun `the disc comes out from behind the case, and the case goes before the sink`() {
+        // Three orderings that together are the whole "it came out of a case" reading. Any one of
+        // them inverted still animates, and still looks like something — just not like that.
+
+        // It must be visible while the case is still there, or it is not emerging from anything.
+        assertTrue(
+            "the disc appears at ${DiscCeremony.DiscAppearMs}ms, after the case has begun leaving",
+            DiscCeremony.DiscOpaqueMs < DiscCeremony.CaseFadeStartMs,
+        )
+        // The case must not still be on screen when the sink starts, or it sinks with the disc.
+        assertTrue(
+            "the case is still going at ${DiscCeremony.CaseFadeStartMs}ms and the sink starts at ${DiscCeremony.FadeInMs}ms",
+            DiscCeremony.CaseFadeStartMs < DiscCeremony.FadeInMs,
+        )
+        // And it has to arrive alone first, or the two appear together and neither reads.
+        assertTrue(
+            "the case must be on screen by itself before the disc appears",
+            DiscCeremony.CaseInMs <= DiscCeremony.DiscAppearMs,
+        )
+    }
+
+    @Test
+    fun `the light appears while the disc is still going through, and everything fits the tail`() {
+        // The slit opening BEFORE the drop ends is deliberate: the light spills as the disc goes
+        // through the slot, not after it has gone. Ordered the other way it reads as two separate
+        // events rather than one.
+        assertTrue(
+            "the slot opens at ${DiscCeremony.SlitOpenStartMs}ms, after the disc has finished falling at ${DiscCeremony.DropMs}ms",
+            DiscCeremony.SlitOpenStartMs < DiscCeremony.DropMs,
+        )
+        assertTrue(
+            "the disc must finish falling inside its own phase",
+            DiscCeremony.DropMs <= DiscCeremony.DiscOutMs,
+        )
+        // The slit's fade runs past the hand-off, so the timeline has to be long enough to draw
+        // it — otherwise the overlay is torn down mid-fade and the light vanishes as a cut.
+        assertTrue(
+            "the slot is still fading at ${DiscCeremony.DiscOutStartMs + DiscCeremony.SlitFadeEndMs}ms but the ceremony ends at ${DiscCeremony.TotalMs}ms",
+            DiscCeremony.DiscOutStartMs + DiscCeremony.SlitFadeEndMs <= DiscCeremony.TotalMs,
         )
     }
 
