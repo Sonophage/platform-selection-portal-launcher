@@ -230,7 +230,7 @@ fun XmbDrillFlyout(
     iconAnimatingAllowed: Boolean = false,
     // See XmbVerticalListRow. Required, not defaulted: the flyout is the path where the missing
     // value went unnoticed, so it does not get to be optional here either.
-    focusedLogoVisible: Boolean,
+    labelHiddenByPanel: Boolean,
     metadataAsSubtitle: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -265,7 +265,7 @@ fun XmbDrillFlyout(
             onItemSelected = onItemSelected,
             onItemLongPress = onItemLongPress,
             iconAnimatingAllowed = iconAnimatingAllowed,
-            focusedLogoVisible = focusedLogoVisible,
+            labelHiddenByPanel = labelHiddenByPanel,
             metadataAsSubtitle = metadataAsSubtitle,
             modifier = Modifier.fillMaxSize().padding(start = DRILL_GAME_COLUMN_LEFT),
         )
@@ -283,7 +283,7 @@ private fun XmbGameColumn(
     selectedIndex: Int,
     iconStyle: GameIconStyle,
     belowTopY: Dp,
-    focusedLogoVisible: Boolean,
+    labelHiddenByPanel: Boolean,
     metadataAsSubtitle: Boolean = false,
     onItemSelected: (Int) -> Unit,
     onItemLongPress: (Int) -> Unit,
@@ -315,7 +315,7 @@ private fun XmbGameColumn(
                 // whatever was on the right. The comment above described the intended behaviour
                 // and this path could not produce it. The parameter has no default any more, so
                 // a fourth call site cannot repeat it.
-                focusedLogoVisible = focusedLogoVisible,
+                labelHiddenByPanel = labelHiddenByPanel,
                 metadataAsSubtitle = metadataAsSubtitle,
                 iconStyle = iconStyle,
                 onClick = { onItemSelected(i) },
@@ -458,7 +458,7 @@ fun XMBItemList(
     // never for a game whose logo will not be drawn at all. Without this the identity of a
     // logo-bearing game was absent for the first 650ms and, on a game with no background art,
     // forever.
-    focusedLogoVisible: Boolean = false,
+    labelHiddenByPanel: Boolean = false,
     metadataAsSubtitle: Boolean = false,
     // When true, the selected row gets a ◀ drill cursor pinned directly to its right.
     drillCursorOnSelected: Boolean = false,
@@ -511,7 +511,7 @@ fun XMBItemList(
                     // that newly entered the window.
                     key(items[i].id) {
                         XmbVerticalListRow(
-                            focusedLogoVisible = focusedLogoVisible,
+                            labelHiddenByPanel = labelHiddenByPanel,
                             metadataAsSubtitle = metadataAsSubtitle,
                             item = items[i],
                             isSelected = i == selectedIndex,
@@ -564,7 +564,7 @@ fun XMBItemList(
                     showText = showLabels,
                     // Unused while isSelected is false, but passed rather than defaulted: the
                     // parameter is required now precisely so nobody has to check that again.
-                    focusedLogoVisible = focusedLogoVisible,
+                    labelHiddenByPanel = labelHiddenByPanel,
                     metadataAsSubtitle = metadataAsSubtitle,
                     iconStyle = iconStyle,
                     onClick = { onItemSelected(selectedIndex - 1) },
@@ -611,7 +611,7 @@ private fun XmbVerticalListRow(
     // No default, deliberately. Two of this function's three call sites used to omit it and got
     // `false`, which silently disabled the rule on the drill flyout — the busiest path of the
     // three. A required parameter turns that from a thing you have to notice into a build error.
-    focusedLogoVisible: Boolean,
+    labelHiddenByPanel: Boolean,
     metadataAsSubtitle: Boolean = false,
     // Whether THIS row may animate its GIF icon — true only for the focused row, so exactly
     // one decoder runs at a time (decision 3). Provided per-row around the icon.
@@ -723,27 +723,34 @@ private fun XmbVerticalListRow(
             // rows keep their labels as always, and a textOnly row (e.g. Untracked) always labels.
             val showGameText = item.textOnly || !item.isRealGame || isSelected
 
-            // THE NAME FADES, it does not blink out. "the title should fade out when it hits any
-            // meta data and returns on the empty state you just made."
+            // THE LABEL FADES, it does not blink out, and it goes as soon as ANY page opens —
+            // the logo included. "soon as logo hits title should fade then that should resolve
+            // that other bug", and then "the subtitle should go as well". The other bug was a long
+            // title printing straight through its own wordmark: "Castlevania : Curse of Darkness"
+            // over the logo saying the same words.
             //
-            // Only the PANEL-driven hide is faded. Moving the cursor still swaps the name instantly
-            // between rows, because that is a cursor keeping up with a d-pad and a 200ms crossfade
-            // on every press reads as lag rather than as polish. What fades is the name getting out
-            // of the way of an Info, Video or Box Art page — and coming back when L1 returns the
-            // strip to rest.
-            val panelHidesText = isSelected && item.isRealGame && !item.textOnly && focusedLogoVisible
-            val textAlpha by animateFloatAsState(
-                targetValue = if (panelHidesText) 0f else 1f,
+            // Title and subtitle leave together. They were briefly split — the name going on the
+            // logo page and the facts staying, on the reasoning that a wordmark does not repeat
+            // the year and the developer — which is true and was still the wrong call: the row
+            // has ONE label, and half of it hanging on beside a wordmark reads as something that
+            // failed to clear rather than as something kept on purpose.
+            //
+            // Only the PANEL-driven hide is faded. Moving the cursor still swaps the name
+            // instantly between rows, because that is a cursor keeping up with a d-pad and a
+            // crossfade on every press reads as lag rather than as polish.
+            val panelHidesLabel = isSelected && item.isRealGame && !item.textOnly && labelHiddenByPanel
+            val labelAlpha by animateFloatAsState(
+                targetValue = if (panelHidesLabel) 0f else 1f,
                 animationSpec = tween(220),
-                label = "xmbRowTextFade",
+                label = "xmbRowLabelFade",
             )
-            if (showText && showGameText && textAlpha > 0f) {
+            if (showText && showGameText && labelAlpha > 0f) {
                 // start padding pushes the label clear of the wallpaper's vertical cross bar, so the
                 // text doesn't butt against the black band (a small gap, PSP-style).
                 Column(
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .alpha(textAlpha)
+                        .alpha(labelAlpha)
                         .padding(start = XmbLayoutSpec.DEFAULT.itemTextStartGapDp.dp),
                 ) {
                     val titleColor = if (isSelected) PrimaryText else InactiveText

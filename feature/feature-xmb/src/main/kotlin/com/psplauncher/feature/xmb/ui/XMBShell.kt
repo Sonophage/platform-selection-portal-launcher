@@ -809,14 +809,9 @@ fun XMBShell(
             //
             // One val, two consumers (the crossbar list and the drill flyout). They were the pair
             // that disagreed — the flyout never received this at all — so they read one value.
-            // The logo page no longer takes the name away either.
-            //
-            // It used to, on the rule that "the logo IS the identity", and the metadata line was
-            // right-aligned under the logo to match. Both halves moved: the facts are the row's
-            // SUBTITLE now, so the row has to be readable on the logo page to carry them. Off the
-            // logo page the panel is 42% of the width and the label runs straight into it, so
-            // there the label still goes.
-            val focusedNameShownOnRight = panelContent != null && stripOpened && !onLogoPage
+            // ANY open page takes the row's label, the logo page included. At rest the row keeps
+            // its name and its line; that is the only state in which it has them.
+            val rowLabelHidden = panelContent != null && stripOpened
             val panelAlpha = if (onLogoPage) pic0Alpha else 1f
             // On the logo page this is the old condition unchanged, so a game with no logo shows
             // nothing here exactly as before. Off it, the panel is what the user asked for with
@@ -979,7 +974,7 @@ fun XMBShell(
                             // Tapping the active memory card under the caticon backs out of the
                             // drill; taps on the other (dimmed) cards are ignored.
                             onSiblingTap = { i -> if (i == uiState.drillSiblingIndex) onTouchBack() },
-                            focusedLogoVisible = focusedNameShownOnRight,
+                            labelHiddenByPanel = rowLabelHidden,
                             metadataAsSubtitle = metadataAsSubtitle,
                             iconStyle = uiState.iconStyle,
                             barTopY = barTop,
@@ -1022,7 +1017,7 @@ fun XMBShell(
                                 fadeByDistance = uiState.fadeByDistance,
                                 textShadow = uiState.textShadow,
                                 iconAnimatingAllowed = iconAnimatingAllowed,
-                                focusedLogoVisible = focusedNameShownOnRight,
+                                labelHiddenByPanel = rowLabelHidden,
                                 metadataAsSubtitle = metadataAsSubtitle,
                                 modifier = Modifier.fillMaxSize(),
                             )
