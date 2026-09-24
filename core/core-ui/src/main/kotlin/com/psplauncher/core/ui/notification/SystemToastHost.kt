@@ -28,6 +28,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -93,24 +94,38 @@ private fun ToastPill(toast: SystemToast) {
     val accent = if (toast.kind == ToastKind.ERROR) ErrorTint else SuccessTint
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ToastStyle.Gap),
         modifier = Modifier
-            .widthIn(max = MaxWidth)
-            .clip(PillShape)
-            .background(PillFill)
-            .border(1.dp, PillEdge, PillShape)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .widthIn(max = ToastStyle.MaxWidth)
+            // shadow() clips to the shape itself at any non-zero elevation, so this is the clip
+            // as well as the lift — a second .clip() under it would be doing nothing.
+            .shadow(ToastStyle.Lift, ToastStyle.Shape)
+            .background(ToastStyle.Fill)
+            .border(1.dp, ToastStyle.Hairline, ToastStyle.Shape)
+            .padding(horizontal = ToastStyle.PadH, vertical = ToastStyle.PadV),
     ) {
+        // The leading slot the design fills with the cover of whatever the toast is about.
+        //
+        // Nothing can fill it yet: every toast the launcher posts is the outcome of a background
+        // TASK -- an artwork scrape, an export, a migration, a media scan -- and none of those is
+        // about one game with one piece of art. The design's own example, "State saved · slot 3 ·
+        // Pokémon Unbound", is a toast this app does not emit. So the slot keeps the outcome
+        // glyph that was already here, at the size and corner the cover would use, and the day a
+        // per-item sender exists the art drops straight in without moving anything.
+        //
         // A drawn glyph rather than a vector asset: core-ui has no material-icons dependency, and
         // pulling one in so a pill can show a tick would be the largest thing in this file.
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(16.dp).clip(RoundedCornerShape(50)).background(accent.copy(alpha = 0.18f)),
+            modifier = Modifier
+                .size(ToastStyle.LeadingSlot)
+                .clip(RoundedCornerShape(ToastStyle.LeadingCorner))
+                .background(accent.copy(alpha = 0.18f)),
         ) {
             Text(
                 text = if (toast.kind == ToastKind.ERROR) "!" else "\u2713",
                 color = accent,
-                fontSize = 10.sp,
+                fontSize = ToastStyle.GlyphSize,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -118,7 +133,7 @@ private fun ToastPill(toast: SystemToast) {
             Text(
                 text = toast.title,
                 color = Color.White,
-                fontSize = 10.sp,
+                fontSize = ToastStyle.TitleSize,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -126,8 +141,8 @@ private fun ToastPill(toast: SystemToast) {
             if (toast.message != null) {
                 Text(
                     text = toast.message,
-                    color = Color.White.copy(alpha = 0.62f),
-                    fontSize = 9.sp,
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = ToastStyle.MessageSize,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -142,11 +157,56 @@ private const val ErrorDwellMs = 5200L
 private const val EnterMs = 260
 private const val ExitMs = 200
 
-private val MaxWidth = 260.dp
 // Clear of the status strip, which is 18dp tall and owns the very top of the screen.
 private val TopGap = 26.dp
-private val PillShape = RoundedCornerShape(9.dp)
-private val PillFill = Color(0xE60D0D14)
-private val PillEdge = Color(0x1AFFFFFF)
 private val SuccessTint = Color(0xFF6FD08C)
 private val ErrorTint = Color(0xFFE2606A)
+
+/**
+ * The card, as the redesign draws it.
+ *
+ * "I just want the toast to look like this but let it stay where it is" — so every number here
+ * moved and the position did not. It is still the top centre, still one at a time.
+ *
+ * The design specifies pixels on a 1920x1080 frame. This panel is 374dpi, a density of 2.3375, so
+ * 1920x1080 is 821x462dp and every figure below is its pixel count divided by that. Kept as the
+ * arithmetic rather than as round dp numbers, because the next panel will have a different
+ * density and the pixel figure is the thing the design actually said.
+ */
+internal object ToastStyle {
+    /**
+     * The design's own legibility floor: "No text below 28 px at native res."
+     *
+     * Stated in its System block, and its own toast then sets the second line at 26px. The FLOOR
+     * wins: it is the rule the whole bundle is drawn against, and 26 is a slip inside one card.
+     * The visible cost is two pixels on one line; the cost of the other reading is a system rule
+     * that means nothing the first time a mock disagrees with it.
+     */
+    const val LegibilityFloorPx = 28f
+
+    /** This panel: 374dpi. 1080 physical pixels over 462dp. */
+    const val PanelDensity = 2.3375f
+
+    private fun px(p: Float) = (p / PanelDensity).dp
+
+    /** 640px of a 1920px frame. */
+    val MaxWidth = px(640f)
+    val Shape = RoundedCornerShape(px(24f))
+    val PadH = px(28f)
+    val PadV = px(22f)
+    val Gap = px(24f)
+
+    /** The cover slot: 80px square, 16px corner. */
+    val LeadingSlot = px(80f)
+    val LeadingCorner = px(16f)
+
+    /** 0 18px 40px rgba(0,0,0,.35), as near as an elevation gets to a CSS blur. */
+    val Lift = px(40f) * 0.42f
+
+    val Fill = Color(0xF0160902)
+    val Hairline = Color(0x1FFFFFFF)
+
+    val TitleSize = (32f / PanelDensity).sp
+    val MessageSize = (LegibilityFloorPx / PanelDensity).sp
+    val GlyphSize = (34f / PanelDensity).sp
+}
