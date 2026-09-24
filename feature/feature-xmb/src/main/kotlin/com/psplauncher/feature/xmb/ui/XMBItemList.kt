@@ -94,6 +94,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isUnspecified
@@ -111,8 +112,10 @@ import com.psplauncher.core.ui.icons.ThemedGlyph
 import com.psplauncher.core.ui.icons.categoryIconFor
 import com.psplauncher.core.ui.icons.systemIconRes
 import com.psplauncher.core.ui.theme.LocalPFPColors
+import com.psplauncher.feature.xmb.viewmodel.GRID_COVER_COUNT
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
+import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.themekit.XmbLayoutSpec
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
@@ -231,6 +234,7 @@ fun XmbDrillFlyout(
     // See XmbVerticalListRow. Required, not defaulted: the flyout is the path where the missing
     // value went unnoticed, so it does not get to be optional here either.
     labelHiddenByPanel: Boolean,
+    cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -265,6 +269,7 @@ fun XmbDrillFlyout(
             onItemSelected = onItemSelected,
             onItemLongPress = onItemLongPress,
             iconAnimatingAllowed = iconAnimatingAllowed,
+            cardArtGrid = cardArtGrid,
             labelHiddenByPanel = labelHiddenByPanel,
             metadataAsSubtitle = metadataAsSubtitle,
             modifier = Modifier.fillMaxSize().padding(start = DRILL_GAME_COLUMN_LEFT),
@@ -284,6 +289,7 @@ private fun XmbGameColumn(
     iconStyle: GameIconStyle,
     belowTopY: Dp,
     labelHiddenByPanel: Boolean,
+    cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     onItemSelected: (Int) -> Unit,
     onItemLongPress: (Int) -> Unit,
@@ -314,6 +320,7 @@ private fun XmbGameColumn(
                 // evaluated against the default `false` here and the active row kept its title
                 // whatever was on the right. The comment above described the intended behaviour
                 // and this path could not produce it. The parameter has no default any more, so
+                cardArtGrid = cardArtGrid,
                 // a fourth call site cannot repeat it.
                 labelHiddenByPanel = labelHiddenByPanel,
                 metadataAsSubtitle = metadataAsSubtitle,
@@ -328,6 +335,40 @@ private fun XmbGameColumn(
                     .fillMaxWidth()
                     .height(ROW_HEIGHT)
                     .offset(y = belowTopY + ROW_HEIGHT * (i - sel)),
+            )
+        }
+    }
+}
+
+/**
+ * A card's tile as a 2x2 of what is inside it.
+ *
+ * "JUST for emulation and media we add a four grid with art of whats inside" — a console card's
+ * glyph says which console it is, which its own label already said; the covers say what you have
+ * on it.
+ *
+ * FEWER THAN FOUR FILLS WHAT IT HAS AND LEAVES THE REST EMPTY — his call, and the reason the
+ * quadrants are a fixed grid rather than a layout that reflows. A card with two games shows two
+ * covers in the top row and space beneath, which reads as a part-filled shelf; the same two
+ * stretched across the whole tile reads as a card that only ever had two.
+ */
+@Composable
+private fun CardArtGrid(covers: List<String>, size: Dp, modifier: Modifier = Modifier) {
+    val gap = size * 0.06f
+    val cell = (size - gap) / 2
+    Box(modifier.size(size)) {
+        covers.take(GRID_COVER_COUNT).forEachIndexed { i, uri ->
+            AsyncImage(
+                model = rememberArtworkModel(uri),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(cell)
+                    .offset(
+                        x = if (i % 2 == 0) 0.dp else cell + gap,
+                        y = if (i < 2) 0.dp else cell + gap,
+                    )
+                    .clip(RoundedCornerShape(cell * 0.10f)),
             )
         }
     }
@@ -459,6 +500,7 @@ fun XMBItemList(
     // logo-bearing game was absent for the first 650ms and, on a game with no background art,
     // forever.
     labelHiddenByPanel: Boolean = false,
+    cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     // When true, the selected row gets a ◀ drill cursor pinned directly to its right.
     drillCursorOnSelected: Boolean = false,
@@ -512,6 +554,7 @@ fun XMBItemList(
                     key(items[i].id) {
                         XmbVerticalListRow(
                             labelHiddenByPanel = labelHiddenByPanel,
+                            cardArtGrid = cardArtGrid,
                             metadataAsSubtitle = metadataAsSubtitle,
                             item = items[i],
                             isSelected = i == selectedIndex,
@@ -562,6 +605,7 @@ fun XMBItemList(
                     // Show the previous item's label too, so its name rises up through the
                     // crossbar with the icon (unless the column is icon-only).
                     showText = showLabels,
+                    cardArtGrid = cardArtGrid,
                     // Unused while isSelected is false, but passed rather than defaulted: the
                     // parameter is required now precisely so nobody has to check that again.
                     labelHiddenByPanel = labelHiddenByPanel,
@@ -612,6 +656,7 @@ private fun XmbVerticalListRow(
     // `false`, which silently disabled the rule on the drill flyout — the busiest path of the
     // three. A required parameter turns that from a thing you have to notice into a build error.
     labelHiddenByPanel: Boolean,
+    cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     // Whether THIS row may animate its GIF icon — true only for the focused row, so exactly
     // one decoder runs at a time (decision 3). Provided per-row around the icon.
@@ -714,6 +759,7 @@ private fun XmbVerticalListRow(
                         item = item,
                         iconStyle = iconStyle,
                         isSelected = isSelected,
+                        cardArtGrid = cardArtGrid,
                     )
                 }
                 }
@@ -814,6 +860,7 @@ private fun XmbItemLeadingIcon(
     item: XMBItem,
     iconStyle: GameIconStyle,
     isSelected: Boolean,
+    cardArtGrid: Boolean = true,
 ) {
     // Material glyph rows follow the theme's unified icon color, matching the tinted
     // silhouette art (PortalIcon) — row alpha handles the unselected dimming.
@@ -1119,7 +1166,17 @@ private fun XmbItemLeadingIcon(
                 } else {
                     null
                 }
-                if (memcardOverride != null) {
+                // The art grid sits ABOVE the default art and BELOW an explicit pick. A user's
+                // custom icon and a collection's chosen glyph are per-slot statements; this is a
+                // global default, and a global default that overrode them would invert the tier
+                // order the icon catalog is built on. Turning the setting off restores the glyph.
+                val artGrid = cardArtGrid &&
+                    memcardOverride == null &&
+                    collectionIconKey == null &&
+                    item.insideCovers.isNotEmpty()
+                if (artGrid) {
+                    CardArtGrid(item.insideCovers, LEADING_ICON_SIZE)
+                } else if (memcardOverride != null) {
                     // Custom icons render as authored (untinted), like every slot — but the
                     // configured icon-legibility matte still draws behind the still frame.
                     com.psplauncher.core.ui.icons.CustomIconSurface(

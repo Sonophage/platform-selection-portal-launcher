@@ -792,6 +792,8 @@ data class XMBUiState(
     // "Fade By Distance": when true, unselected XMB icons and rows dim by how far they sit from
     // (selection still reads by icon size and label). Default false = today's dimming.
     val fadeByDistance: Boolean = true,
+    /** "Card Art Grid": a Games-root card's tile is a 2x2 of what is inside it. */
+    val cardArtGrid: Boolean = true,
     // "Text Shadow": directional drop shadow behind XMB row subtitles (the faded gray helper
     // text), so it stays readable over bright wallpaper regions. Default on — without it the
     // subtitle is the only row label with no separation treatment.
@@ -1588,12 +1590,13 @@ data class XMBItem(
     /** Milliseconds this game has been played; 0 when it has never been launched from here. */
     val totalPlayTimeMillis: Long = 0L,
     /**
-     * Cover art of the newest games INSIDE this card, newest first, for the fan on the right.
+     * Cover art of the newest games INSIDE this card, newest first.
      *
+     * Read by two things: the fan on the right of the crossbar, and the card's own 2x2 art grid.
      * Empty for anything that is not a Games-root card, and for a card whose games have no
-     * artwork — the fan previews what is in there, and there is nothing to preview.
+     * artwork — both consumers are previews of what is in there, and there is nothing to preview.
      */
-    val fanCovers: List<String> = emptyList(),
+    val insideCovers: List<String> = emptyList(),
     val gameId: Long? = null,
     val platformId: String? = null,
     val collectionId: Long? = null,     // set on COLLECTION rows in the Games root
@@ -5106,7 +5109,7 @@ class XMBViewModel @Inject constructor(
             id       = ALL_GAMES_ITEM_ID,
             title    = "All Games",
             subtitle = countLabel(totalGames, "game", "games"),
-            fanCovers = _uiState.value.cardFanCovers[ALL_GAMES_ITEM_ID].orEmpty(),
+            insideCovers = _uiState.value.cardFanCovers[ALL_GAMES_ITEM_ID].orEmpty(),
             type     = XMBItemType.ALL_GAMES,
         )
 
@@ -5117,7 +5120,7 @@ class XMBViewModel @Inject constructor(
                 id       = FAVORITES_ITEM_ID,
                 title    = "Favorites",
                 subtitle = countLabel(favoritesCount, "game", "games"),
-                fanCovers = _uiState.value.cardFanCovers[FAVORITES_ITEM_ID].orEmpty(),
+                insideCovers = _uiState.value.cardFanCovers[FAVORITES_ITEM_ID].orEmpty(),
                 type     = XMBItemType.FAVORITES,
             )
         } else null
@@ -5187,7 +5190,7 @@ class XMBViewModel @Inject constructor(
                 title       = if (card.platformId == WINDOWS_PLATFORM_ID) "Windows Games" else card.displayName,
                 subtitle    = countLabel(count, "game", "games"),
                 platformId  = card.platformId,
-                fanCovers   = _uiState.value.cardFanCovers[cardItemId(card.platformId)].orEmpty(),
+                insideCovers = _uiState.value.cardFanCovers[cardItemId(card.platformId)].orEmpty(),
                 accentColor = platformCache[card.platformId]?.accentColor,
                 type        = XMBItemType.MEMORY_CARD,
             )
@@ -9186,6 +9189,7 @@ class XMBViewModel @Inject constructor(
                 val legibility = com.psplauncher.core.domain.model.IconLegibilityStyle
                     .fromName(prefs[KEY_ICON_LEGIBILITY])
                 val fadeByDistance = prefs[KEY_FADE_BY_DISTANCE] ?: true
+                val cardArtGrid = prefs[KEY_CARD_ART_GRID] ?: true
                 val textShadow = prefs[KEY_TEXT_SHADOW] ?: true
                 _uiState.update {
                     it.copy(
@@ -9195,6 +9199,7 @@ class XMBViewModel @Inject constructor(
                         contextMenuHintDelaySeconds = hintDelaySeconds,
                         iconLegibility = legibility,
                         fadeByDistance = fadeByDistance,
+                        cardArtGrid = cardArtGrid,
                         textShadow = textShadow,
                     )
                 }
@@ -9351,6 +9356,9 @@ class XMBViewModel @Inject constructor(
         // the new question and reusing the key would silently reinterpret it. The old key is left
         // where it is, inert, rather than migrated to a value it never meant.
         private val KEY_FADE_BY_DISTANCE = booleanPreferencesKey("display_fade_by_distance")
+
+        // Must match DisplaySettingsViewModel.KEY_CARD_ART_GRID — both read/write this pref.
+        private val KEY_CARD_ART_GRID = booleanPreferencesKey("display_card_art_grid")
         // Must match DisplaySettingsViewModel.KEY_TEXT_SHADOW — both read/write this pref.
         private val KEY_TEXT_SHADOW = booleanPreferencesKey("display_text_shadow")
         // ICON1 linger default (1.5 s) — the user can adjust the delay under Artwork ▸ Art

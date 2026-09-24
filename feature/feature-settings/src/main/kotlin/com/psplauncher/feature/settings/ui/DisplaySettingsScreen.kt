@@ -327,6 +327,13 @@ fun DisplaySettingsScreen(
                 )
 
                 SettingsToggleRow(
+                    label    = "Card Art Grid",
+                    sublabel = "Show a console card as four covers from inside it, instead of its console icon",
+                    checked  = state.cardArtGrid,
+                    onToggle = { viewModel.setCardArtGrid(it) },
+                )
+
+                SettingsToggleRow(
                     label    = "Fade By Distance",
                     sublabel = "Fade rows and icons further the further they sit from the cursor — off, every unselected one dims the same",
                     checked  = state.fadeByDistance,

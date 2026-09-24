@@ -630,6 +630,7 @@ open class BackupManager @Inject constructor(
             // build still round-trips unchanged; restoring it simply lands a value nobody asks for.
             booleanPreferencesKey("display_solid_unfocused_icons"),
             booleanPreferencesKey("display_fade_by_distance"),
+            booleanPreferencesKey("display_card_art_grid"),
             booleanPreferencesKey("display_text_shadow"),
             booleanPreferencesKey("pref_animated_icons"),
             booleanPreferencesKey("pref_xmb_game_metadata"),

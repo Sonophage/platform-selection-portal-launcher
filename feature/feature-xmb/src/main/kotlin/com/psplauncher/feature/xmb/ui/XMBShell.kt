@@ -103,6 +103,7 @@ import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
+import com.psplauncher.feature.xmb.viewmodel.FAN_COVER_COUNT
 import com.psplauncher.feature.xmb.viewmodel.XMBUiState
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel
 
@@ -889,12 +890,12 @@ fun XMBShell(
             // right-hand corner unconditionally because it and the hover panel can never both
             // apply — the panel wants a focused real GAME and this wants a card.
             val fanCovers = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.fanCovers
+                ?.insideCovers
                 .orEmpty()
             if (fanCovers.isNotEmpty()) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     XmbCoverFan(
-                        covers = fanCovers,
+                        covers = fanCovers.take(FAN_COVER_COUNT),
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .offset(
@@ -999,6 +1000,7 @@ fun XMBShell(
                             // drill; taps on the other (dimmed) cards are ignored.
                             onSiblingTap = { i -> if (i == uiState.drillSiblingIndex) onTouchBack() },
                             labelHiddenByPanel = rowLabelHidden,
+                            cardArtGrid = uiState.cardArtGrid,
                             metadataAsSubtitle = metadataAsSubtitle,
                             iconStyle = uiState.iconStyle,
                             barTopY = barTop,
@@ -1042,6 +1044,7 @@ fun XMBShell(
                                 textShadow = uiState.textShadow,
                                 iconAnimatingAllowed = iconAnimatingAllowed,
                                 labelHiddenByPanel = rowLabelHidden,
+                                cardArtGrid = uiState.cardArtGrid,
                                 metadataAsSubtitle = metadataAsSubtitle,
                                 modifier = Modifier.fillMaxSize(),
                             )

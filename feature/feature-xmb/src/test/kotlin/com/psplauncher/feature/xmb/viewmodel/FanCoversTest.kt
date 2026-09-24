@@ -27,15 +27,15 @@ class FanCoversTest {
     }
 
     @Test
-    fun `the three newest that HAVE art, not the art among the three newest`() {
-        // THE test. Ten games, the three newest unscraped. Taking before mapping hands back an
-        // empty fan while seven covers sit right behind it — and an empty fan is indistinguishable
-        // from a card that genuinely has no art, so nothing downstream can tell it went wrong.
+    fun `the newest that HAVE art, not the art among the newest`() {
+        // THE test. The three newest unscraped. Taking before mapping hands back an empty list
+        // while four covers sit right behind it — and an empty list is indistinguishable from a
+        // card that genuinely has no art, so nothing downstream can tell it went wrong.
         val games = listOf(
             game(10), game(9), game(8),
             game(7, "seven"), game(6, "six"), game(5, "five"), game(4, "four"),
         )
-        assertEquals(listOf("seven", "six", "five"), fanCoversOf(games))
+        assertEquals(listOf("seven", "six", "five", "four"), fanCoversOf(games))
     }
 
     @Test
@@ -60,9 +60,23 @@ class FanCoversTest {
     }
 
     @Test
-    fun `never more than the slots that exist`() {
+    fun `the default carries enough for the hungriest consumer`() {
+        // One list, two readers: the fan takes three and the card's art grid takes four, so the
+        // default limit is the LARGER. Computing it at three would have silently starved the grid
+        // of its fourth cover — a quadrant that is empty on every card, everywhere, which reads
+        // as a library with nothing in it rather than as a number being wrong.
         val many = (1..50L).map { game(it, "c$it") }
-        assertEquals(FAN_COVER_COUNT, fanCoversOf(many).size)
-        assertEquals(listOf("c50", "c49", "c48"), fanCoversOf(many))
+        assertEquals(INSIDE_COVER_COUNT, fanCoversOf(many).size)
+        assertEquals(listOf("c50", "c49", "c48", "c47"), fanCoversOf(many))
+        assertTrue(
+            "the shared list must cover both readers",
+            INSIDE_COVER_COUNT >= FAN_COVER_COUNT && INSIDE_COVER_COUNT >= GRID_COVER_COUNT,
+        )
+    }
+
+    @Test
+    fun `an explicit limit still wins`() {
+        val many = (1..50L).map { game(it, "c$it") }
+        assertEquals(listOf("c50", "c49", "c48"), fanCoversOf(many, FAN_COVER_COUNT))
     }
 }
