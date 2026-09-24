@@ -85,25 +85,59 @@ object BuiltInCategory {
  *
  * Order here is the bar's order, and it applies to a FRESH install only: an established database
  * keeps the positions it already holds, because reconciliation deliberately leaves position alone
- * (it is user-editable). Library carries position 9 rather than 8 for that reason -- appending it
- * meant an older database gained it without colliding. Last Played is the exception: it is placed
- * here, and moved on established databases by a one-shot in CategoryRepositoryImpl, because it
- * was on the bar for a matter of hours before it was given its home.
+ * (it is user-editable).
+ *
+ * THESE NUMBERS ARE READ OFF A REAL INSTALL. They were a first guess at a sensible order, and the
+ * owner then arranged his own bar and asked for that arrangement to be the default — so the
+ * positions below are the ones his database actually holds, copied across. A default that
+ * disagrees with the only arrangement anyone has lived with is a default nobody chose.
+ *
+ * Last Played keeps its one-shot move in CategoryRepositoryImpl for databases seeded before it
+ * had a home.
  */
 val BUILT_IN_CATEGORIES: List<Category> = listOf(
-    Category(id = BuiltInCategory.SETTINGS, name = "Settings",  iconKey = "ic_settings", type = CategoryType.BUILT_IN, position = 0),
-    Category(id = "photos",                 name = "Photo",     iconKey = "ic_photos",   type = CategoryType.BUILT_IN, position = 1),
+    // Last Played first. It has no caticon — the page REPLACES the whole screen — so this
+    // position is what "one step left of Emulation" means rather than a slot on the bar.
+    Category(id = BuiltInCategory.RECENTLY_PLAYED, name = "Last Played", iconKey = "ic_recent", type = CategoryType.BUILT_IN, position = 0),
+    Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 1, isGamingCategory = true),
     Category(id = "music",                  name = "Music",     iconKey = "ic_music",    type = CategoryType.BUILT_IN, position = 2),
     Category(id = "videos",                 name = "Video",     iconKey = "ic_videos",   type = CategoryType.BUILT_IN, position = 3),
-    // Immediately left of Game: "what I was doing" is the thing you reach for first, and the
-    // shortest path to it is one step off the column you already live in.
-    //
-    // isGamingCategory stays FALSE even though every row here is a game. The flag means "games
-    // can be assigned to this category": it puts an Add Games row on the column and gives the
-    // column a sort cycle (see activeSortModes). This section is derived from last_played_at,
-    // nothing can be assigned to it, and its order IS its meaning, so both would be wrong.
-    Category(id = BuiltInCategory.RECENTLY_PLAYED, name = "Last Played", iconKey = "ic_recent", type = CategoryType.BUILT_IN, position = 4),
-    Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 5, isGamingCategory = true),
+    Category(id = "photos",                 name = "Photo",     iconKey = "ic_photos",   type = CategoryType.BUILT_IN, position = 4),
+    Category(id = BuiltInCategory.LIBRARY,  name = "Library",   iconKey = "ic_library",  type = CategoryType.BUILT_IN, position = 5),
     Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 6),
-    Category(id = BuiltInCategory.LIBRARY,  name = "Library",   iconKey = "ic_library",  type = CategoryType.BUILT_IN, position = 9),
+    // Last, with room left before it: a custom category made by the user lands between Network
+    // and Settings rather than past the end of the bar.
+    Category(id = BuiltInCategory.SETTINGS, name = "Settings",  iconKey = "ic_settings", type = CategoryType.BUILT_IN, position = 11),
 )
+
+/**
+ * Where a built-in lands when it is seeded into a database that already exists.
+ *
+ * A row the database already has keeps its own position untouched — that is the user's
+ * arrangement, and reconciliation has never been allowed to move it. A row it has never seen is
+ * APPENDED past everything, whatever number the constant gives it.
+ *
+ * That last part is the whole rule. The constant's positions are the fresh-install ORDER; on an
+ * established database that order means nothing, and the number for a column the user has never
+ * seen is as likely as not to be one of theirs. Two rows sharing a position is a bar whose order
+ * depends on which row the query returns first.
+ *
+ * It replaces the convention it used to take instead: that every new built-in must be given a
+ * position past every old one. That worked, and it meant the default order could never be
+ * rearranged — every column added after the first release had to go on the end whatever the bar
+ * should read like.
+ *
+ * [highestExisting] is null for an empty database, which is a FRESH install: the defaults are
+ * used as written, because there is nothing to collide with and the order is the point.
+ */
+fun seededPositions(
+    defaults: List<Category>,
+    existingIds: Set<String>,
+    highestExisting: Int?,
+): List<Category> {
+    if (highestExisting == null) return defaults
+    var next = highestExisting + 1
+    return defaults.map { category ->
+        if (category.id in existingIds) category else category.copy(position = next++)
+    }
+}

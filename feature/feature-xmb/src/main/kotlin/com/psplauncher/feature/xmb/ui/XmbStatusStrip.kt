@@ -336,7 +336,8 @@ fun XmbPspStatusStrip(
                         sortLabel,
                         color = StripPrimary,
                         fontSize = StripFontSize,
-                        fontWeight = FontWeight.Medium,
+                        lineHeight = StripFontSize * 1.25f,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.align(Alignment.Center),
                     )
                 }
@@ -563,7 +564,7 @@ private fun StripSeparator() {
  * row of text, and 28dp before the owner asked for "a little bigger".
  */
 internal val StripHeight   = 34.dp
-private val StripFontSize = 10.sp
+internal val StripFontSize = 10.sp
 
 /**
  * Every status icon is exactly the font's height. They were 13dp beside 8sp text, which is an icon

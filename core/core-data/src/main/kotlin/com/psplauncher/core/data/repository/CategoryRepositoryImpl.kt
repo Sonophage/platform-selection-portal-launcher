@@ -6,6 +6,7 @@ import com.psplauncher.core.data.database.entity.toDomain
 import com.psplauncher.core.data.database.entity.toEntity
 import com.psplauncher.core.domain.model.BUILT_IN_CATEGORIES
 import com.psplauncher.core.domain.model.BuiltInCategory
+import com.psplauncher.core.domain.model.seededPositions
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.CategoryType
 import kotlinx.coroutines.flow.Flow
@@ -193,7 +194,24 @@ class CategoryRepositoryImpl @Inject constructor(
         pruneRetiredCategories()
         // INSERT OR IGNORE adds built-ins introduced after this DB was first seeded
         // without disturbing existing rows or user edits.
-        categoryDao.insertAll(builtInCategories().map { it.toEntity() })
+        //
+        // A NEW built-in is APPENDED past whatever this database already holds, rather than
+        // dropped at the position the constant gives it. Those positions are the fresh-install
+        // ORDER, and on an established database that order means nothing — the user has arranged
+        // their own bar and the constant's number for a column they have never seen is as likely
+        // as not to be one of theirs. Two rows sharing a position is a bar whose order depends on
+        // which row the query happens to return first.
+        //
+        // This is what lets BUILT_IN_CATEGORIES be an order rather than a list of reserved
+        // numbers. It used to require every new column to take a position past every old one,
+        // which meant the default order could never be rearranged.
+        val existing = categoryDao.getAll()
+        val seeded = seededPositions(
+            defaults = builtInCategories(),
+            existingIds = existing.map { it.id }.toSet(),
+            highestExisting = existing.maxOfOrNull { it.position },
+        )
+        categoryDao.insertAll(seeded.map { it.toEntity() })
         for (category in builtInCategories()) {
             categoryDao.setGamingFlag(category.id, category.isGamingCategory)
         }

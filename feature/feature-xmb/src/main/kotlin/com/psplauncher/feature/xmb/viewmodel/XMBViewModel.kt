@@ -4107,7 +4107,9 @@ class XMBViewModel @Inject constructor(
             else                  -> listOf(emptyAllMusicItem())
         }
         val rows = if (isPlaylist) baseRows + addTracksItem() else baseRows
-        val label = "Sort: ${_uiState.value.musicSortMode.label}"
+        // The mode's name alone. "Sort: Title" spent two thirds of the centre of the strip
+        // naming the control rather than its value, next to a clock that does not say "Time:".
+        val label = _uiState.value.musicSortMode.label
         _uiState.update { it.copy(musicBrowser = it.musicBrowser?.copy(
             rows = rows,
             selectedIndex = state.selectedIndex.coerceIn(0, (rows.size - 1).coerceAtLeast(0)),
@@ -5182,10 +5184,10 @@ class XMBViewModel @Inject constructor(
         return listOf(parent) to 0
     }
 
-    // Status-bar hint for the current list ("Sort: Title"), or null when the list isn't sortable.
+    // Status-bar hint for the current list ("Title"), or null when the list isn't sortable.
     private fun currentSortLabel(): String? {
         val cycle = activeSortContext() ?: return null
-        return "Sort: ${_uiState.value.sortModeFor(cycle).label}"
+        return _uiState.value.sortModeFor(cycle).label
     }
 
     /**

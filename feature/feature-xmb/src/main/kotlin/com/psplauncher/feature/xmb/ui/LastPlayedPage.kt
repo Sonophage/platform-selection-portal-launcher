@@ -221,46 +221,36 @@ fun RecentFilterRow(
      */
     onFilterTapped: (RecentFilter) -> Unit = {},
 ) {
-    Row(
-        modifier = modifier.fillMaxHeight(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RecentFilter.entries.forEach { entry ->
-            val active = entry == filter
-            // The target is the full height of the strip and no more.
-            //
-            // It was `padding(vertical = 8.dp)` for one build, which is the obvious way to make
-            // 8sp chrome hittable and is wrong here: the strip is a fixed 18.dp Box, so padding
-            // grew each name past its container and the labels came out clipped to a few pixels
-            // of glyph on a tablet. Filling the height gets the same press out of the space that
-            // actually exists, and widening happens sideways, where there is room.
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(4.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { onFilterTapped(entry) },
-                    )
-                    .padding(horizontal = 6.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-            Text(
-                text = entry.label,
-                // White either way, dimmed rather than recoloured. These sit over whatever
-                // artwork the focused item brought, and the theme is re-tinted from that same
-                // artwork -- a themed colour here is drawn FROM the picture it must be read
-                // against, which on a gold frame came out gold on gold.
-                color = Color.White.copy(alpha = if (active) 1f else 0.45f),
-                // Chrome-sized, like everything else in this band.
-                fontSize = 8.sp,
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                style = TextStyle(shadow = XmbTextShadow),
+    // ONE name: the filter you are on, not all five.
+    //
+    // All five were on screen so a finger could go straight to the one it wanted, and that cost
+    // the whole centre of the strip to say a thing that is one word. The press still works — it
+    // cycles, which is what X does — so the affordance survives at a fifth of the width.
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(4.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { onFilterTapped(RecentFilter.entries[(filter.ordinal + 1) % RecentFilter.entries.size]) },
             )
-            }
-        }
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = filter.label,
+            // White. These sit over whatever artwork the focused item brought, and the theme is
+            // re-tinted from that same artwork — a themed colour here is drawn FROM the picture it
+            // must be read against, which on a gold frame came out gold on gold.
+            color = Color.White,
+            // The strip's own size, so the centre matches the clock and the live activity either
+            // side of it rather than being chrome inside chrome.
+            fontSize = StripFontSize,
+            lineHeight = StripFontSize * 1.25f,
+            fontWeight = FontWeight.SemiBold,
+            style = TextStyle(shadow = XmbTextShadow),
+        )
     }
 }
 

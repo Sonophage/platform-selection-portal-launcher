@@ -80,20 +80,39 @@ class CategoryBarFallbackTest {
     }
 
     @Test
-    fun `Library is appended rather than inserted`() {
-        // Library takes a position past every original built-in, so a database seeded by an older
-        // build gains it without colliding with the positions its existing rows already hold.
+    fun `the defaults are an ORDER, not a set of reserved numbers`() {
+        // This used to assert that Library sat past every other built-in, so an older database
+        // could gain it without colliding with a position one of its rows already held. That rule
+        // made the default order unchangeable: every column added after the first release had to
+        // go on the end, whatever the bar should actually read like.
         //
-        // Last Played is deliberately NOT held to this rule: it is placed left of Game, and an
-        // established database is corrected by the one-shot in CategoryRepositoryImpl rather than
-        // by where the constant puts it. See the test below.
-        val library = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.LIBRARY }
-        val others = BUILT_IN_CATEGORIES.filter {
-            it.id != BuiltInCategory.LIBRARY && it.id != BuiltInCategory.RECENTLY_PLAYED
-        }
+        // Collisions are handled where they happen instead — reconcileBuiltInCategories appends a
+        // NEW built-in past whatever the database already holds and ignores the constant's number,
+        // because on an established install that number is the fresh-install order and the user
+        // has arranged their own. So the only thing left to assert here is what the order IS.
+        assertEquals(
+            listOf(
+                BuiltInCategory.RECENTLY_PLAYED,
+                BuiltInCategory.GAMES,
+                "music",
+                "videos",
+                "photos",
+                BuiltInCategory.LIBRARY,
+                "network",
+                BuiltInCategory.SETTINGS,
+            ),
+            BUILT_IN_CATEGORIES.sortedBy { it.position }.map { it.id },
+        )
+    }
+
+    @Test
+    fun `Settings is last, with room before it for a category the user makes`() {
+        val settings = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.SETTINGS }
+        val others = BUILT_IN_CATEGORIES.filter { it.id != BuiltInCategory.SETTINGS }
+        assertTrue("Settings is not last", others.all { it.position < settings.position })
         assertTrue(
-            "Library at ${library.position} would collide with an established row",
-            others.all { it.position < library.position },
+            "no room between the last built-in and Settings for a custom category",
+            settings.position > (others.maxOf { it.position } + 1),
         )
     }
 
