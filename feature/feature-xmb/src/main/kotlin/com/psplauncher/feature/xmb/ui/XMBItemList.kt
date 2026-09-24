@@ -231,6 +231,7 @@ fun XmbDrillFlyout(
     // See XmbVerticalListRow. Required, not defaulted: the flyout is the path where the missing
     // value went unnoticed, so it does not get to be optional here either.
     focusedLogoVisible: Boolean,
+    metadataAsSubtitle: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -265,6 +266,7 @@ fun XmbDrillFlyout(
             onItemLongPress = onItemLongPress,
             iconAnimatingAllowed = iconAnimatingAllowed,
             focusedLogoVisible = focusedLogoVisible,
+            metadataAsSubtitle = metadataAsSubtitle,
             modifier = Modifier.fillMaxSize().padding(start = DRILL_GAME_COLUMN_LEFT),
         )
     }
@@ -282,6 +284,7 @@ private fun XmbGameColumn(
     iconStyle: GameIconStyle,
     belowTopY: Dp,
     focusedLogoVisible: Boolean,
+    metadataAsSubtitle: Boolean = false,
     onItemSelected: (Int) -> Unit,
     onItemLongPress: (Int) -> Unit,
     iconAnimatingAllowed: Boolean = false,
@@ -313,6 +316,7 @@ private fun XmbGameColumn(
                 // and this path could not produce it. The parameter has no default any more, so
                 // a fourth call site cannot repeat it.
                 focusedLogoVisible = focusedLogoVisible,
+                metadataAsSubtitle = metadataAsSubtitle,
                 iconStyle = iconStyle,
                 onClick = { onItemSelected(i) },
                 onLongPress = { onItemLongPress(i) },
@@ -455,6 +459,7 @@ fun XMBItemList(
     // logo-bearing game was absent for the first 650ms and, on a game with no background art,
     // forever.
     focusedLogoVisible: Boolean = false,
+    metadataAsSubtitle: Boolean = false,
     // When true, the selected row gets a ◀ drill cursor pinned directly to its right.
     drillCursorOnSelected: Boolean = false,
     // How far the dissolving previous item rises above the bar, in row heights (theme layout spec).
@@ -507,6 +512,7 @@ fun XMBItemList(
                     key(items[i].id) {
                         XmbVerticalListRow(
                             focusedLogoVisible = focusedLogoVisible,
+                            metadataAsSubtitle = metadataAsSubtitle,
                             item = items[i],
                             isSelected = i == selectedIndex,
                             // The real PSP XMB labels EVERY first-level item (selected bright, the
@@ -559,6 +565,7 @@ fun XMBItemList(
                     // Unused while isSelected is false, but passed rather than defaulted: the
                     // parameter is required now precisely so nobody has to check that again.
                     focusedLogoVisible = focusedLogoVisible,
+                    metadataAsSubtitle = metadataAsSubtitle,
                     iconStyle = iconStyle,
                     onClick = { onItemSelected(selectedIndex - 1) },
                     onLongPress = { onItemLongPress(selectedIndex - 1) },
@@ -605,6 +612,7 @@ private fun XmbVerticalListRow(
     // `false`, which silently disabled the rule on the drill flyout — the busiest path of the
     // three. A required parameter turns that from a thing you have to notice into a build error.
     focusedLogoVisible: Boolean,
+    metadataAsSubtitle: Boolean = false,
     // Whether THIS row may animate its GIF icon — true only for the focused row, so exactly
     // one decoder runs at a time (decision 3). Provided per-row around the icon.
     iconAnimatingAllowed: Boolean = false,
@@ -739,7 +747,16 @@ private fun XmbVerticalListRow(
                             modifier = Modifier.weight(1f, fill = false),
                         )
                     }
-                    item.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
+                    // While the logo page is open the focused game's row says what the thing IS —
+                    // year, genre, developer, players — instead of what system it is on and when
+                    // it was last played. Only the FOCUSED row: the metadata belongs to the game
+                    // the panel is about, and printing it under every row would be four lines of
+                    // facts about four different games. Falls back to the normal subtitle for a
+                    // game with nothing scraped, so the line never empties.
+                    val effectiveSubtitle =
+                        if (isSelected && metadataAsSubtitle) item.metadataLine ?: item.subtitle
+                        else item.subtitle
+                    effectiveSubtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
                         Text(
                             text = subtitle,
                             color = SecondaryText,

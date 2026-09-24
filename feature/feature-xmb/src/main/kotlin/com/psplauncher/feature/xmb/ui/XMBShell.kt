@@ -787,6 +787,11 @@ fun XMBShell(
             // never comes through here. Recents keeps the logo it has always led with.
             val stripOpened = uiState.panelPageGameId != null &&
                 uiState.panelPageGameId == uiState.hoverPanelItem?.gameId
+
+            // The focused row swaps its subtitle for the game's scraped facts while the logo page
+            // is open — "and only when the logo is selected". At rest the subtitle stays the
+            // system-and-last-played line, which is what that state is for.
+            val metadataAsSubtitle = stripOpened && onLogoPage && uiState.gameMetadataVisible
             // "Is anything on the right already naming this game?"
             //
             // Off the logo page the panel is 42% of the width and the label runs straight into
@@ -801,8 +806,14 @@ fun XMBShell(
             //
             // One val, two consumers (the crossbar list and the drill flyout). They were the pair
             // that disagreed — the flyout never received this at all — so they read one value.
-            val focusedNameShownOnRight = panelContent != null && stripOpened &&
-                (!onLogoPage || pic0Alpha > 0f)
+            // The logo page no longer takes the name away either.
+            //
+            // It used to, on the rule that "the logo IS the identity", and the metadata line was
+            // right-aligned under the logo to match. Both halves moved: the facts are the row's
+            // SUBTITLE now, so the row has to be readable on the logo page to carry them. Off the
+            // logo page the panel is 42% of the width and the label runs straight into it, so
+            // there the label still goes.
+            val focusedNameShownOnRight = panelContent != null && stripOpened && !onLogoPage
             val panelAlpha = if (onLogoPage) pic0Alpha else 1f
             // On the logo page this is the old condition unchanged, so a game with no logo shows
             // nothing here exactly as before. Off it, the panel is what the user asked for with
@@ -866,73 +877,15 @@ fun XMBShell(
                 }
             }
 
-            // The focused game's scraped one-liner, right-aligned under where the logo sits.
-            // Deliberately NOT a row label: XMBItemList's rule is that a game with a logo shows
-            // no text, because the logo IS the identity. This is the other half of the PS3's
-            // game info -- what the thing IS, not what it is called -- so it lives with the
-            // logo rather than in the list.
-            // Only on the logo page. This line is positioned for a panel that is 38% of the
-            // height; every other page is 62% and draws straight through it — seen on the
-            // device, the line and its accent bar printed across the middle of the box art.
-            // The Info card also leads with this exact text, so on that page it was saying it
-            // twice as well. A null panel (a row with no backdrop art, so no panel at all)
-            // keeps the line: there is nothing for it to collide with.
-            val panelLeavesRoomForMeta = panelPage == null || panelPage == DetailPanelPage.LOGO
-            val metadataLine = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.takeIf { uiState.gameMetadataVisible && it.isRealGame && panelLeavesRoomForMeta }
-                ?.metadataLine
-            var metaVisible by remember(metadataLine) { mutableStateOf(false) }
-            androidx.compose.runtime.LaunchedEffect(metadataLine) {
-                if (metadataLine != null) {
-                    // The same 650 ms as the logo, so the two land together rather than the
-                    // text arriving first and the logo catching up.
-                    kotlinx.coroutines.delay(650)
-                    metaVisible = true
-                }
-            }
-            val metaAlpha by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = if (metaVisible && metadataLine != null) 1f else 0f,
-                animationSpec = if (metaVisible) tween(500) else androidx.compose.animation.core.snap(),
-                label = "gameMetaFade",
-            )
-            if (metadataLine != null && metaAlpha > 0f) {
-                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
-                    // The accent rule: a short bar in the game's own colour, directly above its
-                    // facts. It is the one place the colour is stated OUTRIGHT rather than mixed
-                    // into something else, which is what makes the tint elsewhere read as
-                    // deliberate instead of as a cast on the artwork.
-                    Box(
-                        modifier = Modifier
-                            .offset(y = maxHeight * 0.22f - 14.dp)
-                            .padding(end = 44.dp)
-                            .width(64.dp)
-                            .height(3.dp)
-                            .alpha(metaAlpha)
-                            .background(xmbGameAccent),
-                    )
-                    androidx.compose.material3.Text(
-                        text = metadataLine,
-                        color = Color.White.copy(alpha = 0.72f),
-                        fontSize = 12.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        style = androidx.compose.ui.text.TextStyle(
-                            shadow = androidx.compose.ui.graphics.Shadow(
-                                color = Color.Black.copy(alpha = 0.8f),
-                                offset = androidx.compose.ui.geometry.Offset(0f, 2f),
-                                blurRadius = 5f,
-                            ),
-                        ),
-                        // The logo box is 38% of the height, centred, so its lower edge is at
-                        // 19%. This clears it by a line.
-                        modifier = Modifier
-                            .offset(y = maxHeight * 0.22f)
-                            .padding(end = 44.dp)
-                            .alpha(metaAlpha),
-                    )
-                }
-            }
+            // The focused game's scraped one-liner used to be drawn HERE — right-aligned under
+            // the logo, with an accent bar over it, on the logo page only.
+            //
+            // It is the row's subtitle now: "the metadata line is what I want as the subtitle
+            // under the name of the game and removed from where time played would show up". That
+            // band is where TIME PLAYED lives, and with both in it they printed through each
+            // other — "2005 · CompilationTIME PLAYED: UNDER A MINUTElayers" on the device. One of
+            // them had to leave, and the facts read better under the name they belong to than
+            // right-aligned under a wordmark.
 
             // The panel's page strip, directly under the status bar and in the opposite corner
             // from the helper footer, which is the pill it is wearing. Not on the logo page: that
@@ -1024,6 +977,7 @@ fun XMBShell(
                             // drill; taps on the other (dimmed) cards are ignored.
                             onSiblingTap = { i -> if (i == uiState.drillSiblingIndex) onTouchBack() },
                             focusedLogoVisible = focusedNameShownOnRight,
+                            metadataAsSubtitle = metadataAsSubtitle,
                             iconStyle = uiState.iconStyle,
                             barTopY = barTop,
                             belowTopY = anchorTop,
@@ -1066,6 +1020,7 @@ fun XMBShell(
                                 textShadow = uiState.textShadow,
                                 iconAnimatingAllowed = iconAnimatingAllowed,
                                 focusedLogoVisible = focusedNameShownOnRight,
+                                metadataAsSubtitle = metadataAsSubtitle,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
