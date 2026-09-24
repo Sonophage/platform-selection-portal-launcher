@@ -110,3 +110,76 @@ for an hour. Write the log to a file.
 **Reading a screenshot instead of the pixels.** The rail's scrim was declared broken off a resized
 capture; it had been working the whole time. `im.getpixel()` settles it in one line.
 
+
+---
+
+# Health pass — same day, after the device went off
+
+Ran after the redesign work. `./gradlew test`: **2642 tests, 0 failures, 0 errors, 8 skipped.**
+
+## Lint: 55 errors → 5
+
+Forty-seven of the original 55 were ONE issue repeated — media3's `UnstableApi` — which is enough
+noise to bury the ones that were real. It took three attempts to silence correctly and the
+difference is worth knowing:
+
+| Attempt | Result |
+|---|---|
+| `@file:OptIn(UnstableApi::class)` | Compiles, silences **nothing**. `UnstableApi` is not `@RequiresOptIn`, and Kotlin warns that the opt-in has no effect. |
+| `@UnstableApi` on the class | Satisfies lint here and **propagates** — every injection site of `VideoSnapTranscoder` became an unstable-API usage. 44 errors in one file became errors in four. |
+| `@Suppress("UnsafeOptInUsageError")` | Local. Says this file knows what it calls, and nothing outside has to know anything. |
+
+**The five that remain are all benign:** a `mutableStateOf` in a test harness, two permissions lint
+cannot verify but the manifest declares (`PACKAGE_USAGE_STATS` is appops, the call is wrapped), and
+`QUERY_ALL_PACKAGES`, which a launcher needs to enumerate apps.
+
+## Two crashes that were live
+
+- **`EpubMetadata`** called `ByteArrayOutputStream.toString(Charset)` — API 33, against minSdk 29.
+  A `NoSuchMethodError` while reading a book's metadata on Android 10 through 12.
+- **`EmulatorIntentResolver`** called `isExternalStorageManager` — API 30 — and survived on Android
+  10 *only* because Kotlin's `runCatching` catches `Throwable`. A linkage error caught by a net
+  cast for something else entirely.
+
+## A collector that stacked
+
+`startMenuMusicIfWanted` ran `repeatOnLifecycle` from `onResume`. That suspends until DESTROYED, so
+every resume started **another** collector on the same flow, each racing the others to start the
+music. It belongs in `onCreate`. The comment claiming the scope was torn down at `onStop` went with
+it — `lifecycleScope` is cancelled at `onDestroy`.
+
+## Build: 1478ms → 710ms on an up-to-date `:app:assembleDebug`
+
+The configuration cache is on, which Gradle had been suggesting on every invocation. Heap 2048m →
+6144m on a 30GB machine.
+
+**The first measurement of this was worthless** and is worth remembering: the builds were *failing*
+in 591ms and the failure was piped to `/dev/null`. `copyDebugToDebugDir`'s `rename` lambda closed
+over the build script rather than over a string, which the cache cannot serialise. Both numbers
+above were re-measured with the output read.
+
+## Keyboard pass
+
+The Keyboard glyph family shipped naming **Shift, Space, Tab, Q and E while none of them reached
+the launcher** — and **Escape**, the key a keyboard user reaches for first, was bound to nothing.
+All six are bound now. `KeyboardPromptsAreBoundTest` holds the pair together: a glyph table in
+core-ui names a key, a binding table in core-domain decides what it does, and nothing joined them.
+
+Arrows always worked — Android delivers a real keyboard's arrows as `DPAD_*`.
+
+**Still unverified:** nobody has driven the launcher from a keyboard. The bindings and the labels
+now agree with each other, which is not the same as agreeing with a device.
+
+## Touch pass
+
+Hiding the Last Played caticon fixed a controller problem and created a touch one: a finger has no
+equivalent of "step left off Emulation", so the shelf became a page with no door. **The slot
+returns whenever the last input was a finger** and goes again on the next button press.
+
+Everything else added this run takes a tap — the rail, the pills, the notification sheet, the
+strip's live corner, and the bottom bar's prompts (through the shared renderer, which is why
+`XmbHintBar` has no `clickable` of its own).
+
+**Still unverified:** the Keyboard and Touch glyph families have never been seen on a screen. The
+controller-type picker does not open from injected input, and the owner's setting was left as found
+rather than patched — the datastore is a length-delimited protobuf that a byte edit corrupts.
