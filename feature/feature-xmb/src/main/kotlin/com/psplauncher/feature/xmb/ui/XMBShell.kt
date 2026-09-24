@@ -1127,10 +1127,34 @@ fun XMBShell(
             // padding itself down by StripHeight to make room for it, leaving an empty band where
             // the time should be. Out here both branches draw it, and it is still inside the
             // overlay guard, so the drawer and Settings cover it as before.
+            // What the strip's left half shows. Music is the only source there is: the app's other
+            // background work — scans, scrapes, imports, exports — reports through notifications
+            // and publishes no progress the UI can read. The slot simply stays empty until one
+            // does, which is also what the design's third card shows.
+            val liveActivity = uiState.musicPlayback.track?.takeIf { uiState.musicPlayback.isPlaying }?.let { track ->
+                StripLiveActivity(
+                    art = track.artUri,
+                    title = track.title ?: track.displayName,
+                    detail = listOfNotNull(
+                        track.artist,
+                        formatDuration(uiState.musicPlayback.positionMs.toLong()) + " / " +
+                            formatDuration(uiState.musicPlayback.durationMs.toLong()),
+                    ).joinToString("  ·  "),
+                )
+            }
+
             XmbPspStatusStrip(
                 sortLabel = uiState.sortLabel,
                 showSortButton = uiState.resolvedShowTouchButton,
                 onSortTapped = onXmbSortTapped,
+                live = liveActivity,
+                // The two navigation hints, each shown only where the press does something.
+                // Shoulder: the hover panel's pages, which exist only on a game that has them.
+                // Left/right: stepping the crossbar, which a drilled-in list does not do.
+                hints = StripHints(
+                    shoulder = uiState.panelStripOpen,
+                    leftRight = !uiState.isInSubItem && uiState.categories.size > 1,
+                ),
                 // The home shelf's media filter rides in the middle of the bar. Only there: it
                 // is the only column X filters, and a row of media names over the crossbar would
                 // be naming something that column does not have.

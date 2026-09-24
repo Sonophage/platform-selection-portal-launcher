@@ -1,5 +1,11 @@
 package com.psplauncher.feature.xmb.ui
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import coil3.compose.AsyncImage
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -100,9 +106,30 @@ object XmbStatusIcons {
     }
 }
 
-// ── PSP-style full-width status strip ────────────────────────────────────────
+/**
+ * What the left of the strip is doing right now.
+ *
+ * 12b: "the live activity anchors top-left". [art] is anything Coil can draw — a track's cover, a
+ * game's icon — or null for a row that has no picture of its own.
+ */
+data class StripLiveActivity(val art: Any?, val title: String, val detail: String?)
+
+/** Which navigation hints the centre offers. Both can be true; neither is the usual case. */
+data class StripHints(val shoulder: Boolean = false, val leftRight: Boolean = false)
+
+// ── The status strip, 12b ────────────────────────────────────────────────────
 //
-// Layout:  DATE  ┊  TIME  [bg-task badge]          [BT] [WiFi] [Signal] [Bat] %
+// Layout:  [art] TITLE / detail        <centre>        [icons]  TIME
+//                                                                ▔▔▔▔  battery
+//
+// Pulled apart from the old one, which packed date, time, a separator and the whole icon set into
+// the left corner and hung the battery percentage off the right. The live activity now owns the
+// left, and the time owns the right with the battery drawn as a line under it rather than a glyph
+// and a number beside it.
+//
+// Sized to THIS screen rather than to the design's own frame: the mock's band is about 85dp tall
+// on a 1920x1080 sheet, which is a fifth of this panel's height. 28dp is what the two lines and
+// the art tile actually need, against the 18dp the strip had before.
 
 @Composable
 fun XmbPspStatusStrip(
@@ -111,6 +138,10 @@ fun XmbPspStatusStrip(
     // order; on controller it stays a plain label (X / Square cycles it).
     showSortButton: Boolean = false,
     onSortTapped: () -> Unit = {},
+    /** The thing that is running, drawn top-left. Null when nothing is. */
+    live: StripLiveActivity? = null,
+    /** Which of the two navigation hints apply here. Drawn centre, when nothing else is. */
+    hints: StripHints = StripHints(),
     modifier: Modifier = Modifier,
     /**
      * What sits in the middle of the bar, centred on the SCREEN.
@@ -170,14 +201,65 @@ fun XmbPspStatusStrip(
         verticalAlignment    = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        // ── Left: date  ┊  time  [bg task badge] ──────────────────────────
-        Row(
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(dateString, color = StripMuted,   fontSize = StripFontSize, fontWeight = FontWeight.Normal)
-            StripSeparator()
-            Text(timeString, color = StripPrimary, fontSize = StripFontSize, fontWeight = FontWeight.Medium)
+        // ── Left: what is running ─────────────────────────────────────────
+        //
+        // Music today, and only music. The design's other example is a download with a byte
+        // count, and this app has no downloads — its background work is scans, scrapes, imports
+        // and exports, none of which publishes progress anywhere the UI can read. When one does,
+        // it becomes a second source for this same slot and nothing here changes shape.
+        //
+        // The date went with the redesign. It was beside the time in the old left corner, and the
+        // right side of this one is the time alone under its battery line; a date squeezed in
+        // there would be the thing that made the corner busy again.
+        live?.let { activity ->
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(LiveArtSize)
+                        .clip(RoundedCornerShape(LiveArtCorner))
+                        .background(Color.White.copy(alpha = 0.12f)),
+                ) {
+                    if (activity.art != null) {
+                        AsyncImage(
+                            model = activity.art,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                // BOTH lines carry an explicit lineHeight. Without one they inherit the ambient
+                // text style's, which on this theme is 24sp — so an 8sp title occupied a 57px box
+                // and the detail under it was measured into 6px and drawn as a smear. It looked
+                // exactly like a strip too short for two lines, and the strip was not the problem.
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(
+                        activity.title,
+                        color = StripPrimary,
+                        fontSize = StripFontSize,
+                        lineHeight = StripFontSize * 1.25f,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = LiveTextMax),
+                    )
+                    activity.detail?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            it,
+                            color = StripMuted,
+                            fontSize = LiveDetailSize,
+                            lineHeight = LiveDetailSize * 1.25f,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = LiveTextMax),
+                        )
+                    }
+                }
+            }
         }
 
         }
@@ -191,7 +273,20 @@ fun XmbPspStatusStrip(
         //
         // The filters win where both could apply: X cycles the filter on that page, not the sort.
         when {
+            // The caller's own content wins. On the home shelf that is the media filter, which is
+            // STATE — which cut of the shelf you are looking at — and state beats a hint about a
+            // button. Everywhere else the slot is free and the hints take it.
             centre != null -> centre.invoke(this)
+            hints.shoulder || hints.leftRight -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.align(Alignment.Center),
+                ) {
+                    if (hints.shoulder) StripHint("LB  RB")
+                    if (hints.leftRight) StripHint("◀  ▶")
+                }
+            }
             sortLabel != null -> {
                 // Touch: a chip that cycles the sort. Controller: a plain label, because X
                 // already does it and a chip would be a button that cannot be reached.
@@ -251,22 +346,66 @@ fun XmbPspStatusStrip(
             sys.cellularLevel?.let { level ->
                 SignalBars(level, Modifier.size(width = 14.dp, height = 13.dp))
             }
-            StatusIcon(
-                res         = XmbStatusIcons.battery(batteryLevel, isCharging),
-                description = "Battery",
-                modifier    = Modifier.size(width = 24.dp, height = 11.dp),
-                tint        = if (batteryLevel <= 20 && !isCharging) LowBatteryTint else StripMuted,
-                slotKey     = XmbStatusIcons.batterySlotKey(batteryLevel, isCharging),
-            )
-            Text(
-                text       = "$batteryLevel%",
-                color      = if (batteryLevel <= 20 && !isCharging) LowBatteryTint else StripPrimary,
-                fontSize   = StripFontSize,
-                fontWeight = FontWeight.Medium,
-            )
+            // The time, with the battery as a LINE under it — 12b's right-hand pair. The glyph
+            // and the "81%" beside it are gone: the line says the same thing in the space the
+            // clock already occupies, and the bolt says the rest.
+            //
+            // Green while charging, white off it, and the low-battery tint still wins over both
+            // because a line at 8% that is merely short is not a warning.
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    if (isCharging) {
+                        Text("\u26A1", color = ChargingTint, fontSize = StripFontSize)
+                    }
+                    Text(
+                        text       = timeString,
+                        color      = StripPrimary,
+                        fontSize   = StripFontSize,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+                Box(
+                    Modifier
+                        .width(BatteryLineWidth)
+                        .height(BatteryLineHeight)
+                        .clip(RoundedCornerShape(BatteryLineHeight / 2))
+                        .background(Color.White.copy(alpha = 0.22f)),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth((batteryLevel / 100f).coerceIn(0f, 1f))
+                            .height(BatteryLineHeight)
+                            .clip(RoundedCornerShape(BatteryLineHeight / 2))
+                            .background(
+                                when {
+                                    batteryLevel <= 20 && !isCharging -> LowBatteryTint
+                                    isCharging -> ChargingTint
+                                    else -> StripPrimary
+                                },
+                            ),
+                    )
+                }
+            }
         }
     }
 }
+
+/** One centre hint: the buttons, quietly, in the band that is chrome rather than content. */
+@Composable
+private fun StripHint(text: String) {
+    Text(text, color = StripMuted, fontSize = LiveDetailSize, fontWeight = FontWeight.Medium)
+}
+
+private val LiveArtSize = 22.dp
+private val LiveArtCorner = 5.dp
+private val LiveTextMax = 220.dp
+private val LiveDetailSize = 9.sp
+private val BatteryLineWidth = 44.dp
+private val BatteryLineHeight = 2.dp
+private val ChargingTint = Color(0xFF6FD08C)
 
 // ── Signal-strength meters (theme-neutral white, level-aware) ──────────────────
 //
@@ -372,7 +511,11 @@ private fun StripSeparator() {
  * rather than private because the panel strip is placed directly beneath it, and a second copy of
  * 28 in the shell is a gap that drifts the first time this changes.
  */
-internal val StripHeight   = 18.dp
+/**
+ * Sized to what the content needs on THIS panel: a 22dp art tile and two lines on the left, the
+ * clock and its battery line on the right. It was 18dp when the strip was one row of text.
+ */
+internal val StripHeight   = 28.dp
 private val StripFontSize = 8.sp
 private val StripIconSize  = 10.dp
 private val LowBatteryTint = Color(0xFFFF6B6B)
