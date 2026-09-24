@@ -5,6 +5,8 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-24
+
 ### Added
 - **Start opens the notification panel.** The button was already bound — it confirms inside the
   pickers — and on the crossbar it did nothing at all. BACK closes the sheet, which it also could
