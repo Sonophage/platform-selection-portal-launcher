@@ -45,6 +45,7 @@ class BackupKeyCoverageTest {
         assertCovered(
             "display_icon_legibility",
             "display_solid_unfocused_icons",
+            "display_fade_by_distance",
             "display_text_shadow",
             "pref_animated_icons",
             "pref_icon_display_mode",

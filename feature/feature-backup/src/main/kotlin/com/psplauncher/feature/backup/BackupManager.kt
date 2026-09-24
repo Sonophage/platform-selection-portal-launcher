@@ -623,7 +623,13 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("display_text_color_exact"),
             booleanPreferencesKey("display_text_contrast_notice_suppressed"),
             // Icon + text appearance toggles, missing since they were introduced.
+            //
+            // display_solid_unfocused_icons is SUPERSEDED — nothing reads it any more, it was
+            // replaced by display_fade_by_distance when the setting changed from "dim at all?" to
+            // "dim flat or by distance?". It stays on this list so an archive written by an older
+            // build still round-trips unchanged; restoring it simply lands a value nobody asks for.
             booleanPreferencesKey("display_solid_unfocused_icons"),
+            booleanPreferencesKey("display_fade_by_distance"),
             booleanPreferencesKey("display_text_shadow"),
             booleanPreferencesKey("pref_animated_icons"),
             booleanPreferencesKey("pref_xmb_game_metadata"),
