@@ -6,6 +6,24 @@ All notable changes to PSPLauncher are documented here. This project follows
 ## [Unreleased]
 
 ### Added
+- **Start opens the notification panel.** The button was already bound — it confirms inside the
+  pickers — and on the crossbar it did nothing at all. BACK closes the sheet, which it also could
+  not do before: the sheet was local state the input handler knew nothing about, so BACK went past
+  it and opened the App Drawer with the sheet still on screen.
+
+- **A media row across the top of the sheet.** One row with two tenants: the playing track with
+  its position and a transport, or — when nothing is playing — the last game you were in, with
+  Resume. It shows a PAUSED track, unlike the strip's live slot above it, which is about what is
+  happening right now; a paused track is precisely what you open a transport for. The game's row
+  draws no progress bar, because "last played" knows no position and a bar at zero would be a
+  claim rather than an absence.
+
+- **The device's notifications can be opened and cleared.** Confirm opens the app that posted one,
+  Y clears it, and both are offered only where they work: a notification with no content intent
+  has nowhere to go, and an ongoing one — a media session, a foreground service — cannot be
+  cleared at all. The cursor never stops on the launcher's own column, whose rows are reports of
+  finished work with nothing to do to them.
+
 - **Action pills under the focused row.** Details, Favorite, Open with and Collection on a game;
   Launch, Edit, Favorite and Collection on an app. They are always there rather than opening on a
   press, and nothing moves when one is used. Left and right walk into the row — right lands on the
@@ -90,6 +108,22 @@ All notable changes to PSPLauncher are documented here. This project follows
   screen.
 
 ### Changed
+- **The options rail no longer takes A away from the game.** It opened with its first row already
+  picked, which moved confirm from "play this" to "run whatever the first action happens to be".
+  Nothing is picked until you move onto something; the first press enters from the end it came
+  from, so DOWN lands on the top row and UP on the bottom. Confirm with nothing picked plays the
+  game.
+
+- **Play is gone from the game menu**, because confirm does it on every surface now. The entry
+  remains, hidden, so it stays the one definition of what Play does — confirm runs that row rather
+  than a second path to the same verb.
+
+- **The pill row under a game has a way in that does not cost a press.** DOWN at the bottom of a
+  column enters it, where the press has always done nothing, and UP gives the row back. LEFT no
+  longer enters it: on a drilled-in list LEFT is spent backing out of the folder, so the mirror
+  the code claimed to offer never existed there. Once the cursor is in the row, left and right are
+  the row's and nothing else's — before, LEFT from inside the row left the folder as well.
+
 - **The launcher is set in Instrument Sans.** SIL Open Font License like Inter, one variable file,
   190 KB against Inter's 876 KB. Its weight axis floors at 400 where Inter's ran to 100, so eleven
   call sites that ask for Light now render at 400 — the context menus, the wizard scaffold and its
@@ -178,6 +212,36 @@ All notable changes to PSPLauncher are documented here. This project follows
   glyph beside them, and Touch's directions are arrows rather than the words "Swipe left".
 
 ### Fixed
+- **The crossbar launched games on the wrong emulator.** "Change Emulator" wrote the choice and
+  the launch never read it. With direct launch on — the path confirm takes — the XMB picked the
+  first available emulator for the platform, which is the bottom rung of the resolution ladder on
+  its own, so a per-game override, a Memory Card's emulator and a per-system default were all
+  written by their menus and ignored. Game Detail's Play obeyed all three, so the same game
+  launched on two different emulators depending on how you started it. Its refusal was wrong in
+  the same way: it named a setting that path never consulted.
+
+- **Every action pill ran the wrong thing.** Details opened Manage Collections; Favorite and Open
+  with each opened a submenu. A pill found its menu entry by position in one list and ran it by
+  position in another — the rail's list, which is built by removing exactly the pills — so the
+  press always landed on a real action and never the right one. Actions are dispatched by id now.
+
+- **Nothing in the notification sheet could be pressed.** The full-screen press-catcher that
+  closes it was drawn on top of the sheet rather than under it, so every tap meant for a card or
+  a transport control closed the sheet instead.
+
+- **Opening a notification did nothing.** The intent fired and Android refused it — a launcher
+  sending another app's notification intent has to opt in to the activity start explicitly since
+  Android 14, even though it has a visible window and would otherwise be allowed.
+
+- **The sheet named a game differently from every other screen.** Its Resume row read the title
+  the scan wrote — the ROM's filename with its illegal characters replaced — so it said "The Elder
+  Scrolls V_ Skyrim Special Edition" while the row above it used the colon. The same fault is
+  fixed in Game Detail's "Launching…" and "Could not launch…" messages.
+
+- **The Recent shelf offered a way into a row it does not draw.** The shelf replaces the crossbar's
+  column wholesale and has no pill row, so stepping down at the end of the recents put the cursor
+  on actions nobody could see.
+
 - **Boot flashed bright amber for 2.3 seconds.** Measured on the panel: one frame of near-black,
   then RGB (158, 91, 55) held from 0.07s to 2.33s, then a crossfade down. The boot overlay was
   drawing the themed gradient so that boot and the menu would look identical — a premise that had

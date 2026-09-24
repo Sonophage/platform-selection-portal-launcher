@@ -248,3 +248,86 @@ bottom bar photographed:
 
 The setting was put back to **PlayStation** through the same picker. The datastore was never
 byte-edited — it is a length-delimited protobuf and an edit corrupts it.
+
+---
+
+# The day after — 2026-09-24
+
+Seven code commits, all of them either a bug the redesign run shipped or a thing the owner asked
+for on top of it. **Everything here was driven on the device after installing**, which is new for
+this project and is where two of the bugs came from.
+
+## The launch was obeying the wrong setting
+
+`XMBViewModel.launchResolvedGame` picked its emulator with
+`getProfilesForPlatform(id).firstOrNull { it.isAvailable }`. That is the **bottom rung** of
+`EmulatorLaunchResolver`'s ladder on its own, so the per-game override, the Memory Card's emulator
+and the platform default were written by their menus and never read by the launch. Game Detail's
+Play obeyed all three. Direct launch is ON on the owner's device — `pref_direct_game_launch` is
+`\x12\x02\x08\x01` in the datastore — so this was live, every press, every day.
+
+`GameLaunchResolver` now owns the gathering and both callers take it whole.
+
+**The seam has no automated guard and that is worth knowing.** Putting
+`game.copy(emulatorPackage = null)` into the XMB's call leaves the whole suite green. The rungs are
+pinned; "the XMB uses this function" is held by the call site and nothing else.
+
+## Two lists and one index
+
+Every pill ran the wrong action — Details opened Manage Collections, Favorite opened a submenu.
+A pill found its entry with `menu.items.indexOfFirst { it.id == pillId }` and activation read
+`railRows()`, which is that list **minus the pills**. The index always landed on a real, in-range
+action and never the right one. Dispatch is by id everywhere now.
+
+## What the device found that the tests could not
+
+Both of these shipped green and were caught by installing the build and driving it.
+
+**The sheet's press-catcher was on top of the sheet.** Declared last in the Box, which means drawn
+last, which means over everything — harmless while nothing in the sheet was pressable, and as of
+the same commit that made the rows pressable, it took every one of those presses. It also pruned
+the whole sheet from the accessibility tree: `uiautomator dump` reported 24 nodes and no columns,
+because an opaque clickable covering a node hides it.
+
+**A notification's intent fired and was refused.** `send()` threw nothing, the sheet closed,
+nothing opened. The system said why, at length:
+
+    Background activity launch blocked! [ intent: Intent { cmp=com.android.settings/
+    .Settings$UsbDetailsActivity } ... realCallingUidHasVisibleActivity: true ...
+    resultIfPiSenderAllowsBal: BAL_ALLOW_VISIBLE_WINDOW ... balRequireOptInByPendingIntentCreator: true ]
+
+The launcher was never the problem — the same line says it would be allowed. Since Android 14 the
+SENDER opts in. `ActivityOptions` with `MODE_BACKGROUND_ACTIVITY_START_ALLOWED`, guarded at API 34.
+
+## And one I introduced and caught the same way
+
+The pill row's new DOWN door was guarded on the focused item HAVING pills, not on the row being
+DRAWN. `pillsFor` answers about the item and knows nothing about the screen, and the Last Played
+shelf draws no pill row at all — `XMBItemList` is the only thing that draws them and the shelf
+replaces that branch wholesale. So DOWN at the end of the recents put the cursor on an invisible
+row, where the next confirm would have run an action nobody chose.
+
+`XMBUiState.pillRowVisible` is the one definition now, and all four readers take it.
+
+## Read the logcat before believing a dead press
+
+Three `KEYCODE_DPAD_DOWN` presses produced **two** `Gamepad action: NAVIGATE_DOWN` lines. It looked
+exactly like "the first press after opening is swallowed" and I was about to go hunting for it in
+`shiftContextMenu`. The injected keyevent never arrived.
+
+## Verified on the panel
+
+- Start opens the sheet; both columns draw; the cursor walks it and the bar follows.
+- The **Launcher column renders** — it shows "Nothing has happened yet", which is the empty state
+  the handoff above said had never been seen. It is empty because the history is in memory and the
+  process had just restarted. **It has still never been seen with a toast in it.**
+- The rail opens with nothing picked, the bar reads `Play  <game>`, and Play is not among its rows.
+- The pill row, by pixel: DOWN x3 in Favorites takes Details from (96,102,125) to (221,218,217);
+  RIGHT moves the capsule to Unfavorite; UP leaves the row with the column cursor where it was.
+
+## Wireless adb
+
+`adb tcpip 5555` then `adb connect 192.168.0.80:5555`. A 101 MB install takes **5.4s** over it, a
+screencap 1.3s. `settings get global adb_wifi_enabled` is **0** today, correcting a note that said
+Android's own Wireless debugging was already on — so the pairing route needs enabling first and
+`tcpip` over the cable is what works. It does not survive a reboot.
