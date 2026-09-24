@@ -78,8 +78,10 @@ the coloured PlayStation is the PS4. See `docs/legal/controller-glyph-art.md`.
 - **The notification sheet has never been seen with a launcher notification in it.** Both columns
   render and the Android one is populated from real notifications; the "Launcher" column has only
   ever shown its empty state, because nothing posted a toast during the run.
-- **Keyboard and Touch glyphs are unverified on the device.** They compile and the badge matches
-  the drawer's corner ratio; nobody has switched the family and looked.
+- **Keyboard and Touch glyphs are verified on the device** (2026-09-24). Switched the family and
+  photographed the bottom bar: the Keyboard family draws `PgUp Prev  PgDn Next  Esc Back  Enter
+  Launch  F3 Options  F2 Search`, the Touch family `Tap Enter  Back Back`, keycaps at the height of
+  the verb beside them. Setting restored to PlayStation.
 - **The crossfade off the recents shelf composes both trees** for its 220ms. The else-branch is
   ~360 lines of crossbar. If that step ever hitches, that is why, and the fix is to fade the two
   backgrounds rather than the whole subtree.
@@ -180,6 +182,8 @@ Everything else added this run takes a tap — the rail, the pills, the notifica
 strip's live corner, and the bottom bar's prompts (through the shared renderer, which is why
 `XmbHintBar` has no `clickable` of its own).
 
-**Still unverified:** the Keyboard and Touch glyph families have never been seen on a screen. The
-controller-type picker does not open from injected input, and the owner's setting was left as found
-rather than patched — the datastore is a length-delimited protobuf that a byte edit corrupts.
+**Verified 2026-09-24.** The reason it could not be done before was a bug, not the harness: the
+settings picker panel had no click handler on any of its rows and none on its scrim, so a tap could
+neither choose a value nor close it. Both are now `clickable`. With that, the family was switched by
+touch, both glyph sets were photographed, and the setting was put back to PlayStation — the
+datastore was never byte-edited, which would have corrupted the length-delimited protobuf.
