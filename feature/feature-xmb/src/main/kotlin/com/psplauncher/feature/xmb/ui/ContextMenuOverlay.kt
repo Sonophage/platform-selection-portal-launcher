@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -85,6 +86,11 @@ fun ContextMenuOverlay(
                 RailAction(
                     row = row,
                     focused = index == selectedIndex,
+                    // The column's own ramp, by steps from the cursor — the rail is a list being
+                    // navigated and so it fades like every other list on this screen. One
+                    // definition, in XmbDim; tuning it there tunes the crossbar and the column
+                    // with it, which is the point.
+                    dim = XmbDim.ranked(kotlin.math.abs(index - selectedIndex)),
                     onClick = { onItemActivated(index) },
                 )
             }
@@ -93,15 +99,33 @@ fun ContextMenuOverlay(
 }
 
 @Composable
-private fun RailAction(row: XMBContextMenuItem, focused: Boolean, onClick: () -> Unit) {
+private fun RailAction(row: XMBContextMenuItem, focused: Boolean, dim: Float, onClick: () -> Unit) {
     val destructiveTint = if (row.isDestructive) DestructiveTint else null
     if (!focused) {
-        Monogram(
-            label = row.label,
-            filled = false,
-            tint = destructiveTint,
-            onClick = onClick,
-        )
+        // Named, like the focused one, and faded by distance instead of hidden. A badge alone was
+        // a letter with nothing to disambiguate it — a platform card's rail read S, I, U, S, I, U,
+        // O, H, with two of nearly everything. The dim is what keeps one row obviously the
+        // subject while the rest stay readable.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .alpha(dim)
+                .clip(RoundedCornerShape(RailCorner))
+                .clickable(onClick = onClick)
+                .padding(start = CapsulePadStart, end = CapsulePadEnd, top = CapsulePadV, bottom = CapsulePadV),
+        ) {
+            Text(
+                text = row.label,
+                color = if (row.isDestructive) DestructiveTint else Color.White,
+                fontSize = CapsuleTitleSize,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = CapsuleMaxText),
+            )
+            Spacer(Modifier.width(CapsuleGap))
+            Monogram(label = row.label, filled = false, tint = destructiveTint, onClick = null)
+        }
         return
     }
     // The focused one: a capsule opening leftward, its circle staying on the rail's own line so
