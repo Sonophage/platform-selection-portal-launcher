@@ -3,7 +3,7 @@
 Picks up from `xmb-redesign-plan.md`. **Tier A and Tier B are done. Tier C has not been started.**
 Two items that were not in the plan at all (12b, 12g) were added and finished.
 
-Everything below was driven on the Pocket FIT over wireless adb and looked at, not inferred from
+Everything below was driven on the Pocket FIT over adb and looked at, not inferred from
 the source. Where something is unverified it says so.
 
 ---
@@ -15,10 +15,12 @@ the source. Where something is unverified it says so.
 
 **Delete the result XML first.** A module whose task is up-to-date leaves its last XML in place,
 and reading that is how a red suite looked green for three commits earlier in this project. As of
-this handoff: **2642 tests, 0 failures, 0 errors, 8 skipped.**
+this handoff: **2643 tests across 16 modules, 0 failures, 0 errors, 8 skipped** (7 theme-kit,
+1 feature-artwork, all pre-existing).
 
-The device: `export ANDROID_SERIAL=192.168.0.80:5555`. See `memory/pocket-fit-wireless-adb.md` —
-the USB serial vanishes and `tcpip` dies on reboot.
+The device: `export ANDROID_SERIAL=01411YEF01035627` over USB. `tcpip` died on the reboot between
+the two halves of this run, which is exactly what `memory/pocket-fit-wireless-adb.md` says it does;
+the USB serial came back when the cable did.
 
 ---
 
@@ -42,6 +44,8 @@ the USB serial vanishes and `tcpip` dies on reboot.
 | — | Toast pill **deleted**; notifications live in the header and a pull-down sheet | `XmbNotificationBar.kt`, `SystemToasts.kt` |
 | — | Android's own notifications, via a `NotificationListenerService` | `PfpNotificationListener.kt`, `AndroidNotifications.kt` |
 | — | Real controller art (CC0), plus Keyboard and Touch glyph families | `ControllerButtonGlyph.kt`, `docs/legal/controller-glyph-art.md` |
+| — | **Type to search**: any printable character on the XMB opens Search carrying it | `MainActivity.dispatchKeyEvent`, `XMBViewModel.openSearchTyping` |
+| — | The settings picker takes a tap — options and scrim were both inert | `SettingsScaffold.SettingsPickerPanel` |
 
 ---
 
@@ -78,10 +82,6 @@ the coloured PlayStation is the PS4. See `docs/legal/controller-glyph-art.md`.
 - **The notification sheet has never been seen with a launcher notification in it.** Both columns
   render and the Android one is populated from real notifications; the "Launcher" column has only
   ever shown its empty state, because nothing posted a toast during the run.
-- **Keyboard and Touch glyphs are verified on the device** (2026-09-24). Switched the family and
-  photographed the bottom bar: the Keyboard family draws `PgUp Prev  PgDn Next  Esc Back  Enter
-  Launch  F3 Options  F2 Search`, the Touch family `Tap Enter  Back Back`, keycaps at the height of
-  the verb beside them. Setting restored to PlayStation.
 - **The crossfade off the recents shelf composes both trees** for its 220ms. The else-branch is
   ~360 lines of crossbar. If that step ever hitches, that is why, and the fix is to fade the two
   backgrounds rather than the whole subtree.
@@ -112,12 +112,24 @@ for an hour. Write the log to a file.
 **Reading a screenshot instead of the pixels.** The rail's scrim was declared broken off a resized
 capture; it had been working the whole time. `im.getpixel()` settles it in one line.
 
+**A fix that was itself the next bug.** Binding Shift/Space/Tab/Q/E so the keyboard glyphs would
+stop lying made those five keys *untypable* — `GamepadInputHandler` consumes a bound keycode before
+any text field sees it. The hint bar became honest and the search box went deaf in the same commit.
+**When you bind an input, ask what else was already reading it.**
+
+**"It doesn't work over adb" was a real bug.** The controller-type picker was written off as
+something injected input could not drive, and the Keyboard and Touch glyphs went a whole run
+unverified because of it. The panel simply had no `clickable` on anything — no finger could drive it
+either. *A harness that cannot reach a control is a claim about the control, not about the harness,
+until you have read the control.*
+
 
 ---
 
 # Health pass — same day, after the device went off
 
-Ran after the redesign work. `./gradlew test`: **2642 tests, 0 failures, 0 errors, 8 skipped.**
+Ran after the redesign work, then again after the keyboard and touch work. `./gradlew test`:
+**2643 tests, 0 failures, 0 errors, 8 skipped.**
 
 ## Lint: 55 errors → 5
 
@@ -164,13 +176,45 @@ above were re-measured with the output read.
 
 The Keyboard glyph family shipped naming **Shift, Space, Tab, Q and E while none of them reached
 the launcher** — and **Escape**, the key a keyboard user reaches for first, was bound to nothing.
-All six are bound now. `KeyboardPromptsAreBoundTest` holds the pair together: a glyph table in
-core-ui names a key, a binding table in core-domain decides what it does, and nothing joined them.
+`KeyboardPromptsAreBoundTest` holds that pair together: a glyph table in core-ui names a key, a
+binding table in core-domain decides what it does, and nothing joined them.
+
+**Binding those five was then wrong for a second reason.** `GamepadInputHandler` runs ahead of the
+view tree, so a bound keycode never reaches a text field — Q, E, Space and Shift became keys you
+could not type. The default set is now **keys that produce no character**: Escape, Tab, F2, F3,
+PageUp, PageDown. The test gained `no default binding claims a key that types a character`,
+falsified by binding `KEYCODE_S`, which reports `these bindings swallow a character key: [47]`.
 
 Arrows always worked — Android delivers a real keyboard's arrows as `DPAD_*`.
 
-**Still unverified:** nobody has driven the launcher from a keyboard. The bindings and the labels
-now agree with each other, which is not the same as agreeing with a device.
+**Driven from a keyboard, on the device**, each key pressed and the result read off the tree:
+
+| Key | Action | What it did |
+|---|---|---|
+| Escape | BACK | Closed the context menu; on the XMB root it opens Apps, which is what `Ⓑ Apps` says |
+| Tab | OPEN_SEARCH | Opened Search |
+| F2 | CHANGE_SORT | Cycled the label `Recently Played → Date Added → Title` |
+| F3 | OPEN_CONTEXT_MENU | Opened the app drawer's menu (`Add to Cross Bar`, `App Info`, …) |
+| PgUp / PgDn | PREV/NEXT_CATEGORY | Stepped the drawer's tabs `Recently Used ⇄ Apps` |
+| arrows | DPAD_* | Throughout |
+
+**PgUp/PgDn do nothing on the XMB root, and that is correct.** The XMB shell never handles
+PREV/NEXT_CATEGORY — it is a tab or page step, owned by the app drawer, settings, Game Details and
+the photo and video viewers. Those screens' hint bars name it; the XMB's does not, so nothing is
+lying. Worth knowing before someone "fixes" a dead key.
+
+## Type to search
+
+Typing any printable character on the XMB opens Search carrying that character. On this device the
+keyboard is the hardwired input, and reaching for Tab first is a press that says nothing.
+
+`MainActivity.dispatchKeyEvent` runs the gamepad handler first, then `openSearchOnTypedCharacter`:
+ACTION_DOWN, no repeat, no Ctrl/Alt/Meta, `unicodeChar != 0`, not an ISO control. That order is what
+keeps the six bound keys above from ever being read as text.
+
+**`SearchScreen`'s field is a `TextFieldValue`, not a `String`.** With a `String` the selection stays
+at 0 while the seeded text is inserted around it, so typing `S K Y R` produced `kyrs`. The caret is
+set explicitly to `TextRange(query.length)`.
 
 ## Touch pass
 
@@ -182,8 +226,25 @@ Everything else added this run takes a tap — the rail, the pills, the notifica
 strip's live corner, and the bottom bar's prompts (through the shared renderer, which is why
 `XmbHintBar` has no `clickable` of its own).
 
-**Verified 2026-09-24.** The reason it could not be done before was a bug, not the harness: the
-settings picker panel had no click handler on any of its rows and none on its scrim, so a tap could
-neither choose a value nor close it. Both are now `clickable`. With that, the family was switched by
-touch, both glyph sets were photographed, and the setting was put back to PlayStation — the
-datastore was never byte-edited, which would have corrupted the length-delimited protobuf.
+**The settings picker could not be used by a finger at all.** No `clickable` on the option rows, and
+none on the scrim: a touch user could open one and neither choose a value nor get back out. The
+controller path — cursor, then SELECT — was the only way through, and it was complete, which is why
+this survived. Options take a tap directly (a finger has no cursor, so the tap *is* the choice) and
+the scrim dismisses, the way BACK does.
+
+`feature-settings` has no Compose UI test rig — no `createComposeRule` anywhere in the module — so
+this is covered by the device check only. Standing one up for three lines of `clickable` was judged
+worse than saying so here.
+
+## Both glyph families, seen on a screen — 2026-09-24
+
+That picker bug is why they never had been. With it fixed, the family was switched by touch and the
+bottom bar photographed:
+
+- **Keyboard** — `PgUp Prev · PgDn Next · Esc Back · Enter Launch · F3 Options · F2 Search`. Every
+  one of those keys is really bound; the bar is not naming anything it cannot do.
+- **Touch** — `Tap Enter · Back Back`.
+- Keycaps render at the height of the verb beside them, which was the sizing complaint.
+
+The setting was put back to **PlayStation** through the same picker. The datastore was never
+byte-edited — it is a length-delimited protobuf and an edit corrupts it.
