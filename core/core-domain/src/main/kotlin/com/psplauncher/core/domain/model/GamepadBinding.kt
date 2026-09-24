@@ -74,14 +74,24 @@ val DEFAULT_BINDINGS = listOf(
     // none of those keys reached the launcher. A footer that names a key which does nothing is
     // worse than no footer.
     //
-    // Escape first, because backing out is the one a keyboard user reaches for before anything
-    // else and the alternative was a key that is not on the board (BACK is a phone button).
+    // NOT A SINGLE CHARACTER KEY among them, and that is the whole constraint.
+    //
+    // GamepadInputHandler consumes any keycode it has a binding for, before anything else sees it
+    // and without asking whether a text field has focus. So a letter bound here is a letter that
+    // can never be TYPED — into the app drawer's search box, a rename dialog, or the search this
+    // very list is meant to open. The first pass at this bound Q, E, Space and Shift and quietly
+    // took four characters away from every text field in the app.
+    //
+    // Escape, Tab, the function row and the page keys all arrive with no printable character, so
+    // they can be buttons without costing anyone a keystroke. Escape first: backing out is what a
+    // keyboard user reaches for before anything else, and the alternative was BACK, which is a
+    // phone button and not on a keyboard at all.
     GamepadBinding(KeyEvent.KEYCODE_ESCAPE,        GamepadAction.BACK),
-    GamepadBinding(KeyEvent.KEYCODE_SPACE,         GamepadAction.OPEN_CONTEXT_MENU),
-    GamepadBinding(KeyEvent.KEYCODE_SHIFT_LEFT,    GamepadAction.CHANGE_SORT),
     GamepadBinding(KeyEvent.KEYCODE_TAB,           GamepadAction.OPEN_SEARCH),
-    GamepadBinding(KeyEvent.KEYCODE_Q,             GamepadAction.PREV_CATEGORY),
-    GamepadBinding(KeyEvent.KEYCODE_E,             GamepadAction.NEXT_CATEGORY),
+    GamepadBinding(KeyEvent.KEYCODE_F2,            GamepadAction.CHANGE_SORT),
+    GamepadBinding(KeyEvent.KEYCODE_F3,            GamepadAction.OPEN_CONTEXT_MENU),
+    GamepadBinding(KeyEvent.KEYCODE_PAGE_UP,       GamepadAction.PREV_CATEGORY),
+    GamepadBinding(KeyEvent.KEYCODE_PAGE_DOWN,     GamepadAction.NEXT_CATEGORY),
 )
 
 /**

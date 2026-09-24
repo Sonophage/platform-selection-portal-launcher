@@ -1398,7 +1398,11 @@ fun SettingsScaffold(
             // the scaffold's action handler already owns every action while it is open, and a
             // second focus target would fight the list's cursor underneath.
             pickerState.value?.let { picker ->
-                SettingsPickerPanel(picker = picker, cursor = pickerCursor.intValue)
+                SettingsPickerPanel(
+                    picker = picker,
+                    cursor = pickerCursor.intValue,
+                    onDismiss = { pickerState.value = null },
+                )
             }
         }
     }
@@ -1413,11 +1417,18 @@ fun SettingsScaffold(
  * replacing, so the thing being chosen never moves.
  */
 @Composable
-private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
+private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int, onDismiss: () -> Unit) {
     val density = LocalDensity.current
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            // Tapping off the panel closes it, the way BACK does. Without this the scrim was
+            // inert and a touch user who opened a picker had no way out of it at all.
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            )
             // Light, because the point of anchoring is that the row you came from stays visible.
             // Contrast alone has to say which layer is on top, and the opaque list below does it.
             // Barely a scrim. The reference dims almost nothing -- the panel's own opacity is
@@ -1454,6 +1465,12 @@ private fun SettingsPickerPanel(picker: SettingsPickerRequest, cursor: Int) {
                         .fillMaxWidth()
                         .height(PICKER_ROW_HEIGHT)
                         .clip(PICKER_SHAPE)
+                        // Touch picks an option directly. The controller path drives a cursor and
+                        // then confirms it; a finger has no cursor, so the tap IS the choice.
+                        .clickable {
+                            picker.onPick(index)
+                            onDismiss()
+                        }
                         .background(
                             if (focused) SETTINGS_ROW_SELECTED_FILL else Color.Transparent,
                             PICKER_SHAPE,

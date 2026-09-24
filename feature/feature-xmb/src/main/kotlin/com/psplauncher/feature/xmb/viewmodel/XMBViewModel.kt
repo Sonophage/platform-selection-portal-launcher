@@ -4198,6 +4198,29 @@ class XMBViewModel @Inject constructor(
     private var searchBooks: List<com.psplauncher.core.domain.model.Book> = emptyList()
     private var searchTracks: List<com.psplauncher.core.domain.model.MusicTrack> = emptyList()
 
+    /**
+     * Whether a typed character should open search right now.
+     *
+     * The rule a desktop launcher has always had: start typing and you are searching. It only
+     * holds while NOTHING else owns the keyboard — a search already open, a rename dialog, the app
+     * drawer's own box, a settings text field — because in those a letter is a letter and stealing
+     * it would make the field unusable.
+     *
+     * hasBlockingOverlay covers all of them in one read, which is the point of that predicate; the
+     * context rail is excluded from it separately, so it is named here. A letter over an open rail
+     * should search, not be swallowed by a menu that has no text in it.
+     */
+    fun typeToSearchAllowed(): Boolean {
+        val state = _uiState.value
+        return state.search == null && (!state.hasBlockingOverlay || state.contextRailOnly)
+    }
+
+    /** Opens search already carrying [query] — the character that opened it. */
+    fun openSearchTyping(query: String) {
+        openSearch(SearchScope.ALL)
+        onSearchQueryChange(query)
+    }
+
     fun openSearch(scope: SearchScope) {
         menuSound.play(MenuSound.SELECT)
         _uiState.update { it.copy(search = SearchState(scope = scope)) }

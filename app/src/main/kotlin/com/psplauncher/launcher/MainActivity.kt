@@ -294,7 +294,35 @@ class MainActivity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         // Let the gamepad handler process it first; fall back to normal dispatch
         if (gamepadInputHandler.onKeyEvent(event)) return true
+        if (openSearchOnTypedCharacter(event)) return true
         return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * Start typing anywhere on the XMB and you are searching.
+     *
+     * AFTER the gamepad handler, never before: the bound keys are actions first. Escape backs out
+     * and Space opens options, and a keyboard user pressing them is pressing a button, not writing
+     * the letter " ". Anything the handler did not claim and that produces a character is text.
+     *
+     * The guards are all about not stealing a letter someone meant to type. [unicodeChar] is 0 for
+     * a key with no character — the arrows, the function row, a bare modifier — and the control
+     * range covers Enter, Tab and Backspace, which arrive with a character but are not typing. Ctrl
+     * and Alt mean a shortcut is being attempted, whether or not this app has one. Shift alone does
+     * not, because a capital letter is still a letter.
+     *
+     * The ViewModel decides whether anything else owns the keyboard right now.
+     */
+    private fun openSearchOnTypedCharacter(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return false
+        if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
+        val typed = event.unicodeChar
+        if (typed == 0) return false
+        val ch = typed.toChar()
+        if (ch.isISOControl()) return false
+        if (!xmbViewModel.typeToSearchAllowed()) return false
+        xmbViewModel.openSearchTyping(ch.toString())
+        return true
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {

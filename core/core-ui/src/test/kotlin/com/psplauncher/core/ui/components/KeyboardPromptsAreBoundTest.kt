@@ -27,11 +27,11 @@ class KeyboardPromptsAreBoundTest {
     private val promptedKeys = mapOf(
         ControllerIcon.FACE_SOUTH to KeyEvent.KEYCODE_ENTER,
         ControllerIcon.FACE_EAST to KeyEvent.KEYCODE_ESCAPE,
-        ControllerIcon.FACE_WEST to KeyEvent.KEYCODE_SHIFT_LEFT,
-        ControllerIcon.FACE_NORTH to KeyEvent.KEYCODE_SPACE,
+        ControllerIcon.FACE_WEST to KeyEvent.KEYCODE_F2,
+        ControllerIcon.FACE_NORTH to KeyEvent.KEYCODE_F3,
         ControllerIcon.SELECT to KeyEvent.KEYCODE_TAB,
-        ControllerIcon.BUMPER_LEFT to KeyEvent.KEYCODE_Q,
-        ControllerIcon.BUMPER_RIGHT to KeyEvent.KEYCODE_E,
+        ControllerIcon.BUMPER_LEFT to KeyEvent.KEYCODE_PAGE_UP,
+        ControllerIcon.BUMPER_RIGHT to KeyEvent.KEYCODE_PAGE_DOWN,
         ControllerIcon.DPAD_UP to KeyEvent.KEYCODE_DPAD_UP,
         ControllerIcon.DPAD_DOWN to KeyEvent.KEYCODE_DPAD_DOWN,
         ControllerIcon.DPAD_LEFT to KeyEvent.KEYCODE_DPAD_LEFT,
@@ -73,5 +73,43 @@ class KeyboardPromptsAreBoundTest {
         // A duplicate makes which action runs depend on list order, which nothing promises.
         val keys = DEFAULT_BINDINGS.map { it.keyCode }
         assertTrue("a keycode is bound twice: $keys", keys.size == keys.toSet().size)
+    }
+
+    @Test
+    fun `no default binding claims a key that types a character`() {
+        // The constraint that makes type-to-search possible at all, and the one that was broken:
+        // GamepadInputHandler claims a bound keycode before any text field sees it, so a letter
+        // bound to an action is a letter that can never be typed — into the app drawer's search
+        // box, a rename dialog, or the search these bindings exist to open. Q, E, Space and Shift
+        // were bound for exactly one commit and took four characters away from every field.
+        //
+        // The printable range is checked directly rather than by listing the offenders, so a
+        // binding added later is caught whether or not anyone remembers this.
+        val printable = DEFAULT_BINDINGS.filter { it.keyCode in TYPES_A_CHARACTER }
+        assertTrue(
+            "these bindings swallow a character key: ${printable.map { it.keyCode }}",
+            printable.isEmpty(),
+        )
+    }
+
+    private companion object {
+        /** Letters, digits, space and the punctuation keys — everything that produces text. */
+        val TYPES_A_CHARACTER: Set<Int> =
+            (KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9).toSet() +
+                (KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z).toSet() +
+                setOf(
+                    KeyEvent.KEYCODE_SPACE,
+                    KeyEvent.KEYCODE_COMMA,
+                    KeyEvent.KEYCODE_PERIOD,
+                    KeyEvent.KEYCODE_MINUS,
+                    KeyEvent.KEYCODE_EQUALS,
+                    KeyEvent.KEYCODE_APOSTROPHE,
+                    KeyEvent.KEYCODE_SEMICOLON,
+                    KeyEvent.KEYCODE_SLASH,
+                    KeyEvent.KEYCODE_BACKSLASH,
+                    KeyEvent.KEYCODE_LEFT_BRACKET,
+                    KeyEvent.KEYCODE_RIGHT_BRACKET,
+                    KeyEvent.KEYCODE_GRAVE,
+                )
     }
 }

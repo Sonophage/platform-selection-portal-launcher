@@ -206,20 +206,24 @@ private val xbLabels = mapOf(
  * confirms and Escape backs out — and the D-pad takes the arrows, which Android already delivers
  * as DPAD_* from a real keyboard.
  *
- * EVERY KEY NAMED HERE IS BOUND in DEFAULT_BINDINGS, and that is the whole contract of this table.
- * It shipped for one commit naming Shift, Space, Tab, Q and E while none of them reached the
- * launcher — a footer telling a keyboard user to press a key that does nothing. The shoulders
- * being Q and E is still a choice rather than a standard; that nothing prints one is why the
- * binding and the label have to be decided together, in these two files, at the same time.
+ * EVERY KEY NAMED HERE IS BOUND in DEFAULT_BINDINGS, and NONE OF THEM TYPES A CHARACTER. Both
+ * halves are the contract, and each was broken once:
+ *
+ *  - it shipped naming Shift, Space, Tab, Q and E while none of them reached the launcher, so the
+ *    footer told a keyboard user to press keys that did nothing;
+ *  - binding them then took those four characters away from every text field in the app, because
+ *    the input handler claims a bound keycode before any text field sees it.
+ *
+ * So the buttons are the keys that produce no character — Escape, Tab, the function row, the page
+ * keys — and every letter stays free for typing, which is what type-to-search needs.
  */
 private val kbLabels = mapOf(
     ControllerIcon.FACE_SOUTH to "Enter", ControllerIcon.FACE_EAST to "Esc",
-    ControllerIcon.FACE_WEST to "Shift", ControllerIcon.FACE_NORTH to "Space",
+    ControllerIcon.FACE_WEST to "F2", ControllerIcon.FACE_NORTH to "F3",
     ControllerIcon.DPAD_UP to "\u2191", ControllerIcon.DPAD_DOWN to "\u2193",
     ControllerIcon.DPAD_LEFT to "\u2190", ControllerIcon.DPAD_RIGHT to "\u2192",
     ControllerIcon.DPAD_ALL to "\u2190\u2192",
-    ControllerIcon.BUMPER_LEFT to "Q", ControllerIcon.BUMPER_RIGHT to "E",
-    ControllerIcon.TRIGGER_LEFT to "Z", ControllerIcon.TRIGGER_RIGHT to "C",
+    ControllerIcon.BUMPER_LEFT to "PgUp", ControllerIcon.BUMPER_RIGHT to "PgDn",
     ControllerIcon.START to "F1", ControllerIcon.SELECT to "Tab",
     ControllerIcon.SYSTEM to "Home",
 )

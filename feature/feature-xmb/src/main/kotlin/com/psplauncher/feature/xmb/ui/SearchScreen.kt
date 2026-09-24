@@ -1,5 +1,10 @@
 package com.psplauncher.feature.xmb.ui
 
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -157,9 +162,25 @@ fun SearchScreen(
                 Spacer(Modifier.height(14.dp))
             }
 
+            // A TextFieldValue, not a String, so the CURSOR can be put where the text is.
+            //
+            // Type-to-search opens this screen with the character that opened it already in the
+            // query. With a String-valued field the selection stays at 0, so the next letter is
+            // inserted BEFORE the first one and typing "skyr" produces "kyrs" — which is what it
+            // did. The effect below only fires when the text changed from outside, so ordinary
+            // typing keeps the caret it already has.
+            var field by remember { mutableStateOf(TextFieldValue(state.query, TextRange(state.query.length))) }
+            LaunchedEffect(state.query) {
+                if (state.query != field.text) {
+                    field = TextFieldValue(state.query, TextRange(state.query.length))
+                }
+            }
             OutlinedTextField(
-                value = state.query,
-                onValueChange = onQueryChange,
+                value = field,
+                onValueChange = {
+                    field = it
+                    onQueryChange(it.text)
+                },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = SecondaryText) },
                 placeholder = { Text("Search", color = SecondaryText.copy(alpha = 0.7f)) },
