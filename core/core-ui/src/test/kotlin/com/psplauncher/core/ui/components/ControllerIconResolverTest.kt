@@ -18,6 +18,26 @@ import org.junit.Test
  */
 class ControllerIconResolverTest {
 
+    /**
+     * The families that ship an icon pack, and the ones that are labels only.
+     *
+     * Keyboard and Touch resolve entirely through the printed-label fallback — the same path a
+     * DualSense touchpad takes on an Xbox pad — so every assertion about ART has to name the three
+     * that have it rather than looping over the enum. GlyphFamilyCoverageTest holds the rule that
+     * spans both: whatever the launcher prompts with must render SOMEHOW in every family.
+     */
+    private val ART_FAMILIES = listOf(
+        ControllerDisplayType.PLAYSTATION,
+        ControllerDisplayType.NINTENDO,
+        ControllerDisplayType.XBOX,
+    )
+
+    private val LABEL_FAMILIES = listOf(
+        ControllerDisplayType.KEYBOARD,
+        ControllerDisplayType.TOUCH,
+    )
+
+
     // ── Face positions: the reversal that makes letters unusable as keys ─────
 
     @Test
@@ -69,25 +89,46 @@ class ControllerIconResolverTest {
             ControllerIcon.FACE_SOUTH, ControllerIcon.FACE_EAST,
             ControllerIcon.FACE_WEST, ControllerIcon.FACE_NORTH,
         )
-        for (family in ControllerDisplayType.entries) {
+        for (family in ART_FAMILIES) {
             val art = faces.map { it.drawableForOrNull(family) }
             assertEquals("$family draws a face position twice", 4, art.toSet().size)
+        }
+        // The label-only families are held to the same rule on the path they actually use.
+        for (family in LABEL_FAMILIES) {
+            val labels = faces.mapNotNull { it.printedLabelFor(family) }
+            assertEquals("$family prints a face position twice", labels.size, labels.toSet().size)
         }
     }
 
     // ── Every family supports the full command-bar vocabulary ────────────────
 
     @Test
-    fun `command bar positions resolve for all three families`() {
+    fun `command bar positions resolve for every family with art`() {
         val commandBar = listOf(
             ControllerIcon.FACE_SOUTH, ControllerIcon.FACE_EAST,
             ControllerIcon.FACE_WEST, ControllerIcon.FACE_NORTH,
             ControllerIcon.BUMPER_LEFT, ControllerIcon.BUMPER_RIGHT,
         )
-        for (family in ControllerDisplayType.entries) {
+        for (family in ART_FAMILIES) {
             for (icon in commandBar) {
                 assertNotNull("$icon missing for $family", icon.drawableForOrNull(family))
             }
+        }
+    }
+
+    @Test
+    fun `the label-only families are the ones that ship no art, and nothing else is`() {
+        // The split this file now depends on, asserted rather than assumed. A fourth pack added
+        // without updating ART_FAMILIES would leave it untested by every loop above.
+        assertEquals(
+            ControllerDisplayType.entries.toSet(),
+            (ART_FAMILIES + LABEL_FAMILIES).toSet(),
+        )
+        for (family in ART_FAMILIES) {
+            assertNotNull("$family is in ART_FAMILIES with no art", ControllerIcon.FACE_SOUTH.drawableForOrNull(family))
+        }
+        for (family in LABEL_FAMILIES) {
+            assertNull("$family is in LABEL_FAMILIES with art", ControllerIcon.FACE_SOUTH.drawableForOrNull(family))
         }
     }
 

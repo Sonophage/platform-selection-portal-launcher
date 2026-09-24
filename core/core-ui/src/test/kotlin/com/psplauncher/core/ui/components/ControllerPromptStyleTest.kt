@@ -20,6 +20,21 @@ import org.junit.Test
  */
 class ControllerPromptStyleTest {
 
+    /**
+     * The families that ship an icon pack.
+     *
+     * These tests are about ART MOVING when a layout setting changes — which button's picture the
+     * prompt draws after Confirm/Back is reversed. Keyboard and Touch have no art to move; they
+     * resolve through the printed-label fallback, and the same swaps are covered for them by the
+     * mapping tests, which read the label rather than the drawable.
+     */
+    private val ART_FAMILIES = listOf(
+        ControllerDisplayType.PLAYSTATION,
+        ControllerDisplayType.NINTENDO,
+        ControllerDisplayType.XBOX,
+    )
+
+
     private fun style(
         family: ControllerDisplayType,
         confirmBack: ConfirmBackLayout = ConfirmBackLayout.STANDARD,
@@ -48,7 +63,7 @@ class ControllerPromptStyleTest {
 
     @Test
     fun `reversing Confirm-Back moves the art, for every family`() {
-        for (family in ControllerDisplayType.entries) {
+        for (family in ART_FAMILIES) {
             val standard = style(family).artFor(GamepadAction.SELECT)
             val reversed = style(family, confirmBack = ConfirmBackLayout.REVERSED).artFor(GamepadAction.SELECT)
             assertNotNull(reversed)
@@ -60,7 +75,7 @@ class ControllerPromptStyleTest {
 
     @Test
     fun `swapping X-Y moves the options art, for every family`() {
-        for (family in ControllerDisplayType.entries) {
+        for (family in ART_FAMILIES) {
             val standard = style(family).artFor(GamepadAction.OPEN_CONTEXT_MENU)
             val swapped = style(family, xy = XYLayout.SWAPPED).artFor(GamepadAction.OPEN_CONTEXT_MENU)
             assertNotNull(swapped)
@@ -86,7 +101,7 @@ class ControllerPromptStyleTest {
             GamepadAction.BACK, GamepadAction.SELECT,
             GamepadAction.OPEN_CONTEXT_MENU, GamepadAction.CHANGE_SORT,
         )
-        for (family in ControllerDisplayType.entries) {
+        for (family in ART_FAMILIES) {
             for (confirmBack in ConfirmBackLayout.entries) {
                 for (xy in XYLayout.entries) {
                     val s = style(family, confirmBack, xy)

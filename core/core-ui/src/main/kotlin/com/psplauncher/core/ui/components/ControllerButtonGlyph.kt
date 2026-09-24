@@ -56,6 +56,9 @@ fun ControllerIcon.drawableForOrNull(family: ControllerDisplayType): Int? =
         ControllerDisplayType.PLAYSTATION -> psTable
         ControllerDisplayType.NINTENDO -> nsTable
         ControllerDisplayType.XBOX -> xbTable
+        // No art, by design. Both render through the printed-label fallback below — the same path
+        // a DualSense touchpad takes on an Xbox pad — so neither costs an icon pack.
+        ControllerDisplayType.KEYBOARD, ControllerDisplayType.TOUCH -> emptyMap()
     }[this]
 
 /**
@@ -67,6 +70,8 @@ fun ControllerIcon.printedLabelFor(family: ControllerDisplayType): String? =
         ControllerDisplayType.PLAYSTATION -> psLabels
         ControllerDisplayType.NINTENDO -> nsLabels
         ControllerDisplayType.XBOX -> xbLabels
+        ControllerDisplayType.KEYBOARD -> kbLabels
+        ControllerDisplayType.TOUCH -> touchLabels
     }[this]
 
 private val psTable = mapOf(
@@ -175,6 +180,42 @@ private val xbLabels = mapOf(
     ControllerIcon.STICK_LEFT_CLICK to "LS", ControllerIcon.STICK_RIGHT_CLICK to "RS",
     ControllerIcon.START to "Menu", ControllerIcon.SELECT to "View",
     ControllerIcon.SYSTEM to "Xbox", ControllerIcon.SHARE to "Share",
+)
+
+/**
+ * Keys, for a machine with no pad.
+ *
+ * The face positions take the two keys everything on a desktop already means by them — Enter
+ * confirms and Escape backs out — and the D-pad takes the arrows. The shoulders are the keys
+ * beside the hand that would be on the arrows, which is a guess, but a named one: nothing prints
+ * a standard for "the bumper key".
+ */
+private val kbLabels = mapOf(
+    ControllerIcon.FACE_SOUTH to "Enter", ControllerIcon.FACE_EAST to "Esc",
+    ControllerIcon.FACE_WEST to "Shift", ControllerIcon.FACE_NORTH to "Space",
+    ControllerIcon.DPAD_UP to "\u2191", ControllerIcon.DPAD_DOWN to "\u2193",
+    ControllerIcon.DPAD_LEFT to "\u2190", ControllerIcon.DPAD_RIGHT to "\u2192",
+    ControllerIcon.DPAD_ALL to "\u2190\u2192",
+    ControllerIcon.BUMPER_LEFT to "Q", ControllerIcon.BUMPER_RIGHT to "E",
+    ControllerIcon.TRIGGER_LEFT to "Z", ControllerIcon.TRIGGER_RIGHT to "C",
+    ControllerIcon.START to "F1", ControllerIcon.SELECT to "Tab",
+    ControllerIcon.SYSTEM to "Home",
+)
+
+/**
+ * Gestures, for a finger.
+ *
+ * It names what to DO rather than what to press, which is the only honest prompt for someone
+ * holding no hardware. The directions are the swipe that moves that way; the shoulders have no
+ * gesture at all and are absent rather than invented, which the resolver already handles by
+ * drawing nothing.
+ */
+private val touchLabels = mapOf(
+    ControllerIcon.FACE_SOUTH to "Tap", ControllerIcon.FACE_EAST to "Back",
+    ControllerIcon.FACE_NORTH to "Hold",
+    ControllerIcon.DPAD_UP to "Swipe up", ControllerIcon.DPAD_DOWN to "Swipe down",
+    ControllerIcon.DPAD_LEFT to "Swipe left", ControllerIcon.DPAD_RIGHT to "Swipe right",
+    ControllerIcon.DPAD_ALL to "Swipe",
 )
 
 private val nsLabels = mapOf(

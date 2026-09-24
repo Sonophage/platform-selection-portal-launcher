@@ -34,12 +34,32 @@ enum class ControllerDisplayType {
     XBOX,
     NINTENDO,
     PLAYSTATION,
+
+    /**
+     * Keys, for a pad-less machine: Enter, Esc, the arrows.
+     *
+     * No art ships for it. Every prompt renders through the printed-label fallback the glyph
+     * resolver already has for inputs a family does not physically own, which is the same path a
+     * DualSense touchpad takes on an Xbox pad — so this family costs two tables and no drawables.
+     */
+    KEYBOARD,
+
+    /**
+     * What a finger does, for someone driving the launcher by touch.
+     *
+     * The odd one out: it names GESTURES rather than buttons, because a touch user has no buttons
+     * to be told about. "Tap" where another family says A is the true instruction for them, and a
+     * prompt that showed them a face button would be naming hardware they are not holding.
+     */
+    TOUCH,
 }
 
 fun ControllerDisplayType.displayLabel(): String = when (this) {
     ControllerDisplayType.XBOX        -> "Xbox"
     ControllerDisplayType.NINTENDO    -> "Nintendo"
     ControllerDisplayType.PLAYSTATION -> "PlayStation"
+    ControllerDisplayType.KEYBOARD    -> "Keyboard"
+    ControllerDisplayType.TOUCH       -> "Touch"
 }
 
 // ── Held-navigation scroll speed ──────────────────────────────────────────────
