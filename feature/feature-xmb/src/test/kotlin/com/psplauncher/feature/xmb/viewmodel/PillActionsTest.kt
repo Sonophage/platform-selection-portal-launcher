@@ -70,6 +70,36 @@ class PillActionsTest {
         }
     }
 
+    /**
+     * Why a pill dispatches by ID and never by position.
+     *
+     * The rail drops every id the pill row already carries, so the two lists are not the same
+     * list and never can be: an index taken from the menu addresses a DIFFERENT action in the one
+     * activation reads. That is what shipped — Details ran Manage Collections, Favorite ran
+     * whatever had slid up into its slot — and nothing threw, because both lists are the same
+     * menu in the same order and every index in range is a real action.
+     */
+    @Test
+    fun `the rail cannot address a pill, so a menu index cannot either`() {
+        val item    = game()
+        val menu    = gameContextMenuItems(item, state(), discCount = 1, onRecentShelf = false, hideLocation = null)
+        val pillIds = pillsFor(item).map { it.id }.toSet()
+        val rail    = railRows(menu, pillIds)
+
+        assertTrue(
+            "the rail drew a pill's own action: ${rail.map { it.id }.filter { it in pillIds }}",
+            rail.none { it.id in pillIds },
+        )
+
+        // Concretely: the first pill's index in the menu names something else in the rail.
+        val firstPill = pillsFor(item).first()
+        val atThatIndex = rail.getOrNull(menu.indexOfFirst { it.id == firstPill.id })?.id
+        assertTrue(
+            "activating by index would have run '$atThatIndex' for the '${firstPill.label}' pill",
+            atThatIndex != firstPill.id,
+        )
+    }
+
     @Test
     fun `the favourite pill follows the row it is drawn under`() {
         // Both halves, because a pill that always says "Favorite" and always dispatches "favorite"

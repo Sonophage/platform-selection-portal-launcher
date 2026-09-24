@@ -5666,7 +5666,10 @@ class XMBViewModel @Inject constructor(
             when (action) {
                 GamepadAction.NAVIGATE_UP   -> shiftContextMenu(-1)
                 GamepadAction.NAVIGATE_DOWN -> shiftContextMenu(+1)
-                GamepadAction.SELECT        -> activateContextMenuItem()
+                // The cursor walks railRows, so that is the list its position means something in.
+                GamepadAction.SELECT        ->
+                    state.railRows().getOrNull(state.activeContextMenu?.selectedIndex ?: -1)
+                        ?.let { activateContextMenuItem(it.id) }
                 GamepadAction.BACK,
                 GamepadAction.OPEN_CONTEXT_MENU      -> closeContextMenu()
                 else -> Unit
@@ -6369,11 +6372,19 @@ class XMBViewModel @Inject constructor(
         _uiState.update { it.copy(activeContextMenu = menu.copy(selectedIndex = next)) }
     }
 
-    private fun activateContextMenuItem() {
+    /**
+     * Runs one menu entry, named by [itemId].
+     *
+     * BY ID, NEVER BY POSITION. There are two lists here — the builder's `items + overflow` and
+     * [railRows], which is that minus the More row, minus every id the pill row already carries,
+     * capped at nine with the destructive rows appended. An index into one is a different action
+     * in the other, and the pill row computed its index in the first and spent it in the second,
+     * where its own entry had been removed: Details ran Manage Collections, Favorite ran whatever
+     * had slid into its place. Nothing threw, because both lists are the same menu.
+     */
+    private fun activateContextMenuItem(itemId: String) {
         val state  = _uiState.value
         val menu   = state.activeContextMenu ?: return
-        // The same list the rail draws and the cursor walks. See shiftContextMenu.
-        val itemId = state.railRows().getOrNull(menu.selectedIndex)?.id ?: return
 
         // No More… branch any more: railRows never yields MENU_MORE_ITEM_ID, because the rail
         // takes `items + overflow` and cuts once itself. The builders still split around a More
@@ -7078,21 +7089,24 @@ class XMBViewModel @Inject constructor(
                 Timber.w("Pill '$pillId' pressed on a row that raised no menu")
                 return@launch
             }
-            val index = menu.items.indexOfFirst { it.id == pillId }
-            if (index < 0) {
+            // `items + overflow`, because the builders split long menus around a More row and a
+            // pill's entry can land on either side of it. Membership only — the id is what runs.
+            if ((menu.items + menu.overflow).none { it.id == pillId }) {
                 // PillActionsTest is what stops this; this is what it looks like if it slips
                 // through. Closing again beats leaving a menu the user did not ask for.
                 Timber.w("Pill '$pillId' is not offered by the focused row's menu")
                 closeContextMenu()
                 return@launch
             }
-            onContextMenuItemActivatedAt(index)
+            activateContextMenuItem(pillId)
         }
     }
 
+    /** A rail row was tapped. The index is a position in [railRows] — the list that was drawn. */
     fun onContextMenuItemActivatedAt(index: Int) {
+        val id = _uiState.value.railRows().getOrNull(index)?.id ?: return
         _uiState.update { it.copy(activeContextMenu = it.activeContextMenu?.copy(selectedIndex = index)) }
-        activateContextMenuItem()
+        activateContextMenuItem(id)
     }
 
     fun closeContextMenu() {
