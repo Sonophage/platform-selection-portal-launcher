@@ -948,8 +948,22 @@ data class XMBUiState(
      * it was walked to on, and the logo page the moment it is not.
      */
     val effectivePanelPage: DetailPanelPage
-        get() = if (panelPageGameId != null && panelPageGameId == hoverPanelItem?.gameId) panelPage
-        else DetailPanelPage.LOGO
+        get() = if (panelStripOpen) panelPage else DetailPanelPage.LOGO
+
+    /**
+     * Has the user opened the strip on the game under the cursor right now?
+     *
+     * The same pair [effectivePanelPage] reads, named once and shared, because THREE things now
+     * branch on it and they must not disagree: the shell decides whether to draw the panel at all,
+     * the row decides whether to swap its subtitle for the scraped facts, and L1 decides whether
+     * it is stepping a page or closing the strip. Three private copies of one condition is the
+     * shape that drifts.
+     *
+     * Closed is the resting state, and it is a real state rather than the absence of one: the
+     * crossbar shows the row's name and nothing else, and L1 from the logo page returns to it.
+     */
+    val panelStripOpen: Boolean
+        get() = panelPageGameId != null && panelPageGameId == hoverPanelItem?.gameId
 
     /**
      * Standing on the home page — the state in which the crossbar is hidden and the screen is the
@@ -5867,6 +5881,19 @@ class XMBViewModel @Inject constructor(
 
     private fun stepHoverPanelPage(delta: Int) = _uiState.update { s ->
         val content = s.hoverPanelContent ?: return@update s
+        // LEFT off the first page CLOSES the strip instead of clamping against it.
+        //
+        // The pages run LOGO, Info, Video, Box Art, and stepping left at LOGO used to land back on
+        // LOGO — a press that did nothing, on the one page whose whole job is to be the way back.
+        // It now returns to the resting state, so the strip has an exit at the end you arrived
+        // through rather than only the far one.
+        //
+        // Guarded on the strip being OPEN. Closed, effectivePanelPage also reports LOGO, and
+        // without this L1 would clear an already-empty state and there would be no way to open
+        // the logo page leftward at all.
+        if (delta < 0 && s.panelStripOpen && s.effectivePanelPage == DetailPanelPage.LOGO) {
+            return@update s.copy(panelPageGameId = null)
+        }
         s.copy(
             // Stepping from the EFFECTIVE page, so the first shoulder press after moving to a
             // new game steps off that game's logo rather than off whatever the last game was on.

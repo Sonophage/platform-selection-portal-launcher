@@ -785,8 +785,7 @@ fun XMBShell(
             //
             // The home shelf is NOT affected: LastPlayedPage composes its own GameDetailPanel and
             // never comes through here. Recents keeps the logo it has always led with.
-            val stripOpened = uiState.panelPageGameId != null &&
-                uiState.panelPageGameId == uiState.hoverPanelItem?.gameId
+            val stripOpened = uiState.panelStripOpen
 
             // The focused row swaps its subtitle for the game's scraped facts while the logo page
             // is open — "and only when the logo is selected". At rest the subtitle stays the
