@@ -1,5 +1,13 @@
 package com.psplauncher.feature.xmb.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
@@ -190,10 +198,25 @@ fun XmbPspStatusStrip(
     // centre the middle child between its neighbours, which moves every time the clock's width
     // or the icon set changes, and a row of tab names that drifts is worse than one that is off
     // centre by design.
+    Box(modifier.fillMaxWidth().height(StripHeight)) {
+
+        // The battery, as one hairline across the very top edge of the screen. Full bleed: it is
+        // outside the content's horizontal padding on purpose, because a line that stops 20dp
+        // short of each corner reads as a widget and this is meant to read as the edge itself.
+        //
+        // It shimmers while charging. That is the whole charging cue now — the bolt beside the
+        // clock is gone, and a line that moves says "going up" without spending any of the clock's
+        // room to say it.
+        BatteryLine(
+            level = batteryLevel,
+            charging = isCharging,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(StripHeight)
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = BatteryLineHeight)
             .padding(horizontal = 20.dp),
     ) {
     Row(
@@ -336,15 +359,16 @@ fun XmbPspStatusStrip(
             }
             if (sys.bluetoothOn) {
                 StatusIcon(
-                    XmbStatusIcons.bluetooth, "Bluetooth", Modifier.size(width = 9.dp, height = 13.dp),
+                    XmbStatusIcons.bluetooth, "Bluetooth",
+                    Modifier.size(width = StripIconSize * 0.7f, height = StripIconSize),
                     slotKey = "status_bluetooth",
                 )
             }
             sys.wifiLevel?.let { level ->
-                WifiMeter(level, Modifier.size(width = 16.dp, height = 13.dp))
+                WifiMeter(level, Modifier.size(width = StripIconSize * 1.23f, height = StripIconSize))
             }
             sys.cellularLevel?.let { level ->
-                SignalBars(level, Modifier.size(width = 14.dp, height = 13.dp))
+                SignalBars(level, Modifier.size(width = StripIconSize * 1.08f, height = StripIconSize))
             }
             // The time, with the battery as a LINE under it — 12b's right-hand pair. The glyph
             // and the "81%" beside it are gone: the line says the same thing in the space the
@@ -352,44 +376,63 @@ fun XmbPspStatusStrip(
             //
             // Green while charging, white off it, and the low-battery tint still wins over both
             // because a line at 8% that is merely short is not a warning.
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    if (isCharging) {
-                        Text("\u26A1", color = ChargingTint, fontSize = StripFontSize)
-                    }
-                    Text(
-                        text       = timeString,
-                        color      = StripPrimary,
-                        fontSize   = StripFontSize,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-                Box(
-                    Modifier
-                        .width(BatteryLineWidth)
-                        .height(BatteryLineHeight)
-                        .clip(RoundedCornerShape(BatteryLineHeight / 2))
-                        .background(Color.White.copy(alpha = 0.22f)),
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth((batteryLevel / 100f).coerceIn(0f, 1f))
-                            .height(BatteryLineHeight)
-                            .clip(RoundedCornerShape(BatteryLineHeight / 2))
-                            .background(
-                                when {
-                                    batteryLevel <= 20 && !isCharging -> LowBatteryTint
-                                    isCharging -> ChargingTint
-                                    else -> StripPrimary
-                                },
-                            ),
-                    )
-                }
-            }
+            // The clock, alone. The battery is the line at the top of the screen and the bolt is
+            // the shimmer on it, so nothing else needs to be in this corner.
+            Text(
+                text       = timeString,
+                color      = StripPrimary,
+                fontSize   = StripFontSize,
+                lineHeight = StripFontSize * 1.25f,
+                fontWeight = FontWeight.Medium,
+            )
         }
+    }
+    }
+}
+
+/**
+ * The battery as a line across the top edge: [level] of the width filled, white.
+ *
+ * A travelling highlight runs along the filled part while [charging]. Slow, and only over what is
+ * already filled — a glint that ran the whole width would read as a progress bar for something,
+ * and the one thing a battery line must not look like is a download.
+ */
+@Composable
+private fun BatteryLine(level: Int, charging: Boolean, modifier: Modifier = Modifier) {
+    val fill = (level / 100f).coerceIn(0f, 1f)
+    val travel by rememberInfiniteTransition(label = "charge").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
+        label = "travel",
+    )
+    val low = level <= 20 && !charging
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(BatteryLineHeight)
+            .background(Color.White.copy(alpha = 0.10f)),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(fill)
+                .height(BatteryLineHeight)
+                .drawWithCache {
+                    val base = if (low) LowBatteryTint else Color.White
+                    val brush = if (!charging) {
+                        SolidColor(base)
+                    } else {
+                        val glint = size.width * 0.22f
+                        val head = travel * (size.width + glint * 2f) - glint
+                        Brush.linearGradient(
+                            colors = listOf(base.copy(alpha = 0.55f), Color.White, base.copy(alpha = 0.55f)),
+                            start = Offset(head, 0f),
+                            end = Offset(head + glint, 0f),
+                        )
+                    }
+                    onDrawBehind { drawRect(brush) }
+                },
+        )
     }
 }
 
@@ -399,13 +442,12 @@ private fun StripHint(text: String) {
     Text(text, color = StripMuted, fontSize = LiveDetailSize, fontWeight = FontWeight.Medium)
 }
 
-private val LiveArtSize = 22.dp
+private val LiveArtSize = 26.dp
 private val LiveArtCorner = 5.dp
 private val LiveTextMax = 220.dp
-private val LiveDetailSize = 9.sp
-private val BatteryLineWidth = 44.dp
+private val LiveDetailSize = 8.5.sp
+/** One hairline, across the top edge of the screen. */
 private val BatteryLineHeight = 2.dp
-private val ChargingTint = Color(0xFF6FD08C)
 
 // ── Signal-strength meters (theme-neutral white, level-aware) ──────────────────
 //
@@ -512,11 +554,18 @@ private fun StripSeparator() {
  * 28 in the shell is a gap that drifts the first time this changes.
  */
 /**
- * Sized to what the content needs on THIS panel: a 22dp art tile and two lines on the left, the
- * clock and its battery line on the right. It was 18dp when the strip was one row of text.
+ * Sized to what the content needs on THIS panel: a 26dp art tile and two lines on the left, the
+ * clock on the right, and the battery hairline across the top. It was 18dp when the strip was one
+ * row of text, and 28dp before the owner asked for "a little bigger".
  */
-internal val StripHeight   = 28.dp
-private val StripFontSize = 8.sp
+internal val StripHeight   = 34.dp
+private val StripFontSize = 10.sp
+
+/**
+ * Every status icon is exactly the font's height. They were 13dp beside 8sp text, which is an icon
+ * set half again as big as the words next to it; "make the icons the same size with the font" is
+ * one number, and the widths below are each icon's own aspect against it.
+ */
 private val StripIconSize  = 10.dp
 private val LowBatteryTint = Color(0xFFFF6B6B)
 
