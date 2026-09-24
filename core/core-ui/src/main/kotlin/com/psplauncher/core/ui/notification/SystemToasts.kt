@@ -2,7 +2,10 @@ package com.psplauncher.core.ui.notification
 
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 
 /** What a toast is telling you, which is the only thing its colour and glyph are derived from. */
 enum class ToastKind { SUCCESS, ERROR }
@@ -22,7 +25,11 @@ data class SystemToast(
 )
 
 /**
- * The in-app notification feed: scans, imports and their failures, as a pill on the screen.
+ * The in-app notification feed: scans, imports and their failures.
+ *
+ * It used to be a pill that appeared in the top centre and timed itself out, and anything you did
+ * not happen to be looking at was gone. It is the status strip's left half now, and what it said
+ * is kept in [recent] so the strip can be pulled down into a list of them.
  *
  * A process-wide flow rather than an injected singleton because [BackgroundTaskNotifier] is
  * constructed with `BackgroundTaskNotifier(context)` at a dozen call sites across four modules,
@@ -44,12 +51,36 @@ object SystemToasts {
 
     val events: SharedFlow<SystemToast> = _events
 
+    private val _recent = MutableStateFlow<List<SystemToast>>(emptyList())
+
+    /**
+     * What has been posted, newest first, capped at [HISTORY].
+     *
+     * The flow above is an EVENT — it fires once and is gone, which is all a pill that times
+     * itself out ever needed. A list you can pull down has to still be there when you pull it, so
+     * the two coexist: the strip listens to the event to show the newest for a few seconds, and
+     * reads this when opened.
+     *
+     * In memory only. A notification that survived a restart to tell you about a scan from before
+     * it would be reporting on a world that no longer exists — the same reason the pill never
+     * persisted either.
+     */
+    val recent: StateFlow<List<SystemToast>> = _recent
+
+    /** How many are kept. Enough to cover a session's worth of scans without becoming a log. */
+    const val HISTORY = 12
+
     private var nextId = 0L
 
     @Synchronized
     fun post(title: String, message: String?, kind: ToastKind) {
-        _events.tryEmit(SystemToast(nextId++, title, normalise(message), kind))
+        val toast = SystemToast(nextId++, title, normalise(message), kind)
+        _recent.update { (listOf(toast) + it).take(HISTORY) }
+        _events.tryEmit(toast)
     }
+
+    /** Empties the list — the drop-down's own clear. */
+    fun clear() = _recent.update { emptyList() }
 
     /**
      * Blank is absent.

@@ -1,5 +1,11 @@
 package com.psplauncher.feature.xmb.ui
 
+import com.psplauncher.core.ui.notification.SystemToast
+import com.psplauncher.core.ui.notification.SystemToasts
+import com.psplauncher.core.ui.notification.ToastKind
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.delay
+import com.psplauncher.feature.xmb.viewmodel.countLabel
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -66,7 +72,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import coil3.compose.AsyncImage
 import androidx.compose.foundation.layout.Arrangement
-import com.psplauncher.core.ui.notification.SystemToastHost
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpMessageOverlay
@@ -309,10 +314,9 @@ fun XMBShellContainer(
         onOpenAndroidLibraryPicker = viewModel::openAndroidLibraryPicker,
     )
 
-    // Above every screen the shell draws, below the launch ceremony. A scan that finishes while
-    // a disc is spinning has nothing useful to say to someone who is already on their way into a
-    // game, and the ceremony is the one thing on this screen that is a hand-off rather than a view.
-    SystemToastHost()
+    // The toast pill used to be hosted here. What a background task finished doing is the status
+    // strip's left half now, and the rest of them are behind it — see XmbNotificationBar, which
+    // lives down in the screen beside the strip it drops from.
 
     uiState.discCeremony?.let { ceremony ->
         DiscLaunchCeremony(
@@ -733,6 +737,22 @@ fun XMBShell(
             // permanent elevation would put the clock on top of the App Drawer and Settings,
             // which are meant to cover it.
             val aboveContextRail = if (uiState.activeContextMenu != null) 1f else 0f
+
+            // The newest notification takes the strip's live slot for a few seconds, then hands it
+            // back to whatever was there. Same dwell the pill used to have, and the same reasoning:
+            // it is a courtesy, not a thing you have to dismiss. What it said stays in
+            // SystemToasts.recent, which is what the bar below shows.
+            var flash by remember { mutableStateOf<SystemToast?>(null) }
+            LaunchedEffect(Unit) {
+                SystemToasts.events.collect { toast ->
+                    flash = toast
+                    delay(if (toast.kind == ToastKind.ERROR) 5_200L else 3_200L)
+                    if (flash?.id == toast.id) flash = null
+                }
+            }
+            val notifications by SystemToasts.recent.collectAsState()
+            var notificationsOpen by remember { mutableStateOf(false) }
+
 
             // menu is open — only the wallpaper/wave background shows behind it. Restored
             // automatically when the menu closes. Besides the visual, this REMOVES the XMB's
@@ -1168,6 +1188,16 @@ fun XMBShell(
                     }
                 } else null,
                 modifier = Modifier.align(Alignment.TopCenter).zIndex(aboveContextRail),
+            )
+
+            // The notifications, pulled down from the strip they are posted into. Above the XMB
+            // foreground and below everything after it, which is where the strip itself sits.
+            XmbNotificationBar(
+                open = notificationsOpen,
+                items = notifications,
+                onDismiss = { notificationsOpen = false },
+                onClear = { SystemToasts.clear(); notificationsOpen = false },
+                modifier = Modifier.zIndex(NotificationBarZ),
             )
 
             // No launch control on the shelf itself any more. It was a spine down the right
@@ -1783,3 +1813,11 @@ private fun PreviewXMBRedTheme() {
         XMBShell(uiState = PreviewData.defaultState)
     }
 }
+
+/**
+ * Where the notification bar sits in the shell's stack.
+ *
+ * Above the XMB foreground so it covers the crossbar it drops over, and below 1f so the status
+ * strip — the thing you pressed to open it — still draws on top while the rail is up.
+ */
+private const val NotificationBarZ = 0.5f

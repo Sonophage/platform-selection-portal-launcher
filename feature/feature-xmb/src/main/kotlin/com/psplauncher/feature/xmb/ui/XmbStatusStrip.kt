@@ -150,6 +150,8 @@ fun XmbPspStatusStrip(
     live: StripLiveActivity? = null,
     /** Which of the two navigation hints apply here. Drawn centre, when nothing else is. */
     hints: StripHints = StripHints(),
+    /** Pressing the left half pulls the notifications down. Null leaves the corner inert. */
+    onLiveAreaTapped: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     /**
      * What sits in the middle of the bar, centred on the SCREEN.
@@ -238,6 +240,11 @@ fun XmbPspStatusStrip(
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
+                modifier = if (onLiveAreaTapped != null) {
+                    Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onLiveAreaTapped)
+                } else {
+                    Modifier
+                },
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
