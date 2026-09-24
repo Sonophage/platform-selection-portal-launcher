@@ -5,6 +5,44 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-09-24
+
+### Added
+- **Shelves**, a column of the arrangements you did not have to make: Favorites, Playing,
+  Completed, Backlog, then Recently Added. Every shelf appears only when it has something on it,
+  and the column appears only when any shelf does — mark your first game and it arrives on its
+  own. It is deliberately not called Collections; those are the ones you build by hand and they
+  are unchanged.
+
+- **A game can be marked Playing, Completed or Backlog**, from its own options menu. Marked by
+  hand and never inferred: the launcher knows play time and could guess, and every guess is wrong
+  somewhere obvious — forty hours in an endless roguelike is not "completed". Unmarked is the
+  default and is not the same as Backlog, so an unsorted library carries no badges at all. The
+  mark draws after the game's name, where it cannot indent the column.
+
+- **A game records when it entered the library.** Games that predate this read as "already here"
+  rather than as new, so nothing claims to have arrived today, and Recently Added fills as games
+  actually arrive.
+
+### Changed
+- **Favorites moved out of the Games root into Shelves.** One destination rather than two doors
+  to the same list.
+
+- **The launcher asks for a portrait window** instead of landscape. No effect on a device that
+  forces landscape for everything, which is what the handheld this was built on does — Android's
+  own Settings renders the same way there.
+
+### Fixed
+- **Stepping on and off the Recent shelf drew two whole screens at once** for the length of its
+  fade, one of them the entire crossbar. Measured on the device, a transition now drops roughly a
+  quarter as many frames. Nothing was lost by removing the fade: the background it was fading was
+  never part of it and still crossfades on its own.
+
+- **A rescan could have cleared what you had put on a game.** The library write replaces a row
+  rather than merging into it, so anything the scan does not know about — when the game was added,
+  how you marked it — was written back empty. Both are now read forward before the row is
+  replaced.
+
 ## [1.8.0] - 2026-09-24
 
 ### Added
