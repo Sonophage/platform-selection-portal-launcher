@@ -81,7 +81,7 @@ internal fun gameContextMenuItems(
         if (!state.directLaunch) add(XMBContextMenuItem("play", "Play"))
         // Multi-disc sets: pick which disc to boot — the only way to reach a non-primary disc when
         // direct launch skips Game Detail's picker. Launches the chosen disc.
-        if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc", detail = countLabel(discCount, "disc")))
+        if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))
         if (item.platformId == PlatformIds.WINDOWS) {
             // Writes this game's .pfpgame file so a fresh install can bring it back with its
             // artwork. Offered on every PC game; the exporter explains a refusal.
@@ -323,7 +323,7 @@ internal fun platformContextMenuItems(
     add(XMBContextMenuItem("scrape_missing_artwork", "Scrape Missing Artwork"))
     // Icon display for THIS console only. Games on other Memory Cards are untouched; "Use Global
     // Setting" here clears the console's override.
-    add(XMBContextMenuItem("icon_display_platform", "Icon Display", detail = iconDisplayLabel))
+    add(XMBContextMenuItem("icon_display_platform", "Icon Display ($iconDisplayLabel)"))
     if (pinned) add(XMBContextMenuItem("unpin", "Unpin")) else add(XMBContextMenuItem("pin", "Pin To Top"))
     add(XMBContextMenuItem("library_manager", "Open in Library Manager"))
     add(XMBContextMenuItem("hide", "Hide From Games"))
@@ -338,7 +338,7 @@ internal fun allGamesContextMenuItems(iconDisplayLabel: String): List<XMBContext
     // Scanning (missing-ROM pass, full re-scan) lives in the Library settings.
     XMBContextMenuItem("library_manager", "Manage Library"),
     XMBContextMenuItem("import_pc_games", "Import PC Games"),
-    XMBContextMenuItem("icon_display_global", "Icon Display", detail = iconDisplayLabel),
+    XMBContextMenuItem("icon_display_global", "Icon Display ($iconDisplayLabel)"),
 )
 
 /**

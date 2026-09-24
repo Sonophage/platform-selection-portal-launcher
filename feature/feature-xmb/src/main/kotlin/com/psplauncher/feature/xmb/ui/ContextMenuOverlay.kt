@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +64,7 @@ fun ContextMenuOverlay(
                 Brush.horizontalGradient(
                     0f to Color.Transparent,
                     RailScrimStart to Color.Transparent,
+                    RailScrimSolid to RailScrim,
                     1f to RailScrim,
                 ),
             ),
@@ -109,7 +109,7 @@ private fun RailAction(row: XMBContextMenuItem, focused: Boolean, onClick: () ->
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(RoundedCornerShape(RailIcon / 2))
+            .clip(RoundedCornerShape(RailCorner))
             .background(Color.White)
             .clickable(onClick = onClick)
             .padding(start = CapsulePadStart, end = CapsulePadEnd, top = CapsulePadV, bottom = CapsulePadV),
@@ -117,25 +117,19 @@ private fun RailAction(row: XMBContextMenuItem, focused: Boolean, onClick: () ->
         // widthIn, not width: a fixed box truncated every label longer than "Resume" — the rail's
         // whole claim is that the focused action shows its name, and "Play in Back…" does not.
         // The cap keeps the longest of them ("Scrape Missing Artwork") inside the scrim.
-        Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = CapsuleMaxText)) {
-            Text(
-                text = row.label,
-                color = if (row.isDestructive) DestructiveTint else CapsuleText,
-                fontSize = CapsuleTitleSize,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            row.detail?.takeIf { it.isNotBlank() }?.let { detail ->
-                Text(
-                    text = detail,
-                    color = CapsuleText.copy(alpha = 0.62f),
-                    fontSize = CapsuleDetailSize,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        // One line. The design draws a state line under the name ("Slot 3 · today") and the owner
+        // cut it: "remove the subtitles we won't use them". The couple of rows that had something
+        // to say kept their brackets instead — "Icon Display (Box Art)" — which is where that fact
+        // lived before and is the only place left for it.
+        Text(
+            text = row.label,
+            color = if (row.isDestructive) DestructiveTint else CapsuleText,
+            fontSize = CapsuleTitleSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = CapsuleMaxText),
+        )
         Spacer(Modifier.width(CapsuleGap))
         Monogram(label = row.label, filled = true, tint = destructiveTint, onClick = null)
     }
@@ -157,7 +151,7 @@ private fun Monogram(label: String, filled: Boolean, tint: Color?, onClick: (() 
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(RailIcon)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(RailCorner))
             .background(
                 when {
                     filled -> tint ?: CapsuleText
@@ -183,7 +177,6 @@ private val RailGap = 13.dp
 private val RailEdgeGap = 24.dp
 private val RailGlyphSize = 13.sp
 private val CapsuleTitleSize = 13.sp
-private val CapsuleDetailSize = 11.sp
 private val CapsulePadStart = 14.dp
 private val CapsulePadEnd = 4.dp
 private val CapsulePadV = 4.dp
@@ -192,6 +185,12 @@ private val CapsuleMaxText = 170.dp
 private val CapsuleText = Color(0xFF1A0C03)
 private val DestructiveTint = Color(0xFFE2606A)
 
-/** The scrim's colour at the right edge, and where it starts: half the screen, per the owner. */
-private val RailScrim = Color(0xE60E0601)
+// The scrim: clear until the middle, then down to solid before it reaches the rail, so the icons
+// sit on black rather than on a ramp. It was a 90%-alpha edge stop, which left the right THIRD
+// still showing the wallpaper through it — "make the gradient darker on the right of the screen".
+private val RailScrim = Color(0xFF080301)
 private const val RailScrimStart = 0.5f
+private const val RailScrimSolid = 0.82f
+
+/** Rounded squares, not circles, at the app drawer's own corner ratio — a quarter of the side. */
+private val RailCorner = 7.dp

@@ -193,18 +193,6 @@ data class XMBContextMenuItem(
      * undifferentiated column where "Remove from Library" sat two rows under "Icon Display".
      */
     val heading: String? = null,
-    /**
-     * A second line under the label, on the rail's focused capsule only.
-     *
-     * The state the action is about, not a description of it: "Box Art" under Icon Display, "3
-     * discs" under Choose Disc. Null everywhere there is nothing TRUE to say, which is most rows —
-     * "Removes this game" under "Remove from Library" is a caption, and a caption on every row is
-     * a wall of text with one fact hidden in it.
-     *
-     * The panel this rail replaces had nowhere to put it, so the detail was written into the label
-     * in brackets: "Icon Display (Box Art)". Those have moved here.
-     */
-    val detail: String? = null,
 )
 
 // Drives the shared text-input dialog. Creating a collection is the default; the optional
