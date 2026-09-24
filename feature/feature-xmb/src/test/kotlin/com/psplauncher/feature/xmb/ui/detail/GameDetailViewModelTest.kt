@@ -19,6 +19,8 @@ import com.psplauncher.feature.artwork.match.MetadataPreview
 import com.psplauncher.feature.artwork.store.ArtworkStore
 import com.psplauncher.feature.launcher.EmulatorIntentResolver
 import com.psplauncher.feature.launcher.EmulatorProfileRepository
+import com.psplauncher.feature.launcher.byLaunchPreference
+import com.psplauncher.feature.launcher.supportsPlatform
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -49,7 +51,6 @@ class GameDetailViewModelTest {
     private lateinit var platformDao: PlatformDao
     private lateinit var memoryCardRepository: MemoryCardRepository
     private lateinit var profileRepository: EmulatorProfileRepository
-    private lateinit var autoCoreMemory: com.psplauncher.feature.launcher.AutoCoreMemory
     private lateinit var intentResolver: EmulatorIntentResolver
     private lateinit var artworkRepository: ArtworkRepository
     private lateinit var artworkAccent: com.psplauncher.core.data.repository.ArtworkAccent
@@ -101,7 +102,6 @@ class GameDetailViewModelTest {
         platformDao       = mockk(relaxed = true)
         memoryCardRepository = mockk(relaxed = true)
         profileRepository = mockk(relaxed = true)
-        autoCoreMemory    = mockk(relaxed = true)
         intentResolver    = mockk(relaxed = true)
         artworkRepository = mockk(relaxed = true)
         artworkAccent     = mockk(relaxed = true)
@@ -124,7 +124,17 @@ class GameDetailViewModelTest {
         coEvery { platformDao.getById("psx") }    returns fakePlatform
         coEvery { memoryCardRepository.getById("psx") } returns null
         every { profileRepository.getInstalledProfiles() }         returns emptyList()
-        coEvery { profileRepository.getProfilesForPlatform(any()) }  returns emptyList()
+        // TWO READS THAT MUST AGREE. In production getProfilesForPlatform IS getInstalledProfiles
+        // filtered to the console and ordered by launch preference, so the stub derives it the
+        // same way instead of being set independently. Stubbing them apart is how a test ends up
+        // with an emulator installed and no emulator for its platform — a state the app cannot be
+        // in, which fails tests that are testing something else entirely.
+        coEvery { profileRepository.getProfilesForPlatform(any()) } answers {
+            val platformId = firstArg<String>()
+            profileRepository.getInstalledProfiles()
+                .filter { it.isAvailable && it.supportsPlatform(platformId) }
+                .byLaunchPreference()
+        }
 
         viewModel = newViewModel()
     }
@@ -133,10 +143,8 @@ class GameDetailViewModelTest {
             context           = context,
             gameRepository    = gameRepository,
             platformDao       = platformDao,
-            memoryCardRepository = memoryCardRepository,
             collectionRepository = mockk(relaxed = true),
             profileRepository = profileRepository,
-            autoCoreMemory    = autoCoreMemory,
             intentResolver    = intentResolver,
             artworkRepository = artworkRepository,
             artworkAccent     = artworkAccent,
@@ -145,6 +153,12 @@ class GameDetailViewModelTest {
             menuSound         = menuSound,
             launcherShortcutRepository = mockk(relaxed = true),
             launchDispatcher  = launchDispatcher,
+            // The REAL resolver over the same mocks. Every ladder test below drives the actual
+            // precedence rather than a stub of it, which is the only reason they still mean
+            // anything now that the gathering moved out of this class.
+            launchResolver    = com.psplauncher.feature.launcher.GameLaunchResolver(
+                profileRepository, memoryCardRepository, platformDao,
+            ),
             pcGameExporter    = pcGameExporter,
         )
 
@@ -688,51 +702,12 @@ class GameDetailViewModelTest {
         coVerify(exactly = 1) { launchDispatcher.launch(any(), any(), fakeIntent) }
     }
 
-    @Test
-    fun `launch resolves to the console's remembered retroarch core`() = runTest {
-        // Two RetroArch cores cover the same console; the console remembers gambatte, so the
-        // automatic pick must be gambatte even though mgba sorts first in the detected pool.
-        val mgba = com.psplauncher.core.domain.model.EmulatorProfile(
-            id = "auto_retroarch_mgba_libretro_android",
-            name = "RetroArch · mGBA (GBA)",
-            packageName = "com.retroarch",
-            intentType = com.psplauncher.core.domain.model.IntentType.COMPONENT,
-            supportedPlatformIds = listOf("gb", "gbc", "gba"),
-            autoSource = "retroarch-core",
-            coreMap = mapOf("gb" to "/data/data/com.retroarch/cores/mgba_libretro_android.so"),
-        )
-        val gambatte = com.psplauncher.core.domain.model.EmulatorProfile(
-            id = "auto_retroarch_gambatte_libretro_android",
-            name = "RetroArch · Gambatte (GB/GBC)",
-            packageName = "com.retroarch",
-            intentType = com.psplauncher.core.domain.model.IntentType.COMPONENT,
-            supportedPlatformIds = listOf("gb", "gbc"),
-            autoSource = "retroarch-core",
-            coreMap = mapOf("gb" to "/data/data/com.retroarch/cores/gambatte_libretro_android.so"),
-        )
-        val gbGame = fakeGame.copy(platformId = "gb", romPath = "/roms/gb/tetris.gb")
-        val fakeIntent = fakeLaunchIntent()
-        coEvery { gameRepository.getById(1L) } returns gbGame
-        every { profileRepository.getInstalledProfiles() } returns listOf(mgba, gambatte)
-        coEvery { autoCoreMemory.rememberedProfileId("gb") } returns gambatte.id
-        coEvery { intentResolver.resolve(any(), any()) } returns Result.success(fakeIntent)
-
-        viewModel.loadGame(1L)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.launch()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // The remembered core wins the automatic pick, and the resolver handed that profile's
-        // intent to the shared launch funnel.
-        coVerify(exactly = 1) {
-            launchDispatcher.launch(
-                any(),
-                match { it.profile.id == gambatte.id },
-                fakeIntent,
-            )
-        }
-    }
+    // `launch resolves to the console's remembered retroarch core` was here. The stabilisation it
+    // asserted is no longer this class's to do — the ordered pool comes from
+    // EmulatorProfileRepository.getProfilesForPlatform, which is mocked here, so the test would
+    // have been asserting on its own stub. It is covered where the behaviour now lives:
+    // EmulatorProfileRepositoryTest `getProfilesForPlatform leads with the console's remembered
+    // core`, over EmulatorLaunchPreferenceTest's nine cases for the ordering itself.
 
     // The guard has to hold even when launching would otherwise fully succeed — otherwise the test
     // passes for the wrong reason (no emulator installed) and the real regression slips through.

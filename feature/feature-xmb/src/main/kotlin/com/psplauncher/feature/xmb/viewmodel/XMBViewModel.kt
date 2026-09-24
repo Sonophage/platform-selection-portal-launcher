@@ -72,7 +72,6 @@ import com.psplauncher.feature.appbar.CategorizedApp
 import com.psplauncher.feature.appbar.LauncherShortcutRepository
 import com.psplauncher.feature.launcher.LaunchDispatchResult
 import com.psplauncher.feature.launcher.LaunchRecoveryAction
-import com.psplauncher.feature.launcher.LaunchSource
 import com.psplauncher.feature.launcher.ResolvedLaunch
 import com.psplauncher.feature.launcher.corePathFor
 import com.psplauncher.feature.artwork.api.ArtworkRepository
@@ -1867,6 +1866,7 @@ class XMBViewModel @Inject constructor(
     private val pcGameScanner: com.psplauncher.feature.settings.pc.PcGameScanner,
     private val pcGameExporter: com.psplauncher.feature.settings.pc.PcGameExporter,
     private val launchDispatcher: com.psplauncher.feature.launcher.LaunchDispatcher,
+    private val launchResolver: com.psplauncher.feature.launcher.GameLaunchResolver,
     private val setupStateProvider: com.psplauncher.feature.launcher.SetupStateProvider,
     private val customIconStore: CustomIconStore,
     private val pfpThemeStore: PfpThemeStore,
@@ -8125,25 +8125,25 @@ class XMBViewModel @Inject constructor(
             )
             return
         }
-        val profile = emulatorProfileRepository.getProfilesForPlatform(game.platformId)
-            .firstOrNull { it.isAvailable }
-        if (profile == null) {
-            Timber.w("No emulator available for direct launch: ${game.platformId}")
+        // The SAME ladder Game Detail launches by — per-game override, memory card, platform
+        // default, then the automatic pick. This used to take the first available profile for the
+        // platform, which is the ladder's BOTTOM rung on its own: with direct launch on, a game
+        // pinned through "Change Emulator" launched on something else and said nothing.
+        val resolvedLaunch = launchResolver.resolve(game).getOrElse { reason ->
+            Timber.w(reason, "Direct launch unresolved: gameId=${game.id}, platform=${game.platformId}")
+            // The resolver names WHICH rung failed and why — a shelved platform default reads
+            // differently from nothing being configured at all — so its message is the one worth
+            // surfacing rather than a fixed sentence about per-system defaults.
             launchDispatcher.recordPreflightFailure(
                 game, null,
-                "No emulator is set up for ${game.platformId.uppercase()}. " +
-                    "Assign one under Settings ▸ Emulators ▸ Per-System Defaults.",
+                reason.message ?: "No emulator is set up for ${game.platformId.uppercase()}.",
             )
             return
         }
+        val profile = resolvedLaunch.profile
         // Preflight the same checks Game Detail's resolver applies, so a stale RetroArch core
         // mapping (or a dropped launch activity) refuses here with a repair, not at startActivity.
         val validation = runCatching { intentResolver.validateBeforeLaunch(game, profile) }
-        val resolvedLaunch = ResolvedLaunch(
-            profile  = profile,
-            source   = LaunchSource.CATALOG_DEFAULT,
-            corePath = profile.corePathFor(game.platformId),
-        )
         if (validation.isFailure) {
             Timber.w(
                 validation.exceptionOrNull(),

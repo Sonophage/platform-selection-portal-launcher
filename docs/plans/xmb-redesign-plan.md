@@ -73,8 +73,17 @@ Nothing outstanding. Seth cleared the three hardware items above.
 |---|---|---|
 | 14 | **3c replaces Game Details wholesale.** *"This would replace the game details screen."* Same backdrop as the column so the item reads as opening up; one white primary button with Favorite and More as round secondaries; box art, screenshots and video in one media row. | `ui/detail/GameDetailScreen.kt` |
 | 15 | **3e's look on the existing 12-step wizard.** Labelled progress line, one question per step with the likely answer pre-picked. Drop its background treatment. Keep every step, including the media ones 3e omits. | setup wizard |
-| 16 | **8b live Appearance preview.** A small XMB in the right panel that repaints as colour, background and icon size change. Means rendering the crossbar twice, at two sizes, from one source of truth. | `feature-settings` |
-| 17 | **Artwork chain.** 9l queue, restricted to games **missing** art — *"art work review would be only to fill in missing art."* Then 9j's carousel, all sources in one row tagged by origin, L1/R1 stepping. Then 8o to compare current against found with the source list. Picker collapses to five tabs: logo, screenshots, manual, video, game art — **as grouping only**. The twelve `ArtworkKind` values are untouched. | `feature-artwork`, `ArtworkSettingsScreen.kt` |
+| 17 | **Artwork chain.** *Deferred to a larger Settings run — Settings is expected to move underneath it.* 9l queue, restricted to games **missing** art — *"art work review would be only to fill in missing art."* Then 9j's carousel, all sources in one row tagged by origin, L1/R1 stepping. Then 8o to compare current against found with the source list. Picker collapses to five tabs: logo, screenshots, manual, video, game art — **as grouping only**. The twelve `ArtworkKind` values are untouched. | `feature-artwork`, `ArtworkSettingsScreen.kt` |
+
+## Item 16 was dropped
+
+**8b's live Appearance preview, cut on 2026-09-24.** Seth's call. It was the only Tier C item that
+bought nothing but a look at itself, and it was the most expensive of the four: a second crossbar
+rendered at a second size from one source of truth, kept in step with the real one forever after.
+
+**Item 17 is deferred rather than dropped**, to a larger Settings run. The artwork chain ends in
+`ArtworkSettingsScreen`, and Settings is expected to move underneath it; building the chain first
+would be building it against a surface about to change.
 
 ## Item 7 was dropped, and it is the one the plan got wrong
 

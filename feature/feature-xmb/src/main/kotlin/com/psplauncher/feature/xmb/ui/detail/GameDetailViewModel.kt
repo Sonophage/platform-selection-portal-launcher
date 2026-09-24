@@ -12,7 +12,6 @@ import androidx.lifecycle.viewModelScope
 import com.psplauncher.core.data.database.dao.PlatformDao
 import com.psplauncher.core.data.database.entity.PlatformEntity
 import com.psplauncher.core.data.repository.CollectionRepository
-import com.psplauncher.core.data.repository.MemoryCardRepository
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.feature.xmb.ui.collection.CollectionPickerOption
 import com.psplauncher.feature.xmb.ui.collection.CollectionPickerUi
@@ -34,12 +33,10 @@ import com.psplauncher.core.data.datastore.pfpDataStore
 import kotlinx.coroutines.flow.first
 import com.psplauncher.feature.artwork.store.ArtworkStore
 import com.psplauncher.feature.launcher.EmulatorIntentResolver
-import com.psplauncher.feature.launcher.EmulatorLaunchResolver
 import com.psplauncher.feature.launcher.EmulatorProfileRepository
 import com.psplauncher.feature.launcher.LaunchDispatchResult
 import com.psplauncher.feature.launcher.ResolvedLaunch
 import com.psplauncher.feature.launcher.byLaunchPreference
-import com.psplauncher.feature.launcher.stabilizeCore
 import com.psplauncher.feature.launcher.supportsPlatform
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -365,10 +362,8 @@ class GameDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val gameRepository: GameRepository,
     private val platformDao: PlatformDao,
-    private val memoryCardRepository: MemoryCardRepository,
     private val collectionRepository: CollectionRepository,
     private val profileRepository: EmulatorProfileRepository,
-    private val autoCoreMemory: com.psplauncher.feature.launcher.AutoCoreMemory,
     private val intentResolver: EmulatorIntentResolver,
     private val artworkRepository: ArtworkRepository,
     private val artworkAccent: com.psplauncher.core.data.repository.ArtworkAccent,
@@ -377,6 +372,7 @@ class GameDetailViewModel @Inject constructor(
     private val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer,
     private val launcherShortcutRepository: com.psplauncher.feature.appbar.LauncherShortcutRepository,
     private val launchDispatcher: com.psplauncher.feature.launcher.LaunchDispatcher,
+    private val launchResolver: com.psplauncher.feature.launcher.GameLaunchResolver,
     private val pcGameExporter: com.psplauncher.feature.settings.pc.PcGameExporter,
 ) : ViewModel() {
 
@@ -1393,35 +1389,17 @@ class GameDetailViewModel @Inject constructor(
     }
 
     /**
-     * Resolves which emulator (and RetroArch core) will launch [game]. This function only gathers
-     * the ladder's inputs from their stores; the precedence itself lives in
-     * [EmulatorLaunchResolver] (feature-launcher) so it is shared, tested logic.
+     * Which emulator (and RetroArch core) will launch [game].
+     *
+     * Both the precedence and the gathering of its inputs live in `GameLaunchResolver`
+     * (feature-launcher). This page used to gather them itself, which was fine while it was the
+     * only thing that launched a game; the XMB hands off directly when direct launch is on, and
+     * the copy IT made of this function had only the bottom rung of the ladder in it.
      */
     private suspend fun resolveLaunchProfile(
         game: Game,
         platform: PlatformEntity? = null,
-    ): Result<ResolvedLaunch> {
-        val platformId = game.platformId
-        val installed = profileRepository.getInstalledProfiles()
-        // Ordered so the automatic fallback picks a standalone emulator over a RetroArch core when
-        // both support the console. Unavailable profiles (e.g. a RetroArch core the SAF link
-        // detected as not installed) are excluded so the fallback never lands on one. The console's
-        // remembered RetroArch core is then lifted to the front of the core tier, so the core (and
-        // its RetroArch configs) stays stable even as the detected core set changes.
-        val platformProfiles =
-            installed.filter { it.isAvailable && it.supportsPlatform(platformId) }
-                .byLaunchPreference()
-                .stabilizeCore(autoCoreMemory.rememberedProfileId(platformId))
-        return EmulatorLaunchResolver.resolve(
-            platformId           = platformId,
-            installedProfiles    = installed,
-            platformProfiles     = platformProfiles,
-            perGameOverride      = game.emulatorPackage?.takeIf { it.isNotBlank() },
-            memoryCardEmulatorId = memoryCardRepository.getById(platformId)?.emulatorId?.takeIf { it.isNotBlank() },
-            platformDefault      = (platform?.preferredEmulatorPackage
-                ?: platformDao.getById(platformId)?.preferredEmulatorPackage)?.takeIf { it.isNotBlank() },
-        )
-    }
+    ): Result<ResolvedLaunch> = launchResolver.resolve(game, platform)
 
     // ── Emulator picker ───────────────────────────────────────────────────
 
