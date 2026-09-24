@@ -102,6 +102,7 @@ import com.psplauncher.feature.xmb.ui.app.AppDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
+import com.psplauncher.feature.xmb.viewmodel.focusedPillIndex
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.FAN_COVER_COUNT
 import com.psplauncher.feature.xmb.viewmodel.formatDuration
@@ -229,6 +230,7 @@ fun XMBShellContainer(
         onSettingsActionConsumed = viewModel::consumeSettingsAction,
         onPromptTapped = viewModel::onPromptTapped,
         onPillActivated = viewModel::onPillActivated,
+        focusedPillIndex = uiState.focusedPillIndex,
         onCloseAppDrawer = viewModel::onCloseAppDrawer,
         onAddAppToOpenCategory = viewModel::addAppToOpenCategory,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
@@ -369,6 +371,8 @@ fun XMBShell(
     onPromptTapped: (com.psplauncher.core.domain.model.GamepadAction) -> Unit = {},
     /** Runs a tapped 9i action pill, by the id its row's context menu dispatches. */
     onPillActivated: (String) -> Unit = {},
+    /** Which pill the controller cursor is on, or null while it is on the row itself. */
+    focusedPillIndex: Int? = null,
     onCloseAppDrawer: () -> Unit = {},
     /** Y menu's "Add to Cross Bar": the drawer names the app, the XMB knows the column. */
     onAddAppToOpenCategory: (String) -> Unit = {},
@@ -1013,6 +1017,7 @@ fun XMBShell(
                         // The caticon bar keeps its drilled-in "hidden right".
                         XmbDrillFlyout(
                             onPillActivated = onPillActivated,
+                            focusedPillIndex = focusedPillIndex,
                             siblings = uiState.drillSiblings,
                             siblingIndex = uiState.drillSiblingIndex,
                             items = uiState.currentItems,
@@ -1056,6 +1061,7 @@ fun XMBShell(
                                 if (categoryIndex == uiState.selectedCategoryIndex) uiState.selectedItemIndex else -1
                             XMBItemList(
                                 onPillActivated = onPillActivated,
+                                focusedPillIndex = focusedPillIndex,
                                 items = uiState.currentItems,
                                 selectedIndex = itemSelectedIndex,
                                 onItemSelected = onItemTap,

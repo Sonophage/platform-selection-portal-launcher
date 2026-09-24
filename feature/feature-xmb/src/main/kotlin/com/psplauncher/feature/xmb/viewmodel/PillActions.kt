@@ -1,5 +1,7 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.domain.model.GamepadAction
+
 // ── The pill row, 9i ──────────────────────────────────────────────────────────
 //
 // A short row of actions under the focused row's meta line. The mock opens them on a press and
@@ -60,4 +62,94 @@ internal fun pillsFor(item: XMBItem): List<XmbPill> = when {
     )
 
     else -> emptyList()
+}
+
+// ── Reaching the pills with a controller ──────────────────────────────────────
+//
+// Left and right enter the row, from either side: right lands on the first pill, left on the
+// last. Walk to the far end and the NEXT press in that direction leaves the row and steps the
+// category, in one press.
+//
+// That last part is the whole rule and it was got wrong first. The recents rail's idiom is that
+// the press which falls off the end is SPENT closing the thing — but the rail has another way to
+// open, and this row does not: spending the press here means the very next one re-enters the row,
+// and the crossbar becomes unreachable from any game or app list forever. The exit has to carry
+// the press with it.
+//
+// The cost is five presses to cross a category from a four-pill row where it used to be one, paid
+// only inside game and app lists; rows with no pills pass every press straight through.
+
+/** What a left/right press means while the cursor is on a row that has pills. */
+internal sealed interface PillNav {
+    /** Enter the row, or move inside it, landing on [index]. */
+    data class Move(val index: Int) : PillNav
+
+    /**
+     * Fall off the end: clear the pill cursor AND let the column handle this same press.
+     *
+     * Not "spend the press leaving". See the note above — a spent press here is a dead end.
+     */
+    data object ExitAndPass : PillNav
+
+    /** Not ours — the column and the crossbar handle it as they always did. */
+    data object Pass : PillNav
+}
+
+/**
+ * Where a press takes the pill cursor. [current] is null when the cursor is still on the row
+ * itself, [count] is how many pills that row has.
+ *
+ * Pure, because the alternative is reading it off a device: most of these branches only happen at
+ * an edge, and an edge in a navigation rule is exactly where a press gets swallowed or doubled
+ * without anyone being able to say which — or, as here, where a whole screen stops being
+ * reachable in a way that only shows up after four presses in a row.
+ */
+internal fun pillNav(action: GamepadAction, current: Int?, count: Int): PillNav {
+    if (count <= 0) return PillNav.Pass
+    return when (action) {
+        GamepadAction.NAVIGATE_RIGHT -> when {
+            current == null -> PillNav.Move(0)
+            current < count - 1 -> PillNav.Move(current + 1)
+            else -> PillNav.ExitAndPass
+        }
+        // The mirror: left enters at the LAST pill, so the row behaves the same whichever side you
+        // arrive from. Entering from the right only would halve the cost of crossing a category
+        // and is a one-line change to the first branch here.
+        GamepadAction.NAVIGATE_LEFT -> when {
+            current == null -> PillNav.Move(count - 1)
+            current > 0 -> PillNav.Move(current - 1)
+            else -> PillNav.ExitAndPass
+        }
+        else -> PillNav.Pass
+    }
+}
+
+/**
+ * Where the pill cursor is, if it is anywhere.
+ *
+ * It carries the ROW's id, not just an index, so it invalidates itself: move the column cursor and
+ * the stored id stops matching the focused row, and [activePillIndex] reads null without anyone
+ * having to remember to clear it. The alternative — a bare index reset from every place that moves
+ * the selection — is a list of call sites with nothing checking it is complete.
+ */
+data class PillCursor(val itemId: String, val index: Int)
+
+/** The pills of whatever row the column cursor is on. */
+internal fun XMBUiState.focusedPills(): List<XmbPill> =
+    currentItems.getOrNull(selectedItemIndex)?.let(::pillsFor).orEmpty()
+
+/**
+ * The focused pill's index, or null when the cursor is still on the row itself.
+ *
+ * Clamped, because a row's pill count changes with the row: Favorite and Unfavorite are one pill,
+ * but a package-backed game has no "Open with" and so has three where the one before it had four.
+ */
+val XMBUiState.focusedPillIndex: Int? get() = activePillIndex()
+
+internal fun XMBUiState.activePillIndex(): Int? {
+    val item = currentItems.getOrNull(selectedItemIndex) ?: return null
+    val cursor = pillCursor?.takeIf { it.itemId == item.id } ?: return null
+    val pills = pillsFor(item)
+    if (pills.isEmpty()) return null
+    return cursor.index.coerceIn(0, pills.lastIndex)
 }

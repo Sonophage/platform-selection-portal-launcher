@@ -270,6 +270,8 @@ fun XmbDrillFlyout(
      * per-row flag got quietly disabled on the busiest path.
      */
     onPillActivated: (String) -> Unit,
+    /** Which pill the controller cursor is on, or null while it is on the row. */
+    focusedPillIndex: Int?,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     modifier: Modifier = Modifier,
@@ -293,6 +295,7 @@ fun XmbDrillFlyout(
             // Pills never draw here — this column is memory cards and showLabels is false — but
             // the callback is required rather than defaulted, so it is passed rather than guessed.
             onPillActivated = onPillActivated,
+            focusedPillIndex = focusedPillIndex,
             modifier = Modifier.fillMaxHeight().width(DRILL_GAME_COLUMN_LEFT - 10.dp),
         )
 
@@ -311,6 +314,7 @@ fun XmbDrillFlyout(
             cardArtGrid = cardArtGrid,
             labelHiddenByPanel = labelHiddenByPanel,
             onPillActivated = onPillActivated,
+            focusedPillIndex = focusedPillIndex,
             metadataAsSubtitle = metadataAsSubtitle,
             modifier = Modifier.fillMaxSize().padding(start = DRILL_GAME_COLUMN_LEFT),
         )
@@ -330,6 +334,8 @@ private fun XmbGameColumn(
     belowTopY: Dp,
     labelHiddenByPanel: Boolean,
     onPillActivated: (String) -> Unit,
+    /** Which pill the controller cursor is on, or null while it is on the row. */
+    focusedPillIndex: Int?,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     onItemSelected: (Int) -> Unit,
@@ -365,6 +371,7 @@ private fun XmbGameColumn(
                 // a fourth call site cannot repeat it.
                 labelHiddenByPanel = labelHiddenByPanel,
                 onPillActivated = onPillActivated,
+                focusedPillIndex = focusedPillIndex,
                 metadataAsSubtitle = metadataAsSubtitle,
                 iconStyle = iconStyle,
                 onClick = { onItemSelected(i) },
@@ -543,6 +550,8 @@ fun XMBItemList(
     // forever.
     labelHiddenByPanel: Boolean = false,
     onPillActivated: (String) -> Unit,
+    /** Which pill the controller cursor is on, or null while it is on the row. */
+    focusedPillIndex: Int?,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     // When true, the selected row gets a ◀ drill cursor pinned directly to its right.
@@ -598,6 +607,7 @@ fun XMBItemList(
                         XmbVerticalListRow(
                             labelHiddenByPanel = labelHiddenByPanel,
                             onPillActivated = onPillActivated,
+                            focusedPillIndex = focusedPillIndex,
                             cardArtGrid = cardArtGrid,
                             metadataAsSubtitle = metadataAsSubtitle,
                             item = items[i],
@@ -654,6 +664,7 @@ fun XMBItemList(
                     // parameter is required now precisely so nobody has to check that again.
                     labelHiddenByPanel = labelHiddenByPanel,
                     onPillActivated = onPillActivated,
+                    focusedPillIndex = focusedPillIndex,
                     metadataAsSubtitle = metadataAsSubtitle,
                     iconStyle = iconStyle,
                     onClick = { onItemSelected(selectedIndex - 1) },
@@ -702,6 +713,8 @@ private fun XmbVerticalListRow(
     // three. A required parameter turns that from a thing you have to notice into a build error.
     labelHiddenByPanel: Boolean,
     onPillActivated: (String) -> Unit,
+    /** Which pill the controller cursor is on, or null while it is on the row. */
+    focusedPillIndex: Int?,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     // Whether THIS row may animate its GIF icon — true only for the focused row, so exactly
@@ -939,8 +952,12 @@ private fun XmbVerticalListRow(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(top = 6.dp),
                             ) {
-                                pills.forEach { pill ->
-                                    XmbActionPill(pill.label) { onPillActivated(pill.id) }
+                                pills.forEachIndexed { index, pill ->
+                                    XmbActionPill(
+                                        label = pill.label,
+                                        focused = index == focusedPillIndex,
+                                        onClick = { onPillActivated(pill.id) },
+                                    )
                                 }
                             }
                         }
@@ -1490,26 +1507,27 @@ private fun AppListIcon(
  * 28px label become 31dp and 12sp. 28px is also the bundle's stated legibility floor, so the
  * label lands exactly on it rather than near it.
  *
- * All the pills look alike. The mock fills its first one solid white to show which one the cursor
- * is on, and there is no cursor here: the row is always visible rather than a thing you enter, so
- * a highlighted pill would be claiming a focus that no press can move.
+ * The focused one is filled solid white with dark text, as the mock draws it. Left and right walk
+ * into the row from either side; see pillNav for what each press costs.
  */
 @Composable
-private fun XmbActionPill(label: String, onClick: () -> Unit) {
+private fun XmbActionPill(label: String, focused: Boolean, onClick: () -> Unit) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .height(PillHeight)
             .clip(RoundedCornerShape(PillHeight / 2))
-            .background(Color.White.copy(alpha = 0.14f))
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.14f))
             .clickable(onClick = onClick)
             .padding(horizontal = PillPadH),
     ) {
         Text(
             text = label,
-            color = PrimaryText,
+            // Solid white capsule, dark text — 9i's own way of showing which pill is under the
+            // cursor. It is the one place in this row that says a press will do something.
+            color = if (focused) PillFocusedText else PrimaryText,
             fontSize = PillTextSize,
-            fontWeight = FontWeight.Medium,
+            fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1,
         )
     }
@@ -1520,3 +1538,4 @@ private val PillHeight = 31.dp
 private val PillPadH = 10.dp
 private val PillGap = 5.dp
 private val PillTextSize = 12.sp
+private val PillFocusedText = Color(0xFF1A0C03)

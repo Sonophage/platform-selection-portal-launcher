@@ -883,6 +883,12 @@ data class XMBUiState(
      * -- hidden, the cards are still there, they are just not drawn.
      */
     val recentRailVisible: Boolean = false,
+    /**
+     * Which 9i pill under the focused row has the cursor, or null while it is on the row itself.
+     *
+     * Keyed to the row's id, so moving the column cursor invalidates it on its own.
+     */
+    val pillCursor: PillCursor? = null,
     val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
     val panelPageGameId: Long? = null,
     val librarySetupComplete: Boolean = false,
@@ -5941,6 +5947,7 @@ class XMBViewModel @Inject constructor(
                     _uiState.update { it.copy(recentRailVisible = true) }
                     return
                 }
+                if (pillPressHandled(action, state)) return
                 val next = (state.selectedCategoryIndex - 1).coerceAtLeast(0)
                 if (next != state.selectedCategoryIndex) onCategorySelected(next)
                 else gamepadInputHandler.cancelRepeat()
@@ -5953,15 +5960,27 @@ class XMBViewModel @Inject constructor(
                     _uiState.update { it.copy(recentRailVisible = false) }
                     return
                 }
+                if (pillPressHandled(action, state)) return
                 if (state.isInSubItem) { gamepadInputHandler.cancelRepeat(); return }
                 val max  = (state.categories.size - 1).coerceAtLeast(0)
                 val next = (state.selectedCategoryIndex + 1).coerceAtMost(max)
                 if (next != state.selectedCategoryIndex) onCategorySelected(next)
                 else gamepadInputHandler.cancelRepeat()
             }
-            GamepadAction.SELECT     -> onItemSelected(state.selectedItemIndex)
+            GamepadAction.SELECT     -> {
+                // A pill under the cursor takes confirm; otherwise the row does, as always.
+                val pill = state.activePillIndex()?.let { state.focusedPills().getOrNull(it) }
+                if (pill != null) onPillActivated(pill.id) else onItemSelected(state.selectedItemIndex)
+            }
             GamepadAction.BACK       -> {
                 menuSound.play(MenuSound.BACK)
+                // The pill row is the innermost open thing, so it closes first — the same order
+                // the recents rail follows, and for the same reason: BACK leaves what you are in
+                // before it leaves what that is inside of.
+                if (state.activePillIndex() != null) {
+                    _uiState.update { it.copy(pillCursor = null) }
+                    return
+                }
                 // The rail collapses first. It is a thing that is open, and BACK closes the
                 // innermost open thing before it does anything larger -- reaching the App Drawer
                 // past an open rail would be a surprise.
@@ -6967,6 +6986,30 @@ class XMBViewModel @Inject constructor(
      * Long enough for a single indexed DB read, short enough that a row which raises no menu at
      * all does not leave a coroutine parked forever on a flow that will never emit.
      */
+    /**
+     * Give a left/right press to the pill row if it wants it.
+     *
+     * Returns true when the press was consumed. [PillNav.ExitAndPass] clears the cursor and
+     * returns FALSE on purpose: that press has to go on to move the category, or a row with pills
+     * would be a place the crossbar can never be reached from — see pillNav's own note.
+     */
+    private fun pillPressHandled(action: GamepadAction, state: XMBUiState): Boolean {
+        val pills = state.focusedPills()
+        return when (val nav = pillNav(action, state.activePillIndex(), pills.size)) {
+            is PillNav.Move -> {
+                val item = state.currentItems.getOrNull(state.selectedItemIndex) ?: return false
+                menuSound.play(MenuSound.SCROLL)
+                _uiState.update { it.copy(pillCursor = PillCursor(item.id, nav.index)) }
+                true
+            }
+            PillNav.ExitAndPass -> {
+                _uiState.update { it.copy(pillCursor = null) }
+                false
+            }
+            PillNav.Pass -> false
+        }
+    }
+
     private val MENU_RAISE_TIMEOUT_MS = 500L
 
     fun onPillActivated(pillId: String) {
