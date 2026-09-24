@@ -165,6 +165,16 @@ data class PillCursor(val itemId: String, val index: Int)
 val XMBUiState.pillRowVisible: Boolean
     get() = !onLastPlayedHome && focusedPills().isNotEmpty()
 
+/**
+ * This row is an installed app rather than something in a library.
+ *
+ * ONE definition, read by everything that treats an app differently: the card that draws its
+ * initial instead of its name, and onSearchActivatedAt, which launches it rather than moving the
+ * cursor to a column it does not belong to. A game shortcut carries a packageName too, which is
+ * why the gameId half is not optional.
+ */
+val XMBItem.isInstalledApp: Boolean get() = gameId == null && packageName != null
+
 /** The pills of whatever row the column cursor is on. */
 fun XMBUiState.focusedPills(): List<XmbPill> =
     currentItems.getOrNull(selectedItemIndex)?.let(::pillsFor).orEmpty()

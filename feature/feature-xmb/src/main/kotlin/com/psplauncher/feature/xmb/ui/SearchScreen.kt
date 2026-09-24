@@ -60,6 +60,7 @@ import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursor
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.xmb.viewmodel.SearchState
+import com.psplauncher.feature.xmb.viewmodel.isInstalledApp
 import com.psplauncher.core.ui.components.PfpMediaCard
 import com.psplauncher.feature.xmb.viewmodel.SEARCH_GRID_COLUMNS
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
@@ -233,6 +234,9 @@ fun SearchScreen(
                                 title = row.title,
                                 art = row.shelfCoverArt,
                                 subtitle = row.subtitle,
+                                // An app will never have art, so its tile is permanent: a letter
+                                // rather than its own name repeated under itself.
+                                initialOnly = row.isInstalledApp,
                                 focused = index == state.selectedIndex,
                                 onClick = { onActivateAt(index) },
                                 width = Dp.Unspecified,

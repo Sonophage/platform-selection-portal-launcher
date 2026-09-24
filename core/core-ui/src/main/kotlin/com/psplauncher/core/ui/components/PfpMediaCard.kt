@@ -75,6 +75,16 @@ fun PfpMediaCard(
     modifier: Modifier = Modifier,
     /** What it is — "Game · Game Boy Advance", an artist, a year. Null draws no second line. */
     subtitle: String? = null,
+    /**
+     * With no art, draw the INITIAL rather than the whole name.
+     *
+     * For an app. An app has no cover and never will — a game without art is waiting to be
+     * scraped, an app is simply not that kind of thing — so the tile is permanent and wants to
+     * read as a mark rather than as a label repeating the name written under it. The App Drawer
+     * made this call first: "a letter on a tile", so a list of them reads as one set rather than
+     * as a pile of other people's branding.
+     */
+    initialOnly: Boolean = false,
     /** Y / long-press. Null leaves the card with no menu, which is not the same as an empty one. */
     onLongClick: (() -> Unit)? = null,
     width: Dp = PfpMediaCardDefaults.Width,
@@ -136,11 +146,16 @@ fun PfpMediaCard(
             } else {
                 // The name, in the tile. A blank tile with the title underneath reads as a failed
                 // image; a tile that says what it is reads as a thing without a picture.
+                //
+                // ...or just the initial, for something that will never have art. See initialOnly.
                 Text(
-                    text = title,
+                    // The first character whatever it is — an app called "8 Ball Pool" gets an 8,
+                    // which is the letter it sorts under anyway.
+                    text = if (initialOnly) title.trim().firstOrNull()?.uppercase() ?: "?" else title,
                     color = palette.textMuted,
-                    fontSize = 12.sp,
-                    maxLines = 4,
+                    fontSize = if (initialOnly) 28.sp else 12.sp,
+                    fontWeight = if (initialOnly) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = if (initialOnly) 1 else 4,
                     textAlign = TextAlign.Center,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(10.dp),

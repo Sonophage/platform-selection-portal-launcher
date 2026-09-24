@@ -4672,9 +4672,13 @@ class XMBViewModel @Inject constructor(
         // Without this the row was findable and dead. searchRowCategory returns null for an app
         // and the function returned right there, so an app could be searched for, could be seen,
         // and could not be opened -- the shape of every "why does nothing happen" report.
-        if (row.gameId == null && row.packageName != null) {
+        // Named rather than smart-cast: isInstalledApp is an extension property, so the compiler
+        // cannot know it implies a non-null packageName. Pulling the value out says the same thing
+        // and keeps the predicate in one place.
+        val appPackage = row.packageName?.takeIf { row.isInstalledApp }
+        if (appPackage != null) {
             closeSearch()
-            launchAppWithDisc(row.packageName, row.shelfCoverArt)
+            launchAppWithDisc(appPackage, row.shelfCoverArt)
             return
         }
 

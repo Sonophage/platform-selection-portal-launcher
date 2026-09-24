@@ -44,6 +44,7 @@ import com.psplauncher.feature.xmb.ui.detail.DetailPanelPage
 import com.psplauncher.feature.xmb.ui.detail.DetailPanelStrip
 import com.psplauncher.feature.xmb.ui.detail.GameDetailPanel
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
+import com.psplauncher.feature.xmb.viewmodel.isInstalledApp
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 
 // ── The home page ────────────────────────────────────────────────────────────
@@ -308,6 +309,8 @@ private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {
         title = item.title,
         art = item.shelfCoverArt,
         subtitle = null,   // the hero above already names what this is
+        // Same rule as the search grid: apps are on this shelf now, and an app's tile is a letter.
+        initialOnly = item.isInstalledApp,
         focused = focused,
         onClick = onClick,
         width = CardWidth,
