@@ -44,15 +44,17 @@ import com.psplauncher.core.ui.notification.ToastKind
 // seconds and was gone; anything you were not looking at you never saw. The newest report sits in
 // the status strip's left half now, and pressing that corner pulls the rest of them down.
 //
-// TWO ROWS, one per source: the device's own notifications, and this launcher's. Each runs
-// sideways from its label, the way every other list on this screen does. They are not interleaved
-// because they are different kinds of thing — the launcher's are events that happened and are
-// done, the system's are ongoing and stay until something dismisses them. One list sorted by time
-// is a list where half the rows can be acted on and half can only be read, saying nothing about
-// which is which.
+// TWO COLUMNS, one per source: the device's own notifications on the left, this launcher's on the
+// right. They are not interleaved because they are different kinds of thing — the launcher's are
+// events that happened and are done, the system's are ongoing and stay until something dismisses
+// them. One list sorted by time is a list where half the rows can be acted on and half can only be
+// read, saying nothing about which is which.
 //
-// The wash is the context rail's, turned a quarter: same XmbScrim, ramped top to bottom off the
-// edge it drops from rather than left to right off the edge the rail hugs.
+// The wash is the context rail's shape turned a quarter — ramped top to bottom off the edge it
+// drops from rather than left to right off the edge the rail hugs — but DARKER than the rail's.
+// Two different colours on purpose: the rail puts short labels beside an edge and wants the
+// wallpaper to keep showing, and this puts sentences across the middle of the screen over whatever
+// art happens to be behind them.
 
 @Composable
 fun XmbNotificationBar(
@@ -78,23 +80,32 @@ fun XmbNotificationBar(
                 verticalArrangement = Arrangement.spacedBy(RowGap),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(0f to XmbScrim, 1f to Color.Transparent))
+                    // Solid across the rows, fading only in the tail below them. A ramp that
+                    // starts fading at the top is already half gone where the second card sits,
+                    // which is where the wallpaper came back through the text.
+                    .background(
+                        Brush.verticalGradient(
+                            0f to SheetScrim,
+                            ScrimHold to SheetScrim,
+                            1f to Color.Transparent,
+                        ),
+                    )
                     // Clear of the strip: it is what you pressed to get here and it stays legible,
                     // the same way the context rail draws under it rather than over.
                     .padding(top = StripHeight + 10.dp, bottom = ScrimTail),
             ) {
-                NoticeRow(label = "System") {
-                    when {
-                        !androidAccessGranted -> EmptyNote(
-                            "Turn on Notification access to see these here",
-                            onClick = onGrantAndroidAccess,
-                        )
-                        android.isEmpty() -> EmptyNote("Nothing from other apps")
-                        else -> LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(CardGap),
-                            contentPadding = PaddingValues(horizontal = EdgeGap),
-                        ) {
-                            items(android, key = { it.key }) { notice ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(ColumnGap),
+                    modifier = Modifier.padding(horizontal = EdgeGap),
+                ) {
+                    NoticeColumn(label = "System", modifier = Modifier.weight(1f)) {
+                        when {
+                            !androidAccessGranted -> EmptyNote(
+                                "Turn on Notification access to see these here",
+                                onClick = onGrantAndroidAccess,
+                            )
+                            android.isEmpty() -> EmptyNote("Nothing from other apps")
+                            else -> android.take(ColumnRows).forEach { notice ->
                                 NoticeCard(
                                     lead = notice.appLabel,
                                     title = notice.title ?: notice.appLabel,
@@ -104,37 +115,32 @@ fun XmbNotificationBar(
                             }
                         }
                     }
-                }
 
-                NoticeRow(label = "Launcher") {
-                    if (items.isEmpty()) {
-                        EmptyNote("Nothing has happened yet")
-                    } else {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(CardGap),
-                            contentPadding = PaddingValues(horizontal = EdgeGap),
-                        ) {
-                            items(items, key = { it.id }) { toast ->
+                    NoticeColumn(label = "Launcher", modifier = Modifier.weight(1f)) {
+                        if (items.isEmpty()) {
+                            EmptyNote("Nothing has happened yet")
+                        } else {
+                            items.take(ColumnRows).forEach { toast ->
                                 NoticeCard(
-                                    lead = if (toast.kind == ToastKind.ERROR) "!" else "✓",
+                                    lead = if (toast.kind == ToastKind.ERROR) "!" else "\u2713",
                                     title = toast.title,
                                     detail = toast.message,
                                     accent = if (toast.kind == ToastKind.ERROR) ErrorTint else SuccessTint,
                                 )
                             }
+                            Text(
+                                "Clear",
+                                color = Muted,
+                                fontSize = DetailSize,
+                                lineHeight = DetailSize * 1.3f,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable(onClick = onClear)
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                            )
                         }
-                        Text(
-                            "Clear",
-                            color = Muted,
-                            fontSize = DetailSize,
-                            lineHeight = DetailSize * 1.3f,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier
-                                .padding(start = EdgeGap, top = 4.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable(onClick = onClear)
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                        )
                     }
                 }
             }
@@ -146,17 +152,16 @@ fun XmbNotificationBar(
     }
 }
 
-/** One labelled row: the source's name, then whatever it has to say, running sideways. */
+/** One labelled column: the source's name, then what it has to say, down the page. */
 @Composable
-private fun NoticeRow(label: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+private fun NoticeColumn(label: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = modifier) {
         Text(
             label,
             color = Muted,
             fontSize = DetailSize,
             lineHeight = DetailSize * 1.3f,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = EdgeGap),
         )
         content()
     }
@@ -170,7 +175,6 @@ private fun EmptyNote(text: String, onClick: (() -> Unit)? = null) {
         fontSize = DetailSize,
         lineHeight = DetailSize * 1.3f,
         modifier = Modifier
-            .padding(start = EdgeGap)
             .clip(RoundedCornerShape(6.dp))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 2.dp),
@@ -189,7 +193,7 @@ private fun NoticeCard(lead: String, title: String, detail: String?, accent: Col
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .widthIn(max = CardMaxWidth)
+            .fillMaxWidth()
             .clip(RoundedCornerShape(RailCorner))
             .background(Color.White.copy(alpha = 0.07f))
             .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -238,10 +242,24 @@ private val Muted = Color(0x99FFFFFF)
 private val SuccessTint = Color(0xFF6FD08C)
 private val ErrorTint = Color(0xFFE2606A)
 private val GlyphSlot = 22.dp
-private val RowGap = 12.dp
-private val CardGap = 8.dp
+private val RowGap = 8.dp
+private val ColumnGap = 22.dp
 private val EdgeGap = 20.dp
-private val CardMaxWidth = 260.dp
+
+/** How many each column shows. It is a glance, not a shade — forty would run off the screen. */
+private const val ColumnRows = 5
+
+/**
+ * Darker than the rail's [XmbScrim], deliberately.
+ *
+ * The rail lays short labels along an edge and wants the wallpaper to keep showing through; this
+ * lays sentences across the middle of the screen over whatever art is behind them, and at the
+ * rail's 77% they were legible against a dark wallpaper and not against a bright one.
+ */
+private val SheetScrim = Color(0xF2050200)
+
+/** How far down the sheet the wash stays solid before it starts to go. */
+private const val ScrimHold = 0.74f
 
 /** How far past the last row the wash keeps fading, so it ends on nothing rather than an edge. */
 private val ScrimTail = 40.dp

@@ -798,7 +798,18 @@ fun XMBShell(
             // leftmost column hides the caticon bar and the item list, and the screen becomes
             // the game you were last playing. RIGHT walks the recents and then steps to the next
             // category, which is what brings the bar back.
-            if (uiState.onLastPlayedHome) {
+            // Crossfaded. Last Played REPLACES the crossbar rather than sitting beside it, so
+            // stepping off the shelf swaps a full-screen page for a bar and a column in a single
+            // frame — a whole screen changing at once reads as a glitch rather than as a move.
+            //
+            // Short, because it is covering a step between two columns and not staging an entrance.
+            // Both trees are composed for the length of it, which is why it is not longer than that.
+            Crossfade(
+                targetState = uiState.onLastPlayedHome,
+                animationSpec = tween(HomeSwapMs),
+                label = "xmbHomeSwap",
+            ) { onLastPlayedHome ->
+            if (onLastPlayedHome) {
                 LastPlayedPage(
                     items = uiState.currentItems,
                     selectedIndex = uiState.selectedItemIndex,
@@ -1159,6 +1170,7 @@ fun XMBShell(
                 }
             }
             } // end: else — the crossbar, shown on every column but Last Played
+            }
 
             // The clock, the date and the battery, on EVERY column including Last Played.
             //
@@ -1878,3 +1890,6 @@ private const val NotificationBarZ = 0.5f
  * again is how it closes.
  */
 private const val XmbChromeZ = 0.6f
+
+/** How long the shelf and the crossbar cross over. Short: it covers a step, not an entrance. */
+private const val HomeSwapMs = 220
