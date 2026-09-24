@@ -193,6 +193,18 @@ data class XMBContextMenuItem(
      * undifferentiated column where "Remove from Library" sat two rows under "Icon Display".
      */
     val heading: String? = null,
+    /**
+     * A second line under the label, on the rail's focused capsule only.
+     *
+     * The state the action is about, not a description of it: "Box Art" under Icon Display, "3
+     * discs" under Choose Disc. Null everywhere there is nothing TRUE to say, which is most rows —
+     * "Removes this game" under "Remove from Library" is a caption, and a caption on every row is
+     * a wall of text with one fact hidden in it.
+     *
+     * The panel this rail replaces had nowhere to put it, so the detail was written into the label
+     * in brackets: "Icon Display (Box Art)". Those have moved here.
+     */
+    val detail: String? = null,
 )
 
 // Drives the shared text-input dialog. Creating a collection is the default; the optional
@@ -6304,32 +6316,30 @@ class XMBViewModel @Inject constructor(
     }
 
     private fun shiftContextMenu(delta: Int) {
-        val menu = _uiState.value.activeContextMenu ?: return
-        // An empty menu can flash in during a rebuild — no-op instead of coercing into
-        // the empty range 0..-1 (IllegalArgumentException).
-        if (menu.items.isEmpty()) return
-        val next = (menu.selectedIndex + delta).coerceIn(0, menu.items.size - 1)
+        val state = _uiState.value
+        val menu = state.activeContextMenu ?: return
+        // railRows, not menu.items: that is the list the rail DRAWS, so it is the list the cursor
+        // has to walk. Indexing the untrimmed one puts the capsule on a different action than the
+        // one that runs — silently, because both lists are the same menu in the same order.
+        //
+        // An empty menu can flash in during a rebuild — no-op instead of coercing into the empty
+        // range 0..-1 (IllegalArgumentException).
+        val rows = state.railRows()
+        if (rows.isEmpty()) return
+        val next = (menu.selectedIndex + delta).coerceIn(0, rows.size - 1)
         _uiState.update { it.copy(activeContextMenu = menu.copy(selectedIndex = next)) }
     }
 
     private fun activateContextMenuItem() {
-        val menu   = _uiState.value.activeContextMenu ?: return
-        val itemId = menu.items.getOrNull(menu.selectedIndex)?.id ?: return
+        val state  = _uiState.value
+        val menu   = state.activeContextMenu ?: return
+        // The same list the rail draws and the cursor walks. See shiftContextMenu.
+        val itemId = state.railRows().getOrNull(menu.selectedIndex)?.id ?: return
 
-        // ── More… ────────────────────────────────────────────────────────────────
-        // Swaps the menu's rows for the ones it was holding back, keeping every context field so
-        // the actions behind More dispatch exactly as they would have in the full menu.
-        if (itemId == MENU_MORE_ITEM_ID) {
-            menuSound.play(MenuSound.SELECT)
-            _uiState.update { it.copy(
-                activeContextMenu = menu.copy(
-                    items = menu.overflow,
-                    overflow = emptyList(),
-                    selectedIndex = 0,
-                ),
-            )}
-            return
-        }
+        // No More… branch any more: railRows never yields MENU_MORE_ITEM_ID, because the rail
+        // takes `items + overflow` and cuts once itself. The builders still split around a More
+        // row — the split is what keeps the panel-shaped menus in the settings screens honest —
+        // and the rail puts the two halves back together before it does its own cutting.
 
         // ── Gaming category picker submenu — move or add game to another category ──
         if (itemId.startsWith("cat_") && menu.gameId != null && menu.categoryContext != null && menu.pendingAppAction != null) {

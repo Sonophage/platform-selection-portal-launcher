@@ -103,6 +103,7 @@ import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.focusedPillIndex
+import com.psplauncher.feature.xmb.viewmodel.railRows
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.FAN_COVER_COUNT
 import com.psplauncher.feature.xmb.viewmodel.formatDuration
@@ -1311,8 +1312,12 @@ fun XMBShell(
             }
 
             uiState.activeContextMenu?.let { menu ->
+                // railRows, not menu.items: the rail drops what the pill row already carries and
+                // caps the rest, and the ViewModel indexes the SAME list, so the cursor and the
+                // drawing cannot disagree about which action is row three.
                 ContextMenuOverlay(
-                    menu = menu,
+                    rows = uiState.railRows(),
+                    selectedIndex = menu.selectedIndex,
                     onItemActivated = onContextMenuItemActivated,
                     onDismiss = onContextMenuDismiss,
                 )
