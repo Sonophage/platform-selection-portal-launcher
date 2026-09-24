@@ -5,7 +5,233 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+- **Action pills under the focused row.** Details, Favorite, Open with and Collection on a game;
+  Launch, Edit, Favorite and Collection on an app. They are always there rather than opening on a
+  press, and nothing moves when one is used. Left and right walk into the row — right lands on the
+  first pill, left on the last — and walking off the far end leaves the row and steps the category
+  in the same press, because a row with no other way in would otherwise be re-entered by the very
+  next press and make the crossbar unreachable. A pill carries no handler of its own: it is an id
+  the row's own menu already dispatches, so a pill and the menu row with the same name cannot
+  drift apart. On the Recent shelf the pills take no left or right at all, since stepping off the
+  shelf is that screen's main gesture and four pills in front of it turn one press into five.
+
+- **A fan of the newest covers beside the focused card.** It answers "what is actually in here"
+  for a row whose label can only say "7 games". It costs no query — the category list already
+  holds every game to compute those counts. "Newest" is highest id first, a proxy for a
+  date-added column the schema does not have, so a library rebuild reorders the fan.
+
+- **A 2x2 art grid on cards, four covers from inside.** Emulation and the media columns both.
+  Fewer than four fills what there is and leaves the rest empty, so a two-game card reads as a
+  part-filled shelf rather than as a card that only ever had two. Each media row takes a different
+  four, offset by four down the same library, so Artists, Albums and Playlists do not all show the
+  same handful. A row that IS one thing — the playing track, the video you stopped — keeps its own
+  art instead.
+
+- **Scrubbers on the playing track and the video you stopped.** A progress line under Now
+  Playing's meta and across the resume row's thumbnail, only while there is something to report.
+  The bar reads the live playback value rather than the one baked in when the column was built,
+  and only the bar recomposes — rebuilding a four-row list twice a second to move three pixels is
+  the wrong trade.
+
+- **The Library column leads with the book you are reading.** Continue reading, the cover, and
+  when you last opened it. Books had no counterpart to Now Playing and Resume, so opening one
+  changed nothing on the screen you came back to. The page number is still not knowable; the rest
+  of the row never depended on it.
+
+- **Add to Cross Bar, on the app drawer's menu.** The drawer names the app and the XMB knows which
+  column is open behind it, so the destination is decided out there and written with the same call
+  the column's own "Add Apps" picker makes. Three columns never read their assigned apps — a
+  gaming category builds from the games table, Settings builds its own hierarchy, and Last Played
+  is derived from `last_played_at` — so sending an app to one of those refuses out loud rather
+  than writing a row that appears on no screen.
+
+- **Android's own notifications, and a sheet to pull them down.** A `NotificationListenerService`
+  reads what the rest of the device is saying. The status strip's corner carries one count for
+  both kinds, because it is a count of what that press opens, and the sheet shows two columns:
+  the device's on the left, the launcher's on the right. Not interleaved — the launcher's are
+  events that happened and are done, the system's are ongoing and stay until something dismisses
+  them, and one list sorted by time is a list where half the rows can be acted on and half can
+  only be read. Nothing is stored; every callback republishes the whole active set.
+
+- **A bottom bar that names what the button acts on.** Full width, the page's footer rather than a
+  pill lying on it: `Ⓑ Apps │ Ⓐ Open All Games … Ⓧ Sort Ⓨ Options Ⓢ Search`. Back leads it, because
+  the button that gets you out of somewhere should be findable without reading and sits in the same
+  place on every screen, while the primary's label changes with every row the cursor touches. Back
+  is named after what it does — at the crossbar root it opens the app drawer, so it says "Apps".
+  With the context rail open the bar reads Select and Close and the right half is empty, since
+  everything it would offer is already in the rail.
+
+- **Keyboard and Touch join Xbox, Nintendo and PlayStation** in Settings ▸ Controller. The prompts
+  name actions and resolve the button from the same mappings the input handler reads, so a footer
+  cannot disagree with the pad.
+
+- **Type to search.** Any printable character on the XMB opens Search carrying it. On a handheld
+  with a hardwired keyboard, reaching for a bound key first is a press that says nothing. The
+  gamepad handler runs first, so the six bound keys are never read as text.
+
+- **A warm bloom behind whatever the cursor is on.** The XMB had no focus glow at all — size and
+  alpha were the only cues, and the distance ramp below weakened the second one. Five stops on a
+  roughly gaussian falloff, so there is no radius at which the glow stops; the first version held
+  80% of its alpha to mid-radius and drew a visible disc. Reach is a fraction of the icon rather
+  than a dp, because icon size is a user setting and a dp bloom would be a ring at one setting and
+  a smudge at another. The design's 4px white ring is not here: there is no single tile shape to
+  wrap while the leading slot holds a dozen different item types.
+
+- **Fade By Distance**, in Appearance. Unselected slots dim by how far they sit from the cursor,
+  along the crossbar and down the item column, off one ramp. It replaces "Solid Unfocused Icons",
+  which asked a different question — that one asked whether to dim at all, this one asks flat or
+  by distance — so it is a new preference key rather than a rename. Reusing the key would have
+  turned "I did not want dimming" into "I want the ramp" on every device that had ever touched it.
+
+- **The disc comes out of a case, and leaves through a drive slot.** The case appears alone, slides
+  left, and the disc rolls out from behind it on an arc; the disc now drops through the bottom of
+  the frame rather than fading, and a bar of light closes to a point exactly as the game takes the
+  screen.
+
+### Changed
+- **The launcher is set in Instrument Sans.** SIL Open Font License like Inter, one variable file,
+  190 KB against Inter's 876 KB. Its weight axis floors at 400 where Inter's ran to 100, so eleven
+  call sites that ask for Light now render at 400 — the context menus, the wizard scaffold and its
+  splash, the boot sequence, the colour-scheme picker, the music browser and the track picker. That
+  is deliberate: the design imports the family at 400/500/600/700, and the alternative is a second
+  font file for one weight nothing asked for. The Credits screen names the new family and authors.
+
+- **The launch ceremony runs to a 6.85-second hand-off**, up from 4.5. The time went on the spin
+  and then on the opening, not on the phases that are movements with a destination — lengthening
+  those makes the disc look slow rather than the ceremony look long.
+
+- **A game row says its system and when you last played it** — "Game Boy Advance · Today, 1:49 PM"
+  — falling back to the publisher for a game never started, and to the bare system name when there
+  is neither. It replaces "Platform (Emulator)", which was the same string on every row of a
+  console's column. The emulator name is still on the game's detail screen, where it is a question
+  someone actually asks.
+
+- **A game keeps its name until you open the hover strip.** Landing on a row used to print the
+  title for about 650ms and then fade the logo in over it and take the name away — which is where
+  the meta line above was going. The crossbar now shows the row's title and meta line at rest and
+  draws no panel; the logo is a page you reach. Whichever shoulder is pressed first opens the strip
+  on the logo page rather than stepping off it, L1 from there returns to rest, and the label clears
+  the moment any page opens, which is what stopped a long title printing through its own wordmark.
+  On the logo page the focused row's subtitle becomes what the thing IS — "2000 · Platform ·
+  Digital Eclipse · 1-2 players" — and falls back to the ordinary line for a game with nothing
+  scraped. Emulation only; the Recent shelf is untouched.
+
+- **The app drawer is eight across with the search box always on the header.** The field used to
+  appear only while search was active, which made the drawer a screen you had to know had a search
+  in it; the field and the keyboard are now two things, so a d-pad press or a tap can put the
+  keyboard away while the query you typed stays on screen.
+
+- **Every drawer tab shows what it holds, and everything else beneath it.** The tab's own apps as
+  one large row, every app it does not hold as a compact A–Z list under it. The two halves come
+  from one filter and its negation, so a tab cannot show an app twice or lose one between them.
+  **All Apps is gone** with the grid that was drawn for it — four sections left: Recently Used,
+  Apps, Emulators, Games. Nothing became unreachable, since every tab already listed the rest.
+
+- **All fourteen context menus are a rail up the right edge.** Actions stack as rounded-square
+  badges against the edge; the focused one grows leftward into a white capsule carrying its name,
+  and the unfocused ones keep their names faded by the same distance ramp the crossbar uses. Only
+  the drawing and the length changed — same builders, same handlers, same cursor. Two rules decide
+  the length: the four ids already on the pill row are dropped, and the rest cap at nine. There is
+  no "More", so what falls past the cap is not reachable from the rail; destructive rows sort last
+  in every builder and are never what gets cut. The scrim is measured off the rail's own width and
+  capped at 62% of the screen, and it is full screen with the status strip and bottom bar drawn on
+  top of it rather than stopping short of them and leaving a seam.
+
+- **The header pulls apart.** Live activity on the left — art tile, title and a detail line, which
+  in practice means music, the only live activity this app has. The clock on the right with the
+  battery drawn as a hairline across the very top edge of the screen, full bleed, filled to the
+  charge and shimmering on the charger; a line that stops short of the corners reads as a widget.
+  The centre carries navigation hints when nothing else claims it, and the shelf's media filter
+  still wins that slot, because which cut of the shelf you are on is state and state beats a hint.
+  Status icons are now exactly the font's height — they had been 13dp beside 8sp text.
+
+- **The toast pill is gone.** It appeared top centre, said its piece for three seconds and left, so
+  anything you were not looking at you never saw. The newest report takes the status strip's live
+  slot for the same dwell, and pressing that corner pulls the rest down as a sheet. The history is
+  in memory only, capped at twelve — a notification that survived a restart would be reporting on
+  a world that no longer exists.
+
+- **Last Played has no slot on the category bar.** It is not a column, it replaces the whole
+  screen, so that icon was one you could never see selected. LEFT off Emulation still reaches it,
+  and it is hidden from the bar rather than removed from the model. The slot comes back whenever
+  the last input was a finger, because a finger has no equivalent of stepping left off Emulation,
+  and goes again on the next button press.
+
+- **The Recent strip shows the filter you are on, not all five**, and "Sort: Title" is now "Title".
+  Both took the whole centre of the strip to name a control rather than its value, next to a clock
+  that does not say "Time:". X still cycles the filter.
+
+- **The default category order is the one on a real device**, read out of the owner's database
+  rather than guessed: Last Played, Emulation, Music, Video, Photo, Library, Network, then Settings
+  with room before it for a category you make.
+
+- **The shelf's launch control is a rail row.** It was a vertical shimmering bar down the right
+  edge with its own widget and its own metrics; it is now the same white capsule and rounded-square
+  badge the context rail draws, from the same file. The shimmer went with it — a solid white
+  capsule does not need the help.
+
+- **The controller glyphs are real art** — Xelu's Free Controller & Keyboard Prompts, CC0 —
+  replacing a white silhouette set under hand-picked tints. An Xbox button is grey with a coloured
+  letter, and the PlayStation set is the DualShock 4 on purpose: a DualSense prints its symbols in
+  white, so accurate PS5 art has no colour in it at all. Keycaps draw at exactly the height of the
+  glyph beside them, and Touch's directions are arrows rather than the words "Swipe left".
+
 ### Fixed
+- **Boot flashed bright amber for 2.3 seconds.** Measured on the panel: one frame of near-black,
+  then RGB (158, 91, 55) held from 0.07s to 2.33s, then a crossfade down. The boot overlay was
+  drawing the themed gradient so that boot and the menu would look identical — a premise that had
+  been dead for a while, since the launcher opens on the Recent shelf and its backdrop is the
+  focused game's own dark art. Boot is flat black now and the first colour on screen is the
+  shelf's. The timings are untouched.
+
+- **Windows had no door.** Library Manager filtered the Windows card out of its Consoles list, and
+  the Settings row that was the only other way in had been removed on the reasoning that the list
+  already showed it. It never had. A fully built screen — rename, Show In Games, pin, Import PC
+  Games — was unreachable.
+
+- **Two things were claiming the cursor.** The crossbar drew the full focus treatment on its
+  selected slot at the same moment the item column drew it around the row the cursor was actually
+  on, so Emulation glowed while the cursor sat on All Games. The bar keeps full brightness and its
+  label — cues that say "this column is open" — and loses the glow and the size bump.
+
+- **A video resume row wore four other films' art.** The art grid skipped rows that already had
+  art, tested as one specific row type, which was correct until Video grew a resume row of a
+  different type. It is decided by type now, so a video whose thumbnail has not been generated
+  still shows an empty slot for its own thumbnail rather than four unrelated films.
+
+- **A new display preference was not in the backup.** `display_fade_by_distance` was never added to
+  the typed backup lists, so it silently did not survive a restore. The drift guard for exactly
+  this had been red for three commits and was not seen, because a stale test-result XML from a task
+  that had not re-run was being read as the current result.
+
+- **Two crashes that were live on older Android.** `EpubMetadata` called a `ByteArrayOutputStream`
+  overload that arrived in API 33 against a minSdk of 29 — a `NoSuchMethodError` while reading a
+  book's metadata on Android 10 through 12. `EmulatorIntentResolver` called
+  `isExternalStorageManager`, API 30, and survived on Android 10 only because Kotlin's
+  `runCatching` catches `Throwable`: a linkage error caught by a net cast for something else.
+
+- **Menu music started a new collector on every resume.** `repeatOnLifecycle` was being run from
+  `onResume`, and it suspends until DESTROYED, so each resume stacked another collector on the same
+  flow and they raced each other to start the track. It belongs in `onCreate`.
+
+- **The settings picker could not be used by a finger at all.** No option row was clickable and
+  neither was the scrim, so a touch user could open a picker and neither choose a value nor get
+  out of it. The controller path — cursor, then SELECT — was complete, which is why this survived.
+  Options take a tap directly and the scrim dismisses, the way BACK does.
+
+- **The keyboard prompts named keys that did nothing.** The Keyboard glyph family shipped naming
+  Shift, Space, Tab, Q and E while not one of them reached the launcher, and Escape — the key a
+  keyboard user reaches for first — was bound to nothing. Binding those five was then wrong for a
+  second reason: the gamepad handler consumes a bound keycode before any text field sees it, so
+  they became keys you could not type. The defaults are now keys that produce no character —
+  Escape, Tab, F2, F3, PageUp, PageDown — and a test holds the glyph table and the binding table
+  together in both directions.
+
+- **Leaving the Recent shelf cost a press that did nothing visible.** RIGHT spent itself closing
+  the cover rail before it would step. It closes on the way past now: LEFT to the shelf and RIGHT
+  back is one press each way.
+
 - **The Recent shelf was unreachable by touch.** Its cover rail came in on LEFT and went away on
   RIGHT, and the media filter cycled on X — both D-pad only. So on the one screen a fresh install
   lands on, a finger could see a single item and had no way to reach any of the others. Tapping
