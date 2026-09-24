@@ -132,9 +132,14 @@ private fun waveTintFrom(accentArgb: Long): Color =
  * whatever this is being drawn over.
  */
 @Composable
-fun WaveOverlay(waveStyle: WaveStyle, accentArgb: Long?, modifier: Modifier) {
+fun WaveOverlay(
+    waveStyle: WaveStyle,
+    accentArgb: Long?,
+    modifier: Modifier,
+    speedScale: Float = 1f,
+) {
     Box(modifier) {
-        WaveLayers(waveStyle, accentArgb?.let(::waveTintFrom) ?: Color.White)
+        WaveLayers(waveStyle, accentArgb?.let(::waveTintFrom) ?: Color.White, speedScale)
     }
 }
 

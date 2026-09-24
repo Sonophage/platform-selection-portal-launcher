@@ -49,7 +49,18 @@ private const val TAU = 6.2831853f
  * be several things to keep in step and only one of them would ever get the next fix.
  */
 @Composable
-fun WaveLayers(waveStyle: WaveStyle, tint: Color = Color.White) {
+fun WaveLayers(
+    waveStyle: WaveStyle,
+    tint: Color = Color.White,
+    /**
+     * A multiplier on how fast the surface moves, for callers that want it to react.
+     *
+     * The crossbar slows it while nothing is happening and quickens it while a game is being
+     * launched. It multiplies rather than replaces the style's own speed, so Reduced stays
+     * proportionally slower than Animated whatever the caller asks for.
+     */
+    speedScale: Float = 1f,
+) {
     val alphaScale = if (waveStyle.reduced) 0.5f else 1f
     val ampScale   = if (waveStyle.reduced) 0.65f else 1f
 
@@ -57,7 +68,7 @@ fun WaveLayers(waveStyle: WaveStyle, tint: Color = Color.White) {
     // scaled by style speed. Frozen at STATIC_TIME when the wave shouldn't animate — no frame loop,
     // no per-frame recomposition. Only advances while this background is on screen.
     val animated = waveStyle.animated
-    val speed = if (waveStyle.reduced) 0.5f else 1f
+    val speed = (if (waveStyle.reduced) 0.5f else 1f) * speedScale
     val time by produceState(STATIC_TIME, animated, speed) {
         if (!animated) {
             value = STATIC_TIME

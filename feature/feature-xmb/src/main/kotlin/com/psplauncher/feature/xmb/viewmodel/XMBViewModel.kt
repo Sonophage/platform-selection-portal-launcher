@@ -657,6 +657,15 @@ data class XMBUiState(
     // are active and no overlay is up — drives the small "Options" hint pill. See
     // XMBViewModel's idle-timer loop for the gate conditions.
     val showContextMenuHint: Boolean = false,
+    /**
+     * Nothing has been pressed for a while.
+     *
+     * Raised by the same poller that raises [showContextMenuHint] and off the same clock — one
+     * idle source of truth, so the wave settling and the hint appearing cannot disagree about
+     * whether anyone is there. It is NOT that flag: the hint is gated on the focused row having a
+     * context menu, and the wave does not care what the cursor is on.
+     */
+    val idle: Boolean = false,
     // True when the user has been idle inside the App Drawer with a controller — the drawer's own
     // contextual hint bar (see shouldShowAppDrawerHint). Deliberately a separate flag from
     // showContextMenuHint: the drawer is a blocking overlay, so the XMB pill's gate is false
@@ -5925,6 +5934,10 @@ class XMBViewModel @Inject constructor(
                 delay(IDLE_HINT_POLL_MS)
                 val s = _uiState.value
                 val idleMs = SystemClock.elapsedRealtime() - lastInteractionMs
+                // The wave's own reading of idle: a plain pause, with none of the hint's
+                // conditions about what is focused or whether an overlay is up.
+                val waveIdle = idleMs >= WAVE_IDLE_MS
+                if (waveIdle != s.idle) _uiState.update { it.copy(idle = waveIdle) }
                 val shouldShow = com.psplauncher.feature.xmb.viewmodel.shouldShowContextMenuHint(
                     state = s,
                     idleMs = idleMs,
@@ -10242,6 +10255,14 @@ class XMBViewModel @Inject constructor(
         private val KEY_BAR_TOP_FRACTION  = androidx.datastore.preferences.core.floatPreferencesKey("display_bar_top_fraction")
         // Per-form-factor live layout tunings (scale + horizontal + vertical), one JSON prefs string.
         // Idle context-menu hint: how long to wait before showing, and how often to recheck.
+        /**
+         * How long before the wave settles into its slower drift.
+         *
+         * Long enough not to react to a pause between two presses, short enough to have happened
+         * by the time someone has stopped looking at the screen.
+         */
+        internal const val WAVE_IDLE_MS = 12_000L
+
         internal const val IDLE_HINT_POLL_MS  = 500L
         private val KEY_XMB_LAYOUT_ADJUST = stringPreferencesKey("display_xmb_layout_adjust")
         private val KEY_SETUP_COMPLETE    = booleanPreferencesKey("library_setup_complete")

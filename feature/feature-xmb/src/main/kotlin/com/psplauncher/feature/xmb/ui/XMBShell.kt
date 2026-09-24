@@ -15,6 +15,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -698,7 +699,11 @@ fun XMBShell(
                 shellSnapSite(it.placement, panelShowingVideo) == SnapSite.BACKGROUND &&
                     it.gameId == selectedItem?.gameId
             }
-            Crossfade(targetState = selectedBg, animationSpec = tween(320), label = "xmbGameBackground") { bg ->
+            // 180ms, down from 320. The backdrop is the largest thing on screen and it changes on
+            // every step of the cursor, so a long fade is the one animation that is always running
+            // — and the wave now draws OVER it, which makes a slow swap underneath read as the
+            // picture lagging behind the row that named it.
+            Crossfade(targetState = selectedBg, animationSpec = tween(180), label = "xmbGameBackground") { bg ->
                 if (bg != null || backgroundSnap != null) {
                     Box(Modifier.fillMaxSize()) {
                         // The clip goes UNDER the still, not over it. With a snap playing, the
@@ -767,10 +772,31 @@ fun XMBShell(
             // Drawn ONCE: XmbBackground was told to hold its own wave back. The artwork fades out
             // across the middle of the screen, so a second wave underneath would be visible right
             // there, at a different alpha.
+            // THE WAVE REACTS. Slower when nothing has been pressed for a while, quicker while a
+            // game is being launched, ordinary otherwise.
+            //
+            // Animated rather than switched: the surface is a continuous thing and a speed that
+            // jumped would be a visible seam across it. 900ms, which is longer than anything else
+            // on this screen on purpose — every other animation here is a response to a press and
+            // has to keep up with one, and this is the opposite, a room changing its mind.
+            //
+            // The launch pulse is worth the frames it costs only because it is visible: the disc
+            // ceremony fades in over 1.7s, so the wave is still on screen underneath it while it
+            // quickens.
+            val waveSpeed by animateFloatAsState(
+                targetValue = when {
+                    uiState.discCeremony != null || uiState.activeGameBoot != null -> 2.1f
+                    uiState.idle -> 0.45f
+                    else -> 1f
+                },
+                animationSpec = tween(900),
+                label = "xmbWaveSpeed",
+            )
             WaveOverlay(
                 waveStyle = effectiveWaveStyle,
                 accentArgb = uiState.focusedItemAccentArgb ?: uiState.wallpaperAccent,
                 modifier = Modifier.fillMaxSize(),
+                speedScale = waveSpeed,
             )
 
             // Hide the XMB foreground (status strip + category bar + item list) while a fullscreen
@@ -1154,8 +1180,12 @@ fun XMBShell(
                         AnimatedContent(
                             targetState = uiState.selectedCategoryIndex,
                             transitionSpec = {
-                                (fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 8 })
-                                    .togetherWith(fadeOut(tween(160)) + slideOutVertically(tween(180)) { -it / 10 })
+                                // Under 200ms, all of it. The column slides in from below and
+                                // the outgoing one leaves upward — the same shapes as before,
+                                // quicker: 260 and 220 were long enough that stepping across the
+                                // bar felt like waiting for each column rather than sweeping.
+                                (fadeIn(tween(130)) + slideInVertically(tween(180)) { it / 8 })
+                                    .togetherWith(fadeOut(tween(110)) + slideOutVertically(tween(140)) { -it / 10 })
                                     .using(SizeTransform(clip = false))
                             },
                             label = "xmbCategoryItems",

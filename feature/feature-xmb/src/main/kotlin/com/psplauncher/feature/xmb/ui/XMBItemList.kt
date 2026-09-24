@@ -733,7 +733,17 @@ private fun XmbVerticalListRow(
     // "the cursor stays, the list breathes" feel.
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 1.06f else 0.9f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        // SPRINGY, and short. The scale overshoots slightly and settles — the row arrives rather
+        // than eases in, which is the whole of what "it feels alive" asks for here.
+        //
+        // StiffnessHigh, not Medium: at 1500 a bouncy spring is still visibly moving past 300ms,
+        // and the budget for this is under 200. Alpha and the bloom below deliberately do NOT
+        // bounce — a row that overshoots its brightness reads as a flicker, and the two of them
+        // arriving on different curves is what makes a bounce look like a glitch.
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh,
+        ),
         label = "xmbListRowScale",
     )
     val rowAlpha by animateFloatAsState(
