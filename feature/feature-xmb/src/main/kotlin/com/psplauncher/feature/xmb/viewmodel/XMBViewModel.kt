@@ -1085,7 +1085,28 @@ data class XMBUiState(
 
     // True whenever something is layered over the main XMB. The gamepad dispatcher uses this
     // as a final guard so D-Pad/A never drives the category bar or item list behind an overlay.
+    /**
+     * True when the context rail is the ONLY thing over the XMB.
+     *
+     * The hint bar reads it: the bar hides behind every blocking overlay, and the rail is one of
+     * them, so "the header and hints still show on top of the context screen" needs the rail
+     * distinguished from the rest — not removed from [hasBlockingOverlay], which decides input
+     * routing and the idle cues as well.
+     */
+    val contextRailOnly: Boolean
+        get() = activeContextMenu != null && !otherBlockingOverlay
+
     val hasBlockingOverlay: Boolean
+        get() = otherBlockingOverlay || activeContextMenu != null
+
+    /**
+     * Everything that covers the XMB EXCEPT the context rail.
+     *
+     * Split out rather than copied: [hasBlockingOverlay] and [contextRailOnly] are two readings of
+     * one list, and a second copy of twenty-five conditions is a second copy that stops agreeing
+     * the first time a screen is added to one of them.
+     */
+    private val otherBlockingOverlay: Boolean
         get() = showBootSequence ||
             activeGameBoot != null ||
             discCeremony != null ||
@@ -1095,7 +1116,6 @@ data class XMBUiState(
             activeAppId != null ||
             activeVideoId != null ||
             activePhotoViewer != null ||
-            activeContextMenu != null ||
             colorSchemePicker != null ||
             customColorPicker != null ||
             xmbLayoutAdjust != null ||
@@ -1528,8 +1548,10 @@ internal fun XMBUiState.withHintsShownNow(): XMBUiState = copy(
 
 fun shouldShowContextMenuHint(state: XMBUiState, idleMs: Long): Boolean =
     state.contextMenuHintEnabled &&
-        !state.hasBlockingOverlay &&
-        state.activeContextMenu == null &&
+        // The context rail is the one blocking overlay the pill survives — "the header and hints
+        // still show on top of the context screen". It used to be excluded twice over, once here
+        // and once inside hasBlockingOverlay, which is why contextRailOnly exists.
+        (!state.hasBlockingOverlay || state.contextRailOnly) &&
         // Every capability the pill can advertise has to be listed here, or the press works and
         // nothing on screen says so. canFilterRecents is the reason this is a list and not a
         // pair: filtering the home shelf down to a medium you have none of empties it, which

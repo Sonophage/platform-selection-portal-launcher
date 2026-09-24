@@ -121,9 +121,12 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `recomputing lowers a flag whose gate no longer holds`() {
+        // The example used to be an open context menu, which no longer lowers anything: the pill
+        // shows over the rail now. A detail screen is a gate that still holds, and what is being
+        // tested is the recompute, not which gate it happens to be.
         val stale = eligibleState().copy(
             showContextMenuHint = true,
-            activeContextMenu = XMBContextMenu("X", emptyList()),
+            activeGameId = 1L,
         )
         assertFalse(stale.withHintsShownNow().showContextMenuHint)
     }
@@ -150,8 +153,22 @@ class ContextMenuHintStateTest {
     }
 
     @Test
-    fun `does not show when a context menu is already open`() {
+    fun `shows over the context rail, which is the one overlay it survives`() {
+        // It used to be hidden here, and that was right while the menu was a panel covering the
+        // corner the pill sits in. The rail leaves that corner empty, and the owner's call is
+        // that the hints stay: "the header and hints still show on top of the context screen".
         val s = eligibleState().copy(activeContextMenu = XMBContextMenu("X", emptyList()))
+        assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
+    }
+
+    @Test
+    fun `a context menu on top of a REAL blocking overlay still hides it`() {
+        // contextRailOnly, not "a menu is open": a menu left standing while a detail screen opens
+        // must not drag the pill back onto a screen that has its own controls.
+        val s = eligibleState().copy(
+            activeContextMenu = XMBContextMenu("X", emptyList()),
+            activeGameId = 1L,
+        )
         assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 

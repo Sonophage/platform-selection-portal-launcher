@@ -281,23 +281,6 @@ fun RecentFilterRow(
  * is a flat wash. It is what makes an edge read as something you can press rather than as a rule:
  * a static strip of colour is chrome, and one with movement in it is an invitation.
  */
-@Composable
-fun LaunchSpine(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            // Stop short of the prompt row. This used to matter far more: the control was a bar
-            // down the whole right edge, and it sat on top of the Apps pill for 114 of its 139
-            // pixels, so a finger aiming at Apps pressed Play. It is a capsule in the middle of
-            // the edge now and cannot reach that corner, but the clearance stays — it is what
-            // keeps the control off the prompts whatever height the shelf is given.
-            .padding(bottom = SpinePromptClearance, end = RailEdgeGap),
-        contentAlignment = Alignment.CenterEnd,
-    ) {
-        XmbRailRow(label = label, focused = true, onClick = onClick)
-    }
-}
-
 /**
  * How far above the bottom edge the launch control ends, so the prompt pills in that corner stay
  * pressable. Sized to clear the hint bar, which is its glyph height plus its own small padding.

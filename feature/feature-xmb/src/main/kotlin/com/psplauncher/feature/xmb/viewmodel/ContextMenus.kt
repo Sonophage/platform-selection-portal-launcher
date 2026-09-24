@@ -74,11 +74,18 @@ internal fun gameContextMenuItems(
         // straight into the game. Launch/title/note/scrape actions all live in Game Detail — the
         // menu stays navigational.
         add(XMBContextMenuItem("game_details", "View Game Details"))
-        // Play appears only when direct launch is OFF. With it on, confirm already launches the
-        // game and this row would be a second way to do what the button under your thumb does.
-        // With it off, confirm opens Game Detail, and the menu is the only place a game can be
-        // started from the list.
-        if (!state.directLaunch) add(XMBContextMenuItem("play", "Play"))
+        // Play appears when direct launch is OFF — with it on, confirm already launches the game
+        // and this row would be a second way to do what the button under your thumb does; with it
+        // off, confirm opens Game Detail and the menu is the only place a game can be started
+        // from the list.
+        //
+        // It appears on the RECENTS shelf either way. That shelf had a launch control of its own,
+        // a spine down the right edge, and the owner moved it here: "remove the play button, add
+        // it to the context menu instead, for the recent screen". So on that one surface the row
+        // is not a duplicate of confirm — it is the thing confirm replaced.
+        if (!state.directLaunch || onRecentShelf) {
+            add(XMBContextMenuItem("play", "Play"))
+        }
         // Multi-disc sets: pick which disc to boot — the only way to reach a non-primary disc when
         // direct launch skips Game Detail's picker. Launches the chosen disc.
         if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))

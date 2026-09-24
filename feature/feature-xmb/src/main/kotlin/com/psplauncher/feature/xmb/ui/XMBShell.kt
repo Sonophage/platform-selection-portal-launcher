@@ -59,6 +59,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -722,6 +723,17 @@ fun XMBShell(
             }
 
             // Hide the XMB foreground (status strip + category bar + item list) while a fullscreen
+            // The status strip and the hint bar draw ABOVE the context rail while it is open, so
+            // the clock, the battery and the button hints survive a menu opening. Declared out
+            // here because the strip is inside the guard below and the hint bar is not.
+            //
+            // zIndex rather than moving those two after the rail in the Box: the rail sits inside
+            // the base-density provider further down, and a composable moved across that boundary
+            // is a composable drawn at a different size. And only WHILE the rail is open — a
+            // permanent elevation would put the clock on top of the App Drawer and Settings,
+            // which are meant to cover it.
+            val aboveContextRail = if (uiState.activeContextMenu != null) 1f else 0f
+
             // menu is open — only the wallpaper/wave background shows behind it. Restored
             // automatically when the menu closes. Besides the visual, this REMOVES the XMB's
             // clickable rows from composition, so a tap on the overlay's empty space can never fall
@@ -1131,20 +1143,12 @@ fun XMBShell(
                         )
                     }
                 } else null,
-                modifier = Modifier.align(Alignment.TopCenter),
+                modifier = Modifier.align(Alignment.TopCenter).zIndex(aboveContextRail),
             )
 
-            // The launch spine, down the right edge, in the focused item's own colour. Outside
-            // the shelf's own Column so it runs the full height of the screen rather than the
-            // height of the content: a spine that stopped at the filter row would be a rule, not
-            // an edge.
-            if (uiState.onLastPlayedHome) {
-                LaunchSpine(
-                    label = if (uiState.directLaunch) "Play" else "Details",
-                    onClick = { onItemTap(uiState.selectedItemIndex) },
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                )
-            }
+            // No launch control on the shelf itself any more. It was a spine down the right
+            // edge, then briefly a rail capsule in the same place; it is a row in the context
+            // rail now, where every other thing you can do to an item already lives.
             } // end: XMB foreground hidden while music browser is open
 
             // Button hint pill: [ X Sort   Y Options ], with the controller-style glyphs, and
@@ -1168,17 +1172,24 @@ fun XMBShell(
             // these two are real bindings a user should be told about: Search is Select at the
             // root and Apps is Back at the root. The buttons could be touch-only because they
             // were touch-only affordances; a named prompt is for both hands.
-            val rootActionsVisible = !uiState.hasBlockingOverlay && !uiState.isInSubItem
+            val rootActionsVisible =
+                (!uiState.hasBlockingOverlay || uiState.contextRailOnly) && !uiState.isInSubItem
             AnimatedVisibility(
                 // Shown when EITHER half has something to say: the root actions are a touch
                 // affordance with their own visibility rule, and hiding them behind the hint's
                 // rule would have taken Search and Apps off screen with the hint.
+                // The rail is the one blocking overlay this survives: "the header and hints still
+                // show on top of the context screen". Everything else still takes it away.
+                //
+                // NOTE the prompts it shows are still the LIST's — Sort, Options, Search, Apps —
+                // while the rail wants Select and Close. That is item 12g's job, which redoes this
+                // bar to follow whatever is open; until then the bar is visible and its words are
+                // about the screen behind the menu.
                 visible = (uiState.showContextMenuHint || rootActionsVisible) &&
-                    uiState.activeContextMenu == null &&
-                    !uiState.hasBlockingOverlay,
+                    (!uiState.hasBlockingOverlay || uiState.contextRailOnly),
                 enter = fadeIn(tween(200)),
                 exit = ExitTransition.None,
-                modifier = Modifier.align(Alignment.BottomEnd),
+                modifier = Modifier.align(Alignment.BottomEnd).zIndex(aboveContextRail),
             ) {
                 ContextMenuHint(
                     showSort = uiState.showContextMenuHint && uiState.canSortCurrentList,

@@ -12,12 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.psplauncher.feature.xmb.viewmodel.XMBContextMenuItem
 
 // ── The right rail, 9h ───────────────────────────────────────────────────────
@@ -40,26 +37,11 @@ fun ContextMenuOverlay(
     Box(
         modifier
             .fillMaxSize()
-            .drawBehind {
-                // Full width, and INSET from the two bars. "Put it below the header and footer so
-                // I can still see those" — the strip carries the clock and the battery and the
-                // hint bar carries what the buttons do, and a menu that hides both takes away the
-                // two things that were true before it opened.
-                //
-                // StripHeight and SpinePromptClearance, not a pair of new numbers: those already
-                // mean "how tall is the status strip" and "how far up does the prompt row reach",
-                // and a copy of either would be a copy that stops agreeing.
-                val top = StripHeight.toPx()
-                val bottom = size.height - SpinePromptClearance.toPx()
-                drawRect(
-                    brush = Brush.horizontalGradient(
-                        0f to Color.Transparent,
-                        1f to RailScrim,
-                    ),
-                    topLeft = Offset(0f, top),
-                    size = Size(size.width, (bottom - top).coerceAtLeast(0f)),
-                )
-            },
+            // Full screen. The status strip and the hint bar stay readable by drawing ON TOP of
+            // this rather than by it stopping short of them — an inset scrim left a horizontal
+            // seam across the whole width where it ended, which is a rule drawn on the screen for
+            // no reason anyone looking at it could name.
+            .background(Brush.horizontalGradient(0f to Color.Transparent, 1f to RailScrim)),
     ) {
         // Catches the press that lands anywhere else, the same job the panel's own dim did.
         Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))

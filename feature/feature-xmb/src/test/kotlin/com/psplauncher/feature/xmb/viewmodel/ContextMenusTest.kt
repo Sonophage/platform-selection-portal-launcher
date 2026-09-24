@@ -445,4 +445,29 @@ class ContextMenusTest {
         val (visible, overflow) = items.splitForOverflow()
         assertEquals(ids(items), ids(visible) + ids(overflow))
     }
+
+    @Test
+    fun `a game on the recents shelf offers Play even when confirm already launches it`() {
+        // The shelf used to carry its own launch control, a spine down the right edge. It was
+        // removed and the action moved here — "remove the play button, add it to the context menu
+        // instead, for the recent screen" — so on that one surface Play is not a duplicate of
+        // confirm, it is the thing confirm replaced.
+        val onShelf = gameContextMenuItems(
+            item = game(), state = state(directLaunch = true),
+            discCount = 1, onRecentShelf = true, hideLocation = null,
+        ).map { it.id }
+        assertTrue("the shelf's only launch control is gone if this is missing", "play" in onShelf)
+    }
+
+    @Test
+    fun `the same game elsewhere still has no Play row while direct launch is on`() {
+        // The rule that was there before, and the reason Play is conditional at all: with direct
+        // launch on, confirm launches the game and a Play row is a second way to do what the
+        // button under your thumb already does.
+        val elsewhere = gameContextMenuItems(
+            item = game(), state = state(directLaunch = true),
+            discCount = 1, onRecentShelf = false, hideLocation = null,
+        ).map { it.id }
+        assertFalse("Play is a duplicate of confirm off the shelf", "play" in elsewhere)
+    }
 }
