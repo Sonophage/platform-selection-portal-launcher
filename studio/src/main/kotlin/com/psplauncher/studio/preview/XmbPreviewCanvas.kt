@@ -210,7 +210,10 @@ private fun XmbCross(model: XmbPreviewModel) {
 @Composable
 private fun CategoryCell(model: XmbPreviewModel, category: SampleContent.Category, selected: Boolean) {
     val spec = model.layout
-    val iconSize = if (selected) spec.categoryIconSelectedDp.dp else spec.categoryIconDp.dp
+    // Matches XMBCategoryBar: one size for every category, selected or not. A preview that still
+    // grew the selected slot would show a theme author a bar the device does not draw, which is
+    // the one thing a preview must never do.
+    val iconSize = spec.categoryIconDp.dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(CategorySlotWidth).height(CatBarHeight).padding(top = 4.dp),

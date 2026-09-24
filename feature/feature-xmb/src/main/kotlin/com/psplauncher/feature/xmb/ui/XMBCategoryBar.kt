@@ -201,12 +201,17 @@ private fun XMBCategoryItem(
     iconAnimatingAllowed: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val iconSize by animateDpAsState(
-        targetValue = if (isSelected) XmbLayoutSpec.DEFAULT.categoryIconSelectedDp.dp
-        else XmbLayoutSpec.DEFAULT.categoryIconDp.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "xmbCategoryIconSize",
-    )
+    // ONE SIZE FOR EVERY CATEGORY. The selected slot used to grow to categoryIconSelectedDp.
+    //
+    // The cursor does not live on the bar — left and right change category and the column follows
+    // at once, so there is no state in which the crossbar is the thing being pointed at. It was
+    // nonetheless drawing the full focus treatment: bigger, brighter, and (briefly) glowing, at
+    // the same moment the item column below was drawing the same three things around the row the
+    // cursor actually was on. Two things claiming the cursor, and only one of them had it.
+    //
+    // The bar keeps the two cues that say "this column is open" rather than "you are here": it is
+    // the only slot at full brightness, and the only one showing its label.
+    val iconSize = XmbLayoutSpec.DEFAULT.categoryIconDp.dp
     val itemAlpha by animateFloatAsState(
         // "Fade By Distance" (Display ▸ Appearance): off, every unselected slot dims the same
         // amount, which is what this always did. On, it dims by how far it sits from the cursor.
@@ -217,14 +222,6 @@ private fun XMBCategoryItem(
         },
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "xmbCategoryAlpha",
-    )
-    // The bloom, on the same spring as everything else so it arrives with the size change rather
-    // than a frame before it. See XmbGlow for why this exists now when the bar's own comment below
-    // still says there is no halo — the dim got deeper, so selection needed a second cue.
-    val glow by animateFloatAsState(
-        targetValue = if (isSelected) 1f else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "xmbCategoryGlow",
     )
     // Only the active category shows its label; others stay hidden (alpha 0) until navigated to.
     // The label keeps its slot so icons never shift when labels fade in/out.
@@ -252,8 +249,6 @@ private fun XMBCategoryItem(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(82.dp)
-                // Behind the alpha, so a slot that is fading out takes its bloom with it.
-                .xmbFocusGlow(glow, XmbGlow.CategoryReach, XmbGlow.CategoryAlpha)
                 .alpha(itemAlpha),
         ) {
             // The selected category's GIF (if the slot holds one) animates exactly while it is
@@ -263,8 +258,8 @@ private fun XMBCategoryItem(
                     (isSelected && iconAnimatingAllowed),
             ) {
             // All category icons resolve through the shared core-ui catalog (catbar_* column
-            // glyphs and sysicon_* console art). Selection is size, alpha, and — since the dim
-            // ramp went deeper — the XmbGlow bloom drawn behind this box.
+            // glyphs and sysicon_* console art). The open column reads by alpha and by its label
+            // alone — no halo here, and no size change; see [iconSize].
             CategoryIconGlyph(
                 iconKey = category.iconKey,
                 contentDescription = category.name,

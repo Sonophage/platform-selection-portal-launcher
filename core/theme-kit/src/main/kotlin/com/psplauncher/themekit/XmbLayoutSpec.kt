@@ -16,8 +16,20 @@ data class XmbLayoutSpec(
     val barTopFraction: Float = 0.11f,
     /** Content inset below the status strip, dp. */
     val contentTopPaddingDp: Float = 20f,
-    /** Category icon size, dp: selected / unselected. */
+    /**
+     * NO LONGER READ BY ANYTHING THAT DRAWS. Kept so existing theme files still parse.
+     *
+     * The crossbar used to grow its selected slot to this. It does not any more: the cursor is
+     * never on the bar, so the bar magnifying one slot competed with the item column magnifying
+     * the row the cursor was actually on. Both XMBCategoryBar and the Studio preview now size
+     * every category at [categoryIconDp].
+     *
+     * It stays in the format because theme files on disk carry the key and dropping it would make
+     * them fail to parse. A theme author who sets it will see no effect, which is why this says so
+     * here rather than leaving the field looking live.
+     */
     val categoryIconSelectedDp: Float = 72f,
+    /** Category icon size, dp — every category, selected or not. */
     val categoryIconDp: Float = 56f,
     /** First-level item leading icon glyph / centering slot, dp. */
     val itemIconDp: Float = 62f,
