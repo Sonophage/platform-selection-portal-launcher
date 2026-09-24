@@ -93,6 +93,7 @@ fun LibraryManagerScreen(
         onRemoveExtension = { p, e -> viewModel.removeExtension(p, e) },
         onAddExtension = { p, e -> viewModel.addExtension(p, e) },
         onScanConsole = { viewModel.scanConsole(it) },
+        onScrapeArtwork = { viewModel.scrapeArtwork(it) },
         onBeginRename = { viewModel.beginRename(it) },
         onCancelRename = { viewModel.cancelRename() },
         onConfirmRename = { viewModel.confirmRename(it) },
@@ -138,6 +139,7 @@ private fun LibraryManagerContent(
     onRemoveExtension: (platformId: String, ext: String) -> Unit,
     onAddExtension: (platformId: String, ext: String) -> Unit,
     onScanConsole: (platformId: String) -> Unit,
+    onScrapeArtwork: (platformId: String) -> Unit,
     onBeginRename: (platformId: String) -> Unit,
     onCancelRename: () -> Unit,
     onConfirmRename: (String) -> Unit,
@@ -167,7 +169,7 @@ private fun LibraryManagerContent(
         LibraryStep.PICK_PLATFORM -> PickPlatformContent(state, onBack = handleBack, onPlatformChosen = onPlatformChosen, modifier = modifier)
         LibraryStep.PICK_EMULATOR -> PickEmulatorContent(state, onBack = handleBack, onEmulatorChosen = onEmulatorChosen, modifier = modifier)
         LibraryStep.SCAN_PROMPT   -> ScanPromptContent(state, onBack = handleBack, onConfirmAddConsole = onConfirmAddConsole, modifier = modifier)
-        LibraryStep.CARD_DETAIL   -> CardDetailContent(state, onBack = handleBack, onAddAndroidApps = onAddAndroidApps, onLoadEmulatorOptions = onLoadEmulatorOptions, onRemoveExtension = onRemoveExtension, onAddExtension = onAddExtension, onScanConsole = onScanConsole, onBeginRename = onBeginRename, onToggleEnabled = onToggleEnabled, onTogglePinned = onTogglePinned, onMoveCard = onMoveCard, onRemoveCard = onRemoveCard, onSetEmulatorForDetail = onSetEmulatorForDetail, onOpenImportPcGames = onOpenImportPcGames, onSetVita3KFolder = onSetVita3KFolder, onScanVitaGames = onScanVitaGames, onRemoveApp = onRemoveApp, modifier = modifier)
+        LibraryStep.CARD_DETAIL   -> CardDetailContent(state, onBack = handleBack, onAddAndroidApps = onAddAndroidApps, onLoadEmulatorOptions = onLoadEmulatorOptions, onRemoveExtension = onRemoveExtension, onAddExtension = onAddExtension, onScanConsole = onScanConsole, onScrapeArtwork = onScrapeArtwork, onBeginRename = onBeginRename, onToggleEnabled = onToggleEnabled, onTogglePinned = onTogglePinned, onMoveCard = onMoveCard, onRemoveCard = onRemoveCard, onSetEmulatorForDetail = onSetEmulatorForDetail, onOpenImportPcGames = onOpenImportPcGames, onSetVita3KFolder = onSetVita3KFolder, onScanVitaGames = onScanVitaGames, onRemoveApp = onRemoveApp, modifier = modifier)
         LibraryStep.IMPORT_PC     -> ImportPcGamesContent(state, onBack = handleBack, onRefreshHomeStatus = onRefreshHomeStatus, onScanPcGamesFolder = onScanPcGamesFolder, onExportManualPcGames = onExportManualPcGames, onImportPcGame = onImportPcGame, onImportAllPcGames = onImportAllPcGames, onTestLaunchPcGame = onTestLaunchPcGame, onAddPcGameById = onAddPcGameById, onDismissMessage = onDismissMessage, homeRoleIntentProvider = homeRoleIntentProvider, modifier = modifier)
     }
 
@@ -237,7 +239,16 @@ private fun LibraryListContent(
 
             SettingsGroup("Consoles")
 
-            val consoleCards = state.cards.filterNot { it.platformId == "windows" }
+            // WINDOWS IS IN THIS LIST. It used to be filtered out, and its own Settings row was
+            // the only way to reach its card detail — then that row was removed in a426a2dc, on
+            // the reasoning that "Windows Games is a card in Library Manager, not a row beside
+            // it". The list had never shown it, so that left a fully built screen with no door:
+            // no rename, no Show In Games, no pin, no Import PC Games.
+            //
+            // The detail screen already handles it — a Windows-specific Library and Actions block
+            // instead of ROM extensions and a console scan, and no Remove, because the PC import
+            // system owns the card. Only the way in was missing.
+            val consoleCards = state.cards
             if (consoleCards.isEmpty()) {
                 Hint("No consoles configured. Add a console to create a Memory Card that appears inside Games.")
             } else {
@@ -405,6 +416,7 @@ private fun CardDetailContent(
     onRemoveExtension: (String, String) -> Unit,
     onAddExtension: (String, String) -> Unit,
     onScanConsole: (String) -> Unit,
+    onScrapeArtwork: (String) -> Unit,
     onBeginRename: (String) -> Unit,
     onToggleEnabled: (String, Boolean) -> Unit,
     onTogglePinned: (String, Boolean) -> Unit,
@@ -417,8 +429,8 @@ private fun CardDetailContent(
     onRemoveApp: (Long) -> Unit,
     modifier: Modifier,
 ) {
-    // No card for this platform. It happens for real: Settings > Windows Games opens this
-    // directly, and the Windows card only exists once a PC game has been imported. It used to
+    // No card for this platform. It happens for real: the Windows card only exists once a PC game
+    // has been imported, so a deep link to it can arrive before there is one. It used to
     // `return` here, which drew NOTHING -- no header, no rail, no Back, just the wallpaper, with
     // no way to tell a missing console from a broken screen.
     val card = state.detailCard
@@ -579,6 +591,19 @@ private fun CardDetailContent(
             }
 
             if (isAndroid) SettingsGroup("Actions")
+            // Every card, not only the consoles. It fills the gaps for THIS card's games and
+            // leaves valid artwork alone, so it is safe to press on a card that is already
+            // complete — it finds nothing and says so.
+            //
+            // The same action has been on the XMB's card context menu all along, and the
+            // repository function behind it is even commented "the per-card menu action". It was
+            // simply never offered in Settings, which is where you go when you are looking at a
+            // card rather than standing on it.
+            SettingsRow(
+                label    = "Scrape Missing Artwork",
+                sublabel = "Fetch box art, logos and backgrounds for this card's games that have none",
+                onClick  = { onScrapeArtwork(card.platformId) },
+            )
             SettingsRow(label = "Rename Memory Card", onClick = { onBeginRename(card.platformId) })
             SettingsToggleRow(
                 label    = "Show In Games",
@@ -859,6 +884,7 @@ fun LibraryManagerScreenPreview() {
             onRemoveExtension = { _, _ -> },
             onAddExtension = { _, _ -> },
             onScanConsole = {},
+            onScrapeArtwork = {},
             onBeginRename = {},
             onCancelRename = {},
             onConfirmRename = {},

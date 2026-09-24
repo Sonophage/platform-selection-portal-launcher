@@ -32,7 +32,15 @@ class MetadataScrapeWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val notifier = BackgroundTaskNotifier(applicationContext)
         val mode = inputData.getString(KEY_MODE) ?: MODE_MISSING
-        val label = if (mode == MODE_ALL) "Re-scraping all games" else "Scraping missing artwork"
+        // Absent for the two library-wide modes; a platform id narrows the same "missing" pass to
+        // one card. The repository has had scrapeMissingForPlatform all along — it was reachable
+        // only from the XMB's card context menu, never through this worker.
+        val platformId = inputData.getString(KEY_PLATFORM)
+        val label = when {
+            platformId != null -> "Scraping missing artwork: ${platformId.uppercase()}"
+            mode == MODE_ALL -> "Re-scraping all games"
+            else -> "Scraping missing artwork"
+        }
         notifier.running(TASK_ID, label, null)
         var lastNotified = 0L
 
@@ -61,8 +69,13 @@ class MetadataScrapeWorker @AssistedInject constructor(
         }
 
         return try {
-            val result = if (mode == MODE_ALL) artworkRepository.reScrapeAllGames(onProgress)
-            else artworkRepository.scrapeMissingOnly(onProgress)
+            // A platform wins over the mode: "all" means the whole library, and there is no
+            // sense in which one card can be re-scraped as all of them.
+            val result = when {
+                platformId != null -> artworkRepository.scrapeMissingForPlatform(platformId, onProgress)
+                mode == MODE_ALL -> artworkRepository.reScrapeAllGames(onProgress)
+                else -> artworkRepository.scrapeMissingOnly(onProgress)
+            }
             // The stop reason leads when there is one: "42 failed" with no explanation reads
             // as a broken library, and the actual cause is usually that a quota ran out.
             val counts = "${result.succeeded} succeeded, ${result.failed} failed of ${result.total}"
@@ -95,6 +108,9 @@ class MetadataScrapeWorker @AssistedInject constructor(
         const val MODE_ALL = "all"
         const val MODE_MISSING = "missing"
         const val KEY_MODE = "mode"
+
+        /** Narrows a [MODE_MISSING] pass to one Memory Card. Absent means the whole library. */
+        const val KEY_PLATFORM = "platform"
         const val KEY_CURRENT = "current"
         const val KEY_TOTAL = "total"
         const val KEY_SUCCEEDED = "succeeded"
@@ -106,10 +122,19 @@ class MetadataScrapeWorker @AssistedInject constructor(
         /** Why ScreenScraper stopped part-way, in the user's words, or absent when it did not. */
         const val KEY_STOPPED_REASON = "stopped_reason"
 
-        /** Enqueues a scrape (no-op if one is already running — KEEP policy). */
-        fun enqueue(context: Context, mode: String): UUID {
+        /**
+         * Enqueues a scrape (no-op if one is already running — KEEP policy).
+         *
+         * [platformId] narrows it to one card. The KEEP policy is doing real work for that case:
+         * the ScreenScraper account this is written against allows ONE thread, so a per-card
+         * scrape starting while a library-wide one runs would have the two fighting over it.
+         */
+        fun enqueue(context: Context, mode: String, platformId: String? = null): UUID {
             val request = OneTimeWorkRequestBuilder<MetadataScrapeWorker>()
-                .setInputData(workDataOf(KEY_MODE to mode))
+                .setInputData(
+                    if (platformId == null) workDataOf(KEY_MODE to mode)
+                    else workDataOf(KEY_MODE to mode, KEY_PLATFORM to platformId)
+                )
                 .build()
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.KEEP, request)

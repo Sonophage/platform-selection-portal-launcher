@@ -18,6 +18,7 @@ import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameContentType
 import com.psplauncher.core.domain.repository.GameRepository
 import com.psplauncher.feature.appbar.LauncherShortcutRepository
+import com.psplauncher.feature.artwork.api.MetadataScrapeWorker
 import com.psplauncher.feature.launcher.EmulatorProfileRepository
 import com.psplauncher.feature.launcher.PcLauncherAdapters
 import com.psplauncher.feature.launcher.PcLauncherCatalog
@@ -543,6 +544,23 @@ class LibraryManagerViewModel @Inject constructor(
             vita3KLibrary.setUx0Folder(uri)   // persists the SAF read grant
             scanVitaGames()
         }
+    }
+
+    /**
+     * Scrape only this card's games that are missing artwork.
+     *
+     * Through the worker rather than straight into ArtworkRepository, which is how the XMB's card
+     * context menu does the same job. The worker's unique-work KEEP policy is the reason: the
+     * ScreenScraper account this is written against allows ONE thread, so a per-card scrape
+     * launched while the library-wide one from Settings > Artwork is running would have two passes
+     * competing for it. Enqueuing both through one unique name makes that impossible.
+     */
+    fun scrapeArtwork(platformId: String) {
+        MetadataScrapeWorker.enqueue(
+            context,
+            MetadataScrapeWorker.MODE_MISSING,
+            platformId = platformId,
+        )
     }
 
     fun scanConsole(platformId: String, removeMissing: Boolean = false) {
