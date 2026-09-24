@@ -803,9 +803,13 @@ private fun XmbVerticalListRow(
                 ) {
                 // Wrapped rather than pushed into XmbItemLeadingIcon: that is a `when` over a
                 // dozen item types, each drawing its own shape, and the bloom is one thing behind
-                // all of them. The 4px white RING the design puts around this does NOT go here —
-                // it wraps a uniform art tile, and there is no such tile until the 2x2 art grid
-                // exists. A ring traced around a bare glyph's bounding box is not that design.
+                // all of them.
+                //
+                // THE DESIGN'S 4px WHITE RING IS CUT, not pending. It was held back because it
+                // wraps a uniform art tile and there was no such tile until the 2x2 art grid
+                // existed. The grid shipped, which removed the reason — and looking at the result
+                // the owner's answer was that the bloom is enough on its own (2026-09-24). Left
+                // as a deferral this comment would read as work owed forever.
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.xmbFocusGlow(
