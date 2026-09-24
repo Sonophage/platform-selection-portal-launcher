@@ -47,6 +47,16 @@ import com.psplauncher.core.ui.theme.LocalPfpTextColors
 // other categories are hidden entirely (alpha 0) until the user navigates to them — the bar stays
 // uncluttered and only the focused category announces itself.
 private val SelectedIcon = Color.White
+
+/**
+ * What every unselected CATEGORY fades to when "Fade By Distance" is off. Unchanged from before it.
+ *
+ * Deliberately not the same number as the item column's, which is 0.68 and always was: a caticon
+ * is a lone glyph on a busy wallpaper and a row is a glyph beside its own label, so they have never
+ * needed the same amount of dimming to read as unselected. Named apart from the row's constant so
+ * the difference stays visible instead of looking like one of them drifted.
+ */
+private const val FlatUnfocusedIconAlpha = 0.58f
 // Resolved per theme rather than fixed: on a pale scheme a light label on a light
 // wallpaper is unreadable, and every one of these was light. See PFPTheme.
 private val LabelInactive: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.inactive
@@ -103,10 +113,10 @@ fun XMBCategoryBar(
     // When drilled into a sub-item, the XMB hides every category to the RIGHT of the active one so
     // the focus collapses onto the active column (PSP second-level behaviour).
     drilledIn: Boolean = false,
-    // "Solid Unfocused Icons" (Display ▸ Appearance): when true, unselected category icons skip
-    // the unfocused dim — selection still reads by icon size and the label fade. Default false
+    // "Fade By Distance" (Display ▸ Appearance): when true, unselected category icons dim by how
+    // many slots they sit from the cursor rather than all sharing one alpha. Default true
     // = today's dimming. (IconLegibility rides LocalIconLegibility, no parameter needed.)
-    solidUnfocusedIcons: Boolean = false,
+    fadeByDistance: Boolean = true,
     // Whether the selected category's GIF icon may animate (battery saver / overlays gate it).
     iconAnimatingAllowed: Boolean = false,
 ) {
@@ -162,9 +172,15 @@ fun XMBCategoryBar(
                 XMBCategoryItem(
                     category = category,
                     isSelected = index == selectedIndex,
+                    // Steps from the cursor along the bar. Drilled in, visibleCategories() has
+                    // already dropped everything to the RIGHT of the selection and kept the
+                    // surviving indices aligned, so this is never negative there and the ramp
+                    // simply applies to whatever is still on the bar — no second rule for the
+                    // drilled-in case, and the PSP behaviour it relies on is untouched.
+                    distance = kotlin.math.abs(index - selectedIndex),
                     onClick = { onCategorySelected(index) },
                     onLongPress = { onCategoryLongPress(index) },
-                    solidUnfocusedIcons = solidUnfocusedIcons,
+                    fadeByDistance = fadeByDistance,
                     iconAnimatingAllowed = iconAnimatingAllowed,
                     modifier = Modifier.width(ItemSlotWidth),
                 )
@@ -178,9 +194,10 @@ fun XMBCategoryBar(
 private fun XMBCategoryItem(
     category: Category,
     isSelected: Boolean,
+    distance: Int,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
-    solidUnfocusedIcons: Boolean,
+    fadeByDistance: Boolean,
     iconAnimatingAllowed: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -191,8 +208,13 @@ private fun XMBCategoryItem(
         label = "xmbCategoryIconSize",
     )
     val itemAlpha by animateFloatAsState(
-        // "Solid Unfocused Icons": skip the unfocused dim; selection still reads by size + label.
-        targetValue = if (isSelected || solidUnfocusedIcons) 1f else 0.58f,
+        // "Fade By Distance" (Display ▸ Appearance): off, every unselected slot dims the same
+        // amount, which is what this always did. On, it dims by how far it sits from the cursor.
+        targetValue = when {
+            isSelected -> 1f
+            fadeByDistance -> XmbDim.ranked(distance)
+            else -> FlatUnfocusedIconAlpha
+        },
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "xmbCategoryAlpha",
     )

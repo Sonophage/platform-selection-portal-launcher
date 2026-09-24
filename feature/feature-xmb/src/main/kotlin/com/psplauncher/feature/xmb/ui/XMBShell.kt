@@ -1042,7 +1042,7 @@ fun XMBShell(
                                 barTopY = barTop,
                                 belowTopY = anchorTop,
                                 previousRiseRows = layoutSpec.previousItemRiseRows,
-                                solidUnfocusedIcons = uiState.solidUnfocusedIcons,
+                                fadeByDistance = uiState.fadeByDistance,
                                 textShadow = uiState.textShadow,
                                 iconAnimatingAllowed = iconAnimatingAllowed,
                                 focusedLogoVisible = focusedNameShownOnRight,
@@ -1064,7 +1064,7 @@ fun XMBShell(
                                 if (id == BuiltInCategory.SETTINGS) onSettingsLongPress()
                             },
                             drilledIn = uiState.drillTitle != null,
-                            solidUnfocusedIcons = uiState.solidUnfocusedIcons,
+                            fadeByDistance = uiState.fadeByDistance,
                             iconAnimatingAllowed = iconAnimatingAllowed,
                             modifier = Modifier
                                 .align(Alignment.TopStart)

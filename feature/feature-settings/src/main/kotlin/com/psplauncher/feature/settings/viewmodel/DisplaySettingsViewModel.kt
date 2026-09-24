@@ -75,8 +75,8 @@ private val KEY_TOUCH_SENSITIVITY  = stringPreferencesKey("interface_touch_sensi
 private val KEY_DIRECT_LAUNCH      = booleanPreferencesKey("pref_direct_game_launch")
 // Must match XMBViewModel.KEY_ICON_LEGIBILITY — both read/write this same pref.
 private val KEY_ICON_LEGIBILITY    = stringPreferencesKey("display_icon_legibility")
-// Must match XMBViewModel.KEY_SOLID_UNFOCUSED_ICONS — both read/write this same pref.
-private val KEY_SOLID_UNFOCUSED_ICONS = booleanPreferencesKey("display_solid_unfocused_icons")
+// Must match XMBViewModel.KEY_FADE_BY_DISTANCE — both read/write this same pref.
+private val KEY_FADE_BY_DISTANCE = booleanPreferencesKey("display_fade_by_distance")
 // Must match XMBViewModel.KEY_TEXT_SHADOW — both read/write this same pref.
 private val KEY_TEXT_SHADOW = booleanPreferencesKey("display_text_shadow")
 // ── Font colour (Display ▸ Font Colour) ──────────────────────────────────────
@@ -151,7 +151,7 @@ data class DisplaySettingsUiState(
     // Icon legibility treatment for XMB silhouette glyphs (None / Offset Shadow / Contour…).
     val iconLegibility: IconLegibilityStyle = IconLegibilityStyle.DEFAULT,
     // Draw unselected XMB icons at full opacity (selection reads by size and label).
-    val solidUnfocusedIcons: Boolean = false,
+    val fadeByDistance: Boolean = true,
     // Directional drop shadow behind XMB row subtitles, so helper text stays readable over
     // bright wallpaper regions. Default on — the shadow is subtle; without it the flat gray
     // subtitle is the one label that washes out.
@@ -264,7 +264,7 @@ class DisplaySettingsViewModel @Inject constructor(
             waveOverWallpaper    = prefs[KEY_WAVE_OVER_WALLPAPER] ?: false,
             touchNavButtonMode   = TouchNavButtonMode.fromName(prefs[KEY_TOUCH_NAV_BUTTON]),
             iconLegibility       = IconLegibilityStyle.fromName(prefs[KEY_ICON_LEGIBILITY]),
-            solidUnfocusedIcons  = prefs[KEY_SOLID_UNFOCUSED_ICONS] ?: false,
+            fadeByDistance       = prefs[KEY_FADE_BY_DISTANCE] ?: true,
             textShadow           = prefs[KEY_TEXT_SHADOW] ?: true,
             textColorArgb        = prefs[KEY_TEXT_COLOR],
             textColorExact       = prefs[KEY_TEXT_COLOR_EXACT] ?: false,
@@ -368,7 +368,7 @@ class DisplaySettingsViewModel @Inject constructor(
 
     fun setIconLegibility(style: IconLegibilityStyle) = save { it[KEY_ICON_LEGIBILITY] = style.name }
 
-    fun setSolidUnfocusedIcons(v: Boolean) = save { it[KEY_SOLID_UNFOCUSED_ICONS] = v }
+    fun setFadeByDistance(v: Boolean) = save { it[KEY_FADE_BY_DISTANCE] = v }
 
     fun setTextShadow(v: Boolean) = save { it[KEY_TEXT_SHADOW] = v }
 

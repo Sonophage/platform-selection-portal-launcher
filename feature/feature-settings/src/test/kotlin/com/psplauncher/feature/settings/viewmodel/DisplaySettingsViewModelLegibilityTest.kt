@@ -144,16 +144,47 @@ class DisplaySettingsViewModelLegibilityTest {
     }
 
     @Test
-    fun `solid unfocused icons toggles and persists`() = runTest(dispatcher) {
-        assertEquals(false, vm.uiState.first().solidUnfocusedIcons)
+    fun `fade by distance defaults on, toggles off, and persists`() = runTest(dispatcher) {
+        // Default ON, where the setting it replaced defaulted OFF. The old toggle asked "draw
+        // unselected icons at full opacity?" and this one asks "fade them by distance?", so the
+        // out-of-the-box answer is the redesign's ramp rather than the flat dim.
+        assertEquals(true, vm.uiState.first().fadeByDistance)
 
-        vm.setSolidUnfocusedIcons(true)
-        eventually("solid icons persisted") {
-            context.pfpDataStore.data.first()[KEY_SOLID_UNFOCUSED_ICONS] == true
+        vm.setFadeByDistance(false)
+        eventually("fade by distance persisted off") {
+            context.pfpDataStore.data.first()[KEY_FADE_BY_DISTANCE] == false
         }
-        eventually("solid icons surfaced") {
-            vm.uiState.first().solidUnfocusedIcons
+        eventually("fade by distance surfaced off") {
+            !vm.uiState.first().fadeByDistance
         }
+
+        vm.setFadeByDistance(true)
+        eventually("fade by distance surfaced on again") {
+            vm.uiState.first().fadeByDistance
+        }
+    }
+
+    @Test
+    fun `the old solid-unfocused value does not decide the new one`() = runTest(dispatcher) {
+        // The keys are deliberately different strings, and this is why. display_solid_unfocused
+        // _icons answered "dim at all?"; display_fade_by_distance answers "dim flat, or by
+        // distance?". A stored true for the first carries no opinion about the second, so reusing
+        // the key would have silently turned "I did not want dimming" into "I want the ramp" on
+        // every device that had ever touched the old toggle — a reading nobody chose, arriving
+        // with no visible cause.
+        context.pfpDataStore.edit { it[KEY_SOLID_UNFOCUSED_ICONS] = false }
+        // Wait for the stale write to be READABLE before asserting anything about it. Asserting
+        // straight away would pass while the value was still in flight, which is the same green
+        // as a correct implementation and tells you nothing.
+        eventually("the stale key is in the store") {
+            context.pfpDataStore.data.first()[KEY_SOLID_UNFOCUSED_ICONS] == false
+        }
+
+        assertEquals(
+            "the new setting must not take its value from the old key",
+            true,
+            vm.uiState.first().fadeByDistance,
+        )
     }
 
     @Test
@@ -196,6 +227,9 @@ class DisplaySettingsViewModelLegibilityTest {
     private companion object {
         // Mirror the (private) ViewModel keys by their string contract, like the wallpaper test.
         val KEY_ICON_LEGIBILITY = stringPreferencesKey("display_icon_legibility")
+        val KEY_FADE_BY_DISTANCE = booleanPreferencesKey("display_fade_by_distance")
+
+        // Still named here on purpose: the point of the test above is that this key is NOT read.
         val KEY_SOLID_UNFOCUSED_ICONS = booleanPreferencesKey("display_solid_unfocused_icons")
         val KEY_TEXT_SHADOW = booleanPreferencesKey("display_text_shadow")
     }

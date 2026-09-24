@@ -158,6 +158,9 @@ private val SecondaryText: Color @Composable @ReadOnlyComposable get() = LocalPf
 // Resolved per theme rather than fixed: on a pale scheme a light label on a light
 // wallpaper is unreadable, and every one of these was light. See PFPTheme.
 private val InactiveText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.inactive
+/** What every unselected ROW fades to when "Fade By Distance" is off. See XMBCategoryBar's 0.58. */
+private const val FlatUnfocusedRowAlpha = 0.68f
+
 // Soft dark halo behind the bright selected label — keeps white legible on the light wave.
 private val SelectedTextShadow = Shadow(
     color = Color(0x73001627),
@@ -328,9 +331,12 @@ private fun XmbGameColumn(
 
 // One sibling icon — plain glyph (no tile/shadow), dimmed when not the active sibling. Video
 // sections use vector glyphs (folder / library / movie); everything else uses console art.
-// solidUnfocusedIcons = the Display ▸ Appearance toggle: full-opacity unselected glyphs.
+// The sibling cross keeps ONE dim and does not take the distance ramp. It is a drill flyout's
+// memory-card column, not a run you scroll: you step onto a sibling, you do not travel past four
+// of them, so "further away" has nothing to mean here. Extending the ramp to it would be applying
+// a rule to a surface its numbers were never about.
 @Composable
-private fun SiblingIcon(item: XMBItem, selected: Boolean, solidUnfocusedIcons: Boolean = false) {
+private fun SiblingIcon(item: XMBItem, selected: Boolean) {
     val chip = if (selected) 56.dp else 40.dp
     val videoGlyph = when (item.type) {
         // Missing takes the vector path rather than console art: there is no sysicon for it, and
@@ -362,13 +368,13 @@ private fun SiblingIcon(item: XMBItem, selected: Boolean, solidUnfocusedIcons: B
                 contentDescription = item.title,
                 tint = LocalPFPColors.current.iconColor,
                 // Layer alpha (not tint alpha) so custom untinted icons dim identically.
-                modifier = Modifier.size(chip).alpha(if (selected || solidUnfocusedIcons) 1f else 0.5f),
+                modifier = Modifier.size(chip).alpha(if (selected) 1f else 0.5f),
             )
         } else {
             com.psplauncher.core.ui.icons.ConsoleIcon(
                 platformId = consoleIconKeyFor(item),
                 contentDescription = item.title,
-                modifier = Modifier.size(chip).alpha(if (selected || solidUnfocusedIcons) 1f else 0.5f),
+                modifier = Modifier.size(chip).alpha(if (selected) 1f else 0.5f),
             )
         }
     }
@@ -453,10 +459,10 @@ fun XMBItemList(
     drillCursorOnSelected: Boolean = false,
     // How far the dissolving previous item rises above the bar, in row heights (theme layout spec).
     previousRiseRows: Float = XmbLayoutSpec.DEFAULT.previousItemRiseRows,
-    // "Solid Unfocused Icons" (Display ▸ Appearance): when true, unselected rows skip the
+    // "Fade By Distance" (Display ▸ Appearance): when true, unselected rows dim by how far they
     // unfocused dim — selection still reads by the row's scale and the bright label. Default
     // false = today's dimming.
-    solidUnfocusedIcons: Boolean = false,
+    fadeByDistance: Boolean = true,
     // "Text Shadow" (Display ▸ Appearance): directional drop shadow behind row labels and
     // subtitles, so helper text stays readable over bright wallpaper regions. Default true —
     // without it the flat gray subtitle is the one label that washes out.
@@ -512,7 +518,11 @@ fun XMBItemList(
                             onLongPress = { onItemLongPress(i) },
                             showIcon = showIcons,
                             trailingCursor = drillCursorOnSelected && i == selectedIndex,
-                            solidUnfocusedIcons = solidUnfocusedIcons,
+                            fadeByDistance = fadeByDistance,
+                            // The window below the bar starts AT the selection, so the row's
+                            // offset into it is its distance — no abs() needed, it cannot go
+                            // negative here.
+                            distance = i - sel,
                             textShadow = textShadow,
                             iconAnimatingAllowed = iconAnimatingAllowed,
                             modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT),
@@ -553,7 +563,9 @@ fun XMBItemList(
                     onClick = { onItemSelected(selectedIndex - 1) },
                     onLongPress = { onItemLongPress(selectedIndex - 1) },
                     showIcon = showIcons,
-                    solidUnfocusedIcons = solidUnfocusedIcons,
+                    fadeByDistance = fadeByDistance,
+                    // Exactly one row is ever drawn above the bar, so it is always one step out.
+                    distance = 1,
                     textShadow = textShadow,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -579,8 +591,10 @@ private fun XmbVerticalListRow(
     showIcon: Boolean = true,
     // When true, a ◀ drill cursor is drawn directly to the right of this row's content.
     trailingCursor: Boolean = false,
-    // "Solid Unfocused Icons": when true, this unselected row skips the unfocused dim.
-    solidUnfocusedIcons: Boolean = false,
+    // "Fade By Distance": when true, this unselected row dims by how far it is from the cursor.
+    fadeByDistance: Boolean = true,
+    /** Rows from the cursor. 0 is the selection; the row above the bar is 1, as is the one below. */
+    distance: Int = 0,
     // "Text Shadow" (Display ▸ Appearance): drop shadow behind row helper text (subtitle).
     textShadow: Boolean = true,
     // Something to the right is already naming the focused game — its PIC0 logo, or the hover
@@ -605,10 +619,14 @@ private fun XmbVerticalListRow(
     )
     val rowAlpha by animateFloatAsState(
         targetValue = when {
-            // "Solid Unfocused Icons": skip the unfocused dim; selection still reads by scale + label.
-            isSelected || solidUnfocusedIcons -> 1f
+            isSelected -> 1f
+            // The empty-state row keeps its own alpha either way: it is not a thing you are
+            // navigating past, it is a message about there being nothing to navigate.
             item.type == XMBItemType.EMPTY -> 0.5f
-            else -> 0.68f
+            // "Fade By Distance" (Display ▸ Appearance): on, a row fades further the further it
+            // sits from the cursor; off, every unselected row shares the one alpha it always had.
+            fadeByDistance -> XmbDim.ranked(distance)
+            else -> FlatUnfocusedRowAlpha
         },
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "xmbListRowAlpha",

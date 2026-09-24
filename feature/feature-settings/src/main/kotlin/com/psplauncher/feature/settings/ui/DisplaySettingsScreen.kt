@@ -327,10 +327,10 @@ fun DisplaySettingsScreen(
                 )
 
                 SettingsToggleRow(
-                    label    = "Solid Unfocused Icons",
-                    sublabel = "Draw unselected icons at full opacity — selection still reads by size and label",
-                    checked  = state.solidUnfocusedIcons,
-                    onToggle = { viewModel.setSolidUnfocusedIcons(it) },
+                    label    = "Fade By Distance",
+                    sublabel = "Fade rows and icons further the further they sit from the cursor — off, every unselected one dims the same",
+                    checked  = state.fadeByDistance,
+                    onToggle = { viewModel.setFadeByDistance(it) },
                 )
 
                 // Default on: the shadow is subtle and helper text over bright wallpaper reads far

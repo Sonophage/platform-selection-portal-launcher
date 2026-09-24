@@ -787,9 +787,9 @@ data class XMBUiState(
     // Appearance. Provided as LocalIconLegibility; NONE renders today's glyph exactly.
     val iconLegibility: com.psplauncher.core.domain.model.IconLegibilityStyle =
         com.psplauncher.core.domain.model.IconLegibilityStyle.DEFAULT,
-    // "Solid Unfocused Icons": when true, unselected XMB icons skip the unfocused alpha dim
+    // "Fade By Distance": when true, unselected XMB icons and rows dim by how far they sit from
     // (selection still reads by icon size and label). Default false = today's dimming.
-    val solidUnfocusedIcons: Boolean = false,
+    val fadeByDistance: Boolean = true,
     // "Text Shadow": directional drop shadow behind XMB row subtitles (the faded gray helper
     // text), so it stays readable over bright wallpaper regions. Default on — without it the
     // subtitle is the only row label with no separation treatment.
@@ -9109,7 +9109,7 @@ class XMBViewModel @Inject constructor(
                     )
                 val legibility = com.psplauncher.core.domain.model.IconLegibilityStyle
                     .fromName(prefs[KEY_ICON_LEGIBILITY])
-                val solidUnfocused = prefs[KEY_SOLID_UNFOCUSED_ICONS] ?: false
+                val fadeByDistance = prefs[KEY_FADE_BY_DISTANCE] ?: true
                 val textShadow = prefs[KEY_TEXT_SHADOW] ?: true
                 _uiState.update {
                     it.copy(
@@ -9118,7 +9118,7 @@ class XMBViewModel @Inject constructor(
                         contextMenuHintEnabled = hintEnabled,
                         contextMenuHintDelaySeconds = hintDelaySeconds,
                         iconLegibility = legibility,
-                        solidUnfocusedIcons = solidUnfocused,
+                        fadeByDistance = fadeByDistance,
                         textShadow = textShadow,
                     )
                 }
@@ -9268,8 +9268,13 @@ class XMBViewModel @Inject constructor(
         private val KEY_TOUCH_SENSITIVITY = stringPreferencesKey("interface_touch_sensitivity")
         // Must match DisplaySettingsViewModel.KEY_ICON_LEGIBILITY — both read/write this pref.
         private val KEY_ICON_LEGIBILITY = stringPreferencesKey("display_icon_legibility")
-        // Must match DisplaySettingsViewModel.KEY_SOLID_UNFOCUSED_ICONS — both read/write this pref.
-        private val KEY_SOLID_UNFOCUSED_ICONS = booleanPreferencesKey("display_solid_unfocused_icons")
+        // Must match DisplaySettingsViewModel.KEY_FADE_BY_DISTANCE — both read/write this pref.
+        //
+        // A NEW key, not a rename of display_solid_unfocused_icons. That one answered "dim at all?"
+        // and this one answers "dim flat or by distance?", so a stored true carries no opinion about
+        // the new question and reusing the key would silently reinterpret it. The old key is left
+        // where it is, inert, rather than migrated to a value it never meant.
+        private val KEY_FADE_BY_DISTANCE = booleanPreferencesKey("display_fade_by_distance")
         // Must match DisplaySettingsViewModel.KEY_TEXT_SHADOW — both read/write this pref.
         private val KEY_TEXT_SHADOW = booleanPreferencesKey("display_text_shadow")
         // ICON1 linger default (1.5 s) — the user can adjust the delay under Artwork ▸ Art
