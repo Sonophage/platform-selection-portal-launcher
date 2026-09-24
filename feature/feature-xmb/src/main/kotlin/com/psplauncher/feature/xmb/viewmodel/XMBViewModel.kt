@@ -6059,9 +6059,37 @@ class XMBViewModel @Inject constructor(
         when (action) {
             // Item cursor moves through the shared moveItemCursor() so touch swipes and the D-pad
             // drive identical logic; cancel auto-repeat when we hit a list boundary.
-            GamepadAction.NAVIGATE_UP   -> if (!moveItemCursor(-1)) gamepadInputHandler.cancelRepeat()
-            GamepadAction.NAVIGATE_DOWN -> if (!moveItemCursor(+1)) gamepadInputHandler.cancelRepeat()
+            GamepadAction.NAVIGATE_UP   -> {
+                // Out of the pill row first, and the press is spent doing it — you came DOWN into
+                // it from this row, so UP gives that row back rather than skipping past it. Same
+                // order BACK follows a few branches below, for the same reason.
+                if (state.activePillIndex() != null) {
+                    menuSound.play(MenuSound.SCROLL)
+                    _uiState.update { it.copy(pillCursor = null) }
+                    return
+                }
+                if (!moveItemCursor(-1)) gamepadInputHandler.cancelRepeat()
+            }
+            GamepadAction.NAVIGATE_DOWN -> {
+                // Already in the row: there is nothing under it.
+                if (state.activePillIndex() != null) {
+                    gamepadInputHandler.cancelRepeat()
+                    return
+                }
+                if (moveItemCursor(+1)) return
+                // The bottom of the column, where DOWN has always done nothing at all. That dead
+                // press is the row's way in — on EVERY screen, including the home shelf, where
+                // left and right are reserved for leaving and the pills had no controller route
+                // in at all. It is offered only where there is something to enter.
+                if (pillPressHandled(action, state)) return
+                gamepadInputHandler.cancelRepeat()
+            }
             GamepadAction.NAVIGATE_LEFT -> {
+                // ALREADY IN THE PILL ROW: left and right are the row's and nothing else's.
+                // Without this, LEFT from inside the row hit the drill branch below and left the
+                // folder entirely — a press that walked out of two things at once, from a cursor
+                // sitting on "Favorite". The row is the innermost open thing; it goes first.
+                if (state.activePillIndex() != null && pillPressHandled(action, state)) return
                 // While drilled into a sub-item, LEFT does not escape to another category — it
                 // backs out one level, the direction the XMB's own drill-in metaphor implies. It
                 // deliberately does NOT fall through to the App Drawer the way BACK does (that is
@@ -6087,6 +6115,10 @@ class XMBViewModel @Inject constructor(
                 else gamepadInputHandler.cancelRepeat()
             }
             GamepadAction.NAVIGATE_RIGHT -> {
+                // The same pre-check as LEFT, and it matters on the one screen the rule below
+                // excludes: the shelf's pills are reachable by DOWN now, and once the cursor is
+                // in them RIGHT has to walk the row rather than step off the shelf.
+                if (state.activePillIndex() != null && pillPressHandled(action, state)) return
                 // ...and RIGHT puts the rail away ON THE WAY PAST. It used to spend the press
                 // doing only that, which made leaving the shelf cost two presses before the pill
                 // row started charging for more — "moving from the recent screen to xmb is taking

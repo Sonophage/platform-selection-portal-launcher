@@ -112,14 +112,29 @@ internal fun pillNav(action: GamepadAction, current: Int?, count: Int): PillNav 
             current < count - 1 -> PillNav.Move(current + 1)
             else -> PillNav.ExitAndPass
         }
-        // The mirror: left enters at the LAST pill, so the row behaves the same whichever side you
-        // arrive from. Entering from the right only would halve the cost of crossing a category
-        // and is a one-line change to the first branch here.
+        // LEFT DOES NOT ENTER THE ROW, and the comment that used to sit here said it did.
+        //
+        // On a drilled-in list — All Games, a platform card, a collection, which is where most
+        // game rows live — LEFT is spent backing out of the drill, and that branch returns long
+        // before this function is reached. So "left enters at the last pill" was true only on an
+        // undrilled column, and the row really was enterable from one side on the screens that
+        // matter. Putting the pills in front of the press that leaves a folder is the cost the
+        // owner already refused on the recents shelf; the row gained a way in from DOWN instead.
+        //
+        // Left still WALKS the row and leaves it, which is a different thing: once the cursor is
+        // in the row, left and right are the row's and nothing else's.
         GamepadAction.NAVIGATE_LEFT -> when {
-            current == null -> PillNav.Move(count - 1)
+            current == null -> PillNav.Pass
             current > 0 -> PillNav.Move(current - 1)
             else -> PillNav.ExitAndPass
         }
+        // DOWN off the bottom of the column, and UP to give it back. The one direction that was
+        // free: walking off the end of a list did nothing at all, on every screen including the
+        // shelf, where left and right are reserved for leaving and the row had no controller
+        // route in at all.
+        // Only the way IN. Leaving upward is BACK's rule — spend the press and leave the
+        // innermost thing — and it is handled where BACK's is, not here.
+        GamepadAction.NAVIGATE_DOWN -> if (current == null) PillNav.Move(0) else PillNav.Pass
         else -> PillNav.Pass
     }
 }
