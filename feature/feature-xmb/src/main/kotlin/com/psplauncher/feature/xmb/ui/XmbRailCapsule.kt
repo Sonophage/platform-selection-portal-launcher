@@ -119,4 +119,14 @@ private val RailGap = 10.dp
 private val RailMaxText = 300.dp
 
 internal val RailInk = Color(0xFF1A0C03)
+
+/**
+ * The wash the rail and the notification sheet both lay down.
+ *
+ * One colour, two directions: the rail ramps it left-to-right off the right edge, the sheet ramps
+ * it top-to-bottom off the top edge. "Mimic the context menu but the gradient is vertical" is one
+ * surface treatment used twice, and a second near-black would be a second near-black to keep in
+ * step the next time either is tuned.
+ */
+internal val XmbScrim = Color(0xC4080301)
 internal val RailDestructive = Color(0xFFE2606A)

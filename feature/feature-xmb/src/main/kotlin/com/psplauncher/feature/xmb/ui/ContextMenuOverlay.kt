@@ -41,7 +41,7 @@ fun ContextMenuOverlay(
             // this rather than by it stopping short of them — an inset scrim left a horizontal
             // seam across the whole width where it ended, which is a rule drawn on the screen for
             // no reason anyone looking at it could name.
-            .background(Brush.horizontalGradient(0f to Color.Transparent, 1f to RailScrim)),
+            .background(Brush.horizontalGradient(0f to Color.Transparent, 1f to XmbScrim)),
     ) {
         // Catches the press that lands anywhere else, the same job the panel's own dim did.
         Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
@@ -71,13 +71,8 @@ fun ContextMenuOverlay(
     }
 }
 
-/**
- * The wash behind the rail: clear at the left edge, [RailScrim] at the right.
- *
- * It has been three things. A fixed half-screen ramp, then one measured off the rail's own width
- * so it grew with the longest label, and now a plain full-width gradient at lower opacity — "have
- * the gradient be fully wide horizontal". The width-tracking version is gone rather than kept
- * alongside: two ways of deciding where the dark starts is one too many.
- */
-private val RailScrim = Color(0xC4080301)
+// The wash behind the rail is XmbScrim, ramped left to right. It has been three things: a fixed
+// half-screen ramp, then one measured off the rail's own width so it grew with the longest label,
+// and now a plain full-width gradient. The width-tracking version is gone rather than kept beside
+// it — two ways of deciding where the dark starts is one too many.
 private const val DimFadeMs = 160
