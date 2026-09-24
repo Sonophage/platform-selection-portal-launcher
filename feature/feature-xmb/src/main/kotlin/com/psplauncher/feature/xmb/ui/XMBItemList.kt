@@ -719,18 +719,31 @@ private fun XmbVerticalListRow(
                 }
             }
 
-            // Game entities are icon-first: NO text on any game row except the ACTIVE row of
-            // The logo overlay IS the identity, so a game hides its title while that logo is on
-            // screen -- and only then. Before the overlay fades in, and for a game whose logo
-            // will not be drawn, the title shows: a row must never be nameless. Non-game rows
-            // keep their labels as always, and a textOnly row (e.g. Untracked) always labels.
-            val showGameText = item.textOnly || !item.isRealGame || (isSelected && !focusedLogoVisible)
-            if (showText && showGameText) {
+            // Game entities are icon-first: NO text on any game row except the ACTIVE one. Non-game
+            // rows keep their labels as always, and a textOnly row (e.g. Untracked) always labels.
+            val showGameText = item.textOnly || !item.isRealGame || isSelected
+
+            // THE NAME FADES, it does not blink out. "the title should fade out when it hits any
+            // meta data and returns on the empty state you just made."
+            //
+            // Only the PANEL-driven hide is faded. Moving the cursor still swaps the name instantly
+            // between rows, because that is a cursor keeping up with a d-pad and a 200ms crossfade
+            // on every press reads as lag rather than as polish. What fades is the name getting out
+            // of the way of an Info, Video or Box Art page — and coming back when L1 returns the
+            // strip to rest.
+            val panelHidesText = isSelected && item.isRealGame && !item.textOnly && focusedLogoVisible
+            val textAlpha by animateFloatAsState(
+                targetValue = if (panelHidesText) 0f else 1f,
+                animationSpec = tween(220),
+                label = "xmbRowTextFade",
+            )
+            if (showText && showGameText && textAlpha > 0f) {
                 // start padding pushes the label clear of the wallpaper's vertical cross bar, so the
                 // text doesn't butt against the black band (a small gap, PSP-style).
                 Column(
                     modifier = Modifier
                         .weight(1f, fill = false)
+                        .alpha(textAlpha)
                         .padding(start = XmbLayoutSpec.DEFAULT.itemTextStartGapDp.dp),
                 ) {
                     val titleColor = if (isSelected) PrimaryText else InactiveText
@@ -747,14 +760,15 @@ private fun XmbVerticalListRow(
                             modifier = Modifier.weight(1f, fill = false),
                         )
                     }
-                    // While the logo page is open the focused game's row says what the thing IS —
-                    // year, genre, developer, players — instead of what system it is on and when
-                    // it was last played. Only the FOCUSED row: the metadata belongs to the game
-                    // the panel is about, and printing it under every row would be four lines of
-                    // facts about four different games. Falls back to the normal subtitle for a
-                    // game with nothing scraped, so the line never empties.
+                    // What the thing IS — year, genre, developer, players — in every state, not
+                    // only while some page is open. A line under a name that changes identity
+                    // depending on which panel page you are on is two lines sharing a slot.
+                    //
+                    // Falls back to the system-and-last-played line for a game with nothing
+                    // scraped, and for anything that is not a game (a platform card's "64 games",
+                    // a settings row's hint), so the slot never empties and nothing else moves.
                     val effectiveSubtitle =
-                        if (isSelected && metadataAsSubtitle) item.metadataLine ?: item.subtitle
+                        if (metadataAsSubtitle) item.metadataLine ?: item.subtitle
                         else item.subtitle
                     effectiveSubtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
                         Text(

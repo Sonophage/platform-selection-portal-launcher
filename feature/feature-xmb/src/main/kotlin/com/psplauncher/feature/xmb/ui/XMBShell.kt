@@ -787,10 +787,14 @@ fun XMBShell(
             // never comes through here. Recents keeps the logo it has always led with.
             val stripOpened = uiState.panelStripOpen
 
-            // The focused row swaps its subtitle for the game's scraped facts while the logo page
-            // is open — "and only when the logo is selected". At rest the subtitle stays the
-            // system-and-last-played line, which is what that state is for.
-            val metadataAsSubtitle = stripOpened && onLogoPage && uiState.gameMetadataVisible
+            // The focused row's subtitle is the game's scraped facts in EVERY state — "it should
+            // always be the meta line. the one that starts with the year". It briefly swapped with
+            // the strip's position, which meant the line under a game's name changed identity
+            // depending on which page you happened to be on; one line, one meaning.
+            //
+            // Still gated on the Game Metadata setting, which is what turns those facts off
+            // wholesale. With it off the row falls back to the system-and-last-played line.
+            val metadataAsSubtitle = uiState.gameMetadataVisible
             // "Is anything on the right already naming this game?"
             //
             // Off the logo page the panel is 42% of the width and the label runs straight into

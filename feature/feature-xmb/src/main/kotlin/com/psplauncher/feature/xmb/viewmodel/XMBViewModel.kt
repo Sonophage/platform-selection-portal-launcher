@@ -5881,6 +5881,18 @@ class XMBViewModel @Inject constructor(
 
     private fun stepHoverPanelPage(delta: Int) = _uiState.update { s ->
         val content = s.hoverPanelContent ?: return@update s
+        // THE FIRST PRESS OPENS, IT DOES NOT STEP.
+        //
+        // Closed, effectivePanelPage reports LOGO, so R1 used to step off it and land on Info —
+        // the logo was skipped entirely going right and only reachable going left. Whichever
+        // shoulder you press first now opens the strip ON the logo page, and stepping starts from
+        // the press after that. The pages read the same order in both directions.
+        if (!s.panelStripOpen) {
+            return@update s.copy(
+                panelPage = DetailPanelPage.LOGO,
+                panelPageGameId = s.hoverPanelItem?.gameId,
+            )
+        }
         // LEFT off the first page CLOSES the strip instead of clamping against it.
         //
         // The pages run LOGO, Info, Video, Box Art, and stepping left at LOGO used to land back on
@@ -5888,10 +5900,9 @@ class XMBViewModel @Inject constructor(
         // It now returns to the resting state, so the strip has an exit at the end you arrived
         // through rather than only the far one.
         //
-        // Guarded on the strip being OPEN. Closed, effectivePanelPage also reports LOGO, and
-        // without this L1 would clear an already-empty state and there would be no way to open
-        // the logo page leftward at all.
-        if (delta < 0 && s.panelStripOpen && s.effectivePanelPage == DetailPanelPage.LOGO) {
+        // Only reachable with the strip already open, because the branch above returned for the
+        // closed case — so this is "you were on the logo page and pressed left again".
+        if (delta < 0 && s.effectivePanelPage == DetailPanelPage.LOGO) {
             return@update s.copy(panelPageGameId = null)
         }
         s.copy(
