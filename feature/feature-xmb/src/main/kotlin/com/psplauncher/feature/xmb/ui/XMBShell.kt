@@ -113,6 +113,7 @@ import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.focusedPillIndex
 import com.psplauncher.feature.xmb.viewmodel.focusedPills
+import com.psplauncher.feature.xmb.viewmodel.promptsFor
 import com.psplauncher.feature.xmb.viewmodel.railRows
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.FAN_COVER_COUNT
@@ -1327,18 +1328,13 @@ fun XMBShell(
                     (!uiState.hasBlockingOverlay || uiState.contextRailOnly),
                 enter = fadeIn(tween(200)),
                 exit = ExitTransition.None,
-                modifier = Modifier.align(Alignment.BottomEnd).zIndex(aboveContextRail),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().zIndex(aboveContextRail),
             ) {
-                ContextMenuHint(
-                    showSort = uiState.showContextMenuHint && uiState.canSortCurrentList,
-                    showFilter = uiState.showContextMenuHint && uiState.canFilterRecents,
-                    showOptions = uiState.showContextMenuHint && uiState.focusedItemHasContextMenu,
-                    showRootActions = rootActionsVisible,
+                // Full width and flush to the bottom edge: it IS the page's footer now, not a
+                // pill lying on the page, so it takes no inset of its own.
+                XmbHintBar(
+                    prompts = promptsFor(uiState),
                     onAction = onPromptTapped,
-                    // Flush to the bottom edge, inset only from the right. A pill floating a
-                    // few dp clear of the edge reads as a thing lying ON the page; sitting on
-                    // the edge it reads as the page's own footer, which is what it is.
-                    modifier = Modifier.padding(end = ControllerHintEdgeGap),
                 )
             }
 
