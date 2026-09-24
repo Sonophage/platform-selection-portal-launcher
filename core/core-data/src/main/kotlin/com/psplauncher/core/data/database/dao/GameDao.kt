@@ -164,6 +164,17 @@ interface GameDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(game: GameEntity): Long
 
+    /**
+     * The row's existing added-date, or null when there is no such row.
+     *
+     * [upsert] is `@Insert(onConflict = REPLACE)`, which SQLite performs as DELETE-then-INSERT, so
+     * every column the caller does not carry is destroyed rather than left alone. A scanner builds
+     * its entity from the filesystem and cannot know when the row was first written, so without
+     * reading it back first every rescan would restamp the whole library as new.
+     */
+    @Query("SELECT date_added FROM games WHERE id = :id")
+    suspend fun dateAddedOf(id: Long): Long?
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(games: List<GameEntity>)
 

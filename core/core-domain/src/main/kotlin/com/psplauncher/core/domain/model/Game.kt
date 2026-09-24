@@ -63,6 +63,12 @@ data class Game(
     val favoriteSortOrder: Int = 0,
     val totalPlayTimeMillis: Long = 0,
     val lastPlayedAt: Long? = null,
+    /**
+     * When this entry entered the library. 0 means it predates the column; see [GameEntity].
+     *
+     * Null only between an insert and its stamp, which the repository closes in the same call.
+     */
+    val dateAdded: Long?          = null,
     val userNote: String?   = null,
     val isManualEntry: Boolean = false,
     // Title derived from a metadata scrape (e.g. "Super Mario World" from "Super_Mario_World_USA.sfc").

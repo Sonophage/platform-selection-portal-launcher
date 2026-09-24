@@ -68,7 +68,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
  * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
  * version bump cannot leave the test still asserting against the old number.
  */
-const val PFP_DATABASE_VERSION = 51
+const val PFP_DATABASE_VERSION = 52
 
 @Database(
     entities = [
@@ -1425,6 +1425,26 @@ abstract class PFPDatabase : RoomDatabase() {
         }
 
         /**
+         * When a game entered the library, so "recently added" can mean it.
+         *
+         * Photos, books and videos have carried `date_added` since their tables were written;
+         * games never did, and the cover fan has been standing in with "highest id first" —
+         * a fair proxy until a platform is deleted and re-added, which drops and re-inserts every
+         * row of it and is exactly when someone looks at a recently-added list.
+         *
+         * **Existing rows are set to 0, not to now.** 0 reads as "was already here, and unknown",
+         * and every query that means recency excludes it. Stamping the migration's own timestamp
+         * would have made the entire library "added today" — one wrong answer for every row,
+         * permanently, since they would all share the instant.
+         */
+        val MIGRATION_51_52 = object : Migration(51, 52) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE games ADD COLUMN date_added INTEGER")
+                db.execSQL("UPDATE games SET date_added = 0")
+            }
+        }
+
+        /**
          * Recency for music and books, so the Last Played shelf can hold all four media.
          *
          * Games and videos already carried their own stamp (`last_played_at`, `last_watched_at`).
@@ -1515,6 +1535,7 @@ abstract class PFPDatabase : RoomDatabase() {
             MIGRATION_48_49,
             MIGRATION_49_50,
             MIGRATION_50_51,
+            MIGRATION_51_52,
         )
 
     }

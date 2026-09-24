@@ -171,6 +171,24 @@ data class GameEntity(
     @ColumnInfo(name = "last_played_at")
     val lastPlayedAt: Long? = null,
 
+    /**
+     * When this entry first entered the library, as a wall-clock instant.
+     *
+     * Three values with three meanings, and the difference matters because a "recently added"
+     * view is a lie if it cannot tell them apart:
+     *
+     *  - **null** — inserted and not yet stamped. Transient, inside one upsert.
+     *  - **0** — already here when the column arrived (migration 51 to 52). Unknowable, and
+     *    deliberately NOT recent. Every row of an existing library starts here.
+     *  - **> 0** — the instant the row was first written.
+     *
+     * NOT derived from the id. Rows are inserted in scan order and the upsert keys on the primary
+     * key, so id order is a fair proxy right up until a platform is deleted and re-added — which
+     * is exactly the moment someone would look at a recently-added list.
+     */
+    @ColumnInfo(name = "date_added")
+    val dateAdded: Long? = null,
+
     @ColumnInfo(name = "user_note")
     val userNote: String? = null,
 
@@ -262,6 +280,7 @@ fun GameEntity.toDomain() = Game(
     favoriteSortOrder = favoriteSortOrder,
     totalPlayTimeMillis = totalPlayTimeMillis,
     lastPlayedAt = lastPlayedAt,
+    dateAdded = dateAdded,
     userNote = userNote,
     isManualEntry = isManualEntry,
     scrapedTitle = scrapedTitle,
@@ -315,6 +334,7 @@ fun Game.toEntity() = GameEntity(
     favoriteSortOrder = favoriteSortOrder,
     totalPlayTimeMillis = totalPlayTimeMillis,
     lastPlayedAt = lastPlayedAt,
+    dateAdded = dateAdded,
     userNote = userNote,
     isManualEntry = isManualEntry,
     scrapedTitle = scrapedTitle,

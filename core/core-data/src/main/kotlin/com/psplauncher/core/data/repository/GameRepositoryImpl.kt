@@ -97,7 +97,15 @@ class GameRepositoryImpl @Inject constructor(
         if (game.isDiscPrimary && discSetKey != null) {
             gameDao.clearOtherDiscPrimaries(discSetKey, game.id)
         }
-        return gameDao.upsert(game.toEntity())
+        // The one place a game enters the library — every scanner funnels through here — so the
+        // one place the added-date is stamped. Read back first: this upsert is a REPLACE, which
+        // is a delete and an insert, so a value the caller does not carry is gone rather than
+        // preserved. An existing row keeps its own stamp; a new one gets now.
+        val entity = game.toEntity()
+        val stamped = entity.copy(
+            dateAdded = entity.dateAdded ?: gameDao.dateAddedOf(entity.id) ?: System.currentTimeMillis(),
+        )
+        return gameDao.upsert(stamped)
     }
 
     override suspend fun delete(id: Long) {

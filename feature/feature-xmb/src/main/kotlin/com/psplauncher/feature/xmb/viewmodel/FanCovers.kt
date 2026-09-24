@@ -18,11 +18,15 @@ const val INSIDE_COVER_COUNT = 4
  * Computing it once at the widest count and letting each take what it needs beats two queries
  * that could disagree about which games are newest.
  *
- * "Newest" is highest id first. There is no date-added column on [Game], and the auto-increment is
- * the honest proxy: rows are inserted in scan order and `@Upsert` keys on the primary key, so
- * rescanning a ROM already in the library updates its row and keeps its id. It DOES reshuffle if a
- * platform is deleted and re-added, because that path deletes the rows — a library rebuild
- * reorders the fan, which is a cosmetic wrong answer on a screen nobody reads for insertion dates.
+ * "Newest" is the added-date, then the id. [Game.dateAdded] is a real stamp now, written once when
+ * the row first enters the library and preserved across every rescan.
+ *
+ * THE ID IS STILL THE TIE-BREAK, and it carries the whole of an existing library. Migration 51 to
+ * 52 set every row that predates the column to 0 rather than to the migration's own instant, so on
+ * a library that has not been rescanned every game ties at 0 and the fan falls through to exactly
+ * the id order it used before. Nothing reorders on upgrade; rows added from here on sort above
+ * them, correctly, and a platform deleted and re-added no longer jumps to the front on the
+ * strength of new ids alone.
  *
  * SORTED, THEN MAPPED, THEN TAKEN, and the order of those three is the whole function. Taking
  * first would hand back the three newest games and then silently drop the ones with no artwork,
@@ -31,7 +35,7 @@ const val INSIDE_COVER_COUNT = 4
  * is for.
  */
 fun fanCoversOf(games: List<Game>, limit: Int = INSIDE_COVER_COUNT): List<String> = games
-    .sortedByDescending { it.id }
+    .sortedWith(compareByDescending<Game> { it.dateAdded ?: 0L }.thenByDescending { it.id })
     .mapNotNull { it.boxArtUri ?: it.artworkUri }
     .take(limit)
 
