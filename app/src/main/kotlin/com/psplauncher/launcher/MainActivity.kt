@@ -1,5 +1,6 @@
 package com.psplauncher.launcher
 
+import com.psplauncher.core.domain.model.GamepadAction
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -292,11 +293,49 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (enterOpensAppDrawer(event)) return true
+        if (minimalKeyboardKey(event)) return true
         // Let the gamepad handler process it first; fall back to normal dispatch
         if (gamepadInputHandler.onKeyEvent(event)) return true
         if (openSearchOnTypedCharacter(event)) return true
         return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * The keys a minimal keyboard actually has, claimed without binding them.
+     *
+     * The owner's keyboard is QWERTY plus Enter, Space, Shift and Back — no Escape, no function
+     * row, no PageUp. Five of the six keyboard bindings name keys that are not on it, so they
+     * never fire, and the two keys that ARE free cannot simply be bound: DEFAULT_BINDINGS is
+     * guarded against claiming anything that types a character, because GamepadInputHandler takes
+     * a bound keycode before any text field sees it. Space in that table is Space you can never
+     * type into the search box.
+     *
+     * So they are claimed HERE, before the handler, and only while nothing is being typed into.
+     * `typeToSearchAllowed()` is exactly that question and is reused rather than restated: if a
+     * letter would have started a search, the launcher owns the keyboard and these two are its
+     * keys; if it would have gone into a field, so do these.
+     *
+     *  - **Enter** opens the App Drawer, on the crossbar only — see [XMBUiState.enterOpensAppDrawer]
+     *    for why it keeps confirming everywhere else.
+     *  - **Space** opens the options for whatever has the cursor, wherever a row has any.
+     *
+     * SHIFT AND THE LETTERS ARE NOT AVAILABLE and there is no way to make them so. A letter is
+     * type-to-search. Shift produces no character of its own, so the guard above would not catch
+     * it, but claiming it would stop the letter after it being capitalised — the same fault one
+     * level down, and one no test currently looks for.
+     */
+    private fun minimalKeyboardKey(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return false
+        if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
+        return when (event.keyCode) {
+            KeyEvent.KEYCODE_ENTER -> enterOpensAppDrawer(event)
+            KeyEvent.KEYCODE_SPACE -> {
+                if (!xmbViewModel.typeToSearchAllowed()) return false
+                xmbViewModel.onClaimedKey(GamepadAction.OPEN_CONTEXT_MENU)
+                true
+            }
+            else -> false
+        }
     }
 
     /**
@@ -311,8 +350,6 @@ class MainActivity : ComponentActivity() {
      * owns the "is this the crossbar" question — see XMBViewModel.enterOpensAppDrawer.
      */
     private fun enterOpensAppDrawer(event: KeyEvent): Boolean {
-        if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return false
-        if (event.keyCode != KeyEvent.KEYCODE_ENTER) return false
         if (!xmbViewModel.enterOpensAppDrawer()) return false
         xmbViewModel.onOpenAppDrawer()
         return true

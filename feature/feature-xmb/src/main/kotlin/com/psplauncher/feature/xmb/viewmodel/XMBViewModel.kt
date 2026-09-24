@@ -5750,6 +5750,20 @@ class XMBViewModel @Inject constructor(
         dispatchGamepadAction(action)
     }
 
+    /**
+     * An action from a key the launcher claimed itself, outside the binding table.
+     *
+     * Space, today. It cannot be bound — DEFAULT_BINDINGS is guarded against claiming a key that
+     * types a character, because a bound keycode never reaches a text field — so the Activity
+     * takes it at dispatch and hands the action here. Controller input, not touch: it came from a
+     * key, and reporting it as a finger would flip the contextual touch controls.
+     */
+    fun onClaimedKey(action: GamepadAction) {
+        markControllerInput()
+        onUserInteraction()
+        dispatchGamepadAction(action)
+    }
+
     private fun collectGamepadActions() {
         viewModelScope.launch {
             gamepadInputHandler.actions.collect { action ->
