@@ -59,7 +59,7 @@ Nothing outstanding. Seth cleared the three hardware items above.
 
 | # | Work | Touches |
 |---|---|---|
-| 7 | **Per-column cursor memory on left/right.** The machinery exists — `viewCursor`, `viewCursorKey`, `navigateRememberingCursor` — but is wired only to drilling in and out. `selectCategory` hardcodes `selectedItemIndex = 0`. | `XMBViewModel.kt:7242` |
+| ~~7~~ | ~~**Per-column cursor memory on left/right.**~~ **DROPPED — see below.** | — |
 | 8 | **Cover fan**, 520x380 at right:120 top:470. Three covers from inside the focused item, largest centre, +/-8deg, 85% opacity. Needs a "newest N covers in this item" query that does not exist. | `XMBShell.kt` |
 | 9 | **2x2 art grid tile** on the focused item, Emulation and all four media columns only. Fewer than four covers: fill what you have, leave the rest empty. **Behind a setting** — art grid or the existing icon. | `XMBItemList.kt`, Display settings |
 | 10 | **Media focus tiles**, each conditional, not permanent. Music: playing track in the focus slot with a scrubber, *"only for currently playing."* Video: 16:9 tile at the same height as other focus tiles, progress line on the thumbnail, *"same for currently playing."* Books: *"last book read would have this at the top"* with page progress. | media columns in `feature-xmb` |
@@ -75,6 +75,27 @@ Nothing outstanding. Seth cleared the three hardware items above.
 | 15 | **3e's look on the existing 12-step wizard.** Labelled progress line, one question per step with the likely answer pre-picked. Drop its background treatment. Keep every step, including the media ones 3e omits. | setup wizard |
 | 16 | **8b live Appearance preview.** A small XMB in the right panel that repaints as colour, background and icon size change. Means rendering the crossbar twice, at two sizes, from one source of truth. | `feature-settings` |
 | 17 | **Artwork chain.** 9l queue, restricted to games **missing** art — *"art work review would be only to fill in missing art."* Then 9j's carousel, all sources in one row tagged by origin, L1/R1 stepping. Then 8o to compare current against found with the source list. Picker collapses to five tabs: logo, screenshots, manual, video, game art — **as grouping only**. The twelve `ArtworkKind` values are untouched. | `feature-artwork`, `ArtworkSettingsScreen.kt` |
+
+## Item 7 was dropped, and it is the one the plan got wrong
+
+It read as cheap: the machinery exists — `viewCursor`, `viewCursorKey`,
+`navigateRememberingCursor` — and `onCategorySelected` merely hardcodes
+`selectedItemIndex = 0`. What that hardcoded zero actually is, is a **deliberate removal**.
+
+Commit `a426a2dc`, 2026-09-22, the day before the design bundle arrived:
+
+> The crossbar remembered where you were in each column and put you back, so sweeping across it
+> left seven columns each scrolled to a different depth with nothing on screen to predict it. The
+> drill cursor is a different thing and stays: going into a folder and back out is one column, not
+> seven.
+
+`XMBViewModel.kt:7261` carries that reasoning as a comment sitting on the exact line item 7 would
+have changed. 1c proposes the behaviour back because the design tool could not know it had already
+been tried and rejected on the handheld.
+
+Dropped on 2026-09-23. The design's argument is PS3 fidelity; the counter-argument came from
+running it. **A missing feature and a removed one look identical in the code — the difference is
+in the history, and it is worth a `git log -S` before calling anything cheap.**
 
 ## Explicitly cut
 
