@@ -44,7 +44,9 @@ internal fun railRows(
     pillIds: Set<String>,
     capacity: Int = RAIL_CAPACITY,
 ): List<XMBContextMenuItem> {
-    val rows = all.filterNot { it.id == MENU_MORE_ITEM_ID || it.id in pillIds }
+    // hidden rows are in the menu so their ids still dispatch, and out of here so nothing draws
+    // them, walks onto them, or counts them against the cap.
+    val rows = all.filterNot { it.hidden || it.id == MENU_MORE_ITEM_ID || it.id in pillIds }
     if (rows.size <= capacity) return rows
     val destructive = rows.filter { it.isDestructive }
     val rest = rows.filterNot { it.isDestructive }

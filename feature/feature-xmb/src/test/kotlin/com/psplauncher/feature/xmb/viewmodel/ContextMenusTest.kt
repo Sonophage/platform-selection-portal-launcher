@@ -342,13 +342,33 @@ class ContextMenusTest {
 
     // ── Play ──────────────────────────────────────────────────────────────
 
+    /**
+     * Play is in every game menu and drawn in none of them.
+     *
+     * It used to be conditional — absent with direct launch on, present on the recents shelf
+     * either way — and both conditions were arguments about whether confirm already did it.
+     * Confirm always does it now, including with the rail open and nothing picked, so a visible
+     * row is a second way to do what the button under your thumb is doing.
+     *
+     * The ENTRY stays, hidden, and that is the point of the change rather than a leftover: it is
+     * the one definition of Play. Confirm dispatches the id and runs this row's handler, where
+     * deleting the row would have meant a second path to the same verb, free to drift from it.
+     */
     @Test
-    fun `play is offered only when direct launch is off`() {
-        // With direct launch ON, confirm already starts the game: a Play row would be a second
-        // way to do what the button under your thumb does. With it OFF, confirm opens Game
-        // Detail, and this menu is the only way to start a game straight from the list.
-        assertTrue("play" in ids(gameContextMenuItems(game(), state(directLaunch = false), 1, false, null)))
-        assertFalse("play" in ids(gameContextMenuItems(game(), state(directLaunch = true), 1, false, null)))
+    fun `play is in every game menu and drawn in none of them`() {
+        listOf(true, false).forEach { direct ->
+            listOf(true, false).forEach { shelf ->
+                val where = "direct=$direct shelf=$shelf"
+                val items = gameContextMenuItems(game(), state(directLaunch = direct), 1, shelf, null)
+                val play = items.firstOrNull { it.id == "play" }
+                assertTrue("$where: no play entry left to dispatch by id", play != null)
+                assertTrue("$where: Play is drawn in the rail", play!!.hidden)
+                assertFalse(
+                    "$where: Play reached the rail anyway",
+                    "play" in railRows(items, pillIds = emptySet()).map { it.id },
+                )
+            }
+        }
     }
 
     @Test
@@ -446,28 +466,4 @@ class ContextMenusTest {
         assertEquals(ids(items), ids(visible) + ids(overflow))
     }
 
-    @Test
-    fun `a game on the recents shelf offers Play even when confirm already launches it`() {
-        // The shelf used to carry its own launch control, a spine down the right edge. It was
-        // removed and the action moved here — "remove the play button, add it to the context menu
-        // instead, for the recent screen" — so on that one surface Play is not a duplicate of
-        // confirm, it is the thing confirm replaced.
-        val onShelf = gameContextMenuItems(
-            item = game(), state = state(directLaunch = true),
-            discCount = 1, onRecentShelf = true, hideLocation = null,
-        ).map { it.id }
-        assertTrue("the shelf's only launch control is gone if this is missing", "play" in onShelf)
-    }
-
-    @Test
-    fun `the same game elsewhere still has no Play row while direct launch is on`() {
-        // The rule that was there before, and the reason Play is conditional at all: with direct
-        // launch on, confirm launches the game and a Play row is a second way to do what the
-        // button under your thumb already does.
-        val elsewhere = gameContextMenuItems(
-            item = game(), state = state(directLaunch = true),
-            discCount = 1, onRecentShelf = false, hideLocation = null,
-        ).map { it.id }
-        assertFalse("Play is a duplicate of confirm off the shelf", "play" in elsewhere)
-    }
 }

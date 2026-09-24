@@ -29,7 +29,8 @@ import com.psplauncher.feature.xmb.viewmodel.XMBContextMenuItem
 @Composable
 fun ContextMenuOverlay(
     rows: List<XMBContextMenuItem>,
-    selectedIndex: Int,
+    /** Null until the cursor is moved onto a row — see XMBContextMenu.selectedIndex. */
+    selectedIndex: Int?,
     onItemActivated: (index: Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -56,7 +57,12 @@ fun ContextMenuOverlay(
                 // The column's own ramp, stretched over this rail's length so a nine-row menu
                 // fades all the way down instead of cliffing at the ramp's third step. One
                 // definition, in XmbDim; tuning it there tunes the crossbar and the column too.
-                val target = XmbDim.smoothed(kotlin.math.abs(index - selectedIndex), rows.lastIndex)
+                // Nothing picked: every row sits at the ramp's first unselected stop. Measuring
+                // the distance from "nowhere" would draw a gradient pointing at a cursor that is
+                // not there — brightest at the top, which reads exactly like row one is focused.
+                val target = selectedIndex
+                    ?.let { XmbDim.smoothed(kotlin.math.abs(index - it), rows.lastIndex) }
+                    ?: XmbDim.smoothed(1, rows.lastIndex)
                 // Animated, so a press slides the whole ramp instead of restamping it.
                 val dim by animateFloatAsState(target, tween(DimFadeMs), label = "railDim")
                 XmbRailRow(

@@ -88,10 +88,21 @@ fun promptsFor(state: XMBUiState): XmbPrompts {
         )
     }
 
+    // The rail. Its primary follows the CURSOR, and the cursor can be nowhere: the menu opens
+    // with nothing picked so confirm still launches the game it is open over, and the bar has to
+    // say that rather than naming a row nobody has moved onto.
     state.activeContextMenu?.let { menu ->
-        val row = state.railRows().getOrNull(menu.selectedIndex)
+        val row = menu.selectedIndex?.let { state.railRows().getOrNull(it) }
+        val primaryVerb = primaryVerbFor(focused, state.directLaunch)
         return XmbPrompts(
-            primary = row?.let { XmbPrompt(GamepadAction.SELECT, "Select", it.label) },
+            primary = when {
+                row != null -> XmbPrompt(GamepadAction.SELECT, "Select", row.label)
+                // Nothing picked: the menu's own primary, named after what it does to this row —
+                // "Play" for a game, and nothing at all for a menu that has no such verb.
+                menu.primaryId != null && primaryVerb != null ->
+                    XmbPrompt(GamepadAction.SELECT, primaryVerb, focused?.title)
+                else -> null
+            },
             back = XmbPrompt(GamepadAction.BACK, "Close"),
             right = emptyList(),
         )

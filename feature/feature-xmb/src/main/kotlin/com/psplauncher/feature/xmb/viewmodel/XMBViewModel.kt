@@ -134,7 +134,21 @@ data class XMBContextMenu(
      * by then, and the two lists could disagree about what the menu contained.
      */
     val overflow: List<XMBContextMenuItem> = emptyList(),
-    val selectedIndex: Int = 0,
+    /**
+     * Which rail row has the cursor, or NULL while the menu is open and nothing is picked.
+     *
+     * It opened on row one, which meant opening the options over a game immediately took confirm
+     * away from the game: the press under your thumb went from "play this" to "run whatever the
+     * first action happens to be". Nothing is selected until you move onto something.
+     */
+    val selectedIndex: Int? = null,
+    /**
+     * The id confirm runs while [selectedIndex] is null — the thing this row IS for.
+     *
+     * "play" on a game, so opening the options does not stop A launching it. Null on a menu with
+     * no such verb, where confirm with nothing picked does nothing at all rather than guessing.
+     */
+    val primaryId: String? = null,
     // Identifies the source of the menu (platform card, game, or app)
     val platformId: String? = null,
     // Set on the "All Games" card's menu (which is not a real Memory Card).
@@ -194,6 +208,16 @@ data class XMBContextMenuItem(
      * undifferentiated column where "Remove from Library" sat two rows under "Icon Display".
      */
     val heading: String? = null,
+    /**
+     * In the menu, dispatchable by id, never drawn and never walked.
+     *
+     * The rail is the one list the cursor reads, so a hidden row simply is not in it. What it
+     * still is, is the ONE definition of what its id does: Play is not a row anyone should have
+     * to find any more — confirm launches the game — but keeping the entry means the press runs
+     * the same handler the row ran, instead of a second path to the same verb that can drift from
+     * it. See [XMBContextMenu.primaryId].
+     */
+    val hidden: Boolean = false,
 )
 
 // Drives the shared text-input dialog. Creating a collection is the default; the optional
@@ -3516,7 +3540,7 @@ class XMBViewModel @Inject constructor(
 
     // Second-level menu: the playlists a video can be added to (checkmarks show membership), plus
     // "Create New Playlist". Stays open while toggling so several can be picked at once.
-    private fun openVideoPlaylistPicker(videoId: String, selectIndex: Int = 0) {
+    private fun openVideoPlaylistPicker(videoId: String, selectIndex: Int? = 0) {
         viewModelScope.launch {
             val playlists = videoRepository.observePlaylists().first()
             val memberOf = videoRepository.getPlaylistIdsForVideo(videoId).toSet()
@@ -3528,7 +3552,7 @@ class XMBViewModel @Inject constructor(
                 activeContextMenu = XMBContextMenu(
                     title = "Add to Playlist",
                     items = items,
-                    selectedIndex = selectIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
+                    selectedIndex = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
                     videoPlaylistPickerVideoId = videoId,
                 )
             )}
@@ -4764,7 +4788,7 @@ class XMBViewModel @Inject constructor(
 
     // Second-level menu: the playlists a track can be added to (checkmarks show membership), plus
     // "Create New Playlist". Stays open while toggling so several can be picked at once.
-    private fun openPlaylistPicker(trackId: String, selectIndex: Int = 0) {
+    private fun openPlaylistPicker(trackId: String, selectIndex: Int? = 0) {
         viewModelScope.launch {
             val playlists = musicRepository.observePlaylists().first()
             val memberOf = musicRepository.getPlaylistIdsForTrack(trackId).toSet()
@@ -4778,7 +4802,7 @@ class XMBViewModel @Inject constructor(
                 activeContextMenu = XMBContextMenu(
                     title                 = "Add to Playlist",
                     items                 = items,
-                    selectedIndex         = selectIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
+                    selectedIndex         = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
                     playlistPickerTrackId = trackId,
                 )
             )}
@@ -5750,10 +5774,19 @@ class XMBViewModel @Inject constructor(
             when (action) {
                 GamepadAction.NAVIGATE_UP   -> shiftContextMenu(-1)
                 GamepadAction.NAVIGATE_DOWN -> shiftContextMenu(+1)
-                // The cursor walks railRows, so that is the list its position means something in.
-                GamepadAction.SELECT        ->
-                    state.railRows().getOrNull(state.activeContextMenu?.selectedIndex ?: -1)
-                        ?.let { activateContextMenuItem(it.id) }
+                // Picked a row: run it. Picked nothing: run what the menu says it is FOR, which
+                // for a game is Play — so opening the options over a game does not take confirm
+                // away from the game. The cursor walks railRows, so that is the list its position
+                // means something in; the primary is an id and needs no list at all.
+                GamepadAction.SELECT        -> {
+                    val menu = state.activeContextMenu
+                    val picked = menu?.selectedIndex?.let { state.railRows().getOrNull(it) }
+                    when {
+                        picked != null -> activateContextMenuItem(picked.id)
+                        menu?.primaryId != null -> activateContextMenuItem(menu.primaryId)
+                        else -> Unit
+                    }
+                }
                 GamepadAction.BACK,
                 GamepadAction.OPEN_CONTEXT_MENU      -> closeContextMenu()
                 else -> Unit
@@ -6363,6 +6396,9 @@ class XMBViewModel @Inject constructor(
                 shortcutId  = item.shortcutId,
                 launchIntentUri = item.launchIntentUri,
                 categoryContext = if (inGamingCategory) currentCat.id else null,
+                // Confirm still plays the game while nothing in the rail is picked. The id runs
+                // the hidden row above, so this is not a second way to launch — it is the row.
+                primaryId   = "play",
             )
         )}
     }
@@ -6370,7 +6406,7 @@ class XMBViewModel @Inject constructor(
     // Second-level menu: the collections a game can be added to (checkmarks show current
     // membership), plus "Create New Collection". Opened from the game options menu. The menu
     // stays open while toggling so the user can add to several collections at once.
-    private fun openCollectionPicker(gameId: Long, selectIndex: Int = 0) {
+    private fun openCollectionPicker(gameId: Long, selectIndex: Int? = 0) {
         viewModelScope.launch {
             val collections = collectionRepository.getAll()
             val memberOf = collectionRepository.getCollectionIdsForGame(gameId).toSet()
@@ -6388,7 +6424,7 @@ class XMBViewModel @Inject constructor(
                 activeContextMenu = XMBContextMenu(
                     title            = "Add to Collection",
                     items            = items,
-                    selectedIndex    = selectIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
+                    selectedIndex    = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
                     gameId           = gameId,
                     collectionGameId = gameId,
                 )
@@ -6486,7 +6522,13 @@ class XMBViewModel @Inject constructor(
         // range 0..-1 (IllegalArgumentException).
         val rows = state.railRows()
         if (rows.isEmpty()) return
-        val next = (menu.selectedIndex + delta).coerceIn(0, rows.size - 1)
+        // Nothing picked yet: the first press enters the list from the end it came from, so DOWN
+        // lands on the top row and UP on the bottom one.
+        val current = menu.selectedIndex ?: return run {
+            val entry = if (delta > 0) 0 else rows.lastIndex
+            _uiState.update { it.copy(activeContextMenu = menu.copy(selectedIndex = entry)) }
+        }
+        val next = (current + delta).coerceIn(0, rows.size - 1)
         _uiState.update { it.copy(activeContextMenu = menu.copy(selectedIndex = next)) }
     }
 

@@ -74,18 +74,17 @@ internal fun gameContextMenuItems(
         // straight into the game. Launch/title/note/scrape actions all live in Game Detail — the
         // menu stays navigational.
         add(XMBContextMenuItem("game_details", "View Game Details"))
-        // Play appears when direct launch is OFF — with it on, confirm already launches the game
-        // and this row would be a second way to do what the button under your thumb does; with it
-        // off, confirm opens Game Detail and the menu is the only place a game can be started
-        // from the list.
+        // PLAY IS IN EVERY GAME MENU AND DRAWN IN NONE OF THEM.
         //
-        // It appears on the RECENTS shelf either way. That shelf had a launch control of its own,
-        // a spine down the right edge, and the owner moved it here: "remove the play button, add
-        // it to the context menu instead, for the recent screen". So on that one surface the row
-        // is not a duplicate of confirm — it is the thing confirm replaced.
-        if (!state.directLaunch || onRecentShelf) {
-            add(XMBContextMenuItem("play", "Play"))
-        }
+        // It used to appear when direct launch was off, and on the recents shelf either way, and
+        // the reasoning each time was about whether confirm already did it. Confirm always does it
+        // now — the rail no longer takes A away from the game it is open over — so a visible row
+        // is a second way to do what the button under your thumb is doing, on every surface.
+        //
+        // It stays in the menu, hidden, because that makes it the one definition of Play: the rail
+        // cannot reach it, and confirm-with-nothing-picked dispatches "play" by id and runs this
+        // entry's handler. Deleting it would mean a second path to the same verb.
+        add(XMBContextMenuItem("play", "Play", hidden = true))
         // Multi-disc sets: pick which disc to boot — the only way to reach a non-primary disc when
         // direct launch skips Game Detail's picker. Launches the chosen disc.
         if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))
