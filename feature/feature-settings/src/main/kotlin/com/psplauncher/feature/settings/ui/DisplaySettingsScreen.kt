@@ -327,6 +327,18 @@ fun DisplaySettingsScreen(
                 )
 
                 SettingsToggleRow(
+                    label    = "Apps On The Recent Shelf",
+                    // Says what it costs, because the answer is not obvious until it has already
+                    // happened: the shelf is the screen the launcher opens on, and the most
+                    // recently used thing on a device full of apps is often one opened for ten
+                    // seconds — which pushes the game you were playing off your own home screen.
+                    sublabel = "Show recently used apps beside games, music, books and video. " +
+                        "Needs usage access; without it no app has a last-used time and none appear",
+                    checked  = state.recentsIncludeApps,
+                    onToggle = { viewModel.setRecentsIncludeApps(it) },
+                )
+
+                SettingsToggleRow(
                     label    = "Card Art Grid",
                     sublabel = "Show a console card as four covers from inside it, instead of its console icon",
                     checked  = state.cardArtGrid,
@@ -521,10 +533,17 @@ fun DisplaySettingsScreen(
             if (section == null || section == DisplaySection.LAYOUT) {
                 SettingsGroup("Orientation")
 
+                // Informational, with nothing behind it: there is no runtime control, and
+                // requestedOrientation is set nowhere in the app. The manifest is the whole lever.
+                //
+                // It said "Landscape (fixed)" until 2026-09-24 and that stopped being true the
+                // moment the manifest went to screenOrientation="user". A settings row is a claim
+                // about the app, and one nothing enforces goes stale silently.
                 SettingsValueRow(
                     label    = "Screen Orientation",
-                    sublabel = "PSP is designed for landscape use",
-                    value    = "Landscape (fixed)",
+                    sublabel = "Follows the device — the XMB is drawn for landscape, so a portrait " +
+                        "device will letterbox it",
+                    value    = "Android auto-rotate",
                 )
 
                 // (The old "Icon Style" option lived here — replaced by Artwork ▸ Game Icon

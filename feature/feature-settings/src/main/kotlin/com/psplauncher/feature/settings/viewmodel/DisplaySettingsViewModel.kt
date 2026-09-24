@@ -80,6 +80,15 @@ private val KEY_FADE_BY_DISTANCE = booleanPreferencesKey("display_fade_by_distan
 
 // Must match XMBViewModel.KEY_CARD_ART_GRID — both read/write this same pref.
 private val KEY_CARD_ART_GRID = booleanPreferencesKey("display_card_art_grid")
+
+/**
+ * Whether the Recent shelf carries Android apps beside games, music, books and videos.
+ *
+ * DEFAULT OFF. The shelf is the screen the launcher opens on, and on a device with a hundred and
+ * fifty apps the most recently used thing is very often an app you opened for ten seconds — which
+ * would push the game you were actually playing off the front of your own home screen.
+ */
+private val KEY_RECENTS_INCLUDE_APPS = booleanPreferencesKey("display_recents_include_apps")
 // Must match XMBViewModel.KEY_TEXT_SHADOW — both read/write this same pref.
 private val KEY_TEXT_SHADOW = booleanPreferencesKey("display_text_shadow")
 // ── Font colour (Display ▸ Font Colour) ──────────────────────────────────────
@@ -156,6 +165,7 @@ data class DisplaySettingsUiState(
     // Draw unselected XMB icons at full opacity (selection reads by size and label).
     val fadeByDistance: Boolean = true,
     val cardArtGrid: Boolean = true,
+    val recentsIncludeApps: Boolean = false,
     // Directional drop shadow behind XMB row subtitles, so helper text stays readable over
     // bright wallpaper regions. Default on — the shadow is subtle; without it the flat gray
     // subtitle is the one label that washes out.
@@ -270,6 +280,7 @@ class DisplaySettingsViewModel @Inject constructor(
             iconLegibility       = IconLegibilityStyle.fromName(prefs[KEY_ICON_LEGIBILITY]),
             fadeByDistance       = prefs[KEY_FADE_BY_DISTANCE] ?: true,
             cardArtGrid          = prefs[KEY_CARD_ART_GRID] ?: true,
+            recentsIncludeApps   = prefs[KEY_RECENTS_INCLUDE_APPS] ?: false,
             textShadow           = prefs[KEY_TEXT_SHADOW] ?: true,
             textColorArgb        = prefs[KEY_TEXT_COLOR],
             textColorExact       = prefs[KEY_TEXT_COLOR_EXACT] ?: false,
@@ -375,6 +386,8 @@ class DisplaySettingsViewModel @Inject constructor(
 
     fun setFadeByDistance(v: Boolean) = save { it[KEY_FADE_BY_DISTANCE] = v }
     fun setCardArtGrid(v: Boolean) = save { it[KEY_CARD_ART_GRID] = v }
+
+    fun setRecentsIncludeApps(v: Boolean) = save { it[KEY_RECENTS_INCLUDE_APPS] = v }
 
     fun setTextShadow(v: Boolean) = save { it[KEY_TEXT_SHADOW] = v }
 

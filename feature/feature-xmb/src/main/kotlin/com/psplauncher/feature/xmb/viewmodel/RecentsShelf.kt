@@ -12,16 +12,47 @@ enum class RecentFilter(val label: String) {
     GAMES("Games"),
     MUSIC("Music"),
     BOOKS("Books"),
-    VIDEO("Video");
+    VIDEO("Video"),
 
-    /** The next filter in the cycle, wrapping past the end back to [ALL]. */
-    fun next(): RecentFilter = entries[(ordinal + 1) % entries.size]
+    /**
+     * Android apps, and the only filter that can be switched off.
+     *
+     * Off by default: the shelf is the screen the launcher opens on, and the most recently used
+     * thing on a device with a hundred and fifty apps is very often one you opened for ten
+     * seconds — which would push the game you were actually playing off your own home screen.
+     */
+    APPS("Apps");
+
+    companion object {
+        /**
+         * The filters that exist right now, in cycle order.
+         *
+         * ONE list, read by the X button and by the row of names a finger taps. Two would be the
+         * pair that disagrees the first time a filter is added — and the pad would then cycle onto
+         * a name the screen never draws, or the screen would offer one the pad skips.
+         */
+        fun visible(includeApps: Boolean): List<RecentFilter> =
+            entries.filter { it != APPS || includeApps }
+    }
+
+    /**
+     * The next filter in the cycle, wrapping past the end back to [ALL].
+     *
+     * Skips anything switched off, and falls back to [ALL] if the current filter has just been
+     * switched off underneath the cursor — which happens the moment someone turns apps off while
+     * standing on the Apps filter.
+     */
+    fun next(includeApps: Boolean): RecentFilter {
+        val cycle = visible(includeApps)
+        val here = cycle.indexOf(this)
+        return if (here < 0) ALL else cycle[(here + 1) % cycle.size]
+    }
 }
 
 /**
- * The home shelf: four libraries merged into one list, newest first.
+ * The home shelf: the libraries merged into one list, newest first.
  *
- * Takes the four media as separate arguments rather than one pre-tagged list. A single list would
+ * Takes each medium as its own argument rather than one pre-tagged list. A single list would
  * need every caller to label each row with its own kind, and a row labelled [RecentFilter.ALL] —
  * or labelled as the wrong medium — would be silently unfilterable. Here the shape of the call
  * makes that impossible, and the `when` below is exhaustive over the enum, so adding a fifth
@@ -39,15 +70,23 @@ internal fun mergeRecents(
     music: List<Pair<Long, XMBItem>>,
     books: List<Pair<Long, XMBItem>>,
     videos: List<Pair<Long, XMBItem>>,
+    /**
+     * Android apps, already empty when the setting is off.
+     *
+     * Emptied by the caller rather than filtered here, so ALL and APPS cannot disagree about
+     * whether apps are on: one list that is empty means both say no.
+     */
+    apps: List<Pair<Long, XMBItem>>,
     filter: RecentFilter,
     limit: Int,
 ): List<XMBItem> {
     val chosen = when (filter) {
-        RecentFilter.ALL -> games + music + books + videos
+        RecentFilter.ALL -> games + music + books + videos + apps
         RecentFilter.GAMES -> games
         RecentFilter.MUSIC -> music
         RecentFilter.BOOKS -> books
         RecentFilter.VIDEO -> videos
+        RecentFilter.APPS -> apps
     }
     return chosen
         .sortedByDescending { it.first }

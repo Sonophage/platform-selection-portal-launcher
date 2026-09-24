@@ -97,6 +97,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -861,6 +863,8 @@ data class XMBUiState(
     val fadeByDistance: Boolean = true,
     /** "Card Art Grid": a Games-root card's tile is a 2x2 of what is inside it. */
     val cardArtGrid: Boolean = true,
+    /** Whether the Recent shelf carries apps too. Off by default — see the settings row. */
+    val recentsIncludeApps: Boolean = false,
     // "Text Shadow": directional drop shadow behind XMB row subtitles (the faded gray helper
     // text), so it stays readable over bright wallpaper regions. Default on — without it the
     // subtitle is the only row label with no separation treatment.
@@ -2685,8 +2689,14 @@ class XMBViewModel @Inject constructor(
                         musicRepository.observeRecentlyPlayedTracks(RECENTLY_PLAYED_LIMIT),
                         bookRepository.observeRecentlyOpenedBooks(RECENTLY_PLAYED_LIMIT),
                         videoRepository.observeRecentlyWatched(),
-                        _uiState.map { it.recentFilter }.distinctUntilChanged(),
-                    ) { games, tracks, books, videos, filter ->
+                        // The filter and the app rows arrive together, as one flow, so this
+                        // stays a TYPED five-argument combine. The six-flow overload hands back an
+                        // Array<Any?> to index and cast, which is the shape that has already cost
+                        // this file two bugs today — a list and an index that agree until they do
+                        // not.
+                        recentFilterAndApps(),
+                    ) { games, tracks, books, videos, filterAndApps ->
+                        val (filter, appRows) = filterAndApps
                         // The play queue for a track opened from this shelf is the shelf's own
                         // music. openMusicPlayerForItem reads it and RETURNS SILENTLY when it is
                         // empty, which is what made A do nothing on a Recent music row: the rows
@@ -2701,6 +2711,7 @@ class XMBViewModel @Inject constructor(
                             music  = tracks.recentMusicRows(),
                             books  = books.map { it.lastOpenedAt ?: 0L }.zip(bookItems(books)),
                             videos = videos.map { it.lastWatchedAt ?: 0L }.zip(videos.toVideoItems()),
+                            apps   = appRows,
                             filter = filter,
                             limit  = RECENTLY_PLAYED_LIMIT,
                         )
@@ -5175,7 +5186,46 @@ class XMBViewModel @Inject constructor(
      * sources, so the list rebuilds itself through the same merge rather than a second path. The
      * cursor goes back to the top because the row it was on usually is not in the new list.
      */
-    private fun cycleRecentFilter() = setRecentFilter(_uiState.value.recentFilter.next())
+    /**
+     * The shelf's filter, and the apps it may show, as one emission.
+     *
+     * Apps come from UsageStatsManager through InstalledAppRepository, which is a suspend read
+     * rather than a flow, so it is re-read when the app set changes and when the setting is
+     * toggled — not on every tick of the four media flows beside it.
+     *
+     * EMPTY WHEN THE SETTING IS OFF, rather than filtered at the merge. One empty list means ALL
+     * and APPS cannot disagree about whether apps are on; two places deciding it is how a filter
+     * ends up showing rows the "All" beside it does not.
+     *
+     * Usage access is a system screen the user can revoke at any time. Without it the timestamps
+     * come back empty and every app reads as never used, so they simply do not appear — the
+     * setting's own row is where that is explained, not here.
+     */
+    private fun recentFilterAndApps(): Flow<Pair<RecentFilter, List<Pair<Long, XMBItem>>>> =
+        combine(
+            _uiState.map { it.recentFilter }.distinctUntilChanged(),
+            _uiState.map { it.recentsIncludeApps }.distinctUntilChanged(),
+            appCategoryRepository.changes().onStart { emit(Unit) },
+        ) { filter, includeApps, _ -> filter to includeApps }
+            .map { (filter, includeApps) ->
+                if (!includeApps) return@map filter to emptyList<Pair<Long, XMBItem>>()
+                val rows = appCategoryRepository.allInstalledApps()
+                    .filter { it.lastUsedAt > 0L }
+                    .sortedByDescending { it.lastUsedAt }
+                    .take(RECENTLY_PLAYED_LIMIT)
+                    .map { app ->
+                        app.lastUsedAt to XMBItem(
+                            id = "recentapp_${app.packageName}",
+                            title = app.label,
+                            subtitle = "App",
+                            packageName = app.packageName,
+                        )
+                    }
+                filter to rows
+            }
+
+    private fun cycleRecentFilter() =
+        setRecentFilter(_uiState.value.let { it.recentFilter.next(it.recentsIncludeApps) })
 
     /**
      * Pick a filter outright, which is what a tap on its name means.
@@ -9998,6 +10048,7 @@ class XMBViewModel @Inject constructor(
                     .fromName(prefs[KEY_ICON_LEGIBILITY])
                 val fadeByDistance = prefs[KEY_FADE_BY_DISTANCE] ?: true
                 val cardArtGrid = prefs[KEY_CARD_ART_GRID] ?: true
+                val recentsIncludeApps = prefs[KEY_RECENTS_INCLUDE_APPS] ?: false
                 val textShadow = prefs[KEY_TEXT_SHADOW] ?: true
                 _uiState.update {
                     it.copy(
@@ -10008,6 +10059,7 @@ class XMBViewModel @Inject constructor(
                         iconLegibility = legibility,
                         fadeByDistance = fadeByDistance,
                         cardArtGrid = cardArtGrid,
+                        recentsIncludeApps = recentsIncludeApps,
                         textShadow = textShadow,
                     )
                 }
@@ -10167,6 +10219,8 @@ class XMBViewModel @Inject constructor(
 
         // Must match DisplaySettingsViewModel.KEY_CARD_ART_GRID — both read/write this pref.
         private val KEY_CARD_ART_GRID = booleanPreferencesKey("display_card_art_grid")
+        // Must match DisplaySettingsViewModel.KEY_RECENTS_INCLUDE_APPS.
+        private val KEY_RECENTS_INCLUDE_APPS = booleanPreferencesKey("display_recents_include_apps")
         // Must match DisplaySettingsViewModel.KEY_TEXT_SHADOW — both read/write this pref.
         private val KEY_TEXT_SHADOW = booleanPreferencesKey("display_text_shadow")
         // ICON1 linger default (1.5 s) — the user can adjust the delay under Artwork ▸ Art

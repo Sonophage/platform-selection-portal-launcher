@@ -1335,6 +1335,7 @@ fun XMBShell(
                             filter = uiState.recentFilter,
                             modifier = Modifier.align(Alignment.Center),
                             onFilterTapped = onRecentFilterTapped,
+                            includeApps = uiState.recentsIncludeApps,
                         )
                     }
                 } else null,

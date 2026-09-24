@@ -178,12 +178,26 @@ fun LastPlayedPage(
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
                 } else {
+                    // TWO DIFFERENT NOTHINGS, and they were the same branch until apps arrived.
+                    //
+                    // `content` is the hover panel — artwork, a logo, scraped facts — and a row
+                    // can perfectly well have none while still being a row. An app has no panel
+                    // at all, so a shelf holding two apps drew "No recent apps." over the top of
+                    // them, with the cover rail beside it showing both. Seen on the device.
+                    //
+                    // The shelf is empty only when it has no ITEMS. Anything else names what the
+                    // cursor is on, which is the least this page can say about a row it is
+                    // already drawing.
+                    val focused = items.getOrNull(selectedIndex)
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                         Text(
-                            text = if (filter == RecentFilter.ALL) "Nothing played yet."
-                                   else "No recent ${filter.label.lowercase()}.",
+                            text = when {
+                                focused != null -> focused.title
+                                filter == RecentFilter.ALL -> "Nothing played yet."
+                                else -> "No recent ${filter.label.lowercase()}."
+                            },
                             color = LocalPfpTextColors.current.secondary,
-                            fontSize = 15.sp,
+                            fontSize = if (focused != null) 22.sp else 15.sp,
                         )
                     }
                 }
@@ -220,6 +234,8 @@ fun RecentFilterRow(
      * it wants — X still cycles, and did so alone until these became pressable.
      */
     onFilterTapped: (RecentFilter) -> Unit = {},
+    /** Whether the Apps filter is in the cycle at all. Off by default; see the Display setting. */
+    includeApps: Boolean = false,
 ) {
     // ONE name: the filter you are on, not all five.
     //
@@ -233,7 +249,10 @@ fun RecentFilterRow(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = { onFilterTapped(RecentFilter.entries[(filter.ordinal + 1) % RecentFilter.entries.size]) },
+                // RecentFilter.next, not an ordinal walk over `entries`: Apps is in the enum
+                // whether or not it is switched on, and stepping by ordinal would land a finger
+                // on a filter the X button skips and the shelf can never fill.
+                onClick = { onFilterTapped(filter.next(includeApps)) },
             )
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,
