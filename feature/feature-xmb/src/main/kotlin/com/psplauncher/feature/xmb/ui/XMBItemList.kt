@@ -144,6 +144,29 @@ private val TAP_TARGET_HEIGHT = 72.dp
 // theme-kit layout spec (single source of truth for the tuned XMB geometry).
 internal val LEADING_ICON_SLOT = XmbLayoutSpec.DEFAULT.itemIconSlotDp.dp
 // Default size of the glyph/art inside that slot (selected rows additionally scale up via the row).
+/**
+ * The row whose progress is changing RIGHT NOW, and where it is up to.
+ *
+ * A scrubber that does not move is a picture of a scrubber. The Now Playing row's fraction is
+ * baked into the item when the column is built, and XMBViewModel deliberately does not rebuild
+ * that list on playback ticks — "never on the half-second position ticks" — because rebuilding a
+ * four-row list twice a second to move three pixels is the wrong trade. So the bar reads the live
+ * value here instead, and only the bar recomposes.
+ *
+ * Ambient rather than a parameter because it would otherwise thread through five signatures to
+ * reach one Box, which is the same reason the icon overrides and the display mode ride this rail.
+ *
+ * Null for every row but one: [itemId] is the row it describes, and a row that is not it keeps
+ * whatever it was built with — a resumed video's position does not move while you look at it.
+ */
+internal data class LiveRowProgress(
+    val itemId: String,
+    val fraction: Float,
+    val label: String?,
+)
+
+internal val LocalLiveRowProgress = androidx.compose.runtime.compositionLocalOf<LiveRowProgress?> { null }
+
 /** The scrubber under a playing or resumable row: a thin bar, the accent filling it. */
 private val ScrubberWidth = 96.dp
 private val ScrubberHeight = 3.dp
@@ -847,7 +870,8 @@ private fun XmbVerticalListRow(
                     // Books have none and will not: progressFraction's own KDoc says why — a book
                     // opens in somebody else's reader, which never reports back.
                     if (isSelected) {
-                        item.progressFraction?.let { fraction ->
+                        val live = LocalLiveRowProgress.current?.takeIf { it.itemId == item.id }
+                        (live?.fraction ?: item.progressFraction)?.let { fraction ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(top = 4.dp),
@@ -867,7 +891,7 @@ private fun XmbVerticalListRow(
                                             .background(LocalPFPColors.current.accentColor),
                                     )
                                 }
-                                item.progressLabel?.let { label ->
+                                (live?.label ?: item.progressLabel)?.let { label ->
                                     Text(
                                         text = label,
                                         color = SecondaryText,

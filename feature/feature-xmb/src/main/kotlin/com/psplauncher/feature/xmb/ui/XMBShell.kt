@@ -104,6 +104,7 @@ import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.FAN_COVER_COUNT
+import com.psplauncher.feature.xmb.viewmodel.formatDuration
 import com.psplauncher.feature.xmb.viewmodel.XMBUiState
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel
 
@@ -474,6 +475,21 @@ fun XMBShell(
       // glyph (crossbar, item rows, status strip) checks this map before its built-in art.
       CompositionLocalProvider(
           com.psplauncher.core.ui.icons.LocalXmbIconOverrides provides uiState.iconOverrides,
+          // The playing track's position, live. The Music column's row carries a fraction from
+          // when it was BUILT, and that list is not rebuilt on playback ticks by design, so this
+          // is what actually moves the bar. Derived here rather than in the row so the row stays
+          // ignorant of what music is.
+          LocalLiveRowProgress provides uiState.musicPlayback.let { pb ->
+              val total = pb.durationMs
+              if (pb.track != null && total > 0) {
+                  LiveRowProgress(
+                      itemId = XMBViewModel.NOW_PLAYING_ITEM_ID,
+                      fraction = (pb.positionMs.toFloat() / total).coerceIn(0f, 1f),
+                      label = formatDuration(pb.positionMs.toLong()) + "  /  " +
+                          formatDuration(total.toLong()),
+                  )
+              } else null
+          },
           // The user's per-slot picks ride the same rail — the tier ABOVE the theme's icons
           // (user pick > theme icon > built-in, at every render site).
           com.psplauncher.core.ui.icons.LocalCustomIcons provides uiState.customIcons,
