@@ -769,6 +769,24 @@ fun XMBShell(
                 label = "pic0Fade",
             )
             val onLogoPage = panelPage == DetailPanelPage.LOGO
+            // HAS THE USER OPENED THE STRIP ON THIS GAME YET?
+            //
+            // panelPageGameId is stamped by every step and every tap on the strip, and
+            // effectivePanelPage falls back to LOGO the moment the cursor is on a different game.
+            // So "these two match" already means "the shoulders have been used on the game under
+            // the cursor right now" — the resting state and the walked-to logo page were simply
+            // indistinguishable before, because both report LOGO.
+            //
+            // They are distinguishable now because they have to be. At REST the crossbar shows the
+            // row's own title and meta line and draws no panel at all; the logo is a page you
+            // reach, not the thing that covers the name the moment you land on a game. The row
+            // text used to survive about 650ms before the logo faded in over it, which made the
+            // system-and-last-played line added for the redesign almost impossible to read.
+            //
+            // The home shelf is NOT affected: LastPlayedPage composes its own GameDetailPanel and
+            // never comes through here. Recents keeps the logo it has always led with.
+            val stripOpened = uiState.panelPageGameId != null &&
+                uiState.panelPageGameId == uiState.hoverPanelItem?.gameId
             // "Is anything on the right already naming this game?"
             //
             // Off the logo page the panel is 42% of the width and the label runs straight into
@@ -783,13 +801,15 @@ fun XMBShell(
             //
             // One val, two consumers (the crossbar list and the drill flyout). They were the pair
             // that disagreed — the flyout never received this at all — so they read one value.
-            val focusedNameShownOnRight = panelContent != null &&
+            val focusedNameShownOnRight = panelContent != null && stripOpened &&
                 (!onLogoPage || pic0Alpha > 0f)
             val panelAlpha = if (onLogoPage) pic0Alpha else 1f
             // On the logo page this is the old condition unchanged, so a game with no logo shows
             // nothing here exactly as before. Off it, the panel is what the user asked for with
             // the shoulders and appears whether the game has a logo or not.
-            if (panelContent != null && panelPage != null && (!onLogoPage || (panelLogo != null && pic0Alpha > 0f))) {
+            if (panelContent != null && panelPage != null && stripOpened &&
+                (!onLogoPage || (panelLogo != null && pic0Alpha > 0f))
+            ) {
                 // BoxWithConstraints, not Box: the vertical placement below is derived from the
                 // screen height, and it MUST be measured here rather than reusing the shell's outer
                 // maxHeight — that one is taken before the LocalDensity override above, so its dp
