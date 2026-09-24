@@ -70,6 +70,14 @@ import com.psplauncher.feature.appbar.appdrawer.UninstallConfirmDialog
 // ── Entry point ─────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalComposeUiApi::class)
+/** D-pad presses: any of them means the user has moved on from typing. */
+private val NAVIGATION_ACTIONS = setOf(
+    GamepadAction.NAVIGATE_UP,
+    GamepadAction.NAVIGATE_DOWN,
+    GamepadAction.NAVIGATE_LEFT,
+    GamepadAction.NAVIGATE_RIGHT,
+)
+
 @Composable
 fun AppDrawerScreen(
     onBack: () -> Unit,
@@ -109,6 +117,15 @@ fun AppDrawerScreen(
                     searchActive = false
                     viewModel.setSearchQuery("")
                     keyboard?.hide()
+                }
+                // MOVING PUTS THE KEYBOARD AWAY — "if i tap, or move the controller the keyboard
+                // should go away". A d-pad press while the IME is up is somebody who has finished
+                // typing and wants to pick something; leaving it up covers the grid they are now
+                // navigating. The action still lands, so the press that dismisses also moves.
+                searchActive && pendingGamepadAction in NAVIGATION_ACTIONS -> {
+                    searchActive = false
+                    keyboard?.hide()
+                    viewModel.handleGamepadAction(pendingGamepadAction)
                 }
                 overlayOpen -> viewModel.handleGamepadAction(pendingGamepadAction)
                 // BACK on the plain grid closes the drawer (its only controller escape).
@@ -165,12 +182,23 @@ fun AppDrawerScreen(
         },
         onAppTapped = { index ->
             onTouchInteraction()
+            // A tap puts the keyboard away too, by the same reasoning as a d-pad press: the
+            // finger has left the text box and is on the grid. The tap still selects, so the
+            // press that dismisses is not a press that was swallowed.
+            if (searchActive) {
+                searchActive = false
+                keyboard?.hide()
+            }
             viewModel.onAppTapped(index)
         },
         onAppLaunched = { viewModel.launchApp(it) },
         onAppMenu = { viewModel.openAppMenu(it) },
         onTouchBrowse = { index ->
             onTouchInteraction()
+            if (searchActive) {
+                searchActive = false
+                keyboard?.hide()
+            }
             viewModel.onTouchBrowse(index)
         },
         onMenuAction = { viewModel.onMenuAction(it) },

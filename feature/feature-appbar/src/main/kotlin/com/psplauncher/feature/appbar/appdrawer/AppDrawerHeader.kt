@@ -100,9 +100,14 @@ internal fun AppDrawerHeader(
             )
         }
 
-        // Search field — temporarily expands within the header while active (PSP-era mode feel,
-        // not a floating Material component).
-        AnimatedVisibility(visible = searchActive, enter = fadeIn(), exit = fadeOut()) {
+        // THE SEARCH FIELD IS ALWAYS HERE — "we still need to keep the search... it still keeps it
+        // at top always". It used to appear only while search was active, which made the drawer a
+        // thing you had to know had a search in it.
+        //
+        // [searchActive] no longer gates the field, only the KEYBOARD: the box is always on the
+        // header, and X focuses it and raises the IME. Splitting those two is what lets the
+        // keyboard go away on a tap or a d-pad press while the query you typed stays on screen.
+        run {
             BasicTextField(
                 value = searchQuery,
                 onValueChange = onSearchChange,

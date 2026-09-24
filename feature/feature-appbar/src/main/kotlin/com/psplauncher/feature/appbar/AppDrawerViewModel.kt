@@ -15,7 +15,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-const val GRID_COLUMNS = 6
+/**
+ * Apps across the drawer grid. Eight, as 6e draws it, up from six.
+ *
+ * The redesign's own assumption is a 1080p handheld held at 30-40cm, and at eight across a tile is
+ * still wider than a launcher icon needs — what it buys is a row of the alphabet you can take in
+ * without scrolling, which is the point of an A-Z grid.
+ */
+const val GRID_COLUMNS = 8
 
 // The Android Memory Card's platform id, and the sentinel platform for rows that only back an
 // app's artwork/favorites/collections without placing it in the library (mirrors XMBViewModel).
