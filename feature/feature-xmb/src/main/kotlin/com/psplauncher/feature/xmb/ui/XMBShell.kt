@@ -1808,6 +1808,7 @@ fun XMBShell(
                     gameId = gameId,
                     onBack = onCloseGameDetail,
                     autoLaunch = uiState.activeGameAutoLaunch,
+                    initialAction = uiState.activeGameAction,
                     initialDiscId = uiState.activeGameDiscId,
                     pendingGamepadAction = uiState.pendingGameDetailAction,
                     onGamepadActionConsumed = onGameDetailActionConsumed,

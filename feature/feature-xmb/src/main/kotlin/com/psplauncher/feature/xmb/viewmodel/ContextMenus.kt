@@ -70,10 +70,13 @@ internal fun gameContextMenuItems(
     val inMissingBucket = state.selectedPlatformId == XMBViewModel.MISSING_PLATFORM_ID
 
     return buildList {
-        // The explicit path to the edit surface, essential when direct launch makes confirm skip
-        // straight into the game. Launch/title/note/scrape actions all live in Game Detail — the
-        // menu stays navigational.
-        add(XMBContextMenuItem("game_details", "View Game Details"))
+        // "Details" opens a SUBMENU of the things that used to be reachable only by opening the
+        // whole screen and finding them on it. Two of them — Edit Title, Edit Note — do not open
+        // it at all any more; the rest open it already doing the thing.
+        //
+        // It used to say "View Game Details" and be the only way in, which is why this menu could
+        // describe itself as navigational: every verb lived on the far side of it.
+        add(XMBContextMenuItem("game_details", "Details"))
         // PLAY IS IN EVERY GAME MENU AND DRAWN IN NONE OF THEM.
         //
         // It used to appear when direct launch was off, and on the recents shelf either way, and

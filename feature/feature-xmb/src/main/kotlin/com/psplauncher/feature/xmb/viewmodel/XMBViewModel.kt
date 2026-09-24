@@ -779,6 +779,19 @@ data class XMBUiState(
     // True when the Game Detail screen should fire its Play action as soon as the game loads —
     // set by direct-launch confirms and the Options menu's "Launch Game" entry; cleared on close.
     val activeGameAutoLaunch: Boolean = false,
+    /**
+     * A [com.psplauncher.feature.xmb.ui.detail.DetailAction] name to fire as Game Detail opens.
+     *
+     * The Details submenu lists actions that LIVE on that screen — the Artwork Studio, the
+     * metadata preview, the manual viewer, a re-scrape — each of which is a piece of that
+     * screen's own state and cannot simply be run from the crossbar. So the row opens the screen
+     * already doing the thing, the way autoLaunch opens it already launching, rather than landing
+     * you on a page you then have to navigate.
+     *
+     * Edit Title and Edit Note are NOT here: their dialog is the crossbar's own, so those two
+     * never open the screen at all.
+     */
+    val activeGameAction: String? = null,
     // The specific disc to open (and auto-launch) when [activeGameId] is set — set by the game
     // context menu's "Choose Disc" so a direct-launch user can pick a non-primary disc. The
     // primary remains the default whenever this is null.
@@ -4691,7 +4704,11 @@ class XMBViewModel @Inject constructor(
             XMBItemType.PHOTO_FILE -> openSearchedPhoto(row)
             XMBItemType.LIBRARY_BOOK -> openBook(row.id.removePrefix("book_"))
             XMBItemType.MUSIC_TRACK -> openSearchedTrack(row)
-            else -> row.gameId?.let { id -> _uiState.update { s -> s.copy(activeGameId = id, activeGameAutoLaunch = true) } }
+            // launchGameDirectly, not the detail screen's invisible auto-launch. Three of the
+            // four callers of that path were moved off it when direct launch was built — "the
+            // detail overlay is only an editing surface" — and search was the one left behind,
+            // opening a whole screen underneath a launch that never shows it.
+            else -> row.gameId?.let { id -> launchGameDirectly(id) }
         }
     }
 
@@ -7059,6 +7076,39 @@ class XMBViewModel @Inject constructor(
                 appAction {
                     gameRepository.setPreferredEmulator(gid, choice.takeIf { it != "default" })
                 }
+            } else if (itemId.startsWith("detail_")) {
+                val gid = menu.gameId
+                when (val what = itemId.removePrefix("detail_")) {
+                    // The crossbar's own dialog. Blank clears the override / the note, which is
+                    // what its confirm handlers already did.
+                    "title" -> viewModelScope.launch {
+                        val game = gameRepository.getById(gid) ?: return@launch
+                        closeContextMenu()
+                        _uiState.update { it.copy(collectionNameDialog = CollectionNameDialogState(
+                            title = "Edit Title",
+                            initialText = game.displayTitle,
+                            editTitleGameId = gid,
+                            placeholder = "Leave blank to use the scanned name",
+                        ))}
+                    }
+                    "note" -> viewModelScope.launch {
+                        val game = gameRepository.getById(gid) ?: return@launch
+                        closeContextMenu()
+                        _uiState.update { it.copy(collectionNameDialog = CollectionNameDialogState(
+                            title = "Edit Note",
+                            initialText = game.userNote.orEmpty(),
+                            editNoteGameId = gid,
+                            placeholder = "Anything you want to remember about this game",
+                        ))}
+                    }
+                    "open" -> _uiState.update {
+                        it.copy(activeGameId = gid, activeGameAutoLaunch = false, activeGameAction = null)
+                    }
+                    // Everything else is a DetailAction name, fired as the screen opens.
+                    else -> _uiState.update {
+                        it.copy(activeGameId = gid, activeGameAutoLaunch = false, activeGameAction = what)
+                    }
+                }
             } else if (itemId.startsWith("pstate_")) {
                 // "pstate_none" clears the mark; every other value is a PlayState name. Unknown
                 // names resolve to null, which is the same as clearing — a stale id cannot write
@@ -7085,11 +7135,7 @@ class XMBViewModel @Inject constructor(
                     appAction { gameRepository.setPreferredDisc(menu.gameId, discId) }
                 }
             } else when (itemId) {
-                // Always opens the Game Detail screen (no auto-launch) — the edit surface for
-                // artwork, title, notes, emulator when direct launch is the confirm behavior.
-                "game_details"           -> _uiState.update {
-                    it.copy(activeGameId = menu.gameId, activeGameAutoLaunch = false)
-                }
+                "game_details"           -> openGameDetailsMenu(menu.gameId)
                 // Offered only when direct launch is off (see gameContextMenuItems), and it
                 // takes the SAME path confirm would take with direct launch on -- a true XMB
                 // hand-off, no Game Detail composed, cursor left on this entity when the
@@ -7267,6 +7313,34 @@ class XMBViewModel @Inject constructor(
      * is to pick a different one — and a menu you can enter and not leave is the shape of every
      * flag that ends up stuck on.
      */
+    /**
+     * The things a game's own screen used to keep to itself.
+     *
+     * Two of them run here and never open it: Edit Title and Edit Note put up the crossbar's own
+     * text dialog, which has had handlers for both since before anything called them — the
+     * confirm path was built and unreachable.
+     *
+     * The other four are pieces of that screen's state — the Artwork Studio, the metadata
+     * preview, the manual viewer, a re-scrape — so they open it with the action already firing
+     * rather than landing you on a page to go looking. "Open Game Details" is last, for the
+     * everything-else.
+     */
+    private fun openGameDetailsMenu(gameId: Long) {
+        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
+            title = "Details",
+            items = listOf(
+                XMBContextMenuItem("detail_title", "Edit Title"),
+                XMBContextMenuItem("detail_note", "Edit Note"),
+                XMBContextMenuItem("detail_ARTWORK", "Artwork"),
+                XMBContextMenuItem("detail_METADATA", "Update Metadata"),
+                XMBContextMenuItem("detail_MANUAL", "Manual"),
+                XMBContextMenuItem("detail_REFRESH", "Refresh Artwork"),
+                XMBContextMenuItem("detail_open", "Open Game Details"),
+            ),
+            gameId = gameId,
+        ))}
+    }
+
     private fun openPlayStatePickerMenu(gameId: Long) {
         viewModelScope.launch {
             val game = gameRepository.getById(gameId) ?: return@launch
@@ -8785,7 +8859,7 @@ class XMBViewModel @Inject constructor(
     private fun launchGameDirectly(gameId: Long, discId: Long? = null) {
         // Keep the XMB selection untouched. The detail overlay is only an editing surface; direct
         // launch should never navigate through it, so onResume naturally returns to this row.
-        _uiState.update { it.copy(activeGameId = null, activeGameAutoLaunch = false, activeGameDiscId = null) }
+        _uiState.update { it.copy(activeGameId = null, activeGameAutoLaunch = false, activeGameDiscId = null, activeGameAction = null) }
         viewModelScope.launch {
             val selected = gameRepository.getById(gameId) ?: run {
                 Timber.w("Direct launch requested for missing game id=$gameId")
@@ -8892,6 +8966,10 @@ class XMBViewModel @Inject constructor(
                 activeGameId = null,
                 activeGameAutoLaunch = false,
                 activeGameDiscId = null,
+                // Cleared with the screen, or reopening it by any other route would re-fire the
+                // last deep-linked action — the Studio opening again on a press that asked for
+                // nothing of the kind.
+                activeGameAction = null,
                 pendingGameDetailAction = null,
             )
         }

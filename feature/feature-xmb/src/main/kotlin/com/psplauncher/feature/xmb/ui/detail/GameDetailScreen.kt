@@ -163,6 +163,15 @@ fun GameDetailScreen(
     // opens underneath (all launch plumbing lives in the ViewModel) and is what the user
     // returns to when they exit the game.
     autoLaunch: Boolean = false,
+    /**
+     * A [DetailAction] name to run once this game has loaded, from the crossbar's Details submenu.
+     *
+     * The same shape as [autoLaunch] and for the same reason: these actions are pieces of THIS
+     * screen's state — the Studio, the metadata preview, the manual viewer — so the only way to
+     * reach one from the crossbar is to open the screen already doing it. Unlike autoLaunch the
+     * screen stays visible, because every one of them is something you then look at.
+     */
+    initialAction: String? = null,
     // When set (from the XMB context menu's "Choose Disc"), opens the detail page with this
     // disc pre-selected instead of the set's primary — the disc an auto-launch then boots.
     initialDiscId: Long? = null,
@@ -184,6 +193,17 @@ fun GameDetailScreen(
         LaunchedEffect(loadedGameId) {
             // Direct-launch auto-fire: the XMB icon confirm already handled the launch sound.
             if (loadedGameId == gameId) viewModel.launch(playSound = false)
+        }
+    }
+    // Keyed on the loaded game's id for the reason above it: the retained ViewModel still holds
+    // the previously viewed game on reopen, and a boolean key fires the action against that one.
+    if (initialAction != null) {
+        val loadedGameId = state.game?.id
+        LaunchedEffect(loadedGameId, initialAction) {
+            if (loadedGameId != gameId) return@LaunchedEffect
+            // An unknown name does nothing rather than guessing at a neighbour — the submenu and
+            // this enum are two lists that must agree, and a stale id should be inert.
+            DetailAction.entries.firstOrNull { it.name == initialAction }?.let(viewModel::activateAction)
         }
     }
     // Seamless direct launch: the page stays invisible (the XMB remains on screen) until the

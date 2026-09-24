@@ -371,6 +371,25 @@ class ContextMenusTest {
         }
     }
 
+    /**
+     * The Details submenu's ids and DetailAction's names are one pair.
+     *
+     * Four of those rows open Game Detail with the action already firing, matched by NAME through
+     * DetailAction.entries. A renamed constant does not break the build and does not crash — the
+     * row simply opens the screen and does nothing, which is the failure nobody reports. Same
+     * shape as the pill row's ids and the play-state marks.
+     */
+    @Test
+    fun `every deep-linked Details row names a real DetailAction`() {
+        val deepLinked = listOf("ARTWORK", "METADATA", "MANUAL", "REFRESH")
+        deepLinked.forEach { name ->
+            assertTrue(
+                "the Details submenu writes detail_$name, which DetailAction does not have",
+                com.psplauncher.feature.xmb.ui.detail.DetailAction.entries.any { it.name == name },
+            )
+        }
+    }
+
     @Test
     fun `view game details is offered either way`() {
         // The pair to the test above, and the reason Play is not simply "the first row always".
