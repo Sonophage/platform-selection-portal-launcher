@@ -1,27 +1,13 @@
 package com.psplauncher.feature.xmb.ui
 
-import com.psplauncher.core.ui.theme.LocalPFPColors
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.draw.rotate
-import androidx.compose.foundation.layout.requiredWidth
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -40,29 +26,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.components.PfpMediaCard
-import com.psplauncher.core.ui.detail.detailPalette
-import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
-import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.xmb.ui.detail.DetailPanelContent
 import com.psplauncher.feature.xmb.ui.detail.DetailPanelPage
 import com.psplauncher.feature.xmb.ui.detail.DetailPanelStrip
@@ -307,90 +283,29 @@ fun RecentFilterRow(
  */
 @Composable
 fun LaunchSpine(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val accent = LocalPFPColors.current.accentColor
-    val travel by rememberInfiniteTransition(label = "spine").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        // Slow. A fast shimmer on a bar this long reads as a loading indicator, which is the one
-        // thing it must not be mistaken for on a page whose button launches something.
-        animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing)),
-        label = "travel",
-    )
     Box(
         modifier = modifier
             .fillMaxHeight()
-            // Stop short of the prompt row. The spine runs down the whole right edge, and the
-            // Filter / Search / Apps pills sit in that same corner — so the spine was on top of
-            // the Apps pill for 114 of its 139 pixels, and a finger aiming at Apps pressed Play.
-            // Measured with uiautomator on a tablet: spine [2279,0][2400,1504] against Apps
-            // [2254,1413][2393,1504]. Nothing looked wrong, because the two do not overlap in
-            // ink — the spine's gradient has already faded to nothing down there.
-            //
-            // Which is why this shortens the spine rather than moving the pills: the bottom of
-            // the gradient is invisible anyway, so giving that band back costs no pixels the
-            // user can see and returns the corner to the row that has three controls in it.
-            .padding(bottom = SpinePromptClearance)
-            .width(SpineWidth)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+            // Stop short of the prompt row. This used to matter far more: the control was a bar
+            // down the whole right edge, and it sat on top of the Apps pill for 114 of its 139
+            // pixels, so a finger aiming at Apps pressed Play. It is a capsule in the middle of
+            // the edge now and cannot reach that corner, but the clearance stays — it is what
+            // keeps the control off the prompts whatever height the shelf is given.
+            .padding(bottom = SpinePromptClearance, end = RailEdgeGap),
+        contentAlignment = Alignment.CenterEnd,
     ) {
-        // The bar itself, fading at both ends: a solid one reads as a border on the window, and
-        // this belongs to the item rather than to the screen.
-        Box(
-            Modifier.matchParentSize().background(
-                Brush.verticalGradient(
-                    0.00f to accent.copy(alpha = 0.00f),
-                    0.50f to accent.copy(alpha = 0.55f),
-                    1.00f to accent.copy(alpha = 0.00f),
-                )
-            )
-        )
-        // The shimmer is on the WORD, not the bar. A band travelling down the whole strip read
-        // as a progress indicator on a bar whose job is to launch something; on the letters it
-        // reads as a highlight passing over a label, which is the thing that says "press me".
-        //
-        // The gradient runs along the text's own X axis, which a quarter turn later is down the
-        // screen -- so a linear gradient here IS the vertical travel, with no second rotation to
-        // keep in step.
-        val labelPx = with(LocalDensity.current) { SpineLabelLength.toPx() }
-        val glintWidth = labelPx * 0.30f
-        val glintHead = travel * (labelPx + glintWidth * 2f) - glintWidth
-        val shimmer = Brush.linearGradient(
-            colors = listOf(SpineLabelRest, Color.White, SpineLabelRest),
-            start = Offset(glintHead, 0f),
-            end = Offset(glintHead + glintWidth, 0f),
-        )
-        Text(
-            text = label.uppercase(),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 3.sp,
-            maxLines = 1,
-            // requiredWidth before rotate: the node is measured at its own width, ignoring the
-            // spine's, and THEN turned a quarter turn. Measuring it inside a 36dp column first
-            // would wrap the word one letter per line.
-            modifier = Modifier
-                .requiredWidth(SpineLabelLength)
-                .rotate(90f),
-            textAlign = TextAlign.Center,
-            style = TextStyle(brush = shimmer, shadow = XmbTextShadow),
-        )
+        XmbRailRow(label = label, focused = true, onClick = onClick)
     }
 }
 
-/** What the spine's label reads between glints: legible, not lit. */
-private val SpineLabelRest = Color.White.copy(alpha = 0.55f)
-
-/** How long the rotated label is allowed to be. Longer than any word that goes in it. */
-private val SpineLabelLength = 220.dp
-
-private val SpineWidth = 36.dp
-
 /**
- * How far above the bottom edge the launch spine ends, so the prompt pills in that corner stay
+ * How far above the bottom edge the launch control ends, so the prompt pills in that corner stay
  * pressable. Sized to clear the hint bar, which is its glyph height plus its own small padding.
+ *
+ * Internal because the context rail's scrim insets itself by it: "how far up does the prompt row
+ * reach" is one fact and the scrim needs the same answer this does.
  */
-private val SpinePromptClearance = 52.dp
+internal val SpinePromptClearance = 52.dp
 
 @Composable
 private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {
