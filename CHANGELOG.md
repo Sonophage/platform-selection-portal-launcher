@@ -5,6 +5,37 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-09-24
+
+### Added
+- **Apps can appear on the Recent shelf**, beside games, music, books and video — off by default,
+  under Appearance ▸ Wallpaper & Text. It is off because the shelf is the screen the launcher
+  opens on, and the most recently used thing on a device full of apps is often one you opened for
+  ten seconds, which would push the game you were actually playing off your own home screen. It
+  needs usage access; without it no app has a last-used time and none appear. The filter is only
+  in the cycle while the setting is on.
+
+- **Enter opens the App Drawer**, on the crossbar and nowhere else. Everywhere else it still
+  confirms — it is the keyboard's confirm key, and taking it outright would leave a keyboard user
+  unable to open a folder, start a game or pick a row in the options rail.
+
+- **Space opens the options** for whatever has the cursor, and still types a space in any text
+  field. For keyboards that have no Escape and no function row.
+
+### Changed
+- **The launcher follows the device's auto-rotate** instead of being pinned to landscape. Your
+  rotation lock is honoured. The XMB is drawn for landscape, so a portrait device will letterbox
+  it.
+
+### Fixed
+- **The Recent shelf said "No recent apps." while showing two of them.** It decided the shelf was
+  empty by asking whether the focused row had artwork and scraped details to show, which an app
+  never does. It now says so only when the shelf is actually empty, and otherwise names what the
+  cursor is on.
+
+- **The Screen Orientation row in Settings said "Landscape (fixed)"**, which stopped being true
+  when the launcher started following auto-rotate.
+
 ## [1.9.0] - 2026-09-24
 
 ### Added
