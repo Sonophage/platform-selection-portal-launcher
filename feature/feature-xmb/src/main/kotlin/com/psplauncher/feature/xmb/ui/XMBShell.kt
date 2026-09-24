@@ -819,17 +819,18 @@ fun XMBShell(
             // leftmost column hides the caticon bar and the item list, and the screen becomes
             // the game you were last playing. RIGHT walks the recents and then steps to the next
             // category, which is what brings the bar back.
-            // Crossfaded. Last Played REPLACES the crossbar rather than sitting beside it, so
-            // stepping off the shelf swaps a full-screen page for a bar and a column in a single
-            // frame — a whole screen changing at once reads as a glitch rather than as a move.
+            // NOT crossfaded any more, and the transition did not lose anything by it.
             //
-            // Short, because it is covering a step between two columns and not staging an entrance.
-            // Both trees are composed for the length of it, which is why it is not longer than that.
-            Crossfade(
-                targetState = uiState.onLastPlayedHome,
-                animationSpec = tween(HomeSwapMs),
-                label = "xmbHomeSwap",
-            ) { onLastPlayedHome ->
+            // A Crossfade composes BOTH branches for its whole duration, and the else below is
+            // the entire crossbar — bar, column, hover panel, pill row. Paying for two of those
+            // trees every time the cursor steps on or off the shelf is what the owner could feel.
+            //
+            // What made it look like a move was never this fade. The BACKGROUND is drawn above
+            // this, outside it, and already crossfades on its own over 320ms whenever the focused
+            // item's backdrop changes — which stepping on or off the shelf always does. That is
+            // the largest thing on screen and it is still fading; only the foreground, which is
+            // mostly text and small tiles, now swaps on one frame.
+            val onLastPlayedHome = uiState.onLastPlayedHome
             if (onLastPlayedHome) {
                 LastPlayedPage(
                     items = uiState.currentItems,
@@ -1222,7 +1223,6 @@ fun XMBShell(
                 }
             }
             } // end: else — the crossbar, shown on every column but Last Played
-            }
 
             // The clock, the date and the battery, on EVERY column including Last Played.
             //
@@ -1984,4 +1984,3 @@ private const val NotificationBarZ = 0.5f
 private const val XmbChromeZ = 0.6f
 
 /** How long the shelf and the crossbar cross over. Short: it covers a step, not an entrance. */
-private const val HomeSwapMs = 220
