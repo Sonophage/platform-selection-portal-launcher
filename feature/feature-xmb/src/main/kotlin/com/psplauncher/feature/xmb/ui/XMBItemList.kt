@@ -144,6 +144,10 @@ private val TAP_TARGET_HEIGHT = 72.dp
 // theme-kit layout spec (single source of truth for the tuned XMB geometry).
 internal val LEADING_ICON_SLOT = XmbLayoutSpec.DEFAULT.itemIconSlotDp.dp
 // Default size of the glyph/art inside that slot (selected rows additionally scale up via the row).
+/** The scrubber under a playing or resumable row: a thin bar, the accent filling it. */
+private val ScrubberWidth = 96.dp
+private val ScrubberHeight = 3.dp
+
 private val LEADING_ICON_SIZE = XmbLayoutSpec.DEFAULT.itemIconDp.dp
 // Horizontal centre of a row's leading icon from the row's left edge: 18.dp row padding + half the
 // slot. The grow/shrink scale pivots here, and the column is shifted so this lands on the caticon's
@@ -834,6 +838,47 @@ private fun XmbVerticalListRow(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 1.dp),
                         )
+                    }
+                    // THE SCRUBBER, under the meta line — 6a's "the playing track takes the focus
+                    // slot, with a scrubber under its meta", and 6b's progress line on a resumed
+                    // video. Only on the SELECTED row: an unselected row is a thing you might go
+                    // to, and a bar on it is a fact about a session you are not in.
+                    //
+                    // Books have none and will not: progressFraction's own KDoc says why — a book
+                    // opens in somebody else's reader, which never reports back.
+                    if (isSelected) {
+                        item.progressFraction?.let { fraction ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 4.dp),
+                            ) {
+                                Box(
+                                    Modifier
+                                        .width(ScrubberWidth)
+                                        .height(ScrubberHeight)
+                                        .clip(RoundedCornerShape(ScrubberHeight / 2))
+                                        .background(Color.White.copy(alpha = 0.22f)),
+                                ) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                                            .height(ScrubberHeight)
+                                            .clip(RoundedCornerShape(ScrubberHeight / 2))
+                                            .background(LocalPFPColors.current.accentColor),
+                                    )
+                                }
+                                item.progressLabel?.let { label ->
+                                    Text(
+                                        text = label,
+                                        color = SecondaryText,
+                                        fontSize = 11.sp,
+                                        style = subtitleStyle,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(start = 10.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

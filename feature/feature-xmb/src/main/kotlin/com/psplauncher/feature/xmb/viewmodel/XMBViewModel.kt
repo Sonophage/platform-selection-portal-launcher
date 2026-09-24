@@ -726,6 +726,13 @@ data class XMBUiState(
     val videoNav: VideoNav = VideoNav.Root,
     val videoLibraries: List<com.psplauncher.core.domain.model.VideoLibrary> = emptyList(),
     val activeVideoId: String? = null,
+    /**
+     * The one video worth offering to resume, or null when there is nothing part-watched.
+     *
+     * 6b's row is "Video · resume", and resume is the whole point: a film you finished is not a
+     * thing to continue, and one you never started has nothing to continue from.
+     */
+    val resumeVideo: com.psplauncher.core.domain.model.Video? = null,
     // Play as soon as the detail page has the film, instead of sitting on its Play button. Only
     // search sets it: everywhere else the detail page IS the destination, and only search is a
     // place you went to reach one specific thing. Mirrors [activeGameAutoLaunch].
@@ -1640,10 +1647,12 @@ data class XMBItem(
     /**
      * How far through this row you are, 0..1, or null when the medium has no notion of it.
      *
-     * Only video has one today: a book opens in somebody else's reader, which never tells us
-     * where it got to, and a game has no length to be a fraction of. Kept as a fraction rather
-     * than a position and a duration because the two are only ever used together and a row that
-     * carried one without the other could not say anything at all.
+     * Video and the playing MUSIC track have one. A book does not: it opens in somebody else's
+     * reader, which never tells us where it got to — so 6c's "page 62 of 190" has no source here
+     * and the Books column gets no scrubber. A game has no length to be a fraction of.
+     *
+     * Kept as a fraction rather than a position and a duration because the two are only ever used
+     * together and a row that carried one without the other could not say anything at all.
      */
     val progressFraction: Float? = null,
     /** "23 min left" — the words beside [progressFraction]. Null whenever that is. */
@@ -3036,6 +3045,30 @@ class XMBViewModel @Inject constructor(
     // Library list drives the Video root; re-render the root when it changes.
     private fun observeVideo() {
         viewModelScope.launch {
+            // The resume candidate, for the row 6b puts at the top of the column.
+            //
+            // Recently watched, narrowed to the ones actually part-way through: a position past
+            // zero, a known duration, and not so near the end that "resume" would drop you into
+            // the credits. RESUME_DONE_FRACTION is that last guard — a player writes the position
+            // as you watch, so a film watched to the end sits at ~100% and would otherwise lead
+            // this column forever, offering to resume something already finished.
+            videoRepository.observeRecentlyWatched().collect { videos ->
+                val resumable = videos.firstOrNull { v ->
+                    val total = v.durationMs ?: 0L
+                    total > 0L && v.resumePositionMs > 0L &&
+                        v.resumePositionMs.toFloat() / total < RESUME_DONE_FRACTION
+                }
+                if (_uiState.value.resumeVideo?.id != resumable?.id) {
+                    _uiState.update { it.copy(resumeVideo = resumable) }
+                    if (currentCategory()?.id == BuiltInCategory.VIDEO &&
+                        _uiState.value.videoNav == VideoNav.Root
+                    ) {
+                        loadItemsForCategory(currentCategory(), keepCursorOnRow = true)
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
             videoRepository.observeLibraries().collect { libraries ->
                 _uiState.update { it.copy(videoLibraries = libraries) }
                 if (currentCategory()?.id == BuiltInCategory.VIDEO &&
@@ -3127,20 +3160,10 @@ class XMBViewModel @Inject constructor(
         type     = XMBItemType.ADD_ACTION,
     )
 
+    // Through the shared mapper, so a library listing and the Video root's resume row cannot
+    // drift into two ideas of what a video row is.
     private fun List<com.psplauncher.core.domain.model.Video>.toVideoItems(): List<XMBItem> =
-        map { video ->
-            XMBItem(
-                id       = "vid_${video.id}",
-                title    = video.displayTitle,
-                subtitle = videoRowSubtitle(video.durationMs, video.resolutionLabel, video.sizeBytes),
-                type     = XMBItemType.VIDEO_FILE,
-                mediaUri = video.uri,
-                mimeType = video.mimeType,
-                coverUri = video.effectiveThumbnailUri,
-                progressFraction = videoProgressFraction(video.resumePositionMs, video.durationMs),
-                progressLabel    = videoProgressLabel(video.resumePositionMs, video.durationMs),
-            )
-        }
+        map { it.toXmbRow() }
 
     private fun setVideoItems(
         videos: List<com.psplauncher.core.domain.model.Video>,
@@ -9423,6 +9446,19 @@ class XMBViewModel @Inject constructor(
         private const val EMPTY_FAVORITES_ITEM_ID = "empty_favorites"
         private const val EMPTY_CATEGORY_ITEM_ID = "empty_category"
         private const val ALL_GAMES_ITEM_ID = "all_games"
+        /**
+         * Past this much of a video, "resume" would be offering to rewatch the credits.
+         *
+         * NOT the same rule as videoProgressFraction's, and deliberately not. That one refuses a
+         * fraction of 1.0 or more, because a resume point past the end is a stale stamp and there
+         * is no bar to draw for it. This one decides whether a video is worth LEADING the column
+         * with, which is a different question: a film at 98% still draws a perfectly good bar in a
+         * listing, and still should not be the first thing the Video column offers.
+         *
+         * If these two are ever collapsed into one number, the column starts offering to resume
+         * things that are finished.
+         */
+        private const val RESUME_DONE_FRACTION = 0.97f
         private const val ALL_GAMES_PLATFORM_ID = "__all_games__"
         private const val FAVORITES_ITEM_ID = "favorites_folder"
         internal const val FAVORITES_PLATFORM_ID = "__favorites__"

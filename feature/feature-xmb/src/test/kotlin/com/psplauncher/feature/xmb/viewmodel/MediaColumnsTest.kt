@@ -8,6 +8,7 @@ import com.psplauncher.core.domain.model.VideoLibrary
 import com.psplauncher.feature.xmb.music.MusicPlaybackState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -517,5 +518,67 @@ class MediaColumnsTest {
             track("2", "B", artist = "Artist B", albumArtist = "Artist B", album = "Now 42"),
         ).albumGroups()
         assertEquals("Various Artists  ·  2 tracks", manyActs.single().subtitle)
+    }
+
+    // ── Scrubbers: the rows that report where you are in something ─────────────────────────
+
+    private fun video(resume: Long, duration: Long? = 600_000L) =
+        com.psplauncher.core.domain.model.Video(
+            id = "v1", libraryId = "lib", uri = "content://v1", displayName = "A Film",
+            durationMs = duration, resumePositionMs = resume,
+        )
+
+    @Test
+    fun `the playing track carries a scrubber, and only while a duration is known`() {
+        val track = MusicTrack(
+            id = "t1", folderId = "f", uri = "content://t1", displayName = "Song",
+            title = "Dracula's Castle", artist = "Michiru Yamane",
+        )
+        val playing = XMBUiState(
+            musicPlayback = MusicPlaybackState(track = track, isPlaying = true, positionMs = 72_000, durationMs = 214_000),
+        ).musicRootSections().first()
+        assertEquals(0.336f, playing.progressFraction!!, 0.005f)
+        assertEquals("1:12  /  3:34", playing.progressLabel)
+
+        // A stream, or a file whose length has not been read: position over zero is a divide by
+        // zero or a bar pinned full, and a bar that is always full is worse than no bar.
+        val unknownLength = XMBUiState(
+            musicPlayback = MusicPlaybackState(track = track, isPlaying = true, positionMs = 72_000, durationMs = 0),
+        ).musicRootSections().first()
+        assertNull("no duration means no scrubber", unknownLength.progressFraction)
+        assertNull(unknownLength.progressLabel)
+    }
+
+    @Test
+    fun `no track playing means no Now Playing row at all`() {
+        // 6a is "only for currently playing" — the row is not a permanent slot that empties.
+        val rows = XMBUiState().musicRootSections()
+        assertTrue("Songs should lead when nothing is playing", rows.first().title == "Songs")
+        assertTrue(rows.none { it.progressFraction != null })
+    }
+
+    @Test
+    fun `a part-watched video leads the Video column with its progress`() {
+        val rows = XMBUiState(resumeVideo = video(resume = 150_000L)).videoRootSections()
+        val resume = rows.first()
+        assertEquals("A Film", resume.title)
+        assertTrue("the resume row says so", resume.subtitle!!.startsWith("Resume"))
+        assertEquals(0.25f, resume.progressFraction!!, 0.005f)
+    }
+
+    @Test
+    fun `nothing part-watched means no resume row`() {
+        val rows = XMBUiState().videoRootSections()
+        assertEquals("Videos", rows.first().title)
+        assertTrue(rows.none { it.subtitle?.startsWith("Resume") == true })
+    }
+
+    @Test
+    fun `the Books column gets no scrubber, because nothing reports a page`() {
+        // Not an oversight and not deferred work: a book opens in somebody else's reader, which
+        // never tells PFP where it got to. 6c's "page 62 of 190" has no source. If a row here ever
+        // grows a progressFraction, something has invented it.
+        val rows = XMBUiState(bookLibraries = listOf(bookLibrary(12))).booksRootSections()
+        assertTrue("books cannot know a page", rows.none { it.progressFraction != null })
     }
 }

@@ -13,6 +13,7 @@ import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.CAMERA_ITEM_
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.MEMORY_CARD_ASSET_URI
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.MUSIC_ALBUMS_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.MUSIC_ARTISTS_ITEM_ID
+import com.psplauncher.core.domain.model.Video
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.NOW_PLAYING_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.OPEN_READER_ITEM_ID
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.PHOTO_ALBUMS_ITEM_ID
@@ -66,12 +67,28 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
     return buildList {
         // Now Playing — only when a track is loaded; clicking returns to the active song.
         musicPlayback.track?.let { track ->
+            // The scrubber rides the row that is already here. 6a puts the playing track in the
+            // focus slot "with a scrubber under its meta", and this row has been the playing
+            // track since Music had a column — so the tile, the title and the artist line all
+            // stay exactly as they were and the bar is the only new thing.
+            //
+            // Guarded on a REAL duration. A stream or a file whose length has not been read yet
+            // reports 0, and position-over-zero is either a divide by zero or a bar pinned full;
+            // a row with no bar reads as a row with no bar, which is true.
+            val total = musicPlayback.durationMs
             add(
                 XMBItem(
                     id       = NOW_PLAYING_ITEM_ID,
                     title    = track.displayTitle,
                     subtitle = listOfNotNull("Now Playing", track.artist).joinToString("  ·  "),
                     coverUri = track.artUri,
+                    progressFraction = if (total > 0) {
+                        (musicPlayback.positionMs.toFloat() / total).coerceIn(0f, 1f)
+                    } else null,
+                    progressLabel = if (total > 0) {
+                        formatDuration(musicPlayback.positionMs.toLong()) +
+                            "  /  " + formatDuration(total.toLong())
+                    } else null,
                     type     = XMBItemType.MUSIC_TRACK,   // renders the album-cover leading tile
                 )
             )
@@ -121,10 +138,40 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
 // Settings → Video; a getting-started "Add Videos" row shows until a root has been added and
 // scanned (keyed off the scan completing, not the video count), then drops away.
 /** The Video root's own sections, without the app rows (see [musicRootSections]). */
+/**
+ * One video as an XMB row.
+ *
+ * ONE mapper, used by the library lists and by the Video root's resume row. They were briefly two
+ * — a hand-written row for resume beside toVideoItems — which is the shape where a row grows a
+ * field in one place and not the other, and the two then disagree about what a video looks like.
+ *
+ * [lead] is the word that goes in front of the usual duration/resolution/size line: "Resume" for
+ * the root's row, nothing for a plain listing.
+ */
+internal fun Video.toXmbRow(lead: String? = null): XMBItem = XMBItem(
+    id       = "vid_$id",
+    title    = displayTitle,
+    subtitle = listOfNotNull(lead, videoRowSubtitle(durationMs, resolutionLabel, sizeBytes))
+        .joinToString("  ·  "),
+    type     = XMBItemType.VIDEO_FILE,
+    mediaUri = uri,
+    mimeType = mimeType,
+    coverUri = effectiveThumbnailUri,
+    progressFraction = videoProgressFraction(resumePositionMs, durationMs),
+    progressLabel    = videoProgressLabel(resumePositionMs, durationMs),
+)
+
 internal fun XMBUiState.videoRootSections(): List<XMBItem> {
     val libraries = videoLibraries
     val totalVideos = libraries.sumOf { it.videoCount }
     return buildList {
+        // Resume leads the column when there is something to resume — 6b's "Video · resume",
+        // the counterpart of Music's Now Playing row. It is a whole row rather than a badge on
+        // the library it lives in, because what you want after opening this column is usually the
+        // thing you stopped watching, not the folder it came from.
+        resumeVideo?.let { video ->
+            add(video.toXmbRow(lead = "Resume"))
+        }
         // Everything first, then the ways of narrowing it -- the same order Music reads in.
         add(
             XMBItem(
