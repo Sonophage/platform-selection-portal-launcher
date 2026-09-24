@@ -115,6 +115,7 @@ import com.psplauncher.core.ui.icons.categoryIconFor
 import com.psplauncher.core.ui.icons.systemIconRes
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.feature.xmb.viewmodel.GRID_COVER_COUNT
+import com.psplauncher.core.domain.model.PlayState
 import com.psplauncher.feature.xmb.viewmodel.pillsFor
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
@@ -875,6 +876,16 @@ private fun XmbVerticalListRow(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
                         )
+                        // The mark, AFTER the title and only when there is one.
+                        //
+                        // After, because a badge in front of the name indents every marked row and
+                        // leaves the column's left edge ragged — the one thing a list of a hundred
+                        // and fifty rows cannot afford. Nothing is drawn for an unmarked game, so
+                        // an unsorted library looks exactly as it does today.
+                        PlayState.fromName(item.playState)?.let { state ->
+                            Spacer(Modifier.width(7.dp))
+                            PlayStateBadge(state, dimmed = !isSelected)
+                        }
                     }
                     // What the thing IS — year, genre, developer, players — in every state, not
                     // only while some page is open. A line under a name that changes identity
@@ -1543,3 +1554,35 @@ private val PillPadH = 10.dp
 private val PillGap = 5.dp
 private val PillTextSize = 12.sp
 private val PillFocusedText = Color(0xFF1A0C03)
+
+/**
+ * Playing / Completed / Backlog, as one glyph in a capsule.
+ *
+ * A mark and not a word: the row's title already competes with a meta line and a pill row, and
+ * "Completed" spelled out beside a name is a second title. The colours are the launcher's own
+ * success and muted tones rather than a new set — three more hexes for three states is three more
+ * things to keep in step with the theme.
+ */
+@Composable
+private fun PlayStateBadge(state: PlayState, dimmed: Boolean) {
+    val tint = when (state) {
+        PlayState.COMPLETED -> Color(0xFF6FD08C)
+        PlayState.PLAYING   -> Color(0xFFFFDCAA)
+        PlayState.BACKLOG   -> Color(0x99FFFFFF)
+    }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(tint.copy(alpha = if (dimmed) 0.10f else 0.20f))
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+    ) {
+        Text(
+            text = state.mark,
+            color = tint.copy(alpha = if (dimmed) 0.55f else 1f),
+            fontSize = 9.sp,
+            lineHeight = 11.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}

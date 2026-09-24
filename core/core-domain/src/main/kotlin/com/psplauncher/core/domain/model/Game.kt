@@ -69,6 +69,8 @@ data class Game(
      * Null only between an insert and its stamp, which the repository closes in the same call.
      */
     val dateAdded: Long?          = null,
+    /** Playing / Completed / Backlog as its enum name, or null for unmarked. See [PlayState]. */
+    val playState: String?        = null,
     val userNote: String?   = null,
     val isManualEntry: Boolean = false,
     // Title derived from a metadata scrape (e.g. "Super Mario World" from "Super_Mario_World_USA.sfc").

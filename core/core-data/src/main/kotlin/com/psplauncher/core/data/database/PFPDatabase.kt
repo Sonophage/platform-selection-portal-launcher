@@ -68,7 +68,7 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
  * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
  * version bump cannot leave the test still asserting against the old number.
  */
-const val PFP_DATABASE_VERSION = 52
+const val PFP_DATABASE_VERSION = 53
 
 @Database(
     entities = [
@@ -1445,6 +1445,19 @@ abstract class PFPDatabase : RoomDatabase() {
         }
 
         /**
+         * Playing / Completed / Backlog, marked by hand.
+         *
+         * No backfill, and that is the decision rather than an omission: every existing row stays
+         * NULL, which means unmarked. The obvious alternative — call the whole library BACKLOG —
+         * would put a badge on 152 games at once and make it say nothing on the day it arrived.
+         */
+        val MIGRATION_52_53 = object : Migration(52, 53) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE games ADD COLUMN play_state TEXT")
+            }
+        }
+
+        /**
          * Recency for music and books, so the Last Played shelf can hold all four media.
          *
          * Games and videos already carried their own stamp (`last_played_at`, `last_watched_at`).
@@ -1536,6 +1549,7 @@ abstract class PFPDatabase : RoomDatabase() {
             MIGRATION_49_50,
             MIGRATION_50_51,
             MIGRATION_51_52,
+            MIGRATION_52_53,
         )
 
     }

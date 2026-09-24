@@ -103,6 +103,11 @@ internal fun gameContextMenuItems(
                 heading = "Library",
             ),
         )
+        // Beside Favorite, because it is the same kind of thing: something you say about a game
+        // rather than something the launcher worked out. A submenu, not a toggle -- four states
+        // do not fit on one row, and a row that cycled them would need you to read it to know
+        // where you had got to.
+        add(XMBContextMenuItem("play_state", "Mark As"))
         if (onRecentShelf) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent"))
         add(XMBContextMenuItem("add_to_collection", "Add to Collection"))
         if (inCollection) add(XMBContextMenuItem("remove_from_collection", "Remove from Collection"))

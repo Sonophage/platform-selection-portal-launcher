@@ -50,6 +50,7 @@ import com.psplauncher.feature.xmb.ui.detail.stepPanelPage
 import com.psplauncher.core.domain.model.HiddenPlacement
 import com.psplauncher.core.domain.model.HideLocationType
 import com.psplauncher.core.domain.model.IconDisplayMode
+import com.psplauncher.core.domain.model.PlayState
 import com.psplauncher.core.domain.model.VideoSnapPlacement
 import com.psplauncher.core.domain.model.MemoryCard
 import com.psplauncher.core.domain.model.MusicTrack
@@ -1740,6 +1741,8 @@ data class XMBItem(
     val iconKey: String? = null,        // catalog icon key for COLLECTION rows (null = default memory-card art)
     val accentColor: Long? = null,
     val isFavorite: Boolean = false,
+    /** Playing / Completed / Backlog as its enum name, or null for unmarked. See [PlayState]. */
+    val playState: String? = null,
     val isAndroidApp: Boolean = false,
     // True for contentType GAME rows — real games open the Game Detail page on select, even when
     // package/shortcut-backed (Android/Windows gaming apps). Standard apps launch directly.
@@ -5570,6 +5573,7 @@ class XMBViewModel @Inject constructor(
             platformId   = g.platformId,
             accentColor  = platformCache[g.platformId]?.accentColor,
             isFavorite   = g.isFavorite,
+            playState    = g.playState,
             isAndroidApp = g.packageName != null,
             isRealGame   = g.contentType == GameContentType.GAME,
             packageName  = g.packageName,
@@ -6755,6 +6759,15 @@ class XMBViewModel @Inject constructor(
                 appAction {
                     gameRepository.setPreferredEmulator(gid, choice.takeIf { it != "default" })
                 }
+            } else if (itemId.startsWith("pstate_")) {
+                // "pstate_none" clears the mark; every other value is a PlayState name. Unknown
+                // names resolve to null, which is the same as clearing — a stale id cannot write
+                // a state the enum does not have.
+                val gid = menu.gameId
+                val choice = itemId.removePrefix("pstate_")
+                appAction {
+                    gameRepository.setPlayState(gid, PlayState.fromName(choice))
+                }
             } else if (itemId.startsWith("icondisp_")) {
                 // Icon display mode picked from the Icon Display submenu ("default" clears the
                 // per-game override so the game follows the global setting again).
@@ -6830,6 +6843,7 @@ class XMBViewModel @Inject constructor(
                 "file_location"          -> showGameFileLocation(menu.gameId)
                 "change_emulator"        -> openEmulatorPickerMenu(menu.gameId)
                 "icon_display"           -> openIconDisplayPickerMenu(menu.gameId)
+                "play_state"             -> openPlayStatePickerMenu(menu.gameId)
                 // Two-step delete: a confirm menu first, matching the Game Detail page's guard.
                 // Two-step delete, and CANCEL IS FIRST so the cursor opens on it.
                 //
@@ -6946,6 +6960,31 @@ class XMBViewModel @Inject constructor(
     // dispatches "emu_pick_<profileId>" (or "emu_pick_default" to clear the per-game override).
     // Second-level menu: how this game's XMB tile is drawn. Checkmark shows the current choice;
     // "Use Global Setting" clears the per-game override.
+    /**
+     * Playing / Completed / Backlog, or none of them.
+     *
+     * "Unmarked" is a row rather than an absence, because the only other way back out of a state
+     * is to pick a different one — and a menu you can enter and not leave is the shape of every
+     * flag that ends up stuck on.
+     */
+    private fun openPlayStatePickerMenu(gameId: Long) {
+        viewModelScope.launch {
+            val game = gameRepository.getById(gameId) ?: return@launch
+            val current = PlayState.fromName(game.playState)
+            val items = buildList {
+                add(XMBContextMenuItem("pstate_none", "Unmarked", checked = current == null))
+                PlayState.entries.forEach { state ->
+                    add(XMBContextMenuItem("pstate_${state.name}", state.label, checked = current == state))
+                }
+            }
+            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
+                title  = "Mark As",
+                items  = items,
+                gameId = gameId,
+            ))}
+        }
+    }
+
     private fun openIconDisplayPickerMenu(gameId: Long) {
         viewModelScope.launch {
             val game = gameRepository.getById(gameId) ?: return@launch

@@ -214,6 +214,10 @@ interface GameDao {
     @Query("UPDATE games SET is_favorite = :isFavorite WHERE id = :id")
     suspend fun setFavorite(id: Long, isFavorite: Boolean)
 
+    /** Marks the game, or clears the mark with null. Column-at-a-time, like every other flag. */
+    @Query("UPDATE games SET play_state = :state WHERE id = :id")
+    suspend fun setPlayState(id: Long, state: String?)
+
     @Query("UPDATE games SET favorite_sort_order = :order WHERE id = :id")
     suspend fun updateFavoriteSortOrder(id: Long, order: Int)
 

@@ -189,6 +189,16 @@ data class GameEntity(
     @ColumnInfo(name = "date_added")
     val dateAdded: Long? = null,
 
+    /**
+     * Playing / Completed / Backlog, as the [com.psplauncher.core.domain.model.PlayState] name.
+     *
+     * Null is unmarked and is the default; it is NOT "backlog". Set by hand from the game's own
+     * menu, never inferred from play time — see the enum for why every inference is wrong
+     * somewhere obvious.
+     */
+    @ColumnInfo(name = "play_state")
+    val playState: String? = null,
+
     @ColumnInfo(name = "user_note")
     val userNote: String? = null,
 
@@ -281,6 +291,7 @@ fun GameEntity.toDomain() = Game(
     totalPlayTimeMillis = totalPlayTimeMillis,
     lastPlayedAt = lastPlayedAt,
     dateAdded = dateAdded,
+    playState = playState,
     userNote = userNote,
     isManualEntry = isManualEntry,
     scrapedTitle = scrapedTitle,
@@ -335,6 +346,7 @@ fun Game.toEntity() = GameEntity(
     totalPlayTimeMillis = totalPlayTimeMillis,
     lastPlayedAt = lastPlayedAt,
     dateAdded = dateAdded,
+    playState = playState,
     userNote = userNote,
     isManualEntry = isManualEntry,
     scrapedTitle = scrapedTitle,

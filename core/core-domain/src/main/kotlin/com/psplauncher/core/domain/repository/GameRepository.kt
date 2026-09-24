@@ -1,5 +1,6 @@
 package com.psplauncher.core.domain.repository
 
+import com.psplauncher.core.domain.model.PlayState
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.PlaySession
 import com.psplauncher.core.domain.model.RecentPlatform
@@ -52,6 +53,9 @@ interface GameRepository {
     suspend fun upsert(game: Game): Long
     suspend fun delete(id: Long)
     suspend fun setFavorite(id: Long, isFavorite: Boolean)
+
+    /** Marks the game Playing / Completed / Backlog, or clears it with null. */
+    suspend fun setPlayState(id: Long, state: PlayState?)
     suspend fun updateFavoriteSortOrder(id: Long, order: Int)
     suspend fun updateNote(id: Long, note: String?)
     suspend fun updateBoxArt(id: Long, uri: String?)

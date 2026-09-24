@@ -116,6 +116,9 @@ class GameRepositoryImpl @Inject constructor(
     override suspend fun setFavorite(id: Long, isFavorite: Boolean) =
         gameDao.setFavorite(id, isFavorite)
 
+    override suspend fun setPlayState(id: Long, state: com.psplauncher.core.domain.model.PlayState?) =
+        gameDao.setPlayState(id, state?.name)
+
     override suspend fun updateFavoriteSortOrder(id: Long, order: Int) =
         gameDao.updateFavoriteSortOrder(id, order)
 
