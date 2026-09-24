@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -77,12 +81,25 @@ fun ControllerIcon.printedLabelFor(family: ControllerDisplayType): String? =
     }[this]
 
 /**
- * The colour a family prints on a FACE position, or null where it prints none.
+ * How much of the glyph's box the button itself occupies.
+ *
+ * Measured off the art rather than guessed: the ring's outer edge spans y 22..105 on a 128px
+ * canvas. The fill is drawn to exactly that, so the white ring sits on the colour's edge instead
+ * of floating inside it or spilling past it.
+ */
+private const val GlyphDiscFraction = 0.656f
+
+/**
+ * The colour a family FILLS a face button with, or null where it prints none.
  *
  * Xbox and PlayStation both colour their four face buttons and it is how people find them — green
- * is where confirm lives on an Xbox pad whatever letter is on it. The art is a white OUTLINE on
- * transparent, so a tint is the whole job: the ring and the symbol inside it take the colour
- * together and read as that button rather than as a coloured blob.
+ * is where confirm lives on an Xbox pad whatever letter is on it.
+ *
+ * THESE HEX VALUES ARE NOT SOURCED FROM EITHER MANUFACTURER. They are the conventional colours as
+ * commonly drawn, picked to read against a dark bar. Nobody publishes an official sRGB value for
+ * a moulded plastic button, and neither pack on disk carries one — the art here is white outlines.
+ * If exact values are wanted they have to come from a reference someone names, and this is the one
+ * place to change them.
  *
  * Nintendo is absent on purpose. A Switch pad's face buttons are unlabelled grey; colouring them
  * would be inventing a convention rather than following one.
@@ -90,15 +107,15 @@ fun ControllerIcon.printedLabelFor(family: ControllerDisplayType): String? =
  * Face positions only. A coloured bumper or d-pad is not a thing either pad does, and tinting the
  * whole set would make a prompt row read as decoration instead of as hardware.
  */
-fun ControllerIcon.faceTintFor(family: ControllerDisplayType): Color? = when (family) {
-    ControllerDisplayType.XBOX -> xbFaceTints
-    ControllerDisplayType.PLAYSTATION -> psFaceTints
+fun ControllerIcon.faceFillFor(family: ControllerDisplayType): Color? = when (family) {
+    ControllerDisplayType.XBOX -> xbFaceFills
+    ControllerDisplayType.PLAYSTATION -> psFaceFills
     else -> emptyMap()
 }[this]
 
 // Xbox: A green, B red, X blue, Y yellow — by POSITION, so an X/Y swap moves the art and the
 // colour together, because both are resolved from the same position the caller asked for.
-private val xbFaceTints = mapOf(
+private val xbFaceFills = mapOf(
     ControllerIcon.FACE_SOUTH to Color(0xFF6CC24A),
     ControllerIcon.FACE_EAST to Color(0xFFEF4A4A),
     ControllerIcon.FACE_WEST to Color(0xFF4A90D9),
@@ -108,7 +125,7 @@ private val xbFaceTints = mapOf(
 // PlayStation: cross blue, circle red, square pink, triangle green. The DualSense itself prints
 // them white; these are the colours the symbols have meant since the first PlayStation, and they
 // are what someone scanning a footer is looking for.
-private val psFaceTints = mapOf(
+private val psFaceFills = mapOf(
     ControllerIcon.FACE_SOUTH to Color(0xFF7FA9E8),
     ControllerIcon.FACE_EAST to Color(0xFFE8767D),
     ControllerIcon.FACE_WEST to Color(0xFFE693D2),
@@ -297,13 +314,34 @@ fun ControllerIconGlyph(
 ) {
     val drawable = icon.drawableForOrNull(family)
     if (drawable != null) {
-        val tint = icon.faceTintFor(family)
-        Image(
-            painter = painterResource(drawable),
-            contentDescription = null,
-            colorFilter = tint?.let { ColorFilter.tint(it) },
-            modifier = modifier.size(size),
-        )
+        val fill = icon.faceFillFor(family)
+        if (fill == null) {
+            Image(
+                painter = painterResource(drawable),
+                contentDescription = null,
+                modifier = modifier.size(size),
+            )
+            return
+        }
+        // The CIRCLE takes the colour and the symbol stays white — which is how both pads print
+        // them. Tinting the art instead coloured the ring AND the letter inside it, so a green A
+        // was a green letter on nothing rather than a green button.
+        //
+        // The art is an outline on a transparent canvas, so the fill is drawn behind it at the
+        // ring's own diameter: the white ring lands on the colour's edge and reads as the rim.
+        Box(modifier.size(size), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .size(size * GlyphDiscFraction)
+                    .clip(CircleShape)
+                    .background(fill),
+            )
+            Image(
+                painter = painterResource(drawable),
+                contentDescription = null,
+                modifier = Modifier.size(size),
+            )
+        }
         return
     }
     val label = icon.printedLabelFor(family) ?: return

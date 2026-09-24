@@ -8,14 +8,14 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The colour a face position is printed in.
+ * The colour a face button is FILLED with.
  *
  * Xbox and PlayStation both colour their four face buttons and it is how people find them — green
  * is where confirm lives on an Xbox pad whatever letter is on it. Resolved by POSITION, like the
  * art, so an X/Y swap moves the colour and the picture together rather than leaving a green button
  * labelled with the wrong action.
  */
-class FaceTintTest {
+class FaceFillTest {
 
     private val faces = listOf(
         ControllerIcon.FACE_SOUTH,
@@ -27,7 +27,7 @@ class FaceTintTest {
     @Test
     fun `Xbox and PlayStation colour all four faces, and each one differently`() {
         listOf(ControllerDisplayType.XBOX, ControllerDisplayType.PLAYSTATION).forEach { family ->
-            val tints = faces.map { it.faceTintFor(family) }
+            val tints = faces.map { it.faceFillFor(family) }
             tints.forEachIndexed { i, tint -> assertNotNull("$family has no tint for ${faces[i]}", tint) }
             assertEquals("$family uses one colour twice", faces.size, tints.toSet().size)
         }
@@ -36,7 +36,7 @@ class FaceTintTest {
     @Test
     fun `Nintendo is left alone, because a Switch pad prints no colours to follow`() {
         // Colouring them would be inventing a convention rather than following one.
-        faces.forEach { assertNull(it.faceTintFor(ControllerDisplayType.NINTENDO)) }
+        faces.forEach { assertNull(it.faceFillFor(ControllerDisplayType.NINTENDO)) }
     }
 
     @Test
@@ -46,7 +46,7 @@ class FaceTintTest {
         val notFaces = ControllerIcon.entries.filterNot { it in faces }
         ControllerDisplayType.entries.forEach { family ->
             notFaces.forEach { icon ->
-                assertNull("$family tints $icon, which is not a face position", icon.faceTintFor(family))
+                assertNull("$family tints $icon, which is not a face position", icon.faceFillFor(family))
             }
         }
     }
@@ -54,7 +54,7 @@ class FaceTintTest {
     @Test
     fun `the label-only families tint nothing, having nothing to tint`() {
         listOf(ControllerDisplayType.KEYBOARD, ControllerDisplayType.TOUCH).forEach { family ->
-            faces.forEach { assertNull(it.faceTintFor(family)) }
+            faces.forEach { assertNull(it.faceFillFor(family)) }
         }
     }
 }
