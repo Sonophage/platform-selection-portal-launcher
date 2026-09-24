@@ -16,14 +16,34 @@ import org.junit.Test
 class XmbDimTest {
 
     @Test
-    fun `the ramp is the running prototype's, not the static mock's`() {
+    fun `the ramp is the running prototype's, scaled down a fifth`() {
         // 1c's logic says [1, .85, .55, .30]; 1a's mock draws .9 then .6 with no third stop. The
-        // bundle contradicts itself and the running version was chosen, so the numbers are worth
-        // stating once somewhere that fails if they quietly become the other set.
+        // bundle contradicts itself, the running version was chosen, and then every unselected
+        // stop was taken 20% further down on the panel. Worth stating once somewhere that fails if
+        // they quietly drift back to either of the published sets.
         assertEquals(1.00f, XmbDim.ranked(0), 1e-6f)
-        assertEquals(0.85f, XmbDim.ranked(1), 1e-6f)
-        assertEquals(0.55f, XmbDim.ranked(2), 1e-6f)
-        assertEquals(0.30f, XmbDim.ranked(3), 1e-6f)
+        assertEquals(0.68f, XmbDim.ranked(1), 1e-6f)
+        assertEquals(0.44f, XmbDim.ranked(2), 1e-6f)
+        assertEquals(0.24f, XmbDim.ranked(3), 1e-6f)
+    }
+
+    @Test
+    fun `the cursor's stop was not scaled with the rest`() {
+        // The 20% went on the DIMMING. Scaling the selected stop too would fade the one slot the
+        // whole cue exists to point at, and every other assertion here would still pass: the ramp
+        // would stay monotonic, stay clamped, and stay in proportion.
+        assertEquals("the selection must not be dimmed at all", 1f, XmbDim.ranked(0), 1e-6f)
+    }
+
+    @Test
+    fun `the stops kept their proportions`() {
+        // Multiplied, not subtracted. A flat 0.20 off would have left .10 at the far end — all but
+        // invisible — while changing the near stop by proportionally much less, which is a
+        // different ramp rather than the same one turned down.
+        val nearToMid = XmbDim.ranked(1) / XmbDim.ranked(2)
+        val midToFar = XmbDim.ranked(2) / XmbDim.ranked(3)
+        assertEquals("the published ramp's near:mid ratio", 0.85f / 0.55f, nearToMid, 1e-4f)
+        assertEquals("the published ramp's mid:far ratio", 0.55f / 0.30f, midToFar, 1e-4f)
     }
 
     @Test
