@@ -97,6 +97,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
@@ -5971,21 +5972,8 @@ class XMBViewModel @Inject constructor(
                 // One level up, or the App Drawer when there is no level left to leave.
                 if (!backOutOfDrill(state)) onOpenAppDrawer()
             }
-            GamepadAction.OPEN_CONTEXT_MENU -> {
-                // Y / Triangle — open context menu for whichever item type has focus
-                val item = state.currentItems.getOrNull(state.selectedItemIndex)
-                when {
-                    item != null && openMusicContextMenu(item) -> Unit
-                    item != null && openVideoContextMenu(item) -> Unit
-                    item != null && openBookContextMenu(item) -> Unit
-                    item != null && openPhotoContextMenu(item) -> Unit
-                    item?.gameId != null -> openGameContextMenu(item)
-                    item?.collectionId != null && item.type == XMBItemType.COLLECTION -> openCollectionRowContextMenu(item.collectionId)
-                    item?.type == XMBItemType.ALL_GAMES -> openAllGamesContextMenu()
-                    item?.platformId != null -> openPlatformContextMenu(item.platformId)
-                    item?.packageName != null -> openAppContextMenu(item)
-                }
-            }
+            // Y / Triangle — open context menu for whichever item type has focus
+            GamepadAction.OPEN_CONTEXT_MENU -> openContextMenuForFocusedItem()
             // Start button no longer restarts / shows the boot screen.
             GamepadAction.HOME          -> Unit
             // Cycle the sort order of the current list (PSP-style). Whichever face button
@@ -6938,6 +6926,76 @@ class XMBViewModel @Inject constructor(
         title.lowercase().filter { it.isLetterOrDigit() }
 
     // Called from touch interaction on the overlay
+    /**
+     * Raise the focused row's own context menu — the Y press, and the one place that decides
+     * which menu a row gets.
+     *
+     * Extracted so the pill row can reuse it. The order of these branches IS the rule (a media row
+     * is asked first, a game beats a package name), and [pillsFor] mirrors it; a second copy here
+     * would be the list-and-its-mirror problem with nothing checking it.
+     */
+    private fun openContextMenuForFocusedItem() {
+        val state = _uiState.value
+        val item = state.currentItems.getOrNull(state.selectedItemIndex)
+        when {
+            item != null && openMusicContextMenu(item) -> Unit
+            item != null && openVideoContextMenu(item) -> Unit
+            item != null && openBookContextMenu(item) -> Unit
+            item != null && openPhotoContextMenu(item) -> Unit
+            item?.gameId != null -> openGameContextMenu(item)
+            item?.collectionId != null && item.type == XMBItemType.COLLECTION -> openCollectionRowContextMenu(item.collectionId)
+            item?.type == XMBItemType.ALL_GAMES -> openAllGamesContextMenu()
+            item?.platformId != null -> openPlatformContextMenu(item.platformId)
+            item?.packageName != null -> openAppContextMenu(item)
+        }
+    }
+
+    /**
+     * A pill under the focused row: open that row's menu and activate the matching entry.
+     *
+     * Through the menu rather than around it, so a pill cannot do a subtly different thing from
+     * the entry with the same name — every handler and every piece of context the action needs is
+     * already assembled by the code that raises the menu.
+     *
+     * A pill whose id the menu does not offer closes the menu again rather than leaving it open on
+     * screen, which is what a user would see as "the button opened a menu I did not ask for".
+     * PillActionsTest is what stops that from happening; this is what it looks like if it does.
+     */
+    /**
+     * How long a pill waits for its row's menu to appear before giving up.
+     *
+     * Long enough for a single indexed DB read, short enough that a row which raises no menu at
+     * all does not leave a coroutine parked forever on a flow that will never emit.
+     */
+    private val MENU_RAISE_TIMEOUT_MS = 500L
+
+    fun onPillActivated(pillId: String) {
+        viewModelScope.launch {
+            openContextMenuForFocusedItem()
+            // WAIT for it. openGameContextMenu decides its Choose Disc entry from a DB read and so
+            // writes the menu from a coroutine — reading activeContextMenu on the next line finds
+            // null and leaves the menu standing open on screen, which is what a tapped pill did
+            // before this: it raised the full menu instead of running the action. The app menu
+            // happens to be synchronous, so half the pills worked and half did not.
+            val menu = withTimeoutOrNull(MENU_RAISE_TIMEOUT_MS) {
+                uiState.first { it.activeContextMenu != null }.activeContextMenu
+            }
+            if (menu == null) {
+                Timber.w("Pill '$pillId' pressed on a row that raised no menu")
+                return@launch
+            }
+            val index = menu.items.indexOfFirst { it.id == pillId }
+            if (index < 0) {
+                // PillActionsTest is what stops this; this is what it looks like if it slips
+                // through. Closing again beats leaving a menu the user did not ask for.
+                Timber.w("Pill '$pillId' is not offered by the focused row's menu")
+                closeContextMenu()
+                return@launch
+            }
+            onContextMenuItemActivatedAt(index)
+        }
+    }
+
     fun onContextMenuItemActivatedAt(index: Int) {
         _uiState.update { it.copy(activeContextMenu = it.activeContextMenu?.copy(selectedIndex = index)) }
         activateContextMenuItem()

@@ -9,6 +9,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -113,6 +115,7 @@ import com.psplauncher.core.ui.icons.categoryIconFor
 import com.psplauncher.core.ui.icons.systemIconRes
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.feature.xmb.viewmodel.GRID_COVER_COUNT
+import com.psplauncher.feature.xmb.viewmodel.pillsFor
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
 import com.psplauncher.core.ui.image.rememberArtworkModel
@@ -261,6 +264,12 @@ fun XmbDrillFlyout(
     // See XmbVerticalListRow. Required, not defaulted: the flyout is the path where the missing
     // value went unnoticed, so it does not get to be optional here either.
     labelHiddenByPanel: Boolean,
+    /**
+     * Runs a tapped action pill. Required, not defaulted, for the same reason as
+     * [labelHiddenByPanel] above: a silent default at one of three call sites is how the last
+     * per-row flag got quietly disabled on the busiest path.
+     */
+    onPillActivated: (String) -> Unit,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     modifier: Modifier = Modifier,
@@ -281,6 +290,9 @@ fun XmbDrillFlyout(
             showLabels = false,
             drillCursorOnSelected = true,
             iconAnimatingAllowed = iconAnimatingAllowed,
+            // Pills never draw here — this column is memory cards and showLabels is false — but
+            // the callback is required rather than defaulted, so it is passed rather than guessed.
+            onPillActivated = onPillActivated,
             modifier = Modifier.fillMaxHeight().width(DRILL_GAME_COLUMN_LEFT - 10.dp),
         )
 
@@ -298,6 +310,7 @@ fun XmbDrillFlyout(
             iconAnimatingAllowed = iconAnimatingAllowed,
             cardArtGrid = cardArtGrid,
             labelHiddenByPanel = labelHiddenByPanel,
+            onPillActivated = onPillActivated,
             metadataAsSubtitle = metadataAsSubtitle,
             modifier = Modifier.fillMaxSize().padding(start = DRILL_GAME_COLUMN_LEFT),
         )
@@ -316,6 +329,7 @@ private fun XmbGameColumn(
     iconStyle: GameIconStyle,
     belowTopY: Dp,
     labelHiddenByPanel: Boolean,
+    onPillActivated: (String) -> Unit,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     onItemSelected: (Int) -> Unit,
@@ -350,6 +364,7 @@ private fun XmbGameColumn(
                 cardArtGrid = cardArtGrid,
                 // a fourth call site cannot repeat it.
                 labelHiddenByPanel = labelHiddenByPanel,
+                onPillActivated = onPillActivated,
                 metadataAsSubtitle = metadataAsSubtitle,
                 iconStyle = iconStyle,
                 onClick = { onItemSelected(i) },
@@ -527,6 +542,7 @@ fun XMBItemList(
     // logo-bearing game was absent for the first 650ms and, on a game with no background art,
     // forever.
     labelHiddenByPanel: Boolean = false,
+    onPillActivated: (String) -> Unit,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     // When true, the selected row gets a ◀ drill cursor pinned directly to its right.
@@ -581,6 +597,7 @@ fun XMBItemList(
                     key(items[i].id) {
                         XmbVerticalListRow(
                             labelHiddenByPanel = labelHiddenByPanel,
+                            onPillActivated = onPillActivated,
                             cardArtGrid = cardArtGrid,
                             metadataAsSubtitle = metadataAsSubtitle,
                             item = items[i],
@@ -636,6 +653,7 @@ fun XMBItemList(
                     // Unused while isSelected is false, but passed rather than defaulted: the
                     // parameter is required now precisely so nobody has to check that again.
                     labelHiddenByPanel = labelHiddenByPanel,
+                    onPillActivated = onPillActivated,
                     metadataAsSubtitle = metadataAsSubtitle,
                     iconStyle = iconStyle,
                     onClick = { onItemSelected(selectedIndex - 1) },
@@ -683,6 +701,7 @@ private fun XmbVerticalListRow(
     // `false`, which silently disabled the rule on the drill flyout — the busiest path of the
     // three. A required parameter turns that from a thing you have to notice into a build error.
     labelHiddenByPanel: Boolean,
+    onPillActivated: (String) -> Unit,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     // Whether THIS row may animate its GIF icon — true only for the focused row, so exactly
@@ -900,6 +919,28 @@ private fun XmbVerticalListRow(
                                         maxLines = 1,
                                         modifier = Modifier.padding(start = 10.dp),
                                     )
+                                }
+                            }
+                        }
+                    }
+                    // 9i's action pills, under everything else the row says about itself.
+                    //
+                    // The mock opens them on a press and pushes the rows below down; these stay —
+                    // "it stays in column always visible". So they appear and vanish with the
+                    // cursor and nothing else moves when you press anything.
+                    //
+                    // They go under the LABEL fade with the rest of the text: a row of actions
+                    // hanging on beside a wordmark is the same mistake as half a label hanging on.
+                    if (isSelected) {
+                        val pills = pillsFor(item)
+                        if (pills.isNotEmpty()) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(PillGap),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 6.dp),
+                            ) {
+                                pills.forEach { pill ->
+                                    XmbActionPill(pill.label) { onPillActivated(pill.id) }
                                 }
                             }
                         }
@@ -1441,3 +1482,41 @@ private fun AppListIcon(
         modifier = modifier.clip(AppIconContainerShape),
     )
 }
+
+/**
+ * One 9i pill: a rounded capsule with a short verb.
+ *
+ * Sized off the mock's 1920x1080 frame over this panel's density of 2.3375 — its 72px capsule and
+ * 28px label become 31dp and 12sp. 28px is also the bundle's stated legibility floor, so the
+ * label lands exactly on it rather than near it.
+ *
+ * All the pills look alike. The mock fills its first one solid white to show which one the cursor
+ * is on, and there is no cursor here: the row is always visible rather than a thing you enter, so
+ * a highlighted pill would be claiming a focus that no press can move.
+ */
+@Composable
+private fun XmbActionPill(label: String, onClick: () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .height(PillHeight)
+            .clip(RoundedCornerShape(PillHeight / 2))
+            .background(Color.White.copy(alpha = 0.14f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = PillPadH),
+    ) {
+        Text(
+            text = label,
+            color = PrimaryText,
+            fontSize = PillTextSize,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+        )
+    }
+}
+
+// 9i's capsule: 72px tall, 24px of side padding, 12px between them, a 28px label.
+private val PillHeight = 31.dp
+private val PillPadH = 10.dp
+private val PillGap = 5.dp
+private val PillTextSize = 12.sp

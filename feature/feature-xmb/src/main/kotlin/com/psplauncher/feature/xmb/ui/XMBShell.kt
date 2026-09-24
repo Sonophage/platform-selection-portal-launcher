@@ -228,6 +228,7 @@ fun XMBShellContainer(
         onThemeShareConsumed = viewModel::onThemeShareConsumed,
         onSettingsActionConsumed = viewModel::consumeSettingsAction,
         onPromptTapped = viewModel::onPromptTapped,
+        onPillActivated = viewModel::onPillActivated,
         onCloseAppDrawer = viewModel::onCloseAppDrawer,
         onAddAppToOpenCategory = viewModel::addAppToOpenCategory,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
@@ -366,6 +367,8 @@ fun XMBShell(
     onSettingsActionConsumed: () -> Unit = {},
     /** Runs a tapped hint prompt, through the same dispatcher a pad press uses. */
     onPromptTapped: (com.psplauncher.core.domain.model.GamepadAction) -> Unit = {},
+    /** Runs a tapped 9i action pill, by the id its row's context menu dispatches. */
+    onPillActivated: (String) -> Unit = {},
     onCloseAppDrawer: () -> Unit = {},
     /** Y menu's "Add to Cross Bar": the drawer names the app, the XMB knows the column. */
     onAddAppToOpenCategory: (String) -> Unit = {},
@@ -1009,6 +1012,7 @@ fun XMBShell(
                         // RIGHT = the GAME CARDS (rom icons), icon-only, centre-pinned on that ◀ line.
                         // The caticon bar keeps its drilled-in "hidden right".
                         XmbDrillFlyout(
+                            onPillActivated = onPillActivated,
                             siblings = uiState.drillSiblings,
                             siblingIndex = uiState.drillSiblingIndex,
                             items = uiState.currentItems,
@@ -1051,6 +1055,7 @@ fun XMBShell(
                             val itemSelectedIndex =
                                 if (categoryIndex == uiState.selectedCategoryIndex) uiState.selectedItemIndex else -1
                             XMBItemList(
+                                onPillActivated = onPillActivated,
                                 items = uiState.currentItems,
                                 selectedIndex = itemSelectedIndex,
                                 onItemSelected = onItemTap,
