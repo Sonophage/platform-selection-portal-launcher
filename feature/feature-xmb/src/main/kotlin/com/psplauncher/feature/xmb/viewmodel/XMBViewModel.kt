@@ -1822,9 +1822,6 @@ class XMBViewModel @Inject constructor(
     private var browserRawTracks: List<MusicTrack> = emptyList()
     private var browserRawPlaylists: List<com.psplauncher.core.domain.model.Playlist> = emptyList()
     private var platformCache: Map<String, PlatformEntity> = emptyMap()
-    // emulator package → friendly name (e.g. "org.ppsspp.ppsspp" → "PPSSPP"), for the game subtitle's
-    // "Platform (Emulator)" label. Populated from the emulator profiles.
-    private var emulatorNameByPackage: Map<String, String> = emptyMap()
     private var enabledCards: List<MemoryCard> = emptyList()
     private var baseThemeColors: PFPColors = DefaultPFPColors
 
@@ -1865,7 +1862,6 @@ class XMBViewModel @Inject constructor(
         observePhoto()
         observeBooks()
         observeHiddenPlacements()
-        observeEmulatorProfiles()
         collectGamepadActions()
         consumeWindowsSetupPrompt()
         observeLaunchRecoveryRequests()
@@ -1943,30 +1939,26 @@ class XMBViewModel @Inject constructor(
 
     fun dismissWindowsSetupPrompt() = _uiState.update { it.copy(showWindowsSetupPrompt = false) }
 
-    // Keeps the emulator package → name map current so game subtitles can show "Platform (Emulator)".
-    // Reloads the on-screen items once names arrive so already-listed games pick up their emulator.
-    private fun observeEmulatorProfiles() {
-        viewModelScope.launch {
-            emulatorProfileRepository.profiles.collect { profiles ->
-                val map = profiles.associate { it.packageName to it.name }
-                if (map != emulatorNameByPackage) {
-                    emulatorNameByPackage = map
-                    if (_uiState.value.currentItems.any { it.gameId != null }) {
-                        loadItemsForCategory(currentCategory())
-                    }
-                }
-            }
-        }
-    }
 
-    // "Platform (Emulator)" for a game's subtitle: the platform's display name, plus the emulator's
-    // friendly name in parens when one is resolvable (the game's override, else the platform default).
-    private fun platformEmulatorLabel(g: Game): String {
-        val platform = platformCache[g.platformId]?.name ?: g.platformId
-        val emulatorPkg = g.emulatorPackage ?: platformCache[g.platformId]?.preferredEmulatorPackage
-        val emulator = emulatorPkg?.let { emulatorNameByPackage[it] }
-        return if (emulator != null) "$platform ($emulator)" else platform
-    }
+    /**
+     * A game row's meta line: the system, then when you last played it.
+     *
+     * "Game Boy Advance · Today, 1:49 PM" — and the redesign's note on it was "This is what is
+     * missing from what we have now. if it hasnt been played it defaults to just the system and
+     * publisher". So a game you have never started falls back to its publisher, and one with
+     * neither a play record nor a publisher is left as the bare system name rather than trailing a
+     * separator with nothing after it.
+     *
+     * THIS REPLACES "Platform (Emulator)". The emulator's friendly name used to sit in parentheses
+     * here; it is the same string on every row of a console's column, which is a poor use of the
+     * one line a row gets, and it is still on the game's detail screen where it is actually a
+     * question you might be asking.
+     */
+    private fun gameMetaLabel(g: Game): String = gameMetaLine(
+        platform = platformCache[g.platformId]?.name ?: g.platformId,
+        lastPlayedAt = g.lastPlayedAt,
+        publisher = g.publisher,
+    )
 
     // Music folders drive the Music category's root list; the default player is cached for launch.
     private fun observeMusic() {
@@ -5273,7 +5265,7 @@ class XMBViewModel @Inject constructor(
             physicalMediaUri = g.physicalMediaUri,
             box3dUri     = g.box3dUri,
             iconDisplayModeOverride = g.iconDisplayMode,
-            subtitle     = platformEmulatorLabel(g),
+            subtitle     = gameMetaLabel(g),
             metadataLine = gameMetadataLine(g.releaseYear, g.genre, g.developer, g.players),
             description  = g.description,
             romPath      = g.romPath,

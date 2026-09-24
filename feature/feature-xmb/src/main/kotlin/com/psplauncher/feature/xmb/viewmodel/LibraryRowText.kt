@@ -127,7 +127,7 @@ internal fun formatDate(ms: Long): String =
  * [now] is a parameter so this can be tested without the test depending on what day it is run.
  */
 internal fun relativeDate(epochMillis: Long, now: Long = System.currentTimeMillis()): String {
-    val days = ((now - epochMillis) / 86_400_000L)
+    val days = daysSince(epochMillis, now)
     return when {
         // A clock that has gone backwards (a restored backup, a device whose time was wrong) must
         // not produce "-3 days ago". The date is always true.
@@ -137,6 +137,61 @@ internal fun relativeDate(epochMillis: Long, now: Long = System.currentTimeMilli
         days <= 30L -> "$days days ago"
         else -> formatDate(epochMillis)
     }
+}
+
+/**
+ * Elapsed 24-hour blocks between the two instants.
+ *
+ * ONE definition, because [relativeDate] and [relativeDateTime] both branch on it and two copies
+ * of the arithmetic would drift the moment either threshold was retuned — the second function
+ * would then attach a clock time to a day the first had stopped calling "Today".
+ *
+ * Elapsed blocks, NOT calendar days: something played at 11pm reads as "Today" until 11pm the
+ * following night. That is pre-existing and is left alone here, but [relativeDateTime] makes it
+ * more visible than it was, since it now prints a clock time beside the word.
+ */
+private fun daysSince(epochMillis: Long, now: Long): Long = (now - epochMillis) / 86_400_000L
+
+/**
+ * [relativeDate], plus the clock time when it happened today.
+ *
+ * "Today" on its own is not much of an answer for a library you touch several times a day, and the
+ * redesign's row meta reads "Game Boy Advance · Today, 1:49 PM". Past today the time stops being
+ * the useful part — what you want from something played three weeks ago is "three weeks ago" — so
+ * only the same-day case carries it.
+ */
+internal fun relativeDateTime(epochMillis: Long, now: Long = System.currentTimeMillis()): String {
+    val day = relativeDate(epochMillis, now)
+    if (daysSince(epochMillis, now) != 0L) return day
+    return "$day, " + SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(epochMillis))
+}
+
+/**
+ * A game row's meta line: the system, then when you last played it.
+ *
+ * "Game Boy Advance · Today, 1:49 PM", and the redesign's note on it was "This is what is missing
+ * from what we have now. if it hasnt been played it defaults to just the system and publisher".
+ *
+ * Three cases, in order: a real play record wins; a game never started falls back to its
+ * publisher; and one with neither is left as the bare system name rather than trailing a separator
+ * with nothing behind it.
+ *
+ * Here rather than inside the ViewModel that calls it, so the ORDER can be tested. It is the whole
+ * rule, it has three branches, and two of them only appear for library entries that are hard to
+ * arrange by hand on a device — a game with a publisher and no play record, and one with neither.
+ *
+ * [lastPlayedAt] of 0 counts as never played. It is a real instant (1970) that the column's
+ * default writes, and sent to a date formatter it reads as fifty years ago rather than as absent.
+ */
+internal fun gameMetaLine(
+    platform: String,
+    lastPlayedAt: Long?,
+    publisher: String?,
+    now: Long = System.currentTimeMillis(),
+): String {
+    val tail = lastPlayedAt?.takeIf { it > 0L }?.let { relativeDateTime(it, now) }
+        ?: publisher?.takeIf { it.isNotBlank() }
+    return if (tail != null) "$platform  ·  $tail" else platform
 }
 
 /**

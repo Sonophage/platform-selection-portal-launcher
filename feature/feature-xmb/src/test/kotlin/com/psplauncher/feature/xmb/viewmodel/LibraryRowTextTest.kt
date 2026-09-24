@@ -222,4 +222,70 @@ class LibraryRowTextTest {
     fun `the default plural is the regular one, so the common case cannot be got wrong`() {
         assertEquals("2 games", countLabel(2, "game"))
     }
+
+    // ── The game row's meta line ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `a played game shows the system and when it was played`() {
+        val now = 1_700_000_000_000L
+        val day = 86_400_000L
+        assertEquals(
+            "Game Boy Advance  ·  Yesterday",
+            gameMetaLine("Game Boy Advance", now - day, "Nintendo", now),
+        )
+        // The play record WINS over the publisher. Both are present on most scraped games, so if
+        // the order inverted every row would still look plausible — it would just have stopped
+        // answering the question the line is for.
+        assertEquals(
+            "Nintendo DS  ·  9 days ago",
+            gameMetaLine("Nintendo DS", now - 9 * day, "Konami", now),
+        )
+    }
+
+    @Test
+    fun `today carries a clock time and nothing else does`() {
+        val now = 1_700_000_000_000L
+        val today = gameMetaLine("Game Boy Advance", now, "Nintendo", now)
+        assertTrue("today should carry a time, got: $today", today.startsWith("Game Boy Advance  ·  Today, "))
+        assertTrue("today's time should not be empty", today.length > "Game Boy Advance  ·  Today, ".length)
+
+        // Every other bucket is a span, not an instant, and a clock time on "9 days ago" is
+        // answering a question nobody asked.
+        assertEquals(
+            "Game Boy Advance  ·  Yesterday",
+            gameMetaLine("Game Boy Advance", now - 86_400_000L, null, now),
+        )
+    }
+
+    @Test
+    fun `an unplayed game falls back to its publisher`() {
+        // "if it hasnt been played it defaults to just the system and publisher".
+        val now = 1_700_000_000_000L
+        assertEquals(
+            "Game Boy Advance  ·  Nintendo",
+            gameMetaLine("Game Boy Advance", null, "Nintendo", now),
+        )
+    }
+
+    @Test
+    fun `a zero timestamp is never played, not 1970`() {
+        // The column's default writes 0, which is a REAL instant a date formatter will happily
+        // render as fifty-odd years ago. That reads as a play record rather than as the absence of
+        // one, and it is the failure this whole line would show on a freshly scanned library.
+        val now = 1_700_000_000_000L
+        assertEquals(
+            "Game Boy Advance  ·  Nintendo",
+            gameMetaLine("Game Boy Advance", 0L, "Nintendo", now),
+        )
+    }
+
+    @Test
+    fun `with neither a play record nor a publisher the separator goes too`() {
+        // Not "Game Boy Advance  ·  " with nothing behind it. A dangling separator looks like a
+        // value that failed to load, which is a bug report about data that was never there.
+        val now = 1_700_000_000_000L
+        assertEquals("Game Boy Advance", gameMetaLine("Game Boy Advance", null, null, now))
+        assertEquals("Game Boy Advance", gameMetaLine("Game Boy Advance", null, "   ", now))
+        assertEquals("Game Boy Advance", gameMetaLine("Game Boy Advance", 0L, "", now))
+    }
 }
