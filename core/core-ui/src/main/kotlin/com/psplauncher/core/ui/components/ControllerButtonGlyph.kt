@@ -10,10 +10,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -228,9 +230,11 @@ private val kbLabels = mapOf(
 private val touchLabels = mapOf(
     ControllerIcon.FACE_SOUTH to "Tap", ControllerIcon.FACE_EAST to "Back",
     ControllerIcon.FACE_NORTH to "Hold",
-    ControllerIcon.DPAD_UP to "Swipe up", ControllerIcon.DPAD_DOWN to "Swipe down",
-    ControllerIcon.DPAD_LEFT to "Swipe left", ControllerIcon.DPAD_RIGHT to "Swipe right",
-    ControllerIcon.DPAD_ALL to "Swipe",
+    // Arrows, not "Swipe left". The word is three times the width of every other glyph in the
+    // row for no more meaning: a prompt naming a direction has always been an arrow in this app.
+    ControllerIcon.DPAD_UP to "\u2191", ControllerIcon.DPAD_DOWN to "\u2193",
+    ControllerIcon.DPAD_LEFT to "\u2190", ControllerIcon.DPAD_RIGHT to "\u2192",
+    ControllerIcon.DPAD_ALL to "\u2190\u2192",
 )
 
 private val nsLabels = mapOf(
@@ -284,18 +288,31 @@ fun ControllerIconGlyph(
     // Keyboard and Touch are the two families that ship no icons, and the owner's call was that
     // they should look like the launcher instead of like a fourth vendor — so the label sits in
     // the same rounded square the rail's badges and the drawer's tiles wear, at the same corner
-    // ratio. A bare word beside three families of drawn buttons read as a missing image.
+    // ratio.
+    //
+    // EXACTLY [size] TALL, and its text scaled from [size] rather than inherited. The cap first
+    // took the ambient text style and a min-height, so "Swipe left" at the bar's 12sp came out
+    // several times the height and many times the width of the pad glyph beside it. A prompt row
+    // has one glyph height; a keycap is allowed to be wider than a circle and is not allowed to
+    // be taller.
+    val capText = with(LocalDensity.current) { (size * KeycapTextRatio).toSp() }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .heightIn(min = size)
+            .height(size)
             .widthIn(min = size)
             .clip(RoundedCornerShape(size * KeycapCornerRatio))
             .background(Color.White.copy(alpha = 0.14f))
             .padding(horizontal = size * KeycapPadRatio)
             .clearAndSetSemantics { },
     ) {
-        Text(text = label, style = LocalTextStyle.current)
+        Text(
+            text = label,
+            fontSize = capText,
+            lineHeight = capText,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
     }
 }
 
@@ -304,6 +321,15 @@ fun ControllerIconGlyph(
  * side, which is what every other rounded square in the launcher uses.
  */
 private const val KeycapCornerRatio = 0.25f
+
+/**
+ * Label height against the cap's height.
+ *
+ * The same 0.42 the drawer's monogram tiles use between letter and tile, taken down a little
+ * because these are words rather than single letters and a word at 0.42 fills the cap edge to
+ * edge.
+ */
+private const val KeycapTextRatio = 0.34f
 
 /** Side padding for a label that is a word rather than a letter: "Enter", "Swipe left". */
 private const val KeycapPadRatio = 0.22f
