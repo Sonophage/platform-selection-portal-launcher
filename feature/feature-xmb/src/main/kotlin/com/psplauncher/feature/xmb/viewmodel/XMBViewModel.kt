@@ -583,6 +583,17 @@ data class XMBUiState(
     val allGamesCount: Int = 0,
     /** Newest-first cover art per Games-root card, keyed by that card's own item id. */
     val cardFanCovers: Map<String, List<String>> = emptyMap(),
+    /**
+     * The covers inside each SHELF, by card id. A map of its own, deliberately.
+     *
+     * These used to live in [cardFanCovers] and were written by two flows — observeCategories
+     * rebuilds that map wholesale on every library change, so it wiped the shelf entries the
+     * shelf flow had just put there, and the shelves drew glyphs instead of covers. Two writers
+     * and one map, where only one of them replaced.
+     *
+     * One owner now: observeShelfContents writes all five, including Favorites.
+     */
+    val shelfFanCovers: Map<String, List<String>> = emptyMap(),
     // Count of favorited entries — drives the Games-root "Favorites" item visibility.
     val favoritesCount: Int = 0,
     // Games flagged missing by the reconciler. Tracked separately because every other count here
@@ -2524,11 +2535,9 @@ class XMBViewModel @Inject constructor(
                     val realGames = displayGames.filter { it.contentType == GameContentType.GAME }
                     val fanCovers = buildMap<String, List<String>> {
                         put(ALL_GAMES_ITEM_ID, fanOf(realGames))
-                        // Keyed to the SHELF now, not the Games-root card that no longer
-                        // exists. The other shelves have no fan yet: their lists are not in this
-                        // combine, and a fan on one shelf and not the rest would read as broken
-                        // rather than as sparse — so this is the one that had it keeping it.
-                        put(SHELF_FAVORITES_ID, fanOf(favorites))
+                        // NO SHELF ENTRIES HERE. This map is rebuilt whole on every library
+                        // change, so anything another flow put in it would be wiped — which is
+                        // exactly what happened to the shelves. They own shelfFanCovers instead.
                         realGames.groupBy { it.platformId }
                             .forEach { (pid, list) -> put(cardItemId(pid), fanOf(list)) }
                     }
@@ -2652,7 +2661,7 @@ class XMBViewModel @Inject constructor(
                                     id       = card.cardId,
                                     title    = card.title,
                                     subtitle = countLabel(card.count, "game", "games"),
-                                    insideCovers = s.cardFanCovers[card.cardId].orEmpty(),
+                                    insideCovers = s.shelfFanCovers[card.cardId].orEmpty(),
                                     type     = XMBItemType.SHELF,
                                 )
                             }
@@ -7595,23 +7604,27 @@ class XMBViewModel @Inject constructor(
             // answers: a card drawn from one snapshot and counted from another.
             combine(
                 marks.map { gameRepository.observeByPlayState(it) } +
-                    gameRepository.observeRecentlyAdded(),
+                    gameRepository.observeRecentlyAdded() +
+                    gameRepository.observeFavorites(),
             ) { lists ->
                 val byState = marks.mapIndexed { i, state -> state to lists[i] }.toMap()
-                byState to lists.last()
-            }.collect { (byState, recentlyAdded) ->
+                Triple(byState, lists[marks.size], lists[marks.size + 1])
+            }.collect { (byState, recentlyAdded, favorites) ->
                 _uiState.update { state ->
                     state.copy(
                         playStateCounts = byState.mapValues { (_, games) -> games.size },
                         recentlyAddedCount = recentlyAdded.size,
-                        // Merged into the map the Games root already fills, because one row asks
-                        // one question of it: "what is inside this card". Favorites' own fan is
-                        // written by observeCategories, which is where its list already is.
-                        cardFanCovers = state.cardFanCovers +
-                            byState.entries.associate { (mark, games) ->
-                                "$SHELF_MARKED_PREFIX${mark.name}" to fanCoversOf(games)
-                            } +
-                            (SHELF_RECENT_ID to fanCoversOf(recentlyAdded)),
+                        // ALL FIVE, from one flow, into a map nothing else writes. Favorites is
+                        // here rather than in observeCategories' map for that reason alone: that
+                        // one is rebuilt whole on every library change and took the shelves' art
+                        // with it every time.
+                        shelfFanCovers = buildMap {
+                            put(SHELF_FAVORITES_ID, fanCoversOf(favorites))
+                            put(SHELF_RECENT_ID, fanCoversOf(recentlyAdded))
+                            byState.forEach { (mark, games) ->
+                                put("$SHELF_MARKED_PREFIX${mark.name}", fanCoversOf(games))
+                            }
+                        },
                     )
                 }
             }

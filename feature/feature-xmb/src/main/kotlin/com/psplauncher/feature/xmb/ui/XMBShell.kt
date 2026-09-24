@@ -783,20 +783,34 @@ fun XMBShell(
             // The launch pulse is worth the frames it costs only because it is visible: the disc
             // ceremony fades in over 1.7s, so the wave is still on screen underneath it while it
             // quickens.
+            val launching = uiState.discCeremony != null || uiState.activeGameBoot != null
             val waveSpeed by animateFloatAsState(
                 targetValue = when {
-                    uiState.discCeremony != null || uiState.activeGameBoot != null -> 2.1f
+                    launching -> 2.1f
                     uiState.idle -> 0.45f
                     else -> 1f
                 },
                 animationSpec = tween(900),
                 label = "xmbWaveSpeed",
             )
+            // AND IT BRIGHTENS. Speed alone is only legible if you are watching the strands; a
+            // glow reads from the corner of the eye, which is where the screen is while you press
+            // the button to leave it.
+            //
+            // It swells fast and falls away slowly — 260ms up against 1200 down. A launch is a
+            // thing that HAPPENS and then is over, and a symmetrical fade would read as the
+            // launcher pulsing on a timer rather than answering the press.
+            val waveGlow by animateFloatAsState(
+                targetValue = if (launching) 1.7f else 1f,
+                animationSpec = tween(if (launching) 260 else 1200),
+                label = "xmbWaveGlow",
+            )
             WaveOverlay(
                 waveStyle = effectiveWaveStyle,
                 accentArgb = uiState.focusedItemAccentArgb ?: uiState.wallpaperAccent,
                 modifier = Modifier.fillMaxSize(),
                 speedScale = waveSpeed,
+                glowScale = waveGlow,
             )
 
             // Hide the XMB foreground (status strip + category bar + item list) while a fullscreen

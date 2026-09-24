@@ -60,8 +60,21 @@ fun WaveLayers(
      * proportionally slower than Animated whatever the caller asks for.
      */
     speedScale: Float = 1f,
+    /**
+     * A multiplier on how brightly the surface lights, for a caller that wants it to swell.
+     *
+     * The crossbar raises it while a game is launching, so the wave brightens rather than merely
+     * moving faster — a speed change alone is only legible if you are watching the strands, and a
+     * glow is legible from the corner of the eye, which is where the screen is while you press the
+     * button to leave it.
+     *
+     * Multiplies the style's own alpha, so Reduced stays proportionally dimmer than Animated
+     * whatever is asked for, and the result is clamped: the shader's Fresnel term already ends in
+     * an alpha, and pushing past 1 would flatten the whole surface to the tint colour.
+     */
+    glowScale: Float = 1f,
 ) {
-    val alphaScale = if (waveStyle.reduced) 0.5f else 1f
+    val alphaScale = (if (waveStyle.reduced) 0.5f else 1f) * glowScale
     val ampScale   = if (waveStyle.reduced) 0.65f else 1f
 
     // Continuously-increasing time in seconds since the first frame (so float precision stays sharp),
@@ -84,9 +97,9 @@ fun WaveLayers(
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ShaderWave(time, alphaScale, ampScale, tint)
+        ShaderWave(time, alphaScale.coerceAtMost(1f), ampScale, tint)
     } else {
-        FallbackWave(time, alphaScale, ampScale, tint)
+        FallbackWave(time, alphaScale.coerceAtMost(1f), ampScale, tint)
     }
     // Soft off-centre light bloom — the same gentle highlight the XMB has near the crossbar.
     Canvas(modifier = Modifier.fillMaxSize()) {
