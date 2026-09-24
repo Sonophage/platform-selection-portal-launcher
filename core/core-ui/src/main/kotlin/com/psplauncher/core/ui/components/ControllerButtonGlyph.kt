@@ -7,6 +7,8 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -73,6 +75,45 @@ fun ControllerIcon.printedLabelFor(family: ControllerDisplayType): String? =
         ControllerDisplayType.KEYBOARD -> kbLabels
         ControllerDisplayType.TOUCH -> touchLabels
     }[this]
+
+/**
+ * The colour a family prints on a FACE position, or null where it prints none.
+ *
+ * Xbox and PlayStation both colour their four face buttons and it is how people find them — green
+ * is where confirm lives on an Xbox pad whatever letter is on it. The art is a white OUTLINE on
+ * transparent, so a tint is the whole job: the ring and the symbol inside it take the colour
+ * together and read as that button rather than as a coloured blob.
+ *
+ * Nintendo is absent on purpose. A Switch pad's face buttons are unlabelled grey; colouring them
+ * would be inventing a convention rather than following one.
+ *
+ * Face positions only. A coloured bumper or d-pad is not a thing either pad does, and tinting the
+ * whole set would make a prompt row read as decoration instead of as hardware.
+ */
+fun ControllerIcon.faceTintFor(family: ControllerDisplayType): Color? = when (family) {
+    ControllerDisplayType.XBOX -> xbFaceTints
+    ControllerDisplayType.PLAYSTATION -> psFaceTints
+    else -> emptyMap()
+}[this]
+
+// Xbox: A green, B red, X blue, Y yellow — by POSITION, so an X/Y swap moves the art and the
+// colour together, because both are resolved from the same position the caller asked for.
+private val xbFaceTints = mapOf(
+    ControllerIcon.FACE_SOUTH to Color(0xFF6CC24A),
+    ControllerIcon.FACE_EAST to Color(0xFFEF4A4A),
+    ControllerIcon.FACE_WEST to Color(0xFF4A90D9),
+    ControllerIcon.FACE_NORTH to Color(0xFFF2C744),
+)
+
+// PlayStation: cross blue, circle red, square pink, triangle green. The DualSense itself prints
+// them white; these are the colours the symbols have meant since the first PlayStation, and they
+// are what someone scanning a footer is looking for.
+private val psFaceTints = mapOf(
+    ControllerIcon.FACE_SOUTH to Color(0xFF7FA9E8),
+    ControllerIcon.FACE_EAST to Color(0xFFE8767D),
+    ControllerIcon.FACE_WEST to Color(0xFFE693D2),
+    ControllerIcon.FACE_NORTH to Color(0xFF74D094),
+)
 
 private val psTable = mapOf(
     ControllerIcon.FACE_SOUTH to R.drawable.ctl_ps_face_south,
@@ -256,9 +297,11 @@ fun ControllerIconGlyph(
 ) {
     val drawable = icon.drawableForOrNull(family)
     if (drawable != null) {
+        val tint = icon.faceTintFor(family)
         Image(
             painter = painterResource(drawable),
             contentDescription = null,
+            colorFilter = tint?.let { ColorFilter.tint(it) },
             modifier = modifier.size(size),
         )
         return
