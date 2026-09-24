@@ -104,6 +104,17 @@ fun XmbNotificationBar(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
+        // THE CATCHER GOES FIRST, which is to say UNDERNEATH.
+        //
+        // It was declared last and therefore drawn on top of the sheet, which was harmless while
+        // nothing in the sheet could be pressed: it caught the press that lands anywhere else and
+        // there was no anywhere else. Now the rows open notifications and the media row has a
+        // transport, and a full-screen clickable over all of them takes every one of those presses
+        // and closes the sheet instead. It also obscured them: uiautomator reported a sheet with
+        // no contents at all, because an opaque clickable covering a node prunes it.
+        if (open) {
+            Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
+        }
         AnimatedVisibility(
             visible = open,
             enter = slideInVertically(tween(220)) { -it } + fadeIn(tween(220)),
@@ -197,10 +208,6 @@ fun XmbNotificationBar(
                     }
                 }
             }
-        }
-        // The press that closes it, over everything the sheet is not covering.
-        if (open) {
-            Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
         }
     }
 }

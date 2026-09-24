@@ -1,7 +1,10 @@
 package com.psplauncher.launcher.notification
 
+import android.app.ActivityOptions
 import android.app.Notification
 import android.app.PendingIntent
+import android.os.Build
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.psplauncher.core.ui.notification.AndroidNotice
@@ -48,10 +51,36 @@ class PfpNotificationListener : NotificationListenerService(), AndroidNotificati
         val intent = intents[key] ?: return false
         // A PendingIntent the posting app has cancelled throws rather than returning anything,
         // and the launcher finding out that a notification is stale is not a crash.
-        return runCatching { intent.send() }
+        return runCatching { intent.send(this, 0, null, null, null, null, balOptions()) }
             .onFailure { Timber.i(it, "Notification content intent could not be sent") }
             .isSuccess
     }
+
+    /**
+     * The opt-in that makes the content intent actually open something.
+     *
+     * Without it `send()` succeeds, throws nothing, and the system writes "Background activity
+     * launch blocked!" to logcat while the screen does not change — which is indistinguishable
+     * from a notification that simply had nowhere to go. Seen on the device: the intent was
+     * resolved (`com.android.settings/.Settings${'$'}UsbDetailsActivity`) and refused at the last step.
+     *
+     * The refusal is not about whether the launcher is allowed. The same log line reports
+     * `realCallingUidHasVisibleActivity: true` and `resultIfPiSenderAllowsBal:
+     * BAL_ALLOW_VISIBLE_WINDOW` — we would be allowed, but since Android 14 the SENDER has to say
+     * so, and the default for a PendingIntent whose creator did not opt in is to refuse.
+     *
+     * Null below 34, where there is no such mode and no such hardening.
+     */
+    private fun balOptions(): Bundle? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ActivityOptions.makeBasic()
+                .setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
+                )
+                .toBundle()
+        } else {
+            null
+        }
 
     override fun dismiss(key: String) {
         runCatching { cancelNotification(key) }
