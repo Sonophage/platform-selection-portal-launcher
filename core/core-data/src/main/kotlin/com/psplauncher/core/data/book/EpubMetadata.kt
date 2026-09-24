@@ -288,7 +288,11 @@ object EpubMetadataReader {
                 i++
             }
         }
-        return out.toString(Charsets.UTF_8)
+        // String(bytes, charset), not out.toString(charset): the charset overload of
+        // ByteArrayOutputStream.toString arrived in API 33 and this module's minSdk is 29, so on
+        // Android 10 through 12 that call is a NoSuchMethodError — a crash while reading a book's
+        // metadata, on the majority of devices this launcher targets.
+        return String(out.toByteArray(), Charsets.UTF_8)
     }
 
     // ── Pull-parser helpers ───────────────────────────────────────────────────

@@ -28,10 +28,8 @@ class BackupWorker @AssistedInject constructor(
         val pkg = runCatching {
             applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0)
         }.getOrNull()
-        val versionCode = pkg?.let {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode.toInt()
-            else @Suppress("DEPRECATION") it.versionCode
-        } ?: 0
+        // longVersionCode arrived in P and minSdk is Q, so the deprecated branch was unreachable.
+        val versionCode = pkg?.longVersionCode?.toInt() ?: 0
         val versionName = pkg?.versionName ?: "unknown"
         return when (
             val result = backupManager.createBackup(

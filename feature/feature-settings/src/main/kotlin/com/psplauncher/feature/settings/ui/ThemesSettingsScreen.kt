@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -142,18 +143,18 @@ private fun ThemesSettingsContent(
     }
 
     var menu by remember { mutableStateOf<ThemeMenu?>(null) }
-    var menuIndex by remember { mutableStateOf(0) }
+    var menuIndex by remember { mutableIntStateOf(0) }
     var myThemesFocused by remember { mutableStateOf(false) }
-    var cardIndex by remember { mutableStateOf(0) }
+    var cardIndex by remember { mutableIntStateOf(0) }
     var iconStripFocused by remember { mutableStateOf(false) }
     val iconStripRequester = remember { FocusRequester() }
-    var iconIndex by remember { mutableStateOf(0) }
+    var iconIndex by remember { mutableIntStateOf(0) }
     // Icon color picker state
     var customPicker by remember { mutableStateOf(false) }
     var pickerHue by remember { mutableStateOf(0f) }
     var pickerSat by remember { mutableStateOf(0f) }
     var pickerVal by remember { mutableStateOf(1f) }
-    var pickerChannel by remember { mutableStateOf(0) }
+    var pickerChannel by remember { mutableIntStateOf(0) }
     val customIndex = PfpColorChoices.size
 
     fun openIconPicker() {

@@ -102,11 +102,8 @@ class EmulatorProfileRepository @Inject constructor(
 
     fun getInstalledVersionCode(packageName: String): Long {
         return try {
-            val info = context.packageManager.getPackageInfo(packageName, 0)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P)
-                info.longVersionCode
-            else
-                @Suppress("DEPRECATION") info.versionCode.toLong()
+            // longVersionCode arrived in P and minSdk is Q; the deprecated branch was unreachable.
+            context.packageManager.getPackageInfo(packageName, 0).longVersionCode
         } catch (_: Exception) { -1L }
     }
 

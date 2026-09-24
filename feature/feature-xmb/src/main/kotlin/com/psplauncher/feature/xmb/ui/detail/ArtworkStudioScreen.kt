@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -728,7 +729,7 @@ internal fun ArtworkStudioContent(
                             else -> {
                                 // Touch long-press toggles a tile's live video preview; controller
                                 // focus previews automatically (one player at a time, ever).
-                                var touchPreviewIndex by remember(state.results) { mutableStateOf(-1) }
+                                var touchPreviewIndex by remember(state.results) { mutableIntStateOf(-1) }
                                 // A page is exactly one gridful that fits the slot, so there is nothing to
                                 // scroll to: the focused tile is always on screen (AD-5).
                                 LazyVerticalGrid(

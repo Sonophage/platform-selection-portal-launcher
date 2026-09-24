@@ -154,7 +154,12 @@ class EmulatorIntentResolver @Inject constructor(
                 // throw where they are not there to enumerate. Failing to answer means we do not
                 // know whether we could have read the file, and not knowing must never be the
                 // reason a launch is refused — so an unanswerable question reads as "no access".
-                val allFilesAccess =
+                //
+                // The SDK check is not decoration: isExternalStorageManager arrived in API 30 and
+                // this app's minSdk is 29. Without it the call is a NoSuchMethodError on Android
+                // 10, which runCatching does happen to swallow — Kotlin's catches Throwable — so
+                // it worked by accident, through a net cast for something else entirely.
+                val allFilesAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
                     runCatching { Environment.isExternalStorageManager() }.getOrDefault(false)
                 if (allFilesAccess) {
                     error(

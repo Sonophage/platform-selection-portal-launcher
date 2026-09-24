@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         hideSystemBars()
         requestNotificationPermissionIfNeeded()
+        startMenuMusicIfWanted()
         ContextCompat.registerReceiver(
             this,
             installShortcutReceiver,
@@ -207,7 +208,6 @@ class MainActivity : ComponentActivity() {
             runCatching { libraryRescanCoordinator.onResume() }
                 .onFailure { Timber.e(it, "Resume-triggered library rescan failed") }
         }
-        startMenuMusicIfWanted()
     }
 
     /**
@@ -215,8 +215,14 @@ class MainActivity : ComponentActivity() {
      *
      * Collected for the whole time the launcher is resumed rather than read once, so toggling the
      * switch or assigning a track in Settings takes effect where you did it instead of on the
-     * next cold start. The collection is cancelled by [onStop] tearing the scope down with the
-     * STARTED state.
+     * next cold start.
+     *
+     * CALLED FROM onCreate, not onResume. repeatOnLifecycle suspends until the lifecycle is
+     * DESTROYED and restarts its block on every RESUMED — so one call covers every resume for the
+     * life of the activity, and calling it from onResume started a SECOND collector on the second
+     * resume, a third on the third, each collecting the same flow and racing the others to start
+     * the music. The old comment here said the scope was torn down at onStop; lifecycleScope is
+     * cancelled at onDestroy.
      */
     private fun startMenuMusicIfWanted() {
         lifecycleScope.launch {

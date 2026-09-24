@@ -44,28 +44,28 @@ class LauncherShortcutRepository @Inject constructor(
     private val launcherApps =
         context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
 
+    // No SDK check: RoleManager arrived in Q and this app's minSdk IS Q, so the guard was a
+    // condition that could not be false guarding a branch that could not run. The resolveActivity
+    // fallback stays — it is reached when the device has no HOME role, which is a real device and
+    // not an old one.
     fun isDefaultLauncher(): Boolean = runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val rm = context.getSystemService(RoleManager::class.java)
-            if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) {
-                return rm.isRoleHeld(RoleManager.ROLE_HOME)
-            }
+        val rm = context.getSystemService(RoleManager::class.java)
+        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) {
+            return rm.isRoleHeld(RoleManager.ROLE_HOME)
         }
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         context.packageManager.resolveActivity(home, 0)?.activityInfo?.packageName == context.packageName
     }.getOrDefault(false)
 
     /**
-     * Intent that lets the user make PFP the Home app. On Q+ this is the system role request
-     * (`ROLE_HOME`); otherwise it falls back to the Home settings screen. Being Home is what unlocks
-     * [harvest] and modern pin-shortcut capture — it is optional.
+     * Intent that lets the user make PFP the Home app: the system role request (`ROLE_HOME`),
+     * falling back to the Home settings screen where the role is not available. Being Home is what
+     * unlocks [harvest] and modern pin-shortcut capture — it is optional.
      */
     fun homeRoleRequestIntent(): Intent {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val rm = context.getSystemService(RoleManager::class.java)
-            if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) {
-                runCatching { return rm.createRequestRoleIntent(RoleManager.ROLE_HOME) }
-            }
+        val rm = context.getSystemService(RoleManager::class.java)
+        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) {
+            runCatching { return rm.createRequestRoleIntent(RoleManager.ROLE_HOME) }
         }
         return Intent(Settings.ACTION_HOME_SETTINGS)
     }

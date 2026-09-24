@@ -132,10 +132,17 @@ dependencies {
 val distDir = rootProject.layout.projectDirectory.dir("dist")
 val appVersion = android.defaultConfig.versionName ?: "0"
 val copyReleaseApk = tasks.register<Copy>("copyReleaseToDist") {
+    // A LOCAL copy of the version, read here at configuration time.
+    //
+    // `rename { "...$appVersion..." }` closed over the build SCRIPT rather than over a string,
+    // and the configuration cache cannot serialise a script object — the task failed at execution
+    // with "Cannot invoke Build_gradle.getAppVersion() because this.this$0 is null". Capturing the
+    // value first leaves the lambda holding a String, which serialises fine.
+    val version = appVersion
     from(layout.buildDirectory.dir("outputs/apk/release"))
     include("*.apk")
     // Clean, versioned name in dist (e.g. PSPLauncher-1.3.0.apk).
-    rename { "PSPLauncher-$appVersion.apk" }
+    rename { "PSPLauncher-$version.apk" }
     into(distDir)
     // dist is a shared, versioned drop folder — always refresh so the current build is
     // guaranteed present even when the APK itself is up-to-date.
@@ -149,9 +156,11 @@ tasks.matching { it.name == "assembleRelease" }.configureEach {
 // in one predictable, gitignored place.
 val debugDir = rootProject.layout.projectDirectory.dir("debug")
 val copyDebugApk = tasks.register<Copy>("copyDebugToDebugDir") {
+    // Local copy, for the reason given on copyReleaseToDist above.
+    val version = appVersion
     from(layout.buildDirectory.dir("outputs/apk/debug"))
     include("*.apk")
-    rename { "PSPLauncher-$appVersion-debug.apk" }
+    rename { "PSPLauncher-$version-debug.apk" }
     into(debugDir)
     outputs.upToDateWhen { false }
 }

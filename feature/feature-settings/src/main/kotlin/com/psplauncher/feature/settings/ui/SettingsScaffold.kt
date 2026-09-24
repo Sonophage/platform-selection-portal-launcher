@@ -679,7 +679,7 @@ fun SettingsScaffold(
     // Last known Y of the focused row — the anchor for re-focusing when that row is removed
     // from composition (imported list items, sections that re-render away).
     var lastFocusedY by remember { mutableStateOf<Float?>(null) }
-    var refocusTick by remember { mutableStateOf(0) }
+    var refocusTick by remember { mutableIntStateOf(0) }
 
     // Set true once any row has actually received focus (the menu is no longer "dead").
     var focusRedirected by remember { mutableStateOf(false) }

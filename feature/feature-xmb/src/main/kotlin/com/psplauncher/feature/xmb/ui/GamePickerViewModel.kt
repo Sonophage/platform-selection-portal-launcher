@@ -1,5 +1,6 @@
 package com.psplauncher.feature.xmb.ui
 
+import timber.log.Timber
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.psplauncher.core.domain.model.Game
@@ -114,11 +115,11 @@ class GamePickerViewModel @Inject constructor(
 
                         _state.update { newState }
                     } catch (e: Exception) {
-                        android.util.Log.e("GamePickerViewModel", "Error processing picker data", e)
+                        Timber.e(e, "Error processing picker data")
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("GamePickerViewModel", "Error loading picker data", e)
+                Timber.e(e, "Error loading picker data")
                 _state.update { it.copy(isLoading = false) }
             }
         }
@@ -208,7 +209,7 @@ class GamePickerViewModel @Inject constructor(
                 // Note: This assumes collectionRepository has a method to create collections
                 // If not, this will need to be implemented
             } catch (e: Exception) {
-                android.util.Log.e("GamePickerViewModel", "Error creating collection", e)
+                Timber.e(e, "Error creating collection")
             }
         }
     }
