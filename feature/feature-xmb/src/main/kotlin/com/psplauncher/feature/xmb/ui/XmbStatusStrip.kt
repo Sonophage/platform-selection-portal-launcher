@@ -246,21 +246,18 @@ fun XmbPspStatusStrip(
                     Modifier
                 },
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(LiveArtSize)
-                        .clip(RoundedCornerShape(LiveArtCorner))
-                        .background(Color.White.copy(alpha = 0.12f)),
-                ) {
-                    if (activity.art != null) {
-                        AsyncImage(
-                            model = activity.art,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                // No tile when there is no art. An empty rounded square reads as a picture that
+                // failed to load, and the two things that fill this slot without one — a finished
+                // task and a bare count — have no picture to fail.
+                if (activity.art != null) {
+                    AsyncImage(
+                        model = activity.art,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(LiveArtSize)
+                            .clip(RoundedCornerShape(LiveArtCorner)),
+                    )
                 }
                 // BOTH lines carry an explicit lineHeight. Without one they inherit the ambient
                 // text style's, which on this theme is 24sp — so an 8sp title occupied a 57px box

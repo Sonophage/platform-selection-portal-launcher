@@ -1,5 +1,8 @@
 package com.psplauncher.feature.xmb.ui
 
+import com.psplauncher.core.ui.notification.AndroidNotifications
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import com.psplauncher.core.ui.notification.SystemToast
 import com.psplauncher.core.ui.notification.SystemToasts
 import com.psplauncher.core.ui.notification.ToastKind
@@ -737,7 +740,18 @@ fun XMBShell(
             // is a composable drawn at a different size. And only WHILE the rail is open — a
             // permanent elevation would put the clock on top of the App Drawer and Settings,
             // which are meant to cover it.
-            val aboveContextRail = if (uiState.activeContextMenu != null) 1f else 0f
+            // The strip and the hint bar sit above the XMB's own content, not just in front of it
+            // visually — the strip is drawn BEFORE the item list, so the list was taking the taps
+            // aimed at the live-activity corner and the notification sheet would not open.
+            //
+            // It drops back to 0 under a real overlay: the App Drawer and Settings are meant to
+            // cover the clock and say so. The context rail is the exception, which is what
+            // contextRailOnly is for.
+            val aboveContextRail = when {
+                uiState.activeContextMenu != null -> 1f
+                uiState.hasBlockingOverlay -> 0f
+                else -> XmbChromeZ
+            }
 
             // The newest notification takes the strip's live slot for a few seconds, then hands it
             // back to whatever was there. Same dwell the pill used to have, and the same reasoning:
@@ -752,7 +766,12 @@ fun XMBShell(
                 }
             }
             val notifications by SystemToasts.recent.collectAsState()
+            val androidNotices by AndroidNotifications.active.collectAsState()
             var notificationsOpen by remember { mutableStateOf(false) }
+            // Read from the secure setting, not kept as a flag: it is changed in Android's own
+            // Settings, outside this process, so it is re-read whenever the sheet is opened.
+            val strip = LocalContext.current
+            val androidAccess = remember(notificationsOpen) { AndroidNotifications.isEnabled(strip) }
 
 
             // menu is open — only the wallpaper/wave background shows behind it. Restored
@@ -1152,7 +1171,7 @@ fun XMBShell(
             // background work — scans, scrapes, imports, exports — reports through notifications
             // and publishes no progress the UI can read. The slot simply stays empty until one
             // does, which is also what the design's third card shows.
-            val liveActivity = uiState.musicPlayback.track?.takeIf { uiState.musicPlayback.isPlaying }?.let { track ->
+            val musicActivity = uiState.musicPlayback.track?.takeIf { uiState.musicPlayback.isPlaying }?.let { track ->
                 StripLiveActivity(
                     art = track.artUri,
                     title = track.title ?: track.displayName,
@@ -1164,11 +1183,24 @@ fun XMBShell(
                 )
             }
 
+            // In order: the report that just landed, then whatever is playing, then a count of
+            // what is waiting behind the corner. The count covers BOTH sections of the sheet,
+            // because it is a count of what that press opens — one number for one place.
+            //
+            // The last case is also what keeps the corner PRESSABLE with nothing playing. Without
+            // it the notifications are there and unreachable.
+            val liveActivity = flash?.let { StripLiveActivity(art = null, title = it.title, detail = it.message) }
+                ?: musicActivity
+                ?: (notifications.size + androidNotices.size)
+                    .takeIf { it > 0 }
+                    ?.let { StripLiveActivity(art = null, title = countLabel(it, "notification"), detail = null) }
+
             XmbPspStatusStrip(
                 sortLabel = uiState.sortLabel,
                 showSortButton = uiState.resolvedShowTouchButton,
                 onSortTapped = onXmbSortTapped,
                 live = liveActivity,
+                onLiveAreaTapped = { notificationsOpen = !notificationsOpen },
                 // The two navigation hints, each shown only where the press does something.
                 // Shoulder: the hover panel's pages, which exist only on a game that has them.
                 // Left/right: stepping the crossbar, which a drilled-in list does not do.
@@ -1202,6 +1234,16 @@ fun XMBShell(
             XmbNotificationBar(
                 open = notificationsOpen,
                 items = notifications,
+                android = androidNotices,
+                androidAccessGranted = androidAccess,
+                onGrantAndroidAccess = {
+                    notificationsOpen = false
+                    runCatching {
+                        strip.startActivity(
+                            AndroidNotifications.settingsIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                },
                 onDismiss = { notificationsOpen = false },
                 onClear = { SystemToasts.clear(); notificationsOpen = false },
                 modifier = Modifier.zIndex(NotificationBarZ),
@@ -1828,3 +1870,11 @@ private fun PreviewXMBRedTheme() {
  * strip — the thing you pressed to open it — still draws on top while the rail is up.
  */
 private const val NotificationBarZ = 0.5f
+
+/**
+ * Where the status strip and the hint bar sit over the XMB's own content.
+ *
+ * Above the notification sheet, because the strip is what you pressed to open it and pressing it
+ * again is how it closes.
+ */
+private const val XmbChromeZ = 0.6f

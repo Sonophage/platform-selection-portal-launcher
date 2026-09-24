@@ -136,6 +136,21 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <!-- ═══ Notification access — the device's own notifications in the strip ═══
+             Exported and bound by the system, which is what this permission means. It cannot be
+             granted by a dialog: the user switches the launcher on in
+             Settings ▸ Notification access, and until they do the service is never constructed
+             and the launcher shows no count. -->
+        <service
+            android:name="com.psplauncher.launcher.notification.PfpNotificationListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- ═══ FileProvider — ROM URIs passed to emulators ════════════ -->
         <!-- EmulatorIntentResolver uses this to build content:// URIs    -->
         <!-- that emulators can read without MANAGE_EXTERNAL_STORAGE       -->

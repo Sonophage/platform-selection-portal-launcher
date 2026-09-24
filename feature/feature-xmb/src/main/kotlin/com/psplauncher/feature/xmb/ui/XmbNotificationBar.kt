@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.psplauncher.core.ui.notification.AndroidNotice
 import com.psplauncher.core.ui.notification.SystemToast
 import com.psplauncher.core.ui.notification.ToastKind
 
@@ -45,6 +46,11 @@ import com.psplauncher.core.ui.notification.ToastKind
 fun XmbNotificationBar(
     open: Boolean,
     items: List<SystemToast>,
+    /** The device's own notifications, in their own section. Empty when access is not granted. */
+    android: List<AndroidNotice> = emptyList(),
+    /** Shown in place of the Android section when the permission has never been granted. */
+    androidAccessGranted: Boolean = true,
+    onGrantAndroidAccess: () -> Unit = {},
     onDismiss: () -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
@@ -66,8 +72,19 @@ fun XmbNotificationBar(
                     .padding(top = StripHeight + 8.dp, bottom = 14.dp)
                     .padding(horizontal = 20.dp),
             ) {
+                // Two sections, not one interleaved list. They are different KINDS of thing: the
+                // launcher's are events that happened and are done, Android's are ongoing and
+                // stay until something dismisses them. Sorted together they would be one list
+                // where half the rows can be acted on and half can only be read, with nothing
+                // saying which is which.
+                SectionHeading("This launcher")
                 if (items.isEmpty()) {
-                    Text("Nothing has happened yet", color = Muted, fontSize = TitleSize, lineHeight = TitleSize * 1.3f)
+                    Text(
+                        "Nothing has happened yet",
+                        color = Muted,
+                        fontSize = DetailSize,
+                        lineHeight = DetailSize * 1.3f,
+                    )
                 } else {
                     items.forEach { NotificationRow(it) }
                     Text(
@@ -83,12 +100,97 @@ fun XmbNotificationBar(
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
+
+                SectionHeading("Android")
+                when {
+                    !androidAccessGranted -> Text(
+                        "Turn on Notification access to see these here",
+                        color = Muted,
+                        fontSize = DetailSize,
+                        lineHeight = DetailSize * 1.3f,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable(onClick = onGrantAndroidAccess)
+                            .padding(vertical = 2.dp),
+                    )
+                    android.isEmpty() -> Text(
+                        "Nothing from other apps",
+                        color = Muted,
+                        fontSize = DetailSize,
+                        lineHeight = DetailSize * 1.3f,
+                    )
+                    else -> android.take(AndroidRows).forEach { AndroidRow(it) }
+                }
             }
         }
         // The press that closes it, over everything the sheet is not covering. Only while open,
         // so the XMB underneath is untouched the rest of the time.
         if (open) {
             Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
+        }
+    }
+}
+
+@Composable
+private fun SectionHeading(text: String) {
+    Text(
+        text,
+        color = Muted,
+        fontSize = DetailSize,
+        lineHeight = DetailSize * 1.3f,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+/**
+ * One notification from another app: who it is from, then what it says.
+ *
+ * The app's name leads, which is the opposite of the launcher's own rows. A launcher report is
+ * always from the launcher and says so by being in that section; an Android row is useless until
+ * you know which app is talking.
+ */
+@Composable
+private fun AndroidRow(notice: AndroidNotice) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(GlyphSlot)
+                .clip(RoundedCornerShape(5.dp))
+                .background(Color.White.copy(alpha = 0.12f)),
+        ) {
+            Text(
+                text = notice.appLabel.trim().firstOrNull()?.uppercase() ?: "?",
+                color = Color.White,
+                fontSize = DetailSize,
+                lineHeight = DetailSize * 1.3f,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Column {
+            Text(
+                listOfNotNull(notice.appLabel, notice.title).joinToString("  ·  "),
+                color = Color.White,
+                fontSize = TitleSize,
+                lineHeight = TitleSize * 1.3f,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            notice.text?.let {
+                Text(
+                    it,
+                    color = Muted,
+                    fontSize = DetailSize,
+                    lineHeight = DetailSize * 1.3f,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -144,6 +246,14 @@ private val Muted = Color(0x99FFFFFF)
 private val SuccessTint = Color(0xFF6FD08C)
 private val ErrorTint = Color(0xFFE2606A)
 private val GlyphSlot = 22.dp
+
+/**
+ * How many Android rows the sheet draws.
+ *
+ * It is a live set, not a history — a device with forty notifications would push the sheet off the
+ * bottom of the screen, and the sheet is a glance, not a shade.
+ */
+private const val AndroidRows = 6
 private val RowGap = 8.dp
 private val TitleSize = NotificationBarStyle.TitleSp.sp
 private val DetailSize = NotificationBarStyle.DetailSp.sp
