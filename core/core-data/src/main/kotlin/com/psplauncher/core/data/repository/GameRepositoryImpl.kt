@@ -38,6 +38,17 @@ class GameRepositoryImpl @Inject constructor(
     override fun observeFavorites(): Flow<List<Game>> =
         gameDao.observeFavorites().map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
+    override fun observeByPlayState(state: com.psplauncher.core.domain.model.PlayState): Flow<List<Game>> =
+        gameDao.observeByPlayState(state.name).map { rows -> rows.map { it.toDomain() } }.flowOn(Dispatchers.Default)
+
+    override fun observePlayStateCount(state: com.psplauncher.core.domain.model.PlayState): Flow<Int> =
+        gameDao.observePlayStateCount(state.name)
+
+    override fun observeRecentlyAdded(): Flow<List<Game>> =
+        gameDao.observeRecentlyAdded().map { rows -> rows.map { it.toDomain() } }.flowOn(Dispatchers.Default)
+
+    override fun observeRecentlyAddedCount(): Flow<Int> = gameDao.observeRecentlyAddedCount()
+
     override fun observeRecentlyPlayed(limit: Int): Flow<List<Game>> =
         gameDao.observeRecentlyPlayed(limit).map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
@@ -97,15 +108,34 @@ class GameRepositoryImpl @Inject constructor(
         if (game.isDiscPrimary && discSetKey != null) {
             gameDao.clearOtherDiscPrimaries(discSetKey, game.id)
         }
-        // The one place a game enters the library — every scanner funnels through here — so the
-        // one place the added-date is stamped. Read back first: this upsert is a REPLACE, which
-        // is a delete and an insert, so a value the caller does not carry is gone rather than
-        // preserved. An existing row keeps its own stamp; a new one gets now.
+        // WHAT THE SCAN CANNOT KNOW, CARRIED FORWARD.
+        //
+        // This upsert is `@Insert(onConflict = REPLACE)`, which SQLite performs as DELETE then
+        // INSERT. It does not merge: every column the incoming entity does not carry is gone. A
+        // scanner builds its row from the filesystem, so anything the USER put on that game is
+        // destroyed unless it is read back first — and this is the one funnel every scanner goes
+        // through, so here is where it is read back.
+        //
+        // The added-date proved it: without the read-back every rescan restamped the whole
+        // library as new, which a test falsifies in one line. play_state is the same shape and is
+        // worse, because it fails SILENTLY — a mark would simply be gone, with nothing on screen
+        // to say so.
+        //
+        // I have NOT observed play_state being cleared on a device. I thought I had: a game I
+        // marked Completed read unmarked an hour later, and I wrote that down as a rescan wiping
+        // it. The owner had re-marked it Playing in between. The hazard is real and is visible in
+        // GameDao.upsert's own contract — REPLACE is a delete and an insert — but the incident
+        // was not, and a fix resting on an invented one is a fix nobody can check.
+        //
+        // ADD TO THIS LIST when you add a user-owned column. The test beside it fails loudly if
+        // the pair drifts, which is the only reason this comment is not the whole defence.
         val entity = game.toEntity()
-        val stamped = entity.copy(
-            dateAdded = entity.dateAdded ?: gameDao.dateAddedOf(entity.id) ?: System.currentTimeMillis(),
+        val existing = if (entity.id != 0L) gameDao.getById(entity.id) else null
+        val merged = entity.copy(
+            dateAdded = entity.dateAdded ?: existing?.dateAdded ?: System.currentTimeMillis(),
+            playState = entity.playState ?: existing?.playState,
         )
-        return gameDao.upsert(stamped)
+        return gameDao.upsert(merged)
     }
 
     override suspend fun delete(id: Long) {

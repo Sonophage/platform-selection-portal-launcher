@@ -6,7 +6,6 @@ import com.psplauncher.core.data.database.dao.PlaySessionDao
 import com.psplauncher.core.data.database.entity.GameEntity
 import com.psplauncher.core.domain.model.Game
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
@@ -40,6 +39,14 @@ class GameDateAddedTest {
         dateAdded = dateAdded,
     )
 
+    private fun entityWith(dateAdded: Long? = null, playState: String? = null) = GameEntity(
+        id = 7, title = "Crisis Core", platformId = "psp", romPath = "/roms/cc.iso",
+        packageName = null, emulatorPackage = null, artworkUri = null, heroUri = null,
+        logoUri = null, description = null, developer = null, publisher = null,
+        releaseYear = null, genre = null, steamGridDbId = null,
+        dateAdded = dateAdded, playState = playState,
+    )
+
     /** What the repository actually handed the DAO. */
     private suspend fun written(block: suspend () -> Unit): GameEntity {
         val slot = slot<GameEntity>()
@@ -50,7 +57,7 @@ class GameDateAddedTest {
 
     @Test
     fun `a game the library has never seen is stamped now`() = runTest {
-        coEvery { dao.dateAddedOf(any()) } returns null
+        coEvery { dao.getById(any()) } returns null
         val before = System.currentTimeMillis()
         val entity = written { repo.upsert(game()) }
         assertTrue(
@@ -66,7 +73,7 @@ class GameDateAddedTest {
      */
     @Test
     fun `a rescan does not restamp a game that was already here`() = runTest {
-        coEvery { dao.dateAddedOf(7L) } returns 1_600_000_000_000L
+        coEvery { dao.getById(7L) } returns entityWith(dateAdded = 1_600_000_000_000L)
         val entity = written { repo.upsert(game(id = 7)) }
         assertEquals(1_600_000_000_000L, entity.dateAdded)
     }
@@ -78,17 +85,39 @@ class GameDateAddedTest {
      */
     @Test
     fun `zero is a real answer and is not mistaken for missing`() = runTest {
-        coEvery { dao.dateAddedOf(7L) } returns 0L
+        coEvery { dao.getById(7L) } returns entityWith(dateAdded = 0L)
         val entity = written { repo.upsert(game(id = 7)) }
         assertEquals(0L, entity.dateAdded)
     }
 
+    /**
+     * The silent one.
+     *
+     * A scanner's entity carries play_state = null and REPLACE is a delete and an insert, so
+     * without the read-back a rescan clears every mark in the library and says nothing — no error,
+     * no toast, just a badge that is no longer there.
+     *
+     * NOT observed in the wild. I reported it as observed and was wrong: the game I had marked
+     * read differently an hour later because the owner had re-marked it, not because a scan ate
+     * it. The hazard is in the DAO's contract either way, which is what this pins.
+     */
+    @Test
+    fun `a rescan does not clear a mark the user put on a game`() = runTest {
+        coEvery { dao.getById(7L) } returns entityWith(dateAdded = 5L, playState = "COMPLETED")
+        val entity = written { repo.upsert(game(id = 7)) }
+        assertEquals("COMPLETED", entity.playState)
+    }
+
     @Test
     fun `a caller that carries its own stamp keeps it`() = runTest {
-        // A restore hands back rows that already know their dates; it must not be told otherwise,
-        // and the database must not even be asked.
+        // A restore hands back rows that already know their dates, and must not be told otherwise.
+        //
+        // This used to also assert the database was never even asked, which was true while the
+        // added-date was the only thing being carried forward. It is not any more: play_state has
+        // to be read back on the same write, so the row is fetched whatever the caller brought.
+        // A saved query is not worth a silently cleared mark.
+        coEvery { dao.getById(7L) } returns entityWith(dateAdded = 999L)
         val entity = written { repo.upsert(game(id = 7, dateAdded = 123L)) }
-        assertEquals(123L, entity.dateAdded)
-        coVerify(exactly = 0) { dao.dateAddedOf(any()) }
+        assertEquals(123L, entity.dateAdded, "the caller's own value lost to the stored one")
     }
 }

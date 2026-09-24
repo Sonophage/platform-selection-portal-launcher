@@ -586,6 +586,15 @@ data class XMBUiState(
     // Games flagged missing by the reconciler. Tracked separately because every other count here
     // comes from queries that filter is_missing = 0, so missing rows are invisible to them.
     val missingCount: Int = 0,
+    /**
+     * How many games carry each mark, and how many arrived since the library started counting.
+     *
+     * The shelves hide themselves on these, card by card, and the Shelves column hides itself when
+     * every one of them is empty — see [shelfCards]. Counts rather than lists, because the column
+     * only needs to know whether there is anything to look at; the lists are read when you open one.
+     */
+    val playStateCounts: Map<PlayState, Int> = emptyMap(),
+    val recentlyAddedCount: Int = 0,
     val selectedPlatformId: String? = null,
     // When non-null, the Games category is showing the contents of a user collection.
     val selectedCollectionId: Long? = null,
@@ -1173,6 +1182,41 @@ data class XMBUiState(
         get() = noticeFocusables.let { rows ->
             if (rows.isEmpty()) null else rows[noticeCursor.coerceIn(0, rows.lastIndex)]
         }
+
+    /**
+     * The shelves that currently have something on them, in the order they are drawn.
+     *
+     * ONE definition, read by the column's contents AND by whether the column exists at all. Two
+     * lists — "what to draw" and "is there anything to draw" — would be the pair that disagrees
+     * the first time a shelf is added, and this file has already produced that bug twice today.
+     *
+     * Favorites leads because it is the shelf that predates all of this. Recently Added is last
+     * because it is a different kind of answer: the other four are things you said about a game,
+     * and that one is a fact about when it arrived.
+     */
+    val shelfCards: List<ShelfCard>
+        get() = buildList {
+            if (favoritesCount > 0) add(ShelfCard.Favorites(favoritesCount))
+            PlayState.entries.forEach { state ->
+                playStateCounts[state]?.takeIf { it > 0 }?.let { add(ShelfCard.Marked(state, it)) }
+            }
+            if (recentlyAddedCount > 0) add(ShelfCard.RecentlyAdded(recentlyAddedCount))
+        }
+
+    /**
+     * Whether a column is on the bar and can be stepped onto.
+     *
+     * ONE predicate, read by the bar's drawing and by left/right stepping. Shelves is the only
+     * column that answers false: with nothing marked and nothing recently added there is nothing
+     * on it, so it is not drawn and not landed on, and it arrives on its own the moment a shelf
+     * has something.
+     *
+     * The category stays in [categories] either way. Removing it would renumber every column to
+     * its right the instant a game was marked, and the selection is an index into that list — you
+     * would mark a game in Music and find yourself in Video.
+     */
+    fun categoryReachable(category: Category): Boolean =
+        category.id != BuiltInCategory.SHELVES || shelfCards.isNotEmpty()
 
     val hasBlockingOverlay: Boolean
         get() = otherBlockingOverlay || activeContextMenu != null || notificationsOpen
@@ -2035,6 +2079,7 @@ class XMBViewModel @Inject constructor(
         observeHiddenPlacements()
         observeAndroidNotices()
         observeResumeGame()
+        observeShelfCounts()
         collectGamepadActions()
         consumeWindowsSetupPrompt()
         observeLaunchRecoveryRequests()
@@ -2418,12 +2463,9 @@ class XMBViewModel @Inject constructor(
                     // The fan's covers, from the SAME snapshot the counts come from — the games
                     // are already in hand here, so this costs a sort and no query.
                     //
-                    // "Newest" is highest id first. There is no date-added column on Game, and the
-                    // auto-increment is the honest proxy: rows are inserted in scan order and
-                    // @Upsert keys on the primary key, so rescanning a ROM already in the library
-                    // updates its row and keeps its id. It DOES reshuffle if a platform is deleted
-                    // and re-added, because that path deletes the rows — a library rebuild
-                    // reorders the fan, which is a cosmetic wrong answer on a screen nobody reads
+                    // "Newest" is date_added, then id — see fanCoversOf, which owns the rule.
+                    // Rows predating that column read 0 and tie, so an untouched library falls
+                    // through to exactly the id order this used to use on its own.
                     // for insertion dates.
                     //
                     // See fanCoversOf for why sorted-then-mapped-then-taken is the whole rule.
@@ -2431,7 +2473,11 @@ class XMBViewModel @Inject constructor(
                     val realGames = displayGames.filter { it.contentType == GameContentType.GAME }
                     val fanCovers = buildMap<String, List<String>> {
                         put(ALL_GAMES_ITEM_ID, fanOf(realGames))
-                        put(FAVORITES_ITEM_ID, fanOf(favorites))
+                        // Keyed to the SHELF now, not the Games-root card that no longer
+                        // exists. The other shelves have no fan yet: their lists are not in this
+                        // combine, and a fan on one shelf and not the rest would read as broken
+                        // rather than as sparse — so this is the one that had it keeping it.
+                        put(SHELF_FAVORITES_ID, fanOf(favorites))
                         realGames.groupBy { it.platformId }
                             .forEach { (pid, list) -> put(cardItemId(pid), fanOf(list)) }
                     }
@@ -2539,6 +2585,59 @@ class XMBViewModel @Inject constructor(
                     gameRepository.observeFavorites().collect { games ->
                         publishGameItems(games.notHiddenAt(HideLocationType.FAVORITES).gameSorted(_uiState.value.gameSortMode).toXmbItems(), keepCursor)
                         keepCursor = true
+                    }
+                }
+                BuiltInCategory.SHELVES -> {
+                    // Two states, one branch: the column's own list of shelves, or the games on
+                    // whichever shelf is open. selectedPlatformId carries which — the same field a
+                    // console card uses, because a shelf IS a folder of games as far as everything
+                    // downstream is concerned, and giving it a second mechanism would give the
+                    // crossbar a second way to be "inside something".
+                    var keepCursor = keepCursorOnRow
+                    when (val shelf = shelfCardFor(_uiState.value.selectedPlatformId)) {
+                        null -> _uiState.update { s ->
+                            val items = s.shelfCards.map { card ->
+                                XMBItem(
+                                    id       = card.cardId,
+                                    title    = card.title,
+                                    subtitle = countLabel(card.count, "game", "games"),
+                                    insideCovers = s.cardFanCovers[card.cardId].orEmpty(),
+                                    type     = XMBItemType.FAVORITES,
+                                )
+                            }
+                            s.copy(
+                                currentItems = items,
+                                selectedItemIndex = s.selectedItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)),
+                            )
+                        }
+                        // Hidden games are honoured on every shelf, for the reason the Last Played
+                        // shelf gives: hiding a game is how someone says they do not want to see
+                        // it, and a shelf that resurfaced it anyway would be a poor joke.
+                        is ShelfCard.Favorites -> gameRepository.observeFavorites().collect { games ->
+                            publishGameItems(
+                                games.notHiddenAt(HideLocationType.FAVORITES)
+                                    .gameSorted(_uiState.value.gameSortMode).toXmbItems(),
+                                keepCursor,
+                            )
+                            keepCursor = true
+                        }
+                        is ShelfCard.Marked -> gameRepository.observeByPlayState(shelf.state).collect { games ->
+                            publishGameItems(
+                                games.notHiddenAt(HideLocationType.ALL_GAMES)
+                                    .gameSorted(_uiState.value.gameSortMode).toXmbItems(),
+                                keepCursor,
+                            )
+                            keepCursor = true
+                        }
+                        // NOT gameSorted, for the reason Last Played is not: when it arrived is
+                        // the whole of what this shelf says, and a user sort would delete it.
+                        is ShelfCard.RecentlyAdded -> gameRepository.observeRecentlyAdded().collect { games ->
+                            publishGameItems(
+                                games.notHiddenAt(HideLocationType.ALL_GAMES).toXmbItems(),
+                                keepCursor,
+                            )
+                            keepCursor = true
+                        }
                     }
                 }
                 BuiltInCategory.RECENTLY_PLAYED -> {
@@ -5349,17 +5448,10 @@ class XMBViewModel @Inject constructor(
             type     = XMBItemType.ALL_GAMES,
         )
 
-        // Favorites sits directly under All Games, but only when at least one game is favorited.
-        val favoritesCount = _uiState.value.favoritesCount
-        val favoritesItem = if (favoritesCount > 0) {
-            XMBItem(
-                id       = FAVORITES_ITEM_ID,
-                title    = "Favorites",
-                subtitle = countLabel(favoritesCount, "game", "games"),
-                insideCovers = _uiState.value.cardFanCovers[FAVORITES_ITEM_ID].orEmpty(),
-                type     = XMBItemType.FAVORITES,
-            )
-        } else null
+        // FAVORITES MOVED OUT OF HERE, to the Shelves column, on 2026-09-24. One destination,
+        // not two: it is a shelf like Playing and Completed, and a card in both places would be
+        // two doors to one list that could disagree about what is behind them. The Games root is
+        // All Games, Missing, then the consoles.
 
         // Missing sits under Favorites and only exists while something is actually missing, so a
         // healthy library never sees it. It disappears on its own once the files come back.
@@ -5372,7 +5464,7 @@ class XMBViewModel @Inject constructor(
                 type     = XMBItemType.MISSING,
             )
         } else null
-        val header = listOfNotNull(allGamesItem, favoritesItem, missingItem)
+        val header = listOfNotNull(allGamesItem, missingItem)
 
         // Search TRAILS this column rather than leading it, via libraryColumn like the other
         // four. It used to lead, on the reasoning that a 147-game library wants search first. What
@@ -6151,7 +6243,7 @@ class XMBViewModel @Inject constructor(
                     return
                 }
                 if (state.pillRowVisible && pillPressHandled(action, state)) return
-                val next = (state.selectedCategoryIndex - 1).coerceAtLeast(0)
+                val next = state.stepToReachableCategory(-1)
                 if (next != state.selectedCategoryIndex) onCategorySelected(next)
                 else gamepadInputHandler.cancelRepeat()
             }
@@ -6173,8 +6265,7 @@ class XMBViewModel @Inject constructor(
                 // they do apply.
                 if (state.pillRowVisible && pillPressHandled(action, state)) return
                 if (state.isInSubItem) { gamepadInputHandler.cancelRepeat(); return }
-                val max  = (state.categories.size - 1).coerceAtLeast(0)
-                val next = (state.selectedCategoryIndex + 1).coerceAtMost(max)
+                val next = state.stepToReachableCategory(+1)
                 if (next != state.selectedCategoryIndex) onCategorySelected(next)
                 else gamepadInputHandler.cancelRepeat()
             }
@@ -7293,6 +7384,27 @@ class XMBViewModel @Inject constructor(
     }
 
     /**
+     * What each shelf holds, as counts.
+     *
+     * Combined into one emission rather than collected separately: the Shelves column appears and
+     * disappears on whether ANY of them is non-zero, and four independent updates would let the
+     * column flicker in and out while a scan is writing.
+     */
+    private fun observeShelfCounts() {
+        viewModelScope.launch {
+            val marks = PlayState.entries
+            combine(
+                marks.map { gameRepository.observePlayStateCount(it) } +
+                    gameRepository.observeRecentlyAddedCount(),
+            ) { values ->
+                marks.mapIndexed { i, state -> state to values[i] }.toMap() to values.last()
+            }.collect { (counts, recent) ->
+                _uiState.update { it.copy(playStateCounts = counts, recentlyAddedCount = recent) }
+            }
+        }
+    }
+
+    /**
      * The one game the sheet can offer to resume.
      *
      * Limit 1 rather than the shelf's list: this row is a shortcut back into what you were doing,
@@ -7950,6 +8062,23 @@ class XMBViewModel @Inject constructor(
      * cancel auto-repeat at a list boundary). Shared by [dispatchGamepadAction]'s NAVIGATE_UP/DOWN
      * and the touch [stepItem], so both drive identical logic — no parallel navigation.
      */
+    /**
+     * The next column [delta] takes you to, stepping OVER any that is not reachable.
+     *
+     * A walk rather than an index bump, because an unreachable column must cost no press at all —
+     * stopping on it and then needing a second press is exactly what hiding Last Played from the
+     * bar was meant to stop, one screen over. Returns the current index when there is nowhere to
+     * go, which is what the caller reads as "cancel the repeat".
+     */
+    private fun XMBUiState.stepToReachableCategory(delta: Int): Int {
+        var next = selectedCategoryIndex + delta
+        while (next in categories.indices) {
+            if (categoryReachable(categories[next])) return next
+            next += delta
+        }
+        return selectedCategoryIndex
+    }
+
     private fun moveItemCursor(delta: Int): Boolean {
         val s = _uiState.value
         if (s.hasBlockingOverlay || delta == 0) return false
@@ -8167,8 +8296,10 @@ class XMBViewModel @Inject constructor(
                 openAllGamesFolder()
                 return
             }
-            FAVORITES_ITEM_ID -> {
-                openFavoritesFolder()
+            // A shelf opens as a folder inside its own column, the same way a console card opens
+            // inside Game — same field, same back-out, nothing new to remember.
+            in SHELF_CARD_IDS -> {
+                item?.id?.let { openShelf(it) }
                 return
             }
             MISSING_ITEM_ID -> {
@@ -8373,14 +8504,16 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    private fun openFavoritesFolder() {
-        val gamesCategoryIndex = _uiState.value.categories.indexOfFirst { it.id == BuiltInCategory.GAMES }
+    /**
+     * Opens one shelf inside the Shelves column.
+     *
+     * It does NOT jump to another category the way openFavoritesFolder does — the shelf lives in
+     * the column you are already standing in, so moving the cursor anywhere would be moving it
+     * away from the thing that was pressed.
+     */
+    private fun openShelf(cardId: String) {
         navigateRememberingCursor {
-            it.copy(
-                selectedCategoryIndex = gamesCategoryIndex.takeIf { index -> index >= 0 } ?: it.selectedCategoryIndex,
-                selectedPlatformId = FAVORITES_PLATFORM_ID,
-                selectedCollectionId = null,
-            )
+            it.copy(selectedPlatformId = cardId, selectedCollectionId = null)
         }
     }
 
@@ -10014,6 +10147,16 @@ class XMBViewModel @Inject constructor(
         private const val RESUME_DONE_FRACTION = 0.97f
         private const val ALL_GAMES_PLATFORM_ID = "__all_games__"
         private const val FAVORITES_ITEM_ID = "favorites_folder"
+        /**
+         * UNREACHABLE as of 2026-09-24 and left in deliberately, for one release.
+         *
+         * Favorites moved to the Shelves column, so nothing sets this any more — the branches
+         * that read it (the drill-in, the title, the hide location, the sibling walk) are dead
+         * paths that still look live. They are not deleted yet because `BuiltInCategory.FAVORITES`
+         * is a legacy CATEGORY id an older database can still carry, and untangling which of
+         * those five readers serves that row and which served the card is a sweep of its own
+         * rather than a line in this change.
+         */
         internal const val FAVORITES_PLATFORM_ID = "__favorites__"
         private const val MISSING_ITEM_ID = "missing_folder"
         internal const val MISSING_PLATFORM_ID = "__missing__"

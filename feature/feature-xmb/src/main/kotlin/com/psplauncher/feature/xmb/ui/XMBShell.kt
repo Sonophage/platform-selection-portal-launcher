@@ -1185,9 +1185,19 @@ fun XMBShell(
                     // "step left off Emulation", so for touch the hidden slot is not tidier, it is
                     // a page with no door. The caticon comes back the moment the last input was a
                     // finger, and goes again on the next button press.
-                    val barCategories = remember(uiState.categories, uiState.lastInputWasTouch) {
-                        if (uiState.lastInputWasTouch) uiState.categories
-                        else uiState.categories.filterNot { it.id == BuiltInCategory.RECENTLY_PLAYED }
+                    //
+                    // Shelves is hidden by a different rule and for a different reason: it is
+                    // hidden while EMPTY, on touch as much as on a pad, because an empty shelf
+                    // column is not tidier or untidier — there is simply nothing in it. That rule
+                    // is categoryReachable, and left/right reads the same one, so the bar cannot
+                    // draw a column the pad refuses to step onto.
+                    val barCategories = remember(
+                        uiState.categories, uiState.lastInputWasTouch, uiState.shelfCards,
+                    ) {
+                        uiState.categories.filter { category ->
+                            uiState.categoryReachable(category) &&
+                                (uiState.lastInputWasTouch || category.id != BuiltInCategory.RECENTLY_PLAYED)
+                        }
                     }
                     val barSelected = remember(barCategories, uiState.selectedCategoryIndex) {
                         uiState.categories.getOrNull(uiState.selectedCategoryIndex)

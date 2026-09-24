@@ -24,6 +24,22 @@ interface GameRepository {
     // for per-disc achievement matching.
     fun observeAllGames(): Flow<List<Game>>
     fun observeFavorites(): Flow<List<Game>>
+
+    /** Games carrying one mark, for that shelf. */
+    fun observeByPlayState(state: PlayState): Flow<List<Game>>
+
+    /** How many carry it, for whether that shelf is drawn at all. */
+    fun observePlayStateCount(state: PlayState): Flow<Int>
+
+    /**
+     * Games added since the library started counting, newest first.
+     *
+     * Rows that predate the date_added column read 0 and are excluded, so an untouched library
+     * has an empty shelf here rather than every game on it.
+     */
+    fun observeRecentlyAdded(): Flow<List<Game>>
+
+    fun observeRecentlyAddedCount(): Flow<Int>
     fun observeByPlatform(platformId: String): Flow<List<Game>>
     // Multi-disc projection: one row per disc set for a Memory Card's game list. The unprojected
     // [observeByPlatform] stays available for scan baselines (existing-path resolution needs every
