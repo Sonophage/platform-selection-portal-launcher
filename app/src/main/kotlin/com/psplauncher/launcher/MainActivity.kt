@@ -292,10 +292,30 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (enterOpensAppDrawer(event)) return true
         // Let the gamepad handler process it first; fall back to normal dispatch
         if (gamepadInputHandler.onKeyEvent(event)) return true
         if (openSearchOnTypedCharacter(event)) return true
         return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * Enter opens the App Drawer, on the crossbar and nowhere else.
+     *
+     * BEFORE the gamepad handler, unlike type-to-search, and that order is the point: ENTER is
+     * bound to SELECT, so letting the handler see it first would confirm whatever the cursor is
+     * on before this ever ran. Claiming it here is what "unbind it, on this screen" means when
+     * the binding table has one row per keycode and no idea which screen is showing.
+     *
+     * Everywhere else the handler gets it and Enter is confirm exactly as before. The ViewModel
+     * owns the "is this the crossbar" question — see XMBViewModel.enterOpensAppDrawer.
+     */
+    private fun enterOpensAppDrawer(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return false
+        if (event.keyCode != KeyEvent.KEYCODE_ENTER) return false
+        if (!xmbViewModel.enterOpensAppDrawer()) return false
+        xmbViewModel.onOpenAppDrawer()
+        return true
     }
 
     /**

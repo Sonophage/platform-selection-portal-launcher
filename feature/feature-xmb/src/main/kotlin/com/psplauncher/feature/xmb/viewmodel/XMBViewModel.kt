@@ -1218,6 +1218,27 @@ data class XMBUiState(
     fun categoryReachable(category: Category): Boolean =
         category.id != BuiltInCategory.SHELVES || shelfCards.isNotEmpty()
 
+    /**
+     * Whether ENTER opens the App Drawer here instead of confirming.
+     *
+     * ON THE CROSSBAR ONLY, and that limit is the whole design. Enter is bound to SELECT, so it is
+     * the keyboard's confirm; taking it away everywhere would leave a keyboard user unable to open
+     * a folder, start a game or pick a rail row. On the crossbar it is the press with the least to
+     * do and the drawer is what gets reached for, and selection there is a finger's job on this
+     * device.
+     *
+     * Excluded, each for its own reason: a drilled-in list, where confirm opens the thing under
+     * the cursor; the Last Played shelf, where confirm launches what you were playing and is the
+     * main verb on the screen; the pill row, where confirm runs the pill; and every overlay, where
+     * something else already owns the keyboard.
+     */
+    val enterOpensAppDrawer: Boolean
+        get() = search == null &&
+            !hasBlockingOverlay &&
+            !isInSubItem &&
+            !onLastPlayedHome &&
+            activePillIndex() == null
+
     val hasBlockingOverlay: Boolean
         get() = otherBlockingOverlay || activeContextMenu != null || notificationsOpen
 
@@ -4392,6 +4413,21 @@ class XMBViewModel @Inject constructor(
      * context rail is excluded from it separately, so it is named here. A letter over an open rail
      * should search, not be swallowed by a menu that has no text in it.
      */
+    /**
+     * Whether ENTER should open the App Drawer instead of confirming.
+     *
+     * ON THE CROSSBAR ONLY, and that limit is the whole design. Enter is bound to SELECT, so it
+     * is the keyboard's confirm — taking it away everywhere would leave a keyboard user unable to
+     * open a folder, start a game or pick a rail row. On the crossbar it is the press with the
+     * least to do and the drawer is what the owner reaches for; selection there is a finger's job
+     * on this device.
+     *
+     * Excluded, each for its own reason: a drilled-in list, where confirm opens the thing under
+     * the cursor; the Last Played shelf, where confirm launches what you were playing and is the
+     * main verb on the screen; and every overlay, where something else already owns the keyboard.
+     */
+    fun enterOpensAppDrawer(): Boolean = _uiState.value.enterOpensAppDrawer
+
     fun typeToSearchAllowed(): Boolean {
         val state = _uiState.value
         return state.search == null && (!state.hasBlockingOverlay || state.overlayKeepsChrome)

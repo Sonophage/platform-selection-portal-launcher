@@ -60,11 +60,15 @@
         android:allowBackup="false">
 
         <!-- ═══ Launcher Activity ═══════════════════════════════════════ -->
+        <!-- screenOrientation="user": Android's own auto-rotate decides, and the user's rotation
+             lock is honoured. NOT "sensor", which ignores the lock — a device held sideways would
+             spin the launcher while every other app on it stayed put. It was sensorLandscape,
+             which pinned the launcher regardless of the system setting. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="sensorPortrait"
+            android:screenOrientation="user"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation"
             android:windowSoftInputMode="stateAlwaysHidden">
 
