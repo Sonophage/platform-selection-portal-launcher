@@ -1148,13 +1148,36 @@ fun XMBShell(
                     // Category bar drawn ON TOP, pushed down to the crossbar line — the fixed pivot
                     // the first-level column appears to scroll beneath. The horizontal shift rides a
                     // composition local so the caticon bar tracks the item column as one cross.
+                    // Last Played has no caticon. It is not a column — it REPLACES the whole
+                    // screen — so a slot for it on the bar was an icon you could never see
+                    // selected: stepping onto it takes the bar away with everything else.
+                    // Stepping LEFT off Emulation still reaches it; the page is its own icon.
+                    //
+                    // Hidden from the BAR, not removed from the model: the category still exists,
+                    // still holds the cursor, and the indices below map back to it, because the
+                    // selection is the real list's and only the drawing is the short one.
+                    val barCategories = remember(uiState.categories) {
+                        uiState.categories.filterNot { it.id == BuiltInCategory.RECENTLY_PLAYED }
+                    }
+                    val barSelected = remember(barCategories, uiState.selectedCategoryIndex) {
+                        uiState.categories.getOrNull(uiState.selectedCategoryIndex)
+                            ?.let { current -> barCategories.indexOfFirst { it.id == current.id } }
+                            ?.takeIf { it >= 0 }
+                            ?: 0
+                    }
                     CompositionLocalProvider(LocalXmbHorizontalShift provides hShift) {
                         XMBCategoryBar(
-                            categories = uiState.categories,
-                            selectedIndex = uiState.selectedCategoryIndex,
-                            onCategorySelected = onCategorySelected,
+                            categories = barCategories,
+                            selectedIndex = barSelected,
+                            // The bar hands back ITS index; the cursor lives in the real list.
+                            onCategorySelected = { barIndex ->
+                                barCategories.getOrNull(barIndex)?.let { picked ->
+                                    val real = uiState.categories.indexOfFirst { it.id == picked.id }
+                                    if (real >= 0) onCategorySelected(real)
+                                }
+                            },
                             onCategoryLongPress = { index ->
-                                val id = uiState.categories.getOrNull(index)?.id
+                                val id = barCategories.getOrNull(index)?.id
                                 if (id == BuiltInCategory.SETTINGS) onSettingsLongPress()
                             },
                             drilledIn = uiState.drillTitle != null,

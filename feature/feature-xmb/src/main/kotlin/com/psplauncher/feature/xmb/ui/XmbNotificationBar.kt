@@ -76,13 +76,13 @@ fun XmbNotificationBar(
             exit = slideOutVertically(tween(180)) { -it } + fadeOut(tween(180)),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
+            // The wash covers the WHOLE screen, not the sheet's own height: it ended where the
+            // content ended, which drew a horizontal edge across the middle of the wallpaper with
+            // the rows floating above it. Full height, solid across the rows, gone by the bottom.
             Column(
                 verticalArrangement = Arrangement.spacedBy(RowGap),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    // Solid across the rows, fading only in the tail below them. A ramp that
-                    // starts fading at the top is already half gone where the second card sits,
-                    // which is where the wallpaper came back through the text.
+                    .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             0f to SheetScrim,
@@ -92,7 +92,7 @@ fun XmbNotificationBar(
                     )
                     // Clear of the strip: it is what you pressed to get here and it stays legible,
                     // the same way the context rail draws under it rather than over.
-                    .padding(top = StripHeight + 10.dp, bottom = ScrimTail),
+                    .padding(top = StripHeight + 10.dp),
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(ColumnGap),
@@ -258,11 +258,13 @@ private const val ColumnRows = 5
  */
 private val SheetScrim = Color(0xF2050200)
 
-/** How far down the sheet the wash stays solid before it starts to go. */
-private const val ScrimHold = 0.74f
-
-/** How far past the last row the wash keeps fading, so it ends on nothing rather than an edge. */
-private val ScrimTail = 40.dp
+/**
+ * How far down the SCREEN the wash stays solid before it starts to go.
+ *
+ * The rows live in the top third, so this holds well past them and then has the rest of the height
+ * to disappear over — a short fade at the bottom of a full-screen wash is a band, not a gradient.
+ */
+private const val ScrimHold = 0.34f
 
 private val TitleSize = NotificationBarStyle.TitleSp.sp
 private val DetailSize = NotificationBarStyle.DetailSp.sp
