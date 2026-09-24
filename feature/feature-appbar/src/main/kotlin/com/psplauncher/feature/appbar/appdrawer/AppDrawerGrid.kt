@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 // ── Application grid ──────────────────────────────────────────────────────────
 //
-// The primary visual element: a 6-column artwork grid with generous spacing and minimal chrome
+// The All Apps view: an eight-column artwork grid with generous spacing and minimal chrome
 // (see PfpMediaCard). The scroll-to-selection and touch-browse effects are subtle and
 // correct — they are kept verbatim from the previous implementation:
 //  - controller cursor movement auto-scrolls the target tile into view;

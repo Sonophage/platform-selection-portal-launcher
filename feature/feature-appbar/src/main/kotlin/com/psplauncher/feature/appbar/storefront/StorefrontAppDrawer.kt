@@ -883,7 +883,7 @@ fun StorefrontAppDrawerPreview() {
     // Counted from the fixture, not typed — see AppDrawerScreen's preview.
     val mockCounts = AppFilter.entries.associateWith { filter -> mockApps.count(filter::matches) }
     val mockState = AppDrawerUiState(
-        visibleApps = mockApps,
+        sectionApps = mockApps,
         activeFilter = AppFilter.ALL,
         selectedIndex = 1,
         filterCounts = mockCounts,

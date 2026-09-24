@@ -53,6 +53,7 @@ import com.psplauncher.core.ui.theme.deriveStorefrontColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerCategoryTabs
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerGrid
+import com.psplauncher.feature.appbar.appdrawer.AppDrawerSection
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHeader
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHintBar
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerOptions
@@ -315,7 +316,11 @@ internal fun AppDrawerContent(
                         )
                     }
 
-                    state.visibleApps.isEmpty() -> {
+                    // The TAB's own apps, not visibleApps, which under every tab but All Apps
+                    // also carries the complement below the row. Zero here means this section is
+                    // empty in either view — on All Apps the complement is empty by definition,
+                    // so the two readings agree there.
+                    state.sectionRowCount == 0 -> {
                         EmptyDrawerMessage(
                             filter = state.activeFilter,
                             hasQuery = state.searchQuery.isNotBlank(),
@@ -326,7 +331,10 @@ internal fun AppDrawerContent(
                         )
                     }
 
-                    else -> {
+                    // All Apps is the one tab with nothing to contrast against, so it keeps
+                    // 6e's eight-across grid. Every other tab draws 8q: its own apps in a row
+                    // that scrolls sideways, everything else in the compact list beneath.
+                    state.activeFilter == AppFilter.ALL -> {
                         AppDrawerGrid(
                             apps = state.visibleApps,
                             selectedIndex = state.selectedIndex,
@@ -335,6 +343,20 @@ internal fun AppDrawerContent(
                             onAppLaunched = onAppLaunched,
                             onAppMenu = onAppMenu,
                             onTouchBrowse = onTouchBrowse,
+                            colors = sf,
+                        )
+                    }
+
+                    else -> {
+                        AppDrawerSection(
+                            matched = state.sectionApps,
+                            rest = state.otherApps,
+                            selectedIndex = state.selectedIndex,
+                            usingTouch = state.usingTouch,
+                            filter = state.activeFilter,
+                            onAppTapped = onAppTapped,
+                            onAppLaunched = onAppLaunched,
+                            onAppMenu = onAppMenu,
                             colors = sf,
                         )
                     }
@@ -524,7 +546,7 @@ private fun AppDrawerPreviewContent() {
     // contradicts is worse than one showing none.
     val mockCounts = AppFilter.entries.associateWith { filter -> mockApps.count(filter::matches) }
     val mockState = AppDrawerUiState(
-        visibleApps = mockApps,
+        sectionApps = mockApps,
         activeFilter = AppFilter.ALL,
         selectedIndex = 1,
         filterCounts = mockCounts,

@@ -97,7 +97,15 @@ enum class AppMenuAction(val label: String) {
 
 data class AppDrawerUiState(
     val allApps: List<InstalledApp> = emptyList(),
-    val visibleApps: List<InstalledApp> = emptyList(),
+    /**
+     * The tab's OWN apps: the large row of the 8q body, and the whole grid on All Apps.
+     */
+    val sectionApps: List<InstalledApp> = emptyList(),
+    /**
+     * Every app the tab does NOT hold, for the compact list under the row. Empty on All Apps,
+     * which has nothing to contrast against and draws the grid instead.
+     */
+    val otherApps: List<InstalledApp> = emptyList(),
     /**
      * Where the drawer opens: Recently Used.
      *
@@ -130,7 +138,32 @@ data class AppDrawerUiState(
     val menuAppIsGame: Boolean = false,
     /** Per-filter app counts (unfiltered by search query) for the category rail. */
     val filterCounts: Map<AppFilter, Int> = emptyMap(),
+    /**
+     * How many of [visibleApps] matched [activeFilter] — the rest are the complement below them.
+     *
+     * [visibleApps] is the tab's own apps followed by every app that is NOT in the tab, in that
+     * order, so one flat cursor addresses both halves of the 8q body and Launch / the Y menu /
+     * Add to Cross Bar keep reading `visibleApps[selectedIndex]` without knowing there are two.
+     *
+     * On All Apps the complement is empty, so this equals `visibleApps.size` and zero means the
+     * drawer is empty in either view — which is why the empty-state gate reads this and not
+     * `visibleApps.isEmpty()`.
+     */
 ) {
+    /**
+     * Both halves as one list, the tab's own apps first.
+     *
+     * DERIVED, not stored beside them. The cursor is a single flat index into this, which is what
+     * lets Launch, the Y menu and Add to Cross Bar keep reading `visibleApps[selectedIndex]`
+     * without knowing the body has two shapes. Holding the two halves and a separate "where the
+     * seam is" would be a pair that must agree with only one of them guarded — and a seam that
+     * disagreed with its lists puts the cursor on a different app than the one it is drawn under.
+     */
+    val visibleApps: List<InstalledApp> get() = sectionApps + otherApps
+
+    /** Where the seam falls in [visibleApps]. */
+    val sectionRowCount: Int get() = sectionApps.size
+
     // Add to Cross Bar leads: it is the one action here that changes the screen you came from.
     // App Info for every app; Mark/Unmark as Game toggles library membership; Uninstall only
     // for non-system apps (guard rail).
@@ -373,21 +406,19 @@ class AppDrawerViewModel @Inject constructor(
         when (action) {
             // Hold a button to open the focused app's mini menu (controller equivalent of long-press).
             GamepadAction.OPEN_CONTEXT_MENU -> openAppMenuForSelected()
-            GamepadAction.NAVIGATE_LEFT  -> {
-                if (cur % GRID_COLUMNS > 0) { _uiState.update { it.copy(selectedIndex = cur - 1) }; menuSound.play(MenuSound.SCROLL) }
-            }
-            GamepadAction.NAVIGATE_RIGHT -> {
-                if (cur % GRID_COLUMNS < GRID_COLUMNS - 1 && cur + 1 < size) {
-                    _uiState.update { it.copy(selectedIndex = cur + 1) }; menuSound.play(MenuSound.SCROLL)
+            GamepadAction.NAVIGATE_LEFT, GamepadAction.NAVIGATE_RIGHT,
+            GamepadAction.NAVIGATE_UP, GamepadAction.NAVIGATE_DOWN -> {
+                val next = if (state.activeFilter == AppFilter.ALL) {
+                    gridStep(action, cur, size)
+                } else {
+                    sectionMove(action, cur, state.sectionRowCount, size)
                 }
-            }
-            GamepadAction.NAVIGATE_UP    -> {
-                val next = cur - GRID_COLUMNS
-                if (next >= 0) { _uiState.update { it.copy(selectedIndex = next) }; menuSound.play(MenuSound.SCROLL) }
-            }
-            GamepadAction.NAVIGATE_DOWN  -> {
-                val next = cur + GRID_COLUMNS
-                if (next < size) { _uiState.update { it.copy(selectedIndex = next) }; menuSound.play(MenuSound.SCROLL) }
+                // The sound follows the move, not the press: a refused move at an edge is silent,
+                // which is how the grid behaved when each direction guarded itself.
+                if (next != cur) {
+                    _uiState.update { it.copy(selectedIndex = next) }
+                    menuSound.play(MenuSound.SCROLL)
+                }
             }
             GamepadAction.SELECT -> {
                 val app = state.visibleApps.getOrNull(cur)
@@ -424,6 +455,15 @@ class AppDrawerViewModel @Inject constructor(
             }
         }
 
-        _uiState.update { it.copy(visibleApps = filtered, filterCounts = counts) }
+        // Everything the tab does NOT hold, for the compact list under the row. From the negation
+        // of the same predicate, never a second list of its own: one rule decides both halves, so
+        // an app cannot appear twice or fall between them.
+        //
+        // All Apps has no complement by definition, and draws the eight-across grid anyway.
+        val rest = if (state.activeFilter == AppFilter.ALL) emptyList() else state.allApps
+            .filter { app -> !state.activeFilter.matches(app) }
+            .filter { app -> query.isEmpty() || app.label.lowercase().contains(query) }
+
+        _uiState.update { it.copy(sectionApps = filtered, otherApps = rest, filterCounts = counts) }
     }
 }

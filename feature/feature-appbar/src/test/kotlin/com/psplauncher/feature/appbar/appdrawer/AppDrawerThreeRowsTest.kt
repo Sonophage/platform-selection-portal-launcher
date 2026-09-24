@@ -56,7 +56,7 @@ class AppDrawerThreeRowsTest {
         }
         val state = AppDrawerUiState(
             allApps = apps,
-            visibleApps = apps,
+            sectionApps = apps,
             activeFilter = AppFilter.ALL,
             isLoading = false,
             selectedIndex = 0,
