@@ -5,6 +5,19 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+### Changed
+- **One bottom bar, on every screen.** Search, the App Drawer and the game and app detail pages
+  each drew their own version of the controller hints — an inline row, a black pill and a pill in
+  a filled footer. All four now draw the crossbar's bar: full width, at the screen edge, with back
+  and the primary action on the left behind a divider and everything else on the right. Verified
+  on the device: all four land on the same pixels.
+
+  The bar works out which prompt goes where from the button each one already names, rather than
+  being handed three named slots. That is what let the other screens use it at all — the drawer's
+  page keys and the manual viewer's D-pad legend fit none of the three slots the crossbar's bar
+  had, and a footer that silently dropped "Next page" would leave the manual with no way out that
+  it admits to.
+
 ## [1.10.0] - 2026-09-24
 
 ### Added

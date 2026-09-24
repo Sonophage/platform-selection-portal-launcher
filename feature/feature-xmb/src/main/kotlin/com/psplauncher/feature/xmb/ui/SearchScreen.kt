@@ -52,9 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerHintStyle
-import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.components.HintBarHeight
+import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursor
@@ -142,7 +142,14 @@ fun SearchScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 40.dp, vertical = if (imeUp) 10.dp else 24.dp),
+                .padding(horizontal = 40.dp)
+                // Room for the hint bar, which is NOT in this column: it is pinned to the screen
+                // edge below, so it lines up with the App Drawer's and the crossbar's instead of
+                // being inset by this screen's own 40dp gutter.
+                .padding(
+                    top = if (imeUp) 10.dp else 24.dp,
+                    bottom = if (imeUp) 10.dp else 24.dp + HintBarHeight,
+                ),
         ) {
             if (!imeUp) {
                 Row(
@@ -200,15 +207,12 @@ fun SearchScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // imePadding here, around the results and the prompts, rather than on the whole
-            // screen: the keyboard is up the entire time this screen is on, so that is not a
-            // transient state, it is the layout, and the results get every pixel above it.
+            // imePadding here, around the results, rather than on the whole screen: the keyboard
+            // is up the entire time this screen is on, so that is not a transient state, it is the
+            // layout, and the results get every pixel above it. The prompts are not in here any
+            // more — they are pinned to the screen edge and are not drawn at all while the IME is
+            // up, so they have nothing to pad around.
             //
-            // The prompt bar drops out while the keyboard is up, for the same reason the header
-            // does. It costs a result row to say "A Open, B Back" next to a keyboard that is
-            // already showing its own confirm key, and on this screen a row is most of what
-            // there is. It also used to sit ON the last result rather than under it, because the
-            // list had no room to give it.
             Column(modifier = Modifier.weight(1f).fillMaxWidth().imePadding()) {
                 // One mixed grid, best matches first — not grouped by medium. A list showed four
                 // results and left the right half of the screen empty; the grid shows five to a
@@ -245,16 +249,20 @@ fun SearchScreen(
                         }
                     }
                 }
-                if (imeUp) return@Column
-                Spacer(Modifier.height(8.dp))
-                PfpControllerHints(
-                    items = listOf(
-                        ControllerPromptItem(GamepadAction.SELECT, "Open"),
-                        ControllerPromptItem(GamepadAction.BACK, "Back"),
-                    ),
-                    style = ControllerHintStyle.INLINE,
-                )
             }
+        }
+
+        // The prompt bar drops out while the keyboard is up, for the same reason the header does.
+        // It costs a result row to say "A Open, B Back" next to a keyboard that is already showing
+        // its own confirm key, and on this screen a row is most of what there is.
+        if (!imeUp) {
+            PfpHintBar(
+                items = listOf(
+                    ControllerPromptItem(GamepadAction.BACK, "Back"),
+                    ControllerPromptItem(GamepadAction.SELECT, "Open"),
+                ),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 }

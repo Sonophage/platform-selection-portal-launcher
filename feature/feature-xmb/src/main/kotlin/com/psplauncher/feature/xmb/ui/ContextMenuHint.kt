@@ -40,8 +40,9 @@ import com.psplauncher.core.ui.preview.PfpPreview
 // fade it in but remove it immediately when it becomes ineligible); this composable only renders
 // its content.
 //
-// The pill chrome itself is the shared core-ui [ControllerHintBar] — the App Drawer renders the
-// same pill for its own actions (see feature-appbar's AppDrawerHintBar).
+// The pill chrome itself is the shared core-ui [ControllerHintBar]. It is the last pill in the
+// app: the App Drawer, Search and the detail pages all moved to the full-width PfpHintBar, and
+// this one survives because it is a floating hint over the live crossbar rather than a footer.
 
 @Composable
 fun ContextMenuHint(

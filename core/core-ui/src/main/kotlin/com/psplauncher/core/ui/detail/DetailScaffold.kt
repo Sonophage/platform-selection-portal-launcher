@@ -46,8 +46,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.ScrollState
-import com.psplauncher.core.ui.components.ControllerHintBar
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.components.PfpHintBar
 
 // ── Console-style detail page: background, scaffold, header, footer ───────────
 //
@@ -132,10 +132,6 @@ internal fun detailSurfaceBottom(): Color = detailPalette().pageBottom
 @Composable
 @ReadOnlyComposable
 internal fun detailHeaderSurface(): Color = detailPalette().header
-
-@Composable
-@ReadOnlyComposable
-internal fun detailFooterSurface(): Color = detailPalette().footer
 
 /**
  * The whole-page backdrop: the App Drawer's translucent theme gradient (deep top easing into a
@@ -302,20 +298,15 @@ fun PfpDetailHelperFooter(
         animationSpec = tween(200),
         label = "pfpDetailHelperFooter",
     )
-    // See-through like the App Drawer's footer. Content cannot slide underneath it: the body above
-    // clips to its own viewport, so the footer row only ever shows the page background.
-    Column(modifier = modifier.fillMaxWidth().height(DetailFooterHeight).background(detailFooterSurface())) {
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(DetailDivider))
-        Box(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentAlignment = Alignment.Center,
-        ) {
-            ControllerHintBar(
-                items = items,
-                background = Color.Black.copy(alpha = 0.70f),
-                modifier = Modifier.alpha(alpha),
-            )
-        }
+    // The shared [PfpHintBar], in a slot that reserves [DetailFooterHeight] whether the bar is
+    // showing or not. The fill and the divider rule that used to be here are gone with the pill:
+    // the bar brings its own scrim, and a detail page's body clips to its own viewport, so nothing
+    // scrolls under it either way.
+    Box(
+        modifier = modifier.fillMaxWidth().height(DetailFooterHeight),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        PfpHintBar(items = items, modifier = Modifier.alpha(alpha))
     }
 }
 

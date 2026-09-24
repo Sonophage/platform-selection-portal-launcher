@@ -377,17 +377,13 @@ internal fun AppDrawerContent(
                 animationSpec = tween(200),
                 label = "appDrawerHint",
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                AppDrawerHintBar(
-                    modifier = Modifier.alpha(hintAlpha),
-                    onAction = onPromptTapped?.takeIf { hintAlpha > 0f },
-                )
-            }
+            // The bar brings its own height and scrim, so the padded, centred slot the pill
+            // needed is gone with it. The alpha fade stays: the slot is still reserved, and the
+            // hints still disappear while the last input was touch.
+            AppDrawerHintBar(
+                modifier = Modifier.alpha(hintAlpha),
+                onAction = onPromptTapped?.takeIf { hintAlpha > 0f },
+            )
         }
 
         // ── Overlays ──────────────────────────────────────────────────────

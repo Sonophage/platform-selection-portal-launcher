@@ -2,21 +2,19 @@ package com.psplauncher.feature.appbar.appdrawer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerHintBar
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.components.PfpHintBar
 
-// ── Controller hint bar (idle pill) ───────────────────────────────────────────
+// ── The App Drawer's footer ───────────────────────────────────────────────────
 //
-// The App Drawer's contextual helper: the same shared pill [ControllerHintBar] (see feature-xmb's
-// ContextMenuHint) names the drawer's actions once the user has been idle with a controller.
-// Glyphs are resolved from the action set by GamepadMappings, so they honour the user's
-// controller family and X/Y swap — no hard-coded letters.
+// The shared [PfpHintBar], the same bar the crossbar and the detail pages draw. What is in it is
+// the drawer's own business — Back and Launch fall left, the page keys and the rest go right —
+// but the look, the glyphs and the X/Y swap are decided in one place for the whole app.
 //
 // Rendered as a permanent footer row at the bottom of the drawer's Column (below the grid);
 // visibility is alpha-driven by the caller, so the slot's height is reserved whether or not the
-// pill is showing and content geometry never changes when it fades in or out.
+// hints are showing and content geometry never changes when they fade in or out.
 
 @Composable
 internal fun AppDrawerHintBar(
@@ -24,20 +22,15 @@ internal fun AppDrawerHintBar(
     /** Runs a tapped prompt through the drawer's own action handler. */
     onAction: ((GamepadAction) -> Unit)? = null,
 ) {
-    ControllerHintBar(
+    PfpHintBar(
         items = listOf(
-            ControllerPromptItem(GamepadAction.PREV_CATEGORY, "Prev"),
-            ControllerPromptItem(GamepadAction.NEXT_CATEGORY, "Next"),
             ControllerPromptItem(GamepadAction.BACK, "Back"),
             ControllerPromptItem(GamepadAction.SELECT, "Launch"),
+            ControllerPromptItem(GamepadAction.PREV_CATEGORY, "Prev"),
+            ControllerPromptItem(GamepadAction.NEXT_CATEGORY, "Next"),
             ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
             ControllerPromptItem(GamepadAction.CHANGE_SORT, "Search"),
         ),
-        // Darker than the shared pill's default (black @ 50%) so the drawer's brighter
-        // background and busy artwork don't wash the fill out into a pale grey — but still
-        // translucent enough that the background reads through it. The XMB's own pill keeps its
-        // lighter default over the darker XMB backdrop.
-        background = Color.Black.copy(alpha = 0.70f),
         modifier = modifier,
         onAction = onAction,
     )
