@@ -50,6 +50,20 @@ object BuiltInCategory {
     const val LIBRARY          = "library"
 
     /**
+     * The shelves: ways the library is arranged that you did not have to make.
+     *
+     * Favorites, then Playing / Completed / Backlog, then Recently Added. Deliberately NOT called
+     * "collections" — that already means the ones the user builds by hand, with Add to Collection
+     * and Manage Collections behind it, and a column of that name holding none of them would be
+     * wrong in the one place it matters.
+     *
+     * Every card inside earns its place by not being empty, and the column earns its place the
+     * same way: with nothing marked and nothing recently added there is nothing to look at, so
+     * there is no column. It arrives on its own the first time you mark a game.
+     */
+    const val SHELVES          = "shelves"
+
+    /**
      * Built-in categories this build no longer has. A row for one of these can still reach a live
      * database two ways: an install seeded by an older build, and a restored backup, which upserts
      * whatever categories the archive carried. Either way the column would draw with no icon and
@@ -99,12 +113,16 @@ val BUILT_IN_CATEGORIES: List<Category> = listOf(
     // Last Played first. It has no caticon — the page REPLACES the whole screen — so this
     // position is what "one step left of Emulation" means rather than a slot on the bar.
     Category(id = BuiltInCategory.RECENTLY_PLAYED, name = "Last Played", iconKey = "ic_recent", type = CategoryType.BUILT_IN, position = 0),
-    Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 1, isGamingCategory = true),
-    Category(id = "music",                  name = "Music",     iconKey = "ic_music",    type = CategoryType.BUILT_IN, position = 2),
-    Category(id = "videos",                 name = "Video",     iconKey = "ic_videos",   type = CategoryType.BUILT_IN, position = 3),
-    Category(id = "photos",                 name = "Photo",     iconKey = "ic_photos",   type = CategoryType.BUILT_IN, position = 4),
-    Category(id = BuiltInCategory.LIBRARY,  name = "Library",   iconKey = "ic_library",  type = CategoryType.BUILT_IN, position = 5),
-    Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 6),
+    // Shelves next: the arrangements of the library you did not have to make. It sits between the
+    // shelf you land on and the library itself, because that is what it is — a way into the games
+    // that is not the whole of them. It draws nothing at all while every shelf inside is empty.
+    Category(id = BuiltInCategory.SHELVES,  name = "Shelves",   iconKey = "ic_favorites", type = CategoryType.BUILT_IN, position = 1),
+    Category(id = BuiltInCategory.GAMES,    name = "Game",      iconKey = "ic_games",    type = CategoryType.BUILT_IN, position = 2, isGamingCategory = true),
+    Category(id = "music",                  name = "Music",     iconKey = "ic_music",    type = CategoryType.BUILT_IN, position = 3),
+    Category(id = "videos",                 name = "Video",     iconKey = "ic_videos",   type = CategoryType.BUILT_IN, position = 4),
+    Category(id = "photos",                 name = "Photo",     iconKey = "ic_photos",   type = CategoryType.BUILT_IN, position = 5),
+    Category(id = BuiltInCategory.LIBRARY,  name = "Library",   iconKey = "ic_library",  type = CategoryType.BUILT_IN, position = 6),
+    Category(id = "network",                name = "Network",   iconKey = "ic_network",  type = CategoryType.BUILT_IN, position = 7),
     // Last, with room left before it: a custom category made by the user lands between Network
     // and Settings rather than past the end of the bar.
     Category(id = BuiltInCategory.SETTINGS, name = "Settings",  iconKey = "ic_settings", type = CategoryType.BUILT_IN, position = 11),

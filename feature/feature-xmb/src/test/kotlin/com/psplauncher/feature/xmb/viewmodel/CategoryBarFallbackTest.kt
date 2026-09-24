@@ -93,6 +93,7 @@ class CategoryBarFallbackTest {
         assertEquals(
             listOf(
                 BuiltInCategory.RECENTLY_PLAYED,
+                BuiltInCategory.SHELVES,
                 BuiltInCategory.GAMES,
                 "music",
                 "videos",
@@ -116,17 +117,27 @@ class CategoryBarFallbackTest {
         )
     }
 
+    /**
+     * Last Played, then Shelves, then Game — in that order and with nothing between them.
+     *
+     * This used to assert that Last Played sat immediately left of GAME, and its comment gave the
+     * reason: a gap would let a future built-in land between them. One now has, deliberately —
+     * Shelves was placed there on 2026-09-24 ("make it the first item out of Recent").
+     *
+     * THE COST IS REAL AND IS THE REASON THIS TEST STILL EXISTS. Last Played has no caticon and is
+     * the screen the launcher opens on, so "one step left of Game" was its only route for a
+     * controller. It is two steps now, through Shelves, whenever Shelves has anything in it —
+     * and one step again whenever it does not, because an empty Shelves is not drawn and not
+     * stepped onto. The chain is what has to stay unbroken: anything landing between these three
+     * puts a column the user did not ask for in front of the one they live on.
+     */
     @Test
-    fun `Last Played sits immediately left of Game`() {
-        // "What I was doing" is one step off the column you already live in. Immediately left,
-        // not merely somewhere left: a gap would let a future built-in land between them.
+    fun `Last Played, then Shelves, then Game, with nothing between them`() {
         val recent = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.RECENTLY_PLAYED }
+        val shelves = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.SHELVES }
         val games = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.GAMES }
-        assertEquals(
-            "Last Played must be the row immediately left of Game",
-            games.position - 1,
-            recent.position,
-        )
+        assertEquals("Shelves must be the row immediately left of Game", games.position - 1, shelves.position)
+        assertEquals("Last Played must be the row immediately left of Shelves", shelves.position - 1, recent.position)
     }
 
     @Test

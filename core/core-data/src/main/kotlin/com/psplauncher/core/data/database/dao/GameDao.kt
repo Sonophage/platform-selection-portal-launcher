@@ -214,6 +214,32 @@ interface GameDao {
     @Query("UPDATE games SET is_favorite = :isFavorite WHERE id = :id")
     suspend fun setFavorite(id: Long, isFavorite: Boolean)
 
+    /** How many games carry each mark, for the shelves that hide themselves when empty. */
+    @Query("SELECT COUNT(*) FROM games WHERE play_state = :state AND is_missing = 0")
+    fun observePlayStateCount(state: String): kotlinx.coroutines.flow.Flow<Int>
+
+    /**
+     * Games added since the column existed, newest first.
+     *
+     * `date_added > 0` is the whole filter and it is doing real work: migration 51 to 52 wrote 0
+     * for every row that predates the column, so an untouched library has nothing here rather than
+     * everything. The shelf fills as games arrive instead of claiming 152 of them arrived at once.
+     */
+    @Query(
+        """
+        SELECT * FROM games
+        WHERE date_added > 0 AND is_missing = 0
+        ORDER BY date_added DESC, id DESC
+        """
+    )
+    fun observeRecentlyAdded(): kotlinx.coroutines.flow.Flow<List<GameEntity>>
+
+    @Query("SELECT COUNT(*) FROM games WHERE date_added > 0 AND is_missing = 0")
+    fun observeRecentlyAddedCount(): kotlinx.coroutines.flow.Flow<Int>
+
+    @Query("SELECT * FROM games WHERE play_state = :state AND is_missing = 0 ORDER BY title COLLATE NOCASE")
+    fun observeByPlayState(state: String): kotlinx.coroutines.flow.Flow<List<GameEntity>>
+
     /** Marks the game, or clears the mark with null. Column-at-a-time, like every other flag. */
     @Query("UPDATE games SET play_state = :state WHERE id = :id")
     suspend fun setPlayState(id: Long, state: String?)
