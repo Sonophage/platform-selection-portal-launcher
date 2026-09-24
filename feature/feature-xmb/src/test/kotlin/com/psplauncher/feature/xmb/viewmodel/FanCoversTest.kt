@@ -80,3 +80,50 @@ class FanCoversTest {
         assertEquals(listOf("c50", "c49", "c48"), fanCoversOf(many, FAN_COVER_COUNT))
     }
 }
+
+/**
+ * Pins the offset that stops a media column repeating itself.
+ *
+ * A column's rows are cuts of ONE library — Songs, Artists, Albums, Playlists — so they draw from
+ * one pool and are told apart by where their window starts. Without the offset every row shows the
+ * same four covers while claiming to stand for something different, which looks deliberate and is
+ * the whole reason this is not just `pool.take(4)` at each row.
+ */
+class GridSliceTest {
+
+    private val pool = (1..14).map { "c$it" }
+
+    @Test
+    fun `each row gets a different window`() {
+        assertEquals(listOf("c1", "c2", "c3", "c4"), pool.gridSliceAt(0))
+        assertEquals(listOf("c5", "c6", "c7", "c8"), pool.gridSliceAt(1))
+        assertEquals(listOf("c9", "c10", "c11", "c12"), pool.gridSliceAt(2))
+    }
+
+    @Test
+    fun `no cover appears on two rows`() {
+        val seen = (0..2).flatMap { pool.gridSliceAt(it) }
+        assertEquals("the windows must not overlap", seen.size, seen.toSet().size)
+    }
+
+    @Test
+    fun `a short pool runs out rather than wrapping`() {
+        // Past the end this is EMPTY, and an empty list draws no grid. Wrapping would put the
+        // first row's covers on the last row, which reads as a repeat rather than as an end —
+        // and the row keeps the glyph it always had, which is a better answer than a wrong one.
+        assertEquals(listOf("c13", "c14"), pool.gridSliceAt(3))
+        assertTrue(pool.gridSliceAt(4).isEmpty())
+        assertTrue(pool.gridSliceAt(99).isEmpty())
+    }
+
+    @Test
+    fun `the pool is big enough for a real column`() {
+        // Music is the longest root: Now Playing, Songs, Artists, Albums, Playlists, plus the
+        // installed music apps. A pool short of that would leave the bottom rows bare while the
+        // top ones had art, which looks like missing data rather than a cap.
+        assertTrue(
+            "the pool must cover at least five rows",
+            MEDIA_COVER_POOL >= GRID_COVER_COUNT * 5,
+        )
+    }
+}

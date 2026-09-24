@@ -174,4 +174,7 @@ class MusicRepositoryImpl @Inject constructor(
         else addTrackToPlaylist(playlistId, trackId)
         return !present
     }
+
+    override fun observeNewestArtUris(limit: Int): Flow<List<String>> =
+        trackDao.observeNewestArtUris(limit)
 }

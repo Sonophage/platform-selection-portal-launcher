@@ -34,4 +34,7 @@ interface PhotoRepository {
     suspend fun replacePhotosForLibrary(libraryId: String, photos: List<Photo>, scannedAt: Long)
     /** Removes one photo row from its library. Never deletes the file on disk. */
     suspend fun removePhoto(id: String)
+
+    /** The newest photo thumbnails, newest first, for the XMB's card art grids. */
+    fun observeNewestArtUris(limit: Int): Flow<List<String>>
 }

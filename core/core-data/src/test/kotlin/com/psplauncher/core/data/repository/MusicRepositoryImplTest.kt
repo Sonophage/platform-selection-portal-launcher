@@ -129,6 +129,13 @@ private class FakeMusicTrackDao : MusicTrackDao {
     private val byFolder = linkedMapOf<String, MutableList<MusicTrackEntity>>()
     fun snapshot(): List<MusicTrackEntity> = byFolder.values.flatten()
     override fun observeAll(): Flow<List<MusicTrackEntity>> = flowOf(byFolder.values.flatten())
+    // Mirrors the SQL: newest id first, art-bearing rows only, capped at the limit.
+    override fun observeNewestArtUris(limit: Int): Flow<List<String>> = flowOf(
+        byFolder.values.flatten()
+            .sortedByDescending { it.id }
+            .mapNotNull { it.artUri?.takeIf { uri -> uri.isNotBlank() } }
+            .take(limit)
+    )
     override fun observeByFolder(folderId: String): Flow<List<MusicTrackEntity>> =
         flowOf(byFolder[folderId]?.toList().orEmpty())
     override suspend fun getById(id: String) = byFolder.values.flatten().firstOrNull { it.id == id }

@@ -535,6 +535,14 @@ enum class DrillOutStep {
  * promise the writer has to keep: nothing in here may be mutated in place after publication.
  */
 @androidx.compose.runtime.Immutable
+/** Newest-first artwork per media column, for the card art grids to slice. */
+data class MediaCovers(
+    val music: List<String> = emptyList(),
+    val video: List<String> = emptyList(),
+    val photo: List<String> = emptyList(),
+    val books: List<String> = emptyList(),
+)
+
 data class XMBUiState(
     // ── Horizontal axis: platforms (SD cards) + utility tabs ──────────────
     val categories: List<Category> = emptyList(),
@@ -557,6 +565,13 @@ data class XMBUiState(
     // Music drill-down: which Music sub-screen is open (Root shows the static items + All Music).
     val musicNav: MusicNav = MusicNav.Root,
     val musicFolders: List<com.psplauncher.core.domain.model.MusicFolder> = emptyList(),
+    /**
+     * Newest-first artwork for each media column's rows to slice, four per row.
+     *
+     * One pool per column rather than one list per row: a column's rows are cuts of the same
+     * library, so they draw from the same art and are told apart by their offset. See gridSliceAt.
+     */
+    val mediaCovers: MediaCovers = MediaCovers(),
     // Last-seen playlist lists, cached so the drill flyout can show a specific playlist's siblings.
     val musicPlaylists: List<com.psplauncher.core.domain.model.Playlist> = emptyList(),
     val videoPlaylists: List<com.psplauncher.core.domain.model.VideoPlaylist> = emptyList(),
@@ -1887,6 +1902,7 @@ class XMBViewModel @Inject constructor(
         observeVideo()
         observePhoto()
         observeBooks()
+        observeMediaCovers()
         observeHiddenPlacements()
         collectGamepadActions()
         consumeWindowsSetupPrompt()
@@ -1987,6 +2003,39 @@ class XMBViewModel @Inject constructor(
     )
 
     // Music folders drive the Music category's root list; the default player is cached for launch.
+    /**
+     * Keeps each media column's art pool current, for the rows' 2x2 grids.
+     *
+     * One combine for all four, and each flow is a LIMIT query returning URIs — twenty-four
+     * strings per column, not every track and photo in the library. The Games grid gets its covers
+     * off the snapshot observeCategories already holds; media has no such snapshot, so this is the
+     * one place that reads art for them.
+     *
+     * The rows are rebuilt on arrival, but only for the column that is actually on screen: a media
+     * column's sections are pure functions of this state, so nothing redraws for a library the
+     * user is not looking at.
+     */
+    private fun observeMediaCovers() {
+        viewModelScope.launch {
+            combine(
+                musicRepository.observeNewestArtUris(MEDIA_COVER_POOL),
+                videoRepository.observeNewestArtUris(MEDIA_COVER_POOL),
+                photoRepository.observeNewestArtUris(MEDIA_COVER_POOL),
+                bookRepository.observeNewestArtUris(MEDIA_COVER_POOL),
+            ) { music, video, photo, books -> MediaCovers(music, video, photo, books) }
+                .collect { covers ->
+                    if (_uiState.value.mediaCovers == covers) return@collect
+                    _uiState.update { it.copy(mediaCovers = covers) }
+                    val id = currentCategory()?.id
+                    if (id == BuiltInCategory.MUSIC || id == BuiltInCategory.VIDEO ||
+                        id == BuiltInCategory.PHOTO || id == BuiltInCategory.LIBRARY
+                    ) {
+                        loadItemsForCategory(currentCategory(), keepCursorOnRow = true)
+                    }
+                }
+        }
+    }
+
     private fun observeMusic() {
         viewModelScope.launch {
             musicRepository.observeFolders().collect { folders ->

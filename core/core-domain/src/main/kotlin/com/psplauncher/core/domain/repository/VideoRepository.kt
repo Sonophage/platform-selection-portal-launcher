@@ -70,4 +70,7 @@ interface VideoRepository {
     fun observeDefaultVideoPlayer(): Flow<String?>
     suspend fun getDefaultVideoPlayer(): String?
     suspend fun setDefaultVideoPlayer(value: String?)
+
+    /** The newest video thumbnails, newest first, for the XMB's card art grids. */
+    fun observeNewestArtUris(limit: Int): Flow<List<String>>
 }

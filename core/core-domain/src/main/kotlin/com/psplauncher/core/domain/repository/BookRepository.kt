@@ -49,4 +49,7 @@ interface BookRepository {
     fun observeDefaultReader(): Flow<String?>
     suspend fun getDefaultReader(): String?
     suspend fun setDefaultReader(packageName: String?)
+
+    /** The newest book covers, newest first, for the XMB's card art grids. */
+    fun observeNewestArtUris(limit: Int): Flow<List<String>>
 }

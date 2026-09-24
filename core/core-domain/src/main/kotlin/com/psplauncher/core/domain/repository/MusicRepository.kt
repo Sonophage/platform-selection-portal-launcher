@@ -54,4 +54,7 @@ interface MusicRepository {
     suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: String)
     /** Adds the track if absent, removes it if present; returns the new membership state. */
     suspend fun toggleTrackInPlaylist(playlistId: Long, trackId: String): Boolean
+
+    /** The newest album covers, newest first, for the XMB's card art grids. */
+    fun observeNewestArtUris(limit: Int): Flow<List<String>>
 }

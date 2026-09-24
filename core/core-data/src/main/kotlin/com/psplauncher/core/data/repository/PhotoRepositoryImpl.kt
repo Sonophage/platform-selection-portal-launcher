@@ -98,4 +98,7 @@ class PhotoRepositoryImpl @Inject constructor(
             deleteOrphanedThumbnails(listOf(thumb)) { photoDao.countReferencingThumbnail(it) > 0 }
         }
     }
+
+    override fun observeNewestArtUris(limit: Int): Flow<List<String>> =
+        photoDao.observeNewestArtUris(limit)
 }

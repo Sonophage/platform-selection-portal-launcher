@@ -115,4 +115,7 @@ class BookRepositoryImpl @Inject constructor(
             else prefs[KEY_BOOK_DEFAULT_READER] = packageName
         }
     }
+
+    override fun observeNewestArtUris(limit: Int): Flow<List<String>> =
+        bookDao.observeNewestArtUris(limit)
 }

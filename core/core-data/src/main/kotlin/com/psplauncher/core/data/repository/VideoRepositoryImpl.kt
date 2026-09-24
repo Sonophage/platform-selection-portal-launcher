@@ -221,4 +221,7 @@ class VideoRepositoryImpl @Inject constructor(
             else prefs[KEY_VIDEO_DEFAULT_PLAYER] = value
         }
     }
+
+    override fun observeNewestArtUris(limit: Int): Flow<List<String>> =
+        videoDao.observeNewestArtUris(limit)
 }

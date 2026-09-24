@@ -48,4 +48,24 @@ interface PhotoDao {
         deleteForLibrary(libraryId)
         if (photos.isNotEmpty()) insertAll(photos)
     }
+
+    /**
+     * The newest thumbnails in this library, newest first — for the XMB's card art grids.
+     *
+     * A LIMIT query returning only the URIs, not the rows. The grids need four per card and the
+     * media columns slice one pool across their rows, so this is tens of strings; streaming every
+     * track or photo to read one column off each would be thousands of rows for a handful of
+     * thumbnails.
+     *
+     * Newest is highest id, the same proxy the games grid uses: these tables have no added-at
+     * column either, and rows are inserted in scan order.
+     */
+    @Query(
+        """
+        SELECT thumbnail_uri FROM photos
+        WHERE thumbnail_uri IS NOT NULL AND thumbnail_uri != ''
+        ORDER BY id DESC LIMIT :limit
+        """
+    )
+    fun observeNewestArtUris(limit: Int): Flow<List<String>>
 }

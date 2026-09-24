@@ -865,6 +865,28 @@ private fun XmbItemLeadingIcon(
     // Material glyph rows follow the theme's unified icon color, matching the tinted
     // silhouette art (PortalIcon) — row alpha handles the unselected dimming.
     val iconTint = LocalPFPColors.current.iconColor
+
+    // THE ART GRID IS CHECKED BEFORE THE TYPE, because by now it applies to rows of many types:
+    // a console card, All Games, a music section, a video library. What they share is not a type,
+    // it is having something inside worth previewing — which is exactly what insideCovers says.
+    //
+    // It still yields to an explicit per-slot pick. A user's custom icon and a collection's chosen
+    // glyph are statements about THIS row; the grid is a global default, and a global default that
+    // overrode them would invert the tier order the icon catalog is built on.
+    val userPickedIcon = (memoryCardSlotKeyFor(item) ?: itemSlotKeyFor(item.type))
+        ?.let { com.psplauncher.core.ui.icons.LocalCustomIcons.current[it] }
+    if (cardArtGrid && item.insideCovers.isNotEmpty() && userPickedIcon == null && item.iconKey == null) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(LEADING_ICON_SIZE).selectedIconBloom(isSelected),
+            ) {
+                CardArtGrid(item.insideCovers, LEADING_ICON_SIZE)
+            }
+        }
+        return
+    }
+
     when {
         // Music tracks (and the "Now Playing" row) show a square album cover, falling back to a
         // framed music-note glyph when the track had no embedded art. The 58dp box keeps every
@@ -1166,17 +1188,9 @@ private fun XmbItemLeadingIcon(
                 } else {
                     null
                 }
-                // The art grid sits ABOVE the default art and BELOW an explicit pick. A user's
-                // custom icon and a collection's chosen glyph are per-slot statements; this is a
-                // global default, and a global default that overrode them would invert the tier
-                // order the icon catalog is built on. Turning the setting off restores the glyph.
-                val artGrid = cardArtGrid &&
-                    memcardOverride == null &&
-                    collectionIconKey == null &&
-                    item.insideCovers.isNotEmpty()
-                if (artGrid) {
-                    CardArtGrid(item.insideCovers, LEADING_ICON_SIZE)
-                } else if (memcardOverride != null) {
+                // No art-grid branch here any more: it is handled once above the `when`, for
+                // every row type that has covers, rather than in the one branch that had them first.
+                if (memcardOverride != null) {
                     // Custom icons render as authored (untinted), like every slot — but the
                     // configured icon-legibility matte still draws behind the still frame.
                     com.psplauncher.core.ui.icons.CustomIconSurface(

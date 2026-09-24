@@ -43,6 +43,23 @@ import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.VIDEO_LIBRAR
  * sections, while the published list also carries the installed music apps. Publishing this
  * one by mistake would silently drop the apps, which is why it is named for what it is.
  */
+/**
+ * Give each row in a media column its own four covers out of the column's pool.
+ *
+ * Applied at the END of a column's builder rather than at each `add`, so the offset is simply the
+ * row's position and nobody has to keep a running index correct while editing the list. Rows that
+ * already carry their own art — a Now Playing track wearing its album cover — keep it: this only
+ * fills rows that had nothing of their own.
+ */
+private fun List<XMBItem>.withColumnCovers(pool: List<String>): List<XMBItem> {
+    if (pool.isEmpty()) return this
+    var slot = 0
+    return map { item ->
+        if (item.coverUri != null && item.type == XMBItemType.MUSIC_TRACK) item
+        else item.copy(insideCovers = pool.gridSliceAt(slot++))
+    }
+}
+
 internal fun XMBUiState.musicRootSections(): List<XMBItem> {
     val folders = musicFolders
     val totalTracks = folders.sumOf { it.trackCount }
@@ -96,7 +113,7 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
                 type     = XMBItemType.PLAYLIST,
             )
         )
-    }
+    }.withColumnCovers(mediaCovers.music)
 }
 
 // Video root: browse rows first (Collections, Video Libraries), then the Video Apps counterpart
@@ -136,7 +153,7 @@ internal fun XMBUiState.videoRootSections(): List<XMBItem> {
                 type     = XMBItemType.VIDEO_LIBRARY,
             )
         )
-    }
+    }.withColumnCovers(mediaCovers.video)
 }
 
 // Photo root, PSP-style: Camera (when a camera app exists) and Albums first, then the Photo Apps
@@ -179,7 +196,7 @@ internal fun XMBUiState.photoRootSections(cameraAvailable: Boolean): List<XMBIte
                 type     = XMBItemType.PHOTO_ALBUMS,
             )
         )
-    }
+    }.withColumnCovers(mediaCovers.photo)
 }
 
 /** The Library root's own sections, without the app rows (see [musicRootSections]). */
@@ -237,7 +254,7 @@ internal fun XMBUiState.booksRootSections(): List<XMBItem> {
                 type     = XMBItemType.MEMORY_CARD,
             )
         )
-    }
+    }.withColumnCovers(mediaCovers.books)
 }
 
 /**
