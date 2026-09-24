@@ -93,6 +93,15 @@ fun WaveLayers(waveStyle: WaveStyle, tint: Color = Color.White) {
 fun WaveBackground(
     waveStyle: WaveStyle,
     modifier: Modifier,
+    /**
+     * False draws the gradient alone.
+     *
+     * For the caller that wants the wave ON TOP of something — the crossbar draws the focused
+     * item's artwork between the gradient and the wave — and needs the base without it. Drawing
+     * the wave here as well would put a second one under the art, and since the art fades out
+     * across the middle of the screen the two would both be visible, at different alphas.
+     */
+    drawWave: Boolean = true,
 ) {
     val colors = LocalPFPColors.current
 
@@ -108,7 +117,7 @@ fun WaveBackground(
     )
 
     Box(modifier = modifier.fillMaxSize().background(gradient)) {
-        WaveLayers(waveStyle)
+        if (drawWave) WaveLayers(waveStyle)
     }
 }
 

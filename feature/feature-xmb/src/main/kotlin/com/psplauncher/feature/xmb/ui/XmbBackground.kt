@@ -76,6 +76,15 @@ fun XmbBackground(
      * own accent is what makes it read as part of the wallpaper.
      */
     wallpaperAccent: Long? = null,
+    /**
+     * Hold the wave back so the caller can draw it over something.
+     *
+     * The crossbar puts the focused item's artwork between this and the wave — album cover, key
+     * art, a film's thumbnail — so the wave reads as part of the screen rather than as a layer the
+     * artwork buried. Everything else (boot, the settings preview) leaves this alone and gets the
+     * wave where it has always been.
+     */
+    waveDrawnByCaller: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val hasWallpaper = customWallpaperPath != null
@@ -91,7 +100,7 @@ fun XmbBackground(
                 modifier = Modifier.fillMaxSize(),
             )
             hasWallpaper -> WallpaperBackground(customWallpaperPath, Modifier.fillMaxSize())
-            else -> WaveBackground(waveStyle, Modifier.fillMaxSize())
+            else -> WaveBackground(waveStyle, Modifier.fillMaxSize(), drawWave = !waveDrawnByCaller)
         }
 
         // The wave a second time, over the picture — and ONLY over a picture. With no wallpaper
@@ -100,7 +109,7 @@ fun XmbBackground(
         // No gradient underneath it here: that is the wallpaper's job now. WaveBackground paints
         // the theme gradient as its base, which would hide the picture entirely, so this draws
         // the wave alone over whatever is behind it.
-        if (hasWallpaper && waveOverWallpaper) {
+        if (hasWallpaper && waveOverWallpaper && !waveDrawnByCaller) {
             WaveOverlay(waveStyle, wallpaperAccent, Modifier.fillMaxSize())
         }
     }
@@ -116,8 +125,14 @@ fun XmbBackground(
 private fun waveTintFrom(accentArgb: Long): Color =
     lerp(Color(accentArgb or 0xFF000000L), Color.White, 0.62f)
 
+/**
+ * The wave alone, tinted, over whatever is already on screen.
+ *
+ * Public because the crossbar draws it itself — see [waveDrawnByCaller]. No gradient: that is
+ * whatever this is being drawn over.
+ */
 @Composable
-private fun WaveOverlay(waveStyle: WaveStyle, accentArgb: Long?, modifier: Modifier) {
+fun WaveOverlay(waveStyle: WaveStyle, accentArgb: Long?, modifier: Modifier) {
     Box(modifier) {
         WaveLayers(waveStyle, accentArgb?.let(::waveTintFrom) ?: Color.White)
     }

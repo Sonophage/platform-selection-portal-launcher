@@ -643,6 +643,10 @@ fun XMBShell(
                 wallpaperAccent     = uiState.wallpaperAccent,
                 motionWallpaperPath = uiState.motionWallpaperPath,
                 motionDecision      = motionDecision,
+                // The wave comes back AFTER the artwork below, not here. A cover, a film's
+                // thumbnail or a game's key art is the background on this screen, and the wave
+                // belongs over it rather than buried under it.
+                waveDrawnByCaller   = true,
                 modifier            = Modifier.fillMaxSize(),
             )
 
@@ -747,6 +751,25 @@ fun XMBShell(
                     }
                 }
             }
+
+            // THE WAVE, ON TOP OF THE ARTWORK. The background is dynamic — whatever the cursor is
+            // on backs the screen, and the chosen wallpaper is what it falls back to — so the wave
+            // is the one constant, and it reads as the launcher's own surface only if it sits above
+            // the picture rather than under it.
+            //
+            // Tinted by that picture's accent, the same way the wave over a wallpaper already is:
+            // white strands over a photograph look like a layer from a different screen. The accent
+            // comes from the image that actually DECODED, so the wave and the backdrop can never be
+            // coloured from two different pictures.
+            //
+            // Drawn ONCE: XmbBackground was told to hold its own wave back. The artwork fades out
+            // across the middle of the screen, so a second wave underneath would be visible right
+            // there, at a different alpha.
+            WaveOverlay(
+                waveStyle = effectiveWaveStyle,
+                accentArgb = uiState.focusedItemAccentArgb ?: uiState.wallpaperAccent,
+                modifier = Modifier.fillMaxSize(),
+            )
 
             // Hide the XMB foreground (status strip + category bar + item list) while a fullscreen
             // The status strip and the hint bar draw ABOVE the context rail while it is open, so
