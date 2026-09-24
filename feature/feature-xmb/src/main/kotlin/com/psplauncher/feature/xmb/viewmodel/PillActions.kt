@@ -135,7 +135,7 @@ internal fun pillNav(action: GamepadAction, current: Int?, count: Int): PillNav 
 data class PillCursor(val itemId: String, val index: Int)
 
 /** The pills of whatever row the column cursor is on. */
-internal fun XMBUiState.focusedPills(): List<XmbPill> =
+fun XMBUiState.focusedPills(): List<XmbPill> =
     currentItems.getOrNull(selectedItemIndex)?.let(::pillsFor).orEmpty()
 
 /**

@@ -109,6 +109,7 @@ import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.focusedPillIndex
+import com.psplauncher.feature.xmb.viewmodel.focusedPills
 import com.psplauncher.feature.xmb.viewmodel.railRows
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.FAN_COVER_COUNT
@@ -1173,7 +1174,13 @@ fun XMBShell(
                 // Left/right: stepping the crossbar, which a drilled-in list does not do.
                 hints = StripHints(
                     shoulder = uiState.panelStripOpen,
-                    leftRight = !uiState.isInSubItem && uiState.categories.size > 1,
+                    // NOT on the crossbar. Stepping left and right between categories is the
+                    // first thing anyone does on this screen and does not need announcing —
+                    // "the dpad hint isn't needed on the main screen". It is shown where the
+                    // press does the less obvious thing: walking into a row's pill actions,
+                    // which only rows that HAVE pills offer, and never on the home shelf where
+                    // left and right are reserved for leaving it.
+                    leftRight = !uiState.onLastPlayedHome && uiState.focusedPills().isNotEmpty(),
                 ),
                 // The home shelf's media filter rides in the middle of the bar. Only there: it
                 // is the only column X filters, and a row of media names over the crossbar would

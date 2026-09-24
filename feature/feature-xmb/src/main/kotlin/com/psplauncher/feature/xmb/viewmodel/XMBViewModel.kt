@@ -5969,20 +5969,24 @@ class XMBViewModel @Inject constructor(
                     _uiState.update { it.copy(recentRailVisible = true) }
                     return
                 }
-                if (pillPressHandled(action, state)) return
+                if (!state.onLastPlayedHome && pillPressHandled(action, state)) return
                 val next = (state.selectedCategoryIndex - 1).coerceAtLeast(0)
                 if (next != state.selectedCategoryIndex) onCategorySelected(next)
                 else gamepadInputHandler.cancelRepeat()
             }
             GamepadAction.NAVIGATE_RIGHT -> {
-                // ...and RIGHT puts it away before it steps to the next category, so the gesture
-                // that opened it is the one that closes it.
+                // ...and RIGHT puts the rail away ON THE WAY PAST. It used to spend the press
+                // doing only that, which made leaving the shelf cost two presses before the pill
+                // row started charging for more — "moving from the recent screen to xmb is taking
+                // too many presses". No return: the rail closes and the step happens together.
                 if (state.onLastPlayedHome && state.recentRailVisible) {
-                    menuSound.play(MenuSound.SYSTEM_BROWSE)
                     _uiState.update { it.copy(recentRailVisible = false) }
-                    return
                 }
-                if (pillPressHandled(action, state)) return
+                // The pill row does NOT take left/right on the home shelf. Stepping off the shelf
+                // is that screen's main gesture, and four pills in the way of it turn one press
+                // into five. The pills are still there to touch, and still walkable everywhere
+                // else — see pillNav for what they cost when they do apply.
+                if (!state.onLastPlayedHome && pillPressHandled(action, state)) return
                 if (state.isInSubItem) { gamepadInputHandler.cancelRepeat(); return }
                 val max  = (state.categories.size - 1).coerceAtLeast(0)
                 val next = (state.selectedCategoryIndex + 1).coerceAtMost(max)
@@ -6627,12 +6631,17 @@ class XMBViewModel @Inject constructor(
                 "change_emulator"        -> openEmulatorPickerMenu(menu.gameId)
                 "icon_display"           -> openIconDisplayPickerMenu(menu.gameId)
                 // Two-step delete: a confirm menu first, matching the Game Detail page's guard.
+                // Two-step delete, and CANCEL IS FIRST so the cursor opens on it.
+                //
+                // The confirm existed and opened with the cursor on "Remove": the row is reached
+                // by holding DOWN to the bottom of the rail and pressing A, and the prompt that
+                // came up answered a second A with yes. The App Drawer's uninstall prompt was
+                // fixed for exactly this and the reasoning is its: a destructive prompt never
+                // opens with the cursor on the destructive answer, because the press that got you
+                // here is the press most likely to arrive again.
                 "remove_game"            -> _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
                     title  = "Remove \"${menu.title}\" from Library?",
-                    items  = listOf(
-                        XMBContextMenuItem("confirm_remove_game", "Remove", isDestructive = true),
-                        XMBContextMenuItem("cancel_remove_game",  "Cancel"),
-                    ),
+                    items  = removeGameConfirmItems(),
                     gameId = menu.gameId,
                 ))}
                 "confirm_remove_game"    -> {
@@ -6644,10 +6653,7 @@ class XMBViewModel @Inject constructor(
                 // file is already gone, so there is no "put it back" once the entry goes too.
                 "remove_missing"         -> _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
                     title  = "Permanently remove \"${menu.title}\"?",
-                    items  = listOf(
-                        XMBContextMenuItem("confirm_remove_missing", "Remove permanently", isDestructive = true),
-                        XMBContextMenuItem("cancel_remove_missing",  "Cancel"),
-                    ),
+                    items  = removeMissingConfirmItems(),
                     gameId = menu.gameId,
                 ))}
                 "confirm_remove_missing" -> {

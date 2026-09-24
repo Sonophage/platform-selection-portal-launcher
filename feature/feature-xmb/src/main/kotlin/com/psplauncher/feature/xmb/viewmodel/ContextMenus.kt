@@ -412,3 +412,30 @@ internal fun List<XMBContextMenuItem>.withOverflowRow(
     return if (overflow.isEmpty()) visible
     else visible + XMBContextMenuItem(MENU_MORE_ITEM_ID, "More…")
 }
+
+// ── Destructive confirms ─────────────────────────────────────────────────────
+//
+// Both of these opened with the cursor on their destructive answer. The rail's Remove From Library
+// is reached by holding DOWN to the bottom and pressing A, and the prompt that came up answered a
+// second A with yes — the press that gets you there is the press most likely to arrive again. The
+// App Drawer's uninstall prompt was fixed for exactly this.
+//
+// Here rather than inline in the ViewModel because "Cancel is first" is a rule with more than one
+// instance, and a rule with instances and no test is a rule that holds until someone adds a third.
+
+/** The two-step confirm for removing a game from the library. Cancel first, always. */
+internal fun removeGameConfirmItems(): List<XMBContextMenuItem> = listOf(
+    XMBContextMenuItem("cancel_remove_game", "Cancel"),
+    XMBContextMenuItem("confirm_remove_game", "Remove", isDestructive = true),
+)
+
+/**
+ * The same, for a game whose file is already gone.
+ *
+ * Its copy states the consequence rather than the action: there is no putting this one back, so
+ * "Remove permanently" is the honest label and Cancel is still what the cursor lands on.
+ */
+internal fun removeMissingConfirmItems(): List<XMBContextMenuItem> = listOf(
+    XMBContextMenuItem("cancel_remove_missing", "Cancel"),
+    XMBContextMenuItem("confirm_remove_missing", "Remove permanently", isDestructive = true),
+)
