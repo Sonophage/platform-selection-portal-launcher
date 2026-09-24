@@ -26,7 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.icons.PortalIcon
-import com.psplauncher.core.ui.wave.WaveStyle
 import com.psplauncher.themekit.UiMediaLimits
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.delay
@@ -64,7 +63,8 @@ private const val HARD_CAP_MS = 12_000L
  *  5. [onComplete] fires EXACTLY once across natural end, skip, error, and timeout.
  *
  * Boot still does not play the user's MOTION WALLPAPER — that restriction is unrelated to this
- * reversal and stays. [XmbBackground] is composed without wallpaper args on purpose.
+ * reversal and stays, and is now moot for the built-in path: boot draws flat black and no
+ * background component at all.
  *
  * The four combinations (default/custom × video/audio) all work. [bootVideoPath] null means the
  * built-in logo animation. [bootAudioPath] is what XMBViewModel resolved via `resolveBootAudio`:
@@ -140,10 +140,21 @@ fun BootSequenceOverlay(
                 )
             }
         } else {
-            // Same background the XMB uses — the classic blue "Original" gradient with the soft
-            // wave folds, tinted by whatever theme is active (LocalPFPColors), so boot and menu
-            // are visually identical. Deliberately no wallpaper args: see the KDoc.
-            XmbBackground(waveStyle = WaveStyle.ANIMATED, modifier = Modifier.fillMaxSize())
+            // BLACK. Not the themed wave, which is what this drew for as long as it existed.
+            //
+            // The reason it drew the wave was that boot and menu would then be "visually
+            // identical", so the dissolve at the end revealed the same picture it was already
+            // showing. That premise is dead: the launcher opens on the Last Played shelf, whose
+            // backdrop is the focused game's own dark artwork, so boot was holding a bright amber
+            // gradient for 2.8 seconds and then crossfading to something dark. Measured on the
+            // panel: RGB (158, 91, 55) from 0.07s to 2.33s, falling to (53, 43, 41) by 2.93s.
+            //
+            // "let it only do black it can go to it's tint once the recent screen is displayed" —
+            // so the colour now arrives WITH the content that justifies it, and boot is a black
+            // field with the mark on it. The wave goes with the gradient; it is the gradient's
+            // folds, and white-on-black lines under a logo are a different screen, not this one
+            // with the colour removed.
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black))
 
             // The boot mark, drawn through PortalIcon because it is exactly what that entry point
             // is for: a single-colour silhouette whose alpha carries the shape. The art is black
