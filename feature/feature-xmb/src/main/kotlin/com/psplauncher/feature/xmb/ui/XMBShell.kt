@@ -885,6 +885,30 @@ fun XMBShell(
             // them had to leave, and the facts read better under the name they belong to than
             // right-aligned under a wordmark.
 
+            // The fan of newest covers, for a Games-root card. See XmbCoverFan: it takes the
+            // right-hand corner unconditionally because it and the hover panel can never both
+            // apply — the panel wants a focused real GAME and this wants a card.
+            val fanCovers = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
+                ?.fanCovers
+                .orEmpty()
+            if (fanCovers.isNotEmpty()) {
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    XmbCoverFan(
+                        covers = fanCovers,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(
+                                x = -maxWidth * XmbCoverFanPlacement.RightInsetFraction,
+                                y = maxHeight * XmbCoverFanPlacement.TopFraction,
+                            )
+                            .size(
+                                width = maxWidth * XmbCoverFanPlacement.WidthFraction,
+                                height = maxHeight * XmbCoverFanPlacement.HeightFraction,
+                            ),
+                    )
+                }
+            }
+
             // The panel's page strip, directly under the status bar and in the opposite corner
             // from the helper footer, which is the pill it is wearing. Not on the logo page: that
             // view is the crossbar exactly as it was, and a tab row over it would be new chrome

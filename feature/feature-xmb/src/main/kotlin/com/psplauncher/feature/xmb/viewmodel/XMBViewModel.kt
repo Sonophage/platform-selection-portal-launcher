@@ -542,6 +542,8 @@ data class XMBUiState(
     val platformGameCounts: Map<String, Int> = emptyMap(),
     // Total real games (content_type = GAME) across all platforms — the "All Games" count.
     val allGamesCount: Int = 0,
+    /** Newest-first cover art per Games-root card, keyed by that card's own item id. */
+    val cardFanCovers: Map<String, List<String>> = emptyMap(),
     // Count of favorited entries — drives the Games-root "Favorites" item visibility.
     val favoritesCount: Int = 0,
     // Games flagged missing by the reconciler. Tracked separately because every other count here
@@ -1585,6 +1587,13 @@ data class XMBItem(
     val romPath: String? = null,
     /** Milliseconds this game has been played; 0 when it has never been launched from here. */
     val totalPlayTimeMillis: Long = 0L,
+    /**
+     * Cover art of the newest games INSIDE this card, newest first, for the fan on the right.
+     *
+     * Empty for anything that is not a Games-root card, and for a card whose games have no
+     * artwork — the fan previews what is in there, and there is nothing to preview.
+     */
+    val fanCovers: List<String> = emptyList(),
     val gameId: Long? = null,
     val platformId: String? = null,
     val collectionId: Long? = null,     // set on COLLECTION rows in the Games root
@@ -2223,6 +2232,27 @@ class XMBViewModel @Inject constructor(
                     // projection and is the authoritative count for this folder.
                     val favoritesTotal = favorites.size
 
+                    // The fan's covers, from the SAME snapshot the counts come from — the games
+                    // are already in hand here, so this costs a sort and no query.
+                    //
+                    // "Newest" is highest id first. There is no date-added column on Game, and the
+                    // auto-increment is the honest proxy: rows are inserted in scan order and
+                    // @Upsert keys on the primary key, so rescanning a ROM already in the library
+                    // updates its row and keeps its id. It DOES reshuffle if a platform is deleted
+                    // and re-added, because that path deletes the rows — a library rebuild
+                    // reorders the fan, which is a cosmetic wrong answer on a screen nobody reads
+                    // for insertion dates.
+                    //
+                    // See fanCoversOf for why sorted-then-mapped-then-taken is the whole rule.
+                    fun fanOf(games: List<Game>): List<String> = fanCoversOf(games)
+                    val realGames = displayGames.filter { it.contentType == GameContentType.GAME }
+                    val fanCovers = buildMap<String, List<String>> {
+                        put(ALL_GAMES_ITEM_ID, fanOf(realGames))
+                        put(FAVORITES_ITEM_ID, fanOf(favorites))
+                        realGames.groupBy { it.platformId }
+                            .forEach { (pid, list) -> put(cardItemId(pid), fanOf(list)) }
+                    }
+
                     // Drop a stale platform folder if its card was removed or disabled. The
                     // synthetic All Games, Favorites, and Missing folders are always valid.
                     val validPlatformId = _uiState.value.selectedPlatformId
@@ -2239,6 +2269,7 @@ class XMBViewModel @Inject constructor(
                     _uiState.update { it.copy(
                         platformGameCounts = counts,
                         allGamesCount = gamesOnlyTotal,
+                        cardFanCovers = fanCovers,
                         favoritesCount = favoritesTotal,
                         selectedPlatformId = validPlatformId,
                         selectedCollectionId = validCollectionId,
@@ -5055,6 +5086,18 @@ class XMBViewModel @Inject constructor(
         )
     }
 
+    /**
+     * A console card's item id, and the key its fan covers are filed under.
+     *
+     * A function rather than the same interpolation typed in three places. The map is FILLED in
+     * observeCategories and READ in memoryCardItems, about 2900 lines apart, and the first attempt
+     * had them disagreeing: one said `card_$pid` and the other `card_${card.platformId}` — both
+     * wrong in the same way, a script having written Kotlin's dollar escape in literally, and each
+     * wrong differently enough that the lookup silently missed. No error, no crash, just a card
+     * with no fan. Two spellings of one key cannot drift if there is only one spelling.
+     */
+    private fun cardItemId(platformId: String): String = "card_" + platformId
+
     // Games root: one item per enabled Memory Card (already ordered pinned-first by the DAO).
     private fun memoryCardItems(): List<XMBItem> {
         // Real games only (excludes app-style entries), matching what All Games actually shows.
@@ -5063,6 +5106,7 @@ class XMBViewModel @Inject constructor(
             id       = ALL_GAMES_ITEM_ID,
             title    = "All Games",
             subtitle = countLabel(totalGames, "game", "games"),
+            fanCovers = _uiState.value.cardFanCovers[ALL_GAMES_ITEM_ID].orEmpty(),
             type     = XMBItemType.ALL_GAMES,
         )
 
@@ -5073,6 +5117,7 @@ class XMBViewModel @Inject constructor(
                 id       = FAVORITES_ITEM_ID,
                 title    = "Favorites",
                 subtitle = countLabel(favoritesCount, "game", "games"),
+                fanCovers = _uiState.value.cardFanCovers[FAVORITES_ITEM_ID].orEmpty(),
                 type     = XMBItemType.FAVORITES,
             )
         } else null
@@ -5138,10 +5183,11 @@ class XMBViewModel @Inject constructor(
         val cardRows = visibleCards.map { card ->
             val count = _uiState.value.platformGameCounts[card.platformId] ?: card.gameCount
             XMBItem(
-                id          = "card_${card.platformId}",
+                id          = cardItemId(card.platformId),
                 title       = if (card.platformId == WINDOWS_PLATFORM_ID) "Windows Games" else card.displayName,
                 subtitle    = countLabel(count, "game", "games"),
                 platformId  = card.platformId,
+                fanCovers   = _uiState.value.cardFanCovers[cardItemId(card.platformId)].orEmpty(),
                 accentColor = platformCache[card.platformId]?.accentColor,
                 type        = XMBItemType.MEMORY_CARD,
             )
