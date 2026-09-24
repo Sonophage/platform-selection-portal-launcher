@@ -60,6 +60,8 @@ import com.psplauncher.core.domain.model.displayLabel
 import com.psplauncher.core.domain.model.resolve
 import com.psplauncher.core.domain.repository.GameRepository
 import com.psplauncher.core.ui.icons.GameIconStyle
+import com.psplauncher.core.ui.notification.AndroidNotice
+import com.psplauncher.core.ui.notification.AndroidNotifications
 import com.psplauncher.core.ui.notification.BackgroundTaskNotifier
 import com.psplauncher.core.ui.notification.SystemToasts
 import com.psplauncher.core.ui.notification.ToastKind
@@ -888,6 +890,32 @@ data class XMBUiState(
      * Keyed to the row's id, so moving the column cursor invalidates it on its own.
      */
     val pillCursor: PillCursor? = null,
+    /**
+     * The notification sheet, pulled down from the strip.
+     *
+     * It lived in the shell as local Compose state, which made it a thing only a finger could
+     * open and only a finger could close: BACK went to the dispatcher, found no branch for it and
+     * opened the App Drawer with the sheet still on screen. State here so a button can open it,
+     * BACK can close it, and it counts as the overlay it is.
+     */
+    val notificationsOpen: Boolean = false,
+    /**
+     * Where the cursor is in the open sheet, over [noticeFocusables].
+     *
+     * Index 0 is the media row when there is one. Clamped on read rather than reset on write,
+     * because the list under it changes on its own — a notification the posting app clears while
+     * the sheet is open shortens it with nobody pressing anything.
+     */
+    val noticeCursor: Int = 0,
+    /** The device's own notifications, live. Empty when access has not been granted. */
+    val androidNotices: List<AndroidNotice> = emptyList(),
+    /**
+     * What the sheet's top row offers when nothing is playing: the last game you were in.
+     *
+     * The row is one slot with two tenants. Music wins it while there is music, because a
+     * transport you can reach is worth more than a shortcut you already have on the shelf below.
+     */
+    val resumeGame: Game? = null,
     val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
     val panelPageGameId: Long? = null,
     val librarySetupComplete: Boolean = false,
@@ -1085,23 +1113,49 @@ data class XMBUiState(
     // True whenever something is layered over the main XMB. The gamepad dispatcher uses this
     // as a final guard so D-Pad/A never drives the category bar or item list behind an overlay.
     /**
-     * True when the context rail is the ONLY thing over the XMB.
+     * True when the only thing over the XMB is one the status strip and hint bar draw ON TOP of.
      *
-     * The hint bar reads it: the bar hides behind every blocking overlay, and the rail is one of
-     * them, so "the header and hints still show on top of the context screen" needs the rail
-     * distinguished from the rest — not removed from [hasBlockingOverlay], which decides input
-     * routing and the idle cues as well.
+     * Two of them now: the context rail and the notification sheet. Both hug an edge, both leave
+     * the crossbar visible behind them, and both need the bar to keep naming what their own
+     * presses do — the sheet especially, since the strip is the thing you pressed to open it and
+     * it pads itself clear of it on purpose.
+     *
+     * They are NOT removed from [hasBlockingOverlay], which also decides input routing and the
+     * idle cues, and both of those should still treat these as overlays. Two readings of one
+     * list, which is why this is a second property and not a second list.
+     *
+     * Was `contextRailOnly`, when the rail was the only one.
      */
-    val contextRailOnly: Boolean
-        get() = activeContextMenu != null && !otherBlockingOverlay
+    val overlayKeepsChrome: Boolean
+        get() = (activeContextMenu != null || notificationsOpen) && !otherBlockingOverlay
+
+    /**
+     * The rows the sheet's cursor walks, in the order it walks them.
+     *
+     * The LAUNCHER column is deliberately absent. Its rows are reports of finished work — there is
+     * nothing to do to one — so a cursor that stopped on them would be a cursor that sometimes
+     * does nothing when you press it. The media row is here when there is something playing,
+     * because that row has controls; the system's notifications are here because they open.
+     */
+    val noticeFocusables: List<NoticeFocus>
+        get() = buildList {
+            if (musicPlayback.track != null || resumeGame != null) add(NoticeFocus.Media)
+            androidNotices.take(NOTICE_ROWS).forEach { add(NoticeFocus.Notice(it.key)) }
+        }
+
+    /** The focused row, or null when the sheet has nothing that can be acted on. */
+    val focusedNotice: NoticeFocus?
+        get() = noticeFocusables.let { rows ->
+            if (rows.isEmpty()) null else rows[noticeCursor.coerceIn(0, rows.lastIndex)]
+        }
 
     val hasBlockingOverlay: Boolean
-        get() = otherBlockingOverlay || activeContextMenu != null
+        get() = otherBlockingOverlay || activeContextMenu != null || notificationsOpen
 
     /**
      * Everything that covers the XMB EXCEPT the context rail.
      *
-     * Split out rather than copied: [hasBlockingOverlay] and [contextRailOnly] are two readings of
+     * Split out rather than copied: [hasBlockingOverlay] and [overlayKeepsChrome] are two readings of
      * one list, and a second copy of twenty-five conditions is a second copy that stops agreeing
      * the first time a screen is added to one of them.
      */
@@ -1549,8 +1603,8 @@ fun shouldShowContextMenuHint(state: XMBUiState, idleMs: Long): Boolean =
     state.contextMenuHintEnabled &&
         // The context rail is the one blocking overlay the pill survives — "the header and hints
         // still show on top of the context screen". It used to be excluded twice over, once here
-        // and once inside hasBlockingOverlay, which is why contextRailOnly exists.
-        (!state.hasBlockingOverlay || state.contextRailOnly) &&
+        // and once inside hasBlockingOverlay, which is why overlayKeepsChrome exists.
+        (!state.hasBlockingOverlay || state.overlayKeepsChrome) &&
         // Every capability the pill can advertise has to be listed here, or the press works and
         // nothing on screen says so. canFilterRecents is the reason this is a list and not a
         // pair: filtering the home shelf down to a medium you have none of empties it, which
@@ -1952,6 +2006,8 @@ class XMBViewModel @Inject constructor(
         observeMediaCovers()
         observeContinueBook()
         observeHiddenPlacements()
+        observeAndroidNotices()
+        observeResumeGame()
         collectGamepadActions()
         consumeWindowsSetupPrompt()
         observeLaunchRecoveryRequests()
@@ -4212,7 +4268,7 @@ class XMBViewModel @Inject constructor(
      */
     fun typeToSearchAllowed(): Boolean {
         val state = _uiState.value
-        return state.search == null && (!state.hasBlockingOverlay || state.contextRailOnly)
+        return state.search == null && (!state.hasBlockingOverlay || state.overlayKeepsChrome)
     }
 
     /** Opens search already carrying [query] — the character that opened it. */
@@ -5661,6 +5717,34 @@ class XMBViewModel @Inject constructor(
             return
         }
 
+        // ── The notification sheet captures ALL input when open ───────────────
+        //
+        // Above the context menu because it is drawn above it, and because the two cannot be open
+        // together: opening the sheet is a press the crossbar takes, and the menu takes every
+        // press while it is up.
+        if (state.notificationsOpen) {
+            when (action) {
+                GamepadAction.NAVIGATE_UP   -> moveNoticeCursor(-1)
+                GamepadAction.NAVIGATE_DOWN -> moveNoticeCursor(+1)
+                // Left and right are the media row's, and only the media row's: they are the
+                // transport. On a notification they do nothing rather than stepping the cursor
+                // sideways through a single column.
+                GamepadAction.NAVIGATE_LEFT  ->
+                    if (state.focusedNotice == NoticeFocus.Media) musicPlayer.prev()
+                GamepadAction.NAVIGATE_RIGHT ->
+                    if (state.focusedNotice == NoticeFocus.Media) musicPlayer.next()
+                GamepadAction.SELECT             -> activateFocusedNotice()
+                GamepadAction.OPEN_CONTEXT_MENU  -> dismissFocusedNotice()
+                GamepadAction.BACK,
+                GamepadAction.HOME               -> {
+                    menuSound.play(MenuSound.BACK)
+                    closeNotifications()
+                }
+                else -> Unit
+            }
+            return
+        }
+
         // ── Context menu captures ALL input when open ──────────────────────────
         if (state.activeContextMenu != null) {
             when (action) {
@@ -6048,7 +6132,9 @@ class XMBViewModel @Inject constructor(
             // Y / Triangle — open context menu for whichever item type has focus
             GamepadAction.OPEN_CONTEXT_MENU -> openContextMenuForFocusedItem()
             // Start button no longer restarts / shows the boot screen.
-            GamepadAction.HOME          -> Unit
+            // Start. It did nothing here at all — the binding exists for the pickers, where it
+            // confirms, and the crossbar simply had no use for it.
+            GamepadAction.HOME          -> toggleNotifications()
             // Cycle the sort order of the current list (PSP-style). Whichever face button
             // the user's X/Y layout assigns to sort dispatches this.
             // X is free on the home page — activeSortModes declines Last Played because its
@@ -7071,6 +7157,133 @@ class XMBViewModel @Inject constructor(
             PillNav.Pass -> false
         }
     }
+
+    // ── The notification sheet ────────────────────────────────────────────────
+
+    /**
+     * The device's notifications, mirrored into the state.
+     *
+     * The shell used to collect this itself, which was fine while the sheet was something only a
+     * finger opened and closed. A cursor has to walk the same list the input dispatcher acts on,
+     * and the dispatcher reads state — so the list lives here and the sheet draws what it is told.
+     */
+    private fun observeAndroidNotices() {
+        viewModelScope.launch {
+            AndroidNotifications.active.collect { notices ->
+                _uiState.update { it.copy(androidNotices = notices) }
+            }
+        }
+    }
+
+    /**
+     * The one game the sheet can offer to resume.
+     *
+     * Limit 1 rather than the shelf's list: this row is a shortcut back into what you were doing,
+     * and a second-most-recent game is not that. The shelf is one press away and already sorted.
+     */
+    private fun observeResumeGame() {
+        viewModelScope.launch {
+            gameRepository.observeRecentlyPlayed(1).collect { games ->
+                _uiState.update { it.copy(resumeGame = games.firstOrNull()) }
+            }
+        }
+    }
+
+    /** Start, or the strip's left corner. */
+    fun toggleNotifications() {
+        menuSound.play(if (_uiState.value.notificationsOpen) MenuSound.BACK else MenuSound.SYSTEM_BROWSE)
+        _uiState.update { it.copy(notificationsOpen = !it.notificationsOpen, noticeCursor = 0) }
+    }
+
+    fun closeNotifications() {
+        _uiState.update { it.copy(notificationsOpen = false) }
+    }
+
+    private fun moveNoticeCursor(delta: Int) {
+        val rows = _uiState.value.noticeFocusables
+        if (rows.isEmpty()) return
+        val next = (_uiState.value.noticeCursor + delta).coerceIn(0, rows.lastIndex)
+        if (next == _uiState.value.noticeCursor) {
+            gamepadInputHandler.cancelRepeat()
+            return
+        }
+        menuSound.play(MenuSound.SCROLL)
+        _uiState.update { it.copy(noticeCursor = next) }
+    }
+
+    /**
+     * Confirm on the focused row.
+     *
+     * Opening a notification closes the sheet, because the thing it opens is another app: leaving
+     * it standing would put the launcher's own overlay over whatever just came to the front. The
+     * media row does NOT close it — play/pause is a thing you do while looking at the sheet.
+     */
+    fun activateFocusedNotice() {
+        when (val focus = _uiState.value.focusedNotice) {
+            null -> Unit
+            // Whichever tenant has the row. Music while there is music; otherwise the game,
+            // and launching one closes the sheet for the same reason opening a notification does.
+            NoticeFocus.Media -> if (_uiState.value.musicPlayback.track != null) {
+                musicPlayer.playPause()
+            } else {
+                _uiState.value.resumeGame?.let { game ->
+                    closeNotifications()
+                    launchGameDirectly(game.id)
+                }
+            }
+            is NoticeFocus.Notice -> {
+                menuSound.play(MenuSound.SELECT)
+                // The close happens whether or not the intent fired. A notification that has gone
+                // stale since the list was drawn leaves nothing to look at either.
+                if (!AndroidNotifications.open(focus.key)) {
+                    Timber.i("Notification ${focus.key} had nothing to open")
+                }
+                closeNotifications()
+            }
+        }
+    }
+
+    /** Y on the focused row: clear one notification. Nothing to do on the media row. */
+    fun dismissFocusedNotice() {
+        val focus = _uiState.value.focusedNotice as? NoticeFocus.Notice ?: return
+        val notice = _uiState.value.androidNotices.firstOrNull { it.key == focus.key } ?: return
+        // Offered only where it works. isClearable is false for an ongoing notice and
+        // cancelNotification on one is a silent no-op, which reads as a dead button.
+        if (!notice.canDismiss) return
+        menuSound.play(MenuSound.BACK)
+        AndroidNotifications.dismiss(focus.key)
+    }
+
+    /** Touch: a row was tapped. The key, not the index — see [NoticeFocus]. */
+    fun onNoticeTapped(key: String) {
+        val rows = _uiState.value.noticeFocusables
+        val index = rows.indexOfFirst { it is NoticeFocus.Notice && it.key == key }
+        if (index < 0) return
+        _uiState.update { it.copy(noticeCursor = index) }
+        activateFocusedNotice()
+    }
+
+    /** Touch: the ✕ on a row. */
+    fun onNoticeDismissTapped(key: String) {
+        val rows = _uiState.value.noticeFocusables
+        val index = rows.indexOfFirst { it is NoticeFocus.Notice && it.key == key }
+        if (index < 0) return
+        _uiState.update { it.copy(noticeCursor = index) }
+        dismissFocusedNotice()
+    }
+
+    /** Touch: the media row's primary — play/pause, or Resume when it is the game's row. */
+    fun onNoticeMediaPrimary() {
+        val rows = _uiState.value.noticeFocusables
+        val index = rows.indexOfFirst { it == NoticeFocus.Media }
+        if (index < 0) return
+        _uiState.update { it.copy(noticeCursor = index) }
+        activateFocusedNotice()
+    }
+
+    fun onNoticeMediaPlayPause() = musicPlayer.playPause()
+    fun onNoticeMediaNext() = musicPlayer.next()
+    fun onNoticeMediaPrev() = musicPlayer.prev()
 
     private val MENU_RAISE_TIMEOUT_MS = 500L
 

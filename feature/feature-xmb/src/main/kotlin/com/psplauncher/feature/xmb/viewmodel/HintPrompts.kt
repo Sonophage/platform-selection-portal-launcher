@@ -60,6 +60,34 @@ internal fun primaryVerbFor(item: XMBItem?, directLaunch: Boolean): String? = wh
 fun promptsFor(state: XMBUiState): XmbPrompts {
     val focused = state.currentItems.getOrNull(state.selectedItemIndex)
 
+    // The notification sheet, which is above everything else and is named first for that reason.
+    // Its prompts are per ROW, because the sheet holds two kinds of row: the media row's confirm
+    // is a transport and has no dismissal, a notification's confirm opens the app that posted it
+    // and Y clears it -- and Y is offered only where clearing actually works, since an ongoing
+    // notice refuses silently.
+    if (state.notificationsOpen) {
+        val focus = state.focusedNotice
+        val notice = (focus as? NoticeFocus.Notice)
+            ?.let { row -> state.androidNotices.firstOrNull { it.key == row.key } }
+        return XmbPrompts(
+            primary = when {
+                focus == NoticeFocus.Media -> XmbPrompt(
+                    GamepadAction.SELECT,
+                    if (state.musicPlayback.track != null) {
+                        if (state.musicPlayback.isPlaying) "Pause" else "Play"
+                    } else "Resume",
+                    state.musicPlayback.track?.let { it.title ?: it.displayName } ?: state.resumeGame?.title,
+                )
+                notice?.canOpen == true -> XmbPrompt(GamepadAction.SELECT, "Open", notice.appLabel)
+                else -> null
+            },
+            back = XmbPrompt(GamepadAction.BACK, "Close"),
+            right = buildList {
+                if (notice?.canDismiss == true) add(XmbPrompt(GamepadAction.OPEN_CONTEXT_MENU, "Clear"))
+            },
+        )
+    }
+
     state.activeContextMenu?.let { menu ->
         val row = state.railRows().getOrNull(menu.selectedIndex)
         return XmbPrompts(

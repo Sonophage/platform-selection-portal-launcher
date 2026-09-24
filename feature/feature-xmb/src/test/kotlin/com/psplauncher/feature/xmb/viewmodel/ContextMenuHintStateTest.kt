@@ -163,7 +163,7 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `a context menu on top of a REAL blocking overlay still hides it`() {
-        // contextRailOnly, not "a menu is open": a menu left standing while a detail screen opens
+        // overlayKeepsChrome, not "a menu is open": a menu left standing while a detail screen opens
         // must not drag the pill back onto a screen that has its own controls.
         val s = eligibleState().copy(
             activeContextMenu = XMBContextMenu("X", emptyList()),

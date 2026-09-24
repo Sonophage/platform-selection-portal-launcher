@@ -211,6 +211,13 @@ fun XMBShellContainer(
         onPanelPageTapped = viewModel::onPanelPageTapped,
         onRecentFilterTapped = viewModel::setRecentFilter,
         onRecentRailToggled = viewModel::toggleRecentRail,
+        onNotificationsToggled = viewModel::toggleNotifications,
+        onNotificationsDismissed = viewModel::closeNotifications,
+        onNoticeTapped = viewModel::onNoticeTapped,
+        onNoticeDismissTapped = viewModel::onNoticeDismissTapped,
+        onNoticeMediaPrimary = viewModel::onNoticeMediaPrimary,
+        onNoticeMediaPrev = viewModel::onNoticeMediaPrev,
+        onNoticeMediaNext = viewModel::onNoticeMediaNext,
         onOpenAppDrawer = viewModel::onOpenAppDrawer,
         onItemTap = viewModel::onItemTap,
         onItemLongPress = viewModel::onItemLongPress,
@@ -350,6 +357,15 @@ fun XMBShell(
     // were D-pad only, which left touch on the shelf able to see one item and reach no others.
     onRecentFilterTapped: (RecentFilter) -> Unit = {},
     onRecentRailToggled: () -> Unit = {},
+    // The notification sheet. Its open state lives in the ViewModel now, so Start opens it and
+    // BACK closes it; these are the finger's way to the same handlers.
+    onNotificationsToggled: () -> Unit = {},
+    onNotificationsDismissed: () -> Unit = {},
+    onNoticeTapped: (String) -> Unit = {},
+    onNoticeDismissTapped: (String) -> Unit = {},
+    onNoticeMediaPrimary: () -> Unit = {},
+    onNoticeMediaPrev: () -> Unit = {},
+    onNoticeMediaNext: () -> Unit = {},
     onOpenAppDrawer: () -> Unit = {},
     // Row tap: move the cursor there, or activate if it's already selected (see XMBViewModel.onItemTap).
     onItemTap: (Int) -> Unit = {},
@@ -746,10 +762,10 @@ fun XMBShell(
             // aimed at the live-activity corner and the notification sheet would not open.
             //
             // It drops back to 0 under a real overlay: the App Drawer and Settings are meant to
-            // cover the clock and say so. The context rail is the exception, which is what
-            // contextRailOnly is for.
+            // cover the clock and say so. The rail and the notification sheet are the exceptions,
+            // which is what overlayKeepsChrome is for.
             val aboveContextRail = when {
-                uiState.activeContextMenu != null -> 1f
+                uiState.activeContextMenu != null || uiState.notificationsOpen -> 1f
                 uiState.hasBlockingOverlay -> 0f
                 else -> XmbChromeZ
             }
@@ -767,8 +783,11 @@ fun XMBShell(
                 }
             }
             val notifications by SystemToasts.recent.collectAsState()
-            val androidNotices by AndroidNotifications.active.collectAsState()
-            var notificationsOpen by remember { mutableStateOf(false) }
+            // The device's notifications come through the state now, not a second collection
+            // here: the input dispatcher acts on that list, and a cursor that walks one list
+            // while the presses land on another is the pill row's bug in a different room.
+            val androidNotices = uiState.androidNotices
+            val notificationsOpen = uiState.notificationsOpen
             // Read from the secure setting, not kept as a flag: it is changed in Android's own
             // Settings, outside this process, so it is re-read whenever the sheet is opened.
             val strip = LocalContext.current
@@ -1227,6 +1246,39 @@ fun XMBShell(
                 )
             }
 
+            // The sheet's top row. Music while there is music — PLAYING or PAUSED, unlike the
+            // strip's live slot above, which is about what is happening right now; a paused track
+            // is exactly what you open a transport to deal with. Otherwise the last game, as a
+            // way back into it.
+            val sheetMedia = uiState.musicPlayback.track?.let { track ->
+                NoticeMedia(
+                    title = track.title ?: track.displayName,
+                    detail = track.artist,
+                    artUri = track.artUri,
+                    progress = uiState.musicPlayback.durationMs
+                        .takeIf { it > 0 }
+                        ?.let { uiState.musicPlayback.positionMs.toFloat() / it },
+                    elapsed = formatDuration(uiState.musicPlayback.positionMs.toLong()) + "  /  " +
+                        formatDuration(uiState.musicPlayback.durationMs.toLong()),
+                    isPlaying = uiState.musicPlayback.isPlaying,
+                    hasTransport = true,
+                    primaryLabel = if (uiState.musicPlayback.isPlaying) "\u23f8" else "\u25b6",
+                )
+            } ?: uiState.resumeGame?.let { game ->
+                NoticeMedia(
+                    title = game.title,
+                    detail = "Continue",
+                    artUri = game.artworkUri ?: game.iconUri,
+                    // No position to report. A bar sitting at zero would be a claim that you are
+                    // at the start of something, which is not what "last played" knows.
+                    progress = null,
+                    elapsed = null,
+                    isPlaying = false,
+                    hasTransport = false,
+                    primaryLabel = "Resume",
+                )
+            }
+
             // In order: the report that just landed, then whatever is playing, then a count of
             // what is waiting behind the corner. The count covers BOTH sections of the sheet,
             // because it is a count of what that press opens — one number for one place.
@@ -1244,7 +1296,7 @@ fun XMBShell(
                 showSortButton = uiState.resolvedShowTouchButton,
                 onSortTapped = onXmbSortTapped,
                 live = liveActivity,
-                onLiveAreaTapped = { notificationsOpen = !notificationsOpen },
+                onLiveAreaTapped = onNotificationsToggled,
                 // The two navigation hints, each shown only where the press does something.
                 // Shoulder: the hover panel's pages, which exist only on a game that has them.
                 // Left/right: stepping the crossbar, which a drilled-in list does not do.
@@ -1281,15 +1333,22 @@ fun XMBShell(
                 android = androidNotices,
                 androidAccessGranted = androidAccess,
                 onGrantAndroidAccess = {
-                    notificationsOpen = false
+                    onNotificationsDismissed()
                     runCatching {
                         strip.startActivity(
                             AndroidNotifications.settingsIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         )
                     }
                 },
-                onDismiss = { notificationsOpen = false },
-                onClear = { SystemToasts.clear(); notificationsOpen = false },
+                media = sheetMedia,
+                focus = uiState.focusedNotice,
+                onNoticeTapped = onNoticeTapped,
+                onNoticeDismissTapped = onNoticeDismissTapped,
+                onMediaPrimary = onNoticeMediaPrimary,
+                onMediaPrev = onNoticeMediaPrev,
+                onMediaNext = onNoticeMediaNext,
+                onDismiss = onNotificationsDismissed,
+                onClear = { SystemToasts.clear(); onNotificationsDismissed() },
                 modifier = Modifier.zIndex(NotificationBarZ),
             )
 
@@ -1320,7 +1379,7 @@ fun XMBShell(
             // root and Apps is Back at the root. The buttons could be touch-only because they
             // were touch-only affordances; a named prompt is for both hands.
             val rootActionsVisible =
-                (!uiState.hasBlockingOverlay || uiState.contextRailOnly) && !uiState.isInSubItem
+                (!uiState.hasBlockingOverlay || uiState.overlayKeepsChrome) && !uiState.isInSubItem
             AnimatedVisibility(
                 // Shown when EITHER half has something to say: the root actions are a touch
                 // affordance with their own visibility rule, and hiding them behind the hint's
@@ -1333,7 +1392,7 @@ fun XMBShell(
                 // bar to follow whatever is open; until then the bar is visible and its words are
                 // about the screen behind the menu.
                 visible = (uiState.showContextMenuHint || rootActionsVisible) &&
-                    (!uiState.hasBlockingOverlay || uiState.contextRailOnly),
+                    (!uiState.hasBlockingOverlay || uiState.overlayKeepsChrome),
                 enter = fadeIn(tween(200)),
                 exit = ExitTransition.None,
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().zIndex(aboveContextRail),

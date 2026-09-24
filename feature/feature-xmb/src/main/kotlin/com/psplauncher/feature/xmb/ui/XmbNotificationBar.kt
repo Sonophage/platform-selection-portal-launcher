@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,11 +31,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.psplauncher.core.ui.notification.AndroidNotice
+import com.psplauncher.feature.xmb.viewmodel.NoticeFocus
 import com.psplauncher.core.ui.notification.SystemToast
 import com.psplauncher.core.ui.notification.ToastKind
 
@@ -56,6 +60,27 @@ import com.psplauncher.core.ui.notification.ToastKind
 // wallpaper to keep showing, and this puts sentences across the middle of the screen over whatever
 // art happens to be behind them.
 
+/**
+ * What the sheet's top row is showing, or null when it has nothing to show.
+ *
+ * One row, two tenants — a playing track or the last game you were in — so the drawing is one
+ * shape and the difference is in what the primary does. [progress] is null for the game, which
+ * has no position to report: a bar at zero would be a claim, not an absence.
+ */
+data class NoticeMedia(
+    val title: String,
+    val detail: String?,
+    val artUri: String?,
+    /** 0..1, or null when there is nothing to scrub. */
+    val progress: Float?,
+    /** "1:04 / 3:58", already formatted by whoever knows the clock. */
+    val elapsed: String?,
+    val isPlaying: Boolean,
+    /** Skip is a music idea; the game row has one control and it is Resume. */
+    val hasTransport: Boolean,
+    val primaryLabel: String,
+)
+
 @Composable
 fun XmbNotificationBar(
     open: Boolean,
@@ -64,7 +89,16 @@ fun XmbNotificationBar(
     android: List<AndroidNotice> = emptyList(),
     /** Shown in place of the system row when the permission has never been granted. */
     androidAccessGranted: Boolean = true,
+    /** The row across the top. Null when nothing is playing and nothing has been played. */
+    media: NoticeMedia? = null,
+    /** The row the cursor is on, so the controller and the finger see the same sheet. */
+    focus: NoticeFocus? = null,
     onGrantAndroidAccess: () -> Unit = {},
+    onNoticeTapped: (String) -> Unit = {},
+    onNoticeDismissTapped: (String) -> Unit = {},
+    onMediaPrimary: () -> Unit = {},
+    onMediaPrev: () -> Unit = {},
+    onMediaNext: () -> Unit = {},
     onDismiss: () -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
@@ -94,6 +128,18 @@ fun XmbNotificationBar(
                     // the same way the context rail draws under it rather than over.
                     .padding(top = StripHeight + 10.dp),
             ) {
+                // Full width, above both columns: it is one thing about the whole device, where
+                // the columns below are two lists from two sources.
+                media?.let {
+                    MediaRow(
+                        media = it,
+                        focused = focus == NoticeFocus.Media,
+                        onPrimary = onMediaPrimary,
+                        onPrev = onMediaPrev,
+                        onNext = onMediaNext,
+                        modifier = Modifier.padding(horizontal = EdgeGap),
+                    )
+                }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(ColumnGap),
                     modifier = Modifier.padding(horizontal = EdgeGap),
@@ -111,6 +157,11 @@ fun XmbNotificationBar(
                                     title = notice.title ?: notice.appLabel,
                                     detail = notice.text,
                                     accent = null,
+                                    focused = (focus as? NoticeFocus.Notice)?.key == notice.key,
+                                    // Only where it goes somewhere. A row that takes a press and
+                                    // does nothing is the fault the keyboard prompts had.
+                                    onClick = if (notice.canOpen) ({ onNoticeTapped(notice.key) }) else null,
+                                    onDismiss = if (notice.canDismiss) ({ onNoticeDismissTapped(notice.key) }) else null,
                                 )
                             }
                         }
@@ -120,6 +171,8 @@ fun XmbNotificationBar(
                         if (items.isEmpty()) {
                             EmptyNote("Nothing has happened yet")
                         } else {
+                            // No focus and no press: these are reports of finished work. The
+                            // cursor does not stop here, so nothing draws as though it could.
                             items.take(ColumnRows).forEach { toast ->
                                 NoticeCard(
                                     lead = if (toast.kind == ToastKind.ERROR) "!" else "\u2713",
@@ -189,13 +242,27 @@ private fun EmptyNote(text: String, onClick: (() -> Unit)? = null) {
  * has no kind, so it takes the neutral badge every monogram in this app wears.
  */
 @Composable
-private fun NoticeCard(lead: String, title: String, detail: String?, accent: Color?) {
+private fun NoticeCard(
+    lead: String,
+    title: String,
+    detail: String?,
+    accent: Color?,
+    focused: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(RailCorner))
-            .background(Color.White.copy(alpha = 0.07f))
+            // The focused card takes the rail's white capsule rather than a ring: this sheet and
+            // the context rail are the same idea in two directions, and a second way of saying
+            // "you are here" is a second thing to keep in step.
+            .background(
+                if (focused) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.07f),
+            )
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 10.dp, vertical = 6.dp),
     ) {
         Box(
@@ -235,13 +302,129 @@ private fun NoticeCard(lead: String, title: String, detail: String?, accent: Col
                 )
             }
         }
+        onDismiss?.let {
+            Spacer(Modifier.weight(1f))
+            Text(
+                "\u00d7",
+                color = if (focused) Color.White else Muted,
+                fontSize = TitleSize,
+                lineHeight = TitleSize * 1.3f,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(onClick = it)
+                    .padding(horizontal = 7.dp, vertical = 1.dp),
+            )
+        }
     }
+}
+
+/**
+ * The row across the top of the sheet: what is playing, how far through, and its controls.
+ *
+ * Its progress is a hairline under the text rather than a bar beside it, the same shape the
+ * battery took across the top of the screen — a line that is part of the thing it describes reads
+ * as a property of it, where a bar next to it reads as a second control.
+ */
+@Composable
+private fun MediaRow(
+    media: NoticeMedia,
+    focused: Boolean,
+    onPrimary: () -> Unit,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(RailCorner))
+            .background(if (focused) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.07f))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            media.artUri?.let { uri ->
+                AsyncImage(
+                    model = uri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(MediaArt).clip(RoundedCornerShape(5.dp)),
+                )
+                Spacer(Modifier.width(10.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    media.title,
+                    color = Color.White,
+                    fontSize = TitleSize,
+                    lineHeight = TitleSize * 1.3f,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                (media.elapsed ?: media.detail)?.let {
+                    Text(
+                        it,
+                        color = Muted,
+                        fontSize = DetailSize,
+                        lineHeight = DetailSize * 1.3f,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (media.hasTransport) {
+                TransportKey("\u23ee", onPrev)
+                Spacer(Modifier.width(4.dp))
+            }
+            TransportKey(media.primaryLabel, onPrimary, wide = true)
+            if (media.hasTransport) {
+                Spacer(Modifier.width(4.dp))
+                TransportKey("\u23ed", onNext)
+            }
+        }
+        media.progress?.let { fraction ->
+            Spacer(Modifier.padding(top = 7.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(Color.White.copy(alpha = 0.16f)),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                        .height(2.dp)
+                        .background(Color.White.copy(alpha = 0.85f)),
+                )
+            }
+        }
+    }
+}
+
+/** One transport control, sized like the keycaps the hint bar draws rather than like a button. */
+@Composable
+private fun TransportKey(label: String, onClick: () -> Unit, wide: Boolean = false) {
+    Text(
+        label,
+        color = Color.White,
+        fontSize = DetailSize,
+        lineHeight = DetailSize * 1.3f,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.White.copy(alpha = 0.14f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = if (wide) 12.dp else 8.dp, vertical = 4.dp),
+    )
 }
 
 private val Muted = Color(0x99FFFFFF)
 private val SuccessTint = Color(0xFF6FD08C)
 private val ErrorTint = Color(0xFFE2606A)
 private val GlyphSlot = 22.dp
+private val MediaArt = 34.dp
 private val RowGap = 8.dp
 private val ColumnGap = 22.dp
 private val EdgeGap = 20.dp

@@ -15,6 +15,20 @@ data class AndroidNotice(
     val title: String?,
     val text: String?,
     val postedAt: Long,
+    /**
+     * This one has somewhere to go when it is pressed.
+     *
+     * Carried as a flag rather than as the PendingIntent itself: the intent belongs to the system
+     * component that was handed it, and a row that offered "open" on a notification with no
+     * content intent would be a press that does nothing — the same fault as a hint bar naming a
+     * key that is bound to nothing.
+     */
+    val canOpen: Boolean = false,
+    /**
+     * The system says this one can be cleared. An ongoing notice — a media session, a foreground
+     * service — cannot be, and swiping it away on the device does not work either.
+     */
+    val canDismiss: Boolean = false,
 )
 
 /**
@@ -41,6 +55,29 @@ object AndroidNotifications {
     /** The live set, newest first. Empty when access has not been granted. */
     val active: StateFlow<List<AndroidNotice>> = _active
 
+    /**
+     * What can be done to a notification, performed by whoever is holding the system's handles.
+     *
+     * The UI names a notification by [AndroidNotice.key] and nothing else. It never holds a
+     * PendingIntent: that arrived from another app, through a system callback, into the one
+     * component the system built, and passing it out to a composable to fire is a handle with no
+     * owner. The service keeps it and answers to a key, exactly as it does for dismissal.
+     */
+    interface NoticeActions {
+        /** Fire the notification's own content intent. False when it could not be sent. */
+        fun open(key: String): Boolean
+
+        /** Clear it, the way swiping it away in the shade does. */
+        fun dismiss(key: String)
+    }
+
+    private var actions: NoticeActions? = null
+
+    /** Called by the listener when it connects. */
+    fun attach(actions: NoticeActions) {
+        this.actions = actions
+    }
+
     /** Called by the listener service. Replaces the list rather than merging into it. */
     fun publish(notices: List<AndroidNotice>) {
         _active.value = notices.sortedByDescending { it.postedAt }
@@ -49,6 +86,22 @@ object AndroidNotifications {
     /** The service has gone away — nothing is known any more, which is not the same as nothing. */
     fun disconnected() {
         _active.value = emptyList()
+        actions = null
+    }
+
+    /**
+     * Open [key], reporting whether anything happened.
+     *
+     * False covers three cases the caller cannot tell apart and does not need to: no service is
+     * bound, the notification has gone since the list was drawn, or its PendingIntent has been
+     * cancelled by the app that posted it. In all three the right answer on screen is the same —
+     * nothing opens — and the list is about to be republished anyway.
+     */
+    fun open(key: String): Boolean = actions?.open(key) ?: false
+
+    /** Clear [key]. A no-op when no service is bound. */
+    fun dismiss(key: String) {
+        actions?.dismiss(key)
     }
 
     /**
