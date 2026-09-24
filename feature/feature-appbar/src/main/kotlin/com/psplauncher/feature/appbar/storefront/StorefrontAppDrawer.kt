@@ -109,7 +109,7 @@ private val TILE_BORDER = 1.dp
 @Composable
 internal fun StorefrontAppDrawerScreen(
     onBack: () -> Unit,
-    initialFilter: AppFilter = AppFilter.ALL,
+    initialFilter: AppFilter = AppFilter.DEFAULT,
     pendingGamepadAction: GamepadAction? = null,
     onGamepadActionConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -884,7 +884,7 @@ fun StorefrontAppDrawerPreview() {
     val mockCounts = AppFilter.entries.associateWith { filter -> mockApps.count(filter::matches) }
     val mockState = AppDrawerUiState(
         sectionApps = mockApps,
-        activeFilter = AppFilter.ALL,
+        activeFilter = AppFilter.DEFAULT,
         selectedIndex = 1,
         filterCounts = mockCounts,
     )

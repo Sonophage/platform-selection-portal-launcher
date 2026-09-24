@@ -1239,7 +1239,7 @@ fun XMBShell(
 
             uiState.activeAppDrawerFilter?.let { filterName ->
                 val initialFilter = runCatching { AppFilter.valueOf(filterName) }
-                    .getOrDefault(AppFilter.ALL)
+                    .getOrDefault(AppFilter.DEFAULT)
                 AppDrawerScreen(
                     initialFilter = initialFilter,
                     onBack = onCloseAppDrawer,

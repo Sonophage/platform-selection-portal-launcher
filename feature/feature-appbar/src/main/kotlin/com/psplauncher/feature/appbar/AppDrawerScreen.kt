@@ -52,7 +52,6 @@ import com.psplauncher.core.ui.theme.StorefrontColors
 import com.psplauncher.core.ui.theme.deriveStorefrontColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerCategoryTabs
-import com.psplauncher.feature.appbar.appdrawer.AppDrawerGrid
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerSection
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHeader
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHintBar
@@ -83,7 +82,7 @@ private val NAVIGATION_ACTIONS = setOf(
 fun AppDrawerScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    initialFilter: AppFilter = AppFilter.ALL,
+    initialFilter: AppFilter = AppFilter.DEFAULT,
     pendingGamepadAction: GamepadAction? = null,
     onGamepadActionConsumed: () -> Unit = {},
     /** Idle-controller gate: when true (and no drawer overlay is open) the hint pill fades in. */
@@ -331,22 +330,6 @@ internal fun AppDrawerContent(
                         )
                     }
 
-                    // All Apps is the one tab with nothing to contrast against, so it keeps
-                    // 6e's eight-across grid. Every other tab draws 8q: its own apps in a row
-                    // that scrolls sideways, everything else in the compact list beneath.
-                    state.activeFilter == AppFilter.ALL -> {
-                        AppDrawerGrid(
-                            apps = state.visibleApps,
-                            selectedIndex = state.selectedIndex,
-                            usingTouch = state.usingTouch,
-                            onAppTapped = onAppTapped,
-                            onAppLaunched = onAppLaunched,
-                            onAppMenu = onAppMenu,
-                            onTouchBrowse = onTouchBrowse,
-                            colors = sf,
-                        )
-                    }
-
                     else -> {
                         AppDrawerSection(
                             matched = state.sectionApps,
@@ -546,8 +529,9 @@ private fun AppDrawerPreviewContent() {
     // contradicts is worse than one showing none.
     val mockCounts = AppFilter.entries.associateWith { filter -> mockApps.count(filter::matches) }
     val mockState = AppDrawerUiState(
-        sectionApps = mockApps,
-        activeFilter = AppFilter.ALL,
+        sectionApps = mockApps.filter(AppFilter.DEFAULT::matches),
+        otherApps = mockApps.filterNot(AppFilter.DEFAULT::matches),
+        activeFilter = AppFilter.DEFAULT,
         selectedIndex = 1,
         filterCounts = mockCounts,
     )

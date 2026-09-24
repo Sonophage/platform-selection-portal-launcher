@@ -4,9 +4,10 @@ import com.psplauncher.core.domain.model.GamepadAction
 
 // ── The 8q body: a tab's own apps up top, everything else below ───────────────
 //
-// All Apps draws the eight-across grid (6e). Every other tab draws this instead: the apps that
-// match the tab as one large row that scrolls sideways, and every app that does NOT match as a
-// compact A-Z list under it, six rows tall, its columns running off to the right.
+// Every tab draws this: the apps that match the tab as one large row that scrolls sideways, and
+// every app that does NOT match as a compact A-Z list under it, six rows tall, its columns
+// running off to the right. There is no All Apps tab and no grid any more — the complement is
+// what makes every installed app reachable from every tab.
 //
 // The two halves come from ONE rule. `AppFilter.matches` decides the top row and its negation
 // decides the list, so a tab can never show an app twice or lose one between the two — the same
@@ -69,29 +70,6 @@ fun sectionMove(action: GamepadAction, index: Int, rowCount: Int, total: Int): I
             val nextColumnStart = (col + 1) * SECTION_LIST_ROWS
             if (nextColumnStart < restCount) rowCount + minOf(local + SECTION_LIST_ROWS, restCount - 1) else cur
         }
-        else -> cur
-    }
-}
-
-/**
- * The All Apps grid's cursor: [GRID_COLUMNS] across, no wrapping at the row ends.
- *
- * Lifted out of the ViewModel's `when` so both views' rules read the same way and are tested in
- * the same file. The behaviour is unchanged — these are the four guards that were written inline.
- *
- * `core-navigation`'s `gridMove` is the same four guards, and this is deliberately not it:
- * feature-appbar does not depend on that module, and taking it on to reuse ten lines would also
- * mean a third copy of the GamepadAction-to-NavigationDirection mapping. The copy that matters is
- * the one beside [sectionMove], because those two are what must not drift.
- */
-fun gridStep(action: GamepadAction, index: Int, size: Int): Int {
-    if (size <= 0) return 0
-    val cur = index.coerceIn(0, size - 1)
-    return when (action) {
-        GamepadAction.NAVIGATE_LEFT  -> if (cur % GRID_COLUMNS > 0) cur - 1 else cur
-        GamepadAction.NAVIGATE_RIGHT -> if (cur % GRID_COLUMNS < GRID_COLUMNS - 1 && cur + 1 < size) cur + 1 else cur
-        GamepadAction.NAVIGATE_UP    -> if (cur - GRID_COLUMNS >= 0) cur - GRID_COLUMNS else cur
-        GamepadAction.NAVIGATE_DOWN  -> if (cur + GRID_COLUMNS < size) cur + GRID_COLUMNS else cur
         else -> cur
     }
 }

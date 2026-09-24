@@ -67,7 +67,7 @@ class AppDrawerViewModelTest {
     @Test
     fun `ALL filter shows all apps`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setFilter(AppFilter.ALL)
+        viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
             val state = awaitItem()
@@ -182,10 +182,10 @@ class AppDrawerViewModelTest {
     fun `clearing search query restores full list`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
         // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the full list is selected explicitly. They used to rely on the drawer defaulting to
-        // All Apps, which made them fail the moment the default became Recently Used for reasons
-        // that had nothing to do with what they were testing.
-        viewModel.setFilter(AppFilter.ALL)
+        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
+        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
+        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+        viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.setSearchQuery("PPSSPP")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -236,10 +236,10 @@ class AppDrawerViewModelTest {
     fun `back on the open options menu closes just the menu`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
         // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the full list is selected explicitly. They used to rely on the drawer defaulting to
-        // All Apps, which made them fail the moment the default became Recently Used for reasons
-        // that had nothing to do with what they were testing.
-        viewModel.setFilter(AppFilter.ALL)
+        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
+        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
+        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+        viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Controller Y opens the focused app's options module (grid focus is on index 0).
@@ -331,10 +331,10 @@ class AppDrawerViewModelTest {
     fun `back after opening uninstall guard rail closes the dialog not the drawer`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
         // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the full list is selected explicitly. They used to rely on the drawer defaulting to
-        // All Apps, which made them fail the moment the default became Recently Used for reasons
-        // that had nothing to do with what they were testing.
-        viewModel.setFilter(AppFilter.ALL)
+        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
+        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
+        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+        viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
 
         openUninstallPrompt()
@@ -386,10 +386,10 @@ class AppDrawerViewModelTest {
     fun `the uninstall prompt opens with the cursor on Cancel`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
         // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the full list is selected explicitly. They used to rely on the drawer defaulting to
-        // All Apps, which made them fail the moment the default became Recently Used for reasons
-        // that had nothing to do with what they were testing.
-        viewModel.setFilter(AppFilter.ALL)
+        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
+        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
+        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+        viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
         openUninstallPrompt()
         viewModel.uiState.test {
@@ -421,10 +421,10 @@ class AppDrawerViewModelTest {
         // never confirming, the guard rail would be a wall.
         testDispatcher.scheduler.advanceUntilIdle()
         // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the full list is selected explicitly. They used to rely on the drawer defaulting to
-        // All Apps, which made them fail the moment the default became Recently Used for reasons
-        // that had nothing to do with what they were testing.
-        viewModel.setFilter(AppFilter.ALL)
+        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
+        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
+        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+        viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
         openUninstallPrompt()
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)

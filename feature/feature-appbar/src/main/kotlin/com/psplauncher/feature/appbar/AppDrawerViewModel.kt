@@ -16,11 +16,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Apps across the drawer grid. Eight, as 6e draws it, up from six.
+ * Apps across a drawer grid. Eight, as 6e drew it, up from six.
  *
- * The redesign's own assumption is a 1080p handheld held at 30-40cm, and at eight across a tile is
- * still wider than a launcher icon needs — what it buys is a row of the alphabet you can take in
- * without scrolling, which is the point of an A-Z grid.
+ * The App Drawer itself no longer has a grid: All Apps was the one tab that drew one, and it is
+ * gone. This is now read only by StorefrontAppDrawer, which nothing reaches either. Left here
+ * rather than deleted with the grid because it is not this change's to take.
  */
 const val GRID_COLUMNS = 8
 
@@ -48,8 +48,7 @@ enum class AppFilter(val label: String, val subtitle: String) {
     RECENT("Recently Used", "Apps you've used lately"),
     APPS("Apps", "Everything that is not a game or an emulator"),
     EMULATORS("Emulators", "RetroArch, PPSSPP, Dolphin and more"),
-    GAMES("Games", "Apps categorized as games"),
-    ALL("All Apps", "Browse every installed app");
+    GAMES("Games", "Apps categorized as games");
 
     /**
      * Whether [app] belongs in this section.
@@ -59,7 +58,6 @@ enum class AppFilter(val label: String, val subtitle: String) {
      * not match the list underneath it — and the count is the half nobody checks.
      */
     fun matches(app: InstalledApp): Boolean = when (this) {
-        ALL -> true
         APPS -> !app.isGame && !app.isEmulator
         GAMES -> app.isGame
         EMULATORS -> app.isEmulator
@@ -408,11 +406,7 @@ class AppDrawerViewModel @Inject constructor(
             GamepadAction.OPEN_CONTEXT_MENU -> openAppMenuForSelected()
             GamepadAction.NAVIGATE_LEFT, GamepadAction.NAVIGATE_RIGHT,
             GamepadAction.NAVIGATE_UP, GamepadAction.NAVIGATE_DOWN -> {
-                val next = if (state.activeFilter == AppFilter.ALL) {
-                    gridStep(action, cur, size)
-                } else {
-                    sectionMove(action, cur, state.sectionRowCount, size)
-                }
+                val next = sectionMove(action, cur, state.sectionRowCount, size)
                 // The sound follows the move, not the press: a refused move at an edge is silent,
                 // which is how the grid behaved when each direction guarded itself.
                 if (next != cur) {
@@ -457,10 +451,9 @@ class AppDrawerViewModel @Inject constructor(
 
         // Everything the tab does NOT hold, for the compact list under the row. From the negation
         // of the same predicate, never a second list of its own: one rule decides both halves, so
-        // an app cannot appear twice or fall between them.
-        //
-        // All Apps has no complement by definition, and draws the eight-across grid anyway.
-        val rest = if (state.activeFilter == AppFilter.ALL) emptyList() else state.allApps
+        // an app cannot appear twice or fall between them — which is also what makes every app
+        // reachable now that there is no All Apps tab to fall back on.
+        val rest = state.allApps
             .filter { app -> !state.activeFilter.matches(app) }
             .filter { app -> query.isEmpty() || app.label.lowercase().contains(query) }
 
