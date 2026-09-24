@@ -84,6 +84,14 @@ fun AppDrawerScreen(
     modifier: Modifier = Modifier,
     initialFilter: AppFilter = AppFilter.DEFAULT,
     pendingGamepadAction: GamepadAction? = null,
+    /**
+     * A character typed while the drawer is open, to be appended to its search.
+     *
+     * Start typing and you are searching, the same way the crossbar behaves — except the box is
+     * already on screen here, so the only thing missing was that nothing focused it.
+     */
+    typedChar: String? = null,
+    onTypedCharConsumed: () -> Unit = {},
     onGamepadActionConsumed: () -> Unit = {},
     /** Idle-controller gate: when true (and no drawer overlay is open) the hint pill fades in. */
     showControllerHint: Boolean = false,
@@ -144,6 +152,15 @@ fun AppDrawerScreen(
             }
             onGamepadActionConsumed()
         }
+    }
+
+    LaunchedEffect(typedChar) {
+        val ch = typedChar ?: return@LaunchedEffect
+        // Opens the box if it is not open, and appends either way. The query is the ViewModel's,
+        // so a character typed before the first press is not lost between the two.
+        searchActive = true
+        viewModel.setSearchQuery(state.searchQuery + ch)
+        onTypedCharConsumed()
     }
 
     val appliedInitial = remember { mutableStateOf(false) }

@@ -746,6 +746,14 @@ data class XMBUiState(
     val pendingSettingsAction: GamepadAction? = null,
     val activeAppDrawerFilter: String? = null,
     val pendingDrawerAction: GamepadAction? = null,
+    /**
+     * A character typed while the App Drawer is open, for its search box to take.
+     *
+     * The drawer's `searchActive` is local Compose state — it is drawer business and the crossbar
+     * has no opinion about it — so a keystroke cannot be handed to it directly. It rides the same
+     * one-shot channel pendingDrawerAction uses: set here, consumed there, cleared on consumption.
+     */
+    val pendingDrawerTypedChar: String? = null,
     val pendingGameDetailAction: GamepadAction? = null,
     val activeGameId: Long? = null,
     // True when the Game Detail screen should fire its Play action as soon as the game loads —
@@ -4407,6 +4415,14 @@ class XMBViewModel @Inject constructor(
     // keystroke would put a database round trip between a key press and the letter appearing,
     // which on a handheld reads as the device struggling.
     private var searchGames: List<com.psplauncher.core.domain.model.Game> = emptyList()
+    /**
+     * Installed apps, for the global search.
+     *
+     * Read once when the search opens, like every other library here. Apps are the one thing on
+     * this device you cannot already find another way — a game has its column, a track has the
+     * music browser, and an app has a drawer you have to know is behind Back.
+     */
+    private var searchApps: List<com.psplauncher.feature.appbar.InstalledApp> = emptyList()
     private var searchVideos: List<com.psplauncher.core.domain.model.Video> = emptyList()
     private var searchPhotos: List<com.psplauncher.core.domain.model.Photo> = emptyList()
     private var searchBooks: List<com.psplauncher.core.domain.model.Book> = emptyList()
@@ -4439,6 +4455,31 @@ class XMBViewModel @Inject constructor(
      */
     fun enterOpensAppDrawer(): Boolean = _uiState.value.enterOpensAppDrawer
 
+    /**
+     * A printable character arrived. Route it to whichever search is the right one.
+     *
+     * Two searches, one gesture: the drawer has its own box and its own results, and typing while
+     * it is open should land there rather than closing it and opening the global one behind it.
+     * Anywhere else on the XMB the character opens the global search carrying itself.
+     *
+     * Returns false when nothing wanted it, so the Activity lets it fall through to whatever
+     * text field is really focused.
+     */
+    fun onTypedCharacter(ch: String): Boolean {
+        if (_uiState.value.activeAppDrawerFilter != null) {
+            _uiState.update { it.copy(pendingDrawerTypedChar = ch) }
+            return true
+        }
+        if (!typeToSearchAllowed()) return false
+        openSearchTyping(ch)
+        return true
+    }
+
+    /** The drawer took the character. One-shot, like every pending action beside it. */
+    fun onDrawerTypedCharConsumed() {
+        _uiState.update { it.copy(pendingDrawerTypedChar = null) }
+    }
+
     fun typeToSearchAllowed(): Boolean {
         val state = _uiState.value
         return state.search == null && (!state.hasBlockingOverlay || state.overlayKeepsChrome)
@@ -4470,6 +4511,9 @@ class XMBViewModel @Inject constructor(
             // know to open, so Music was the one library column with no visible way to search it.
             val wantsTracks = scope == SearchScope.ALL || scope == SearchScope.MUSIC
             searchTracks = if (wantsTracks) musicRepository.observeAllTracks().first() else emptyList()
+            // Apps ride the global search only. There is no Apps scope: the drawer's own box is
+            // the scoped search for them, and it is on screen the whole time the drawer is open.
+            searchApps = if (scope == SearchScope.ALL) appCategoryRepository.allInstalledApps() else emptyList()
             _uiState.update { it.copy(search = it.search?.copy(loaded = true)) }
             rebuildSearchRows()
         }
@@ -4491,6 +4535,7 @@ class XMBViewModel @Inject constructor(
         // Drop the snapshots with the overlay. Holding a whole library alive behind a closed
         // screen is the kind of thing that only shows up as a memory graph six months later.
         searchGames = emptyList(); searchVideos = emptyList(); searchPhotos = emptyList()
+        searchApps = emptyList()
         searchBooks = emptyList(); searchTracks = emptyList()
         _uiState.update { it.copy(search = null) }
     }
@@ -4520,12 +4565,27 @@ class XMBViewModel @Inject constructor(
             searchTracks.filter { matchesSearch(q, it.displayTitle, it.artist, it.album) }
                 .take(SEARCH_RESULTS_PER_LIBRARY)
                 .forEach { add(it.toSearchRow()) }
+            // The package name is in the haystack as well as the label, because half of what
+            // someone remembers about an app is what the store called it.
+            searchApps.filter { matchesSearch(q, it.label, it.packageName) }
+                .take(SEARCH_RESULTS_PER_LIBRARY)
+                .forEach { app ->
+                    add(
+                        XMBItem(
+                            id = "searchapp_${app.packageName}",
+                            title = app.label,
+                            subtitle = "App",
+                            packageName = app.packageName,
+                        ),
+                    )
+                }
         }
         // Asks the snapshots this search is actually working from, so a scoped search reports the
         // state of ITS library rather than the app's — openSearch only fills the lists its scope
         // reads.
         val anyContent = searchGames.isNotEmpty() || searchVideos.isNotEmpty() ||
-            searchPhotos.isNotEmpty() || searchBooks.isNotEmpty() || searchTracks.isNotEmpty()
+            searchPhotos.isNotEmpty() || searchBooks.isNotEmpty() || searchTracks.isNotEmpty() ||
+            searchApps.isNotEmpty()
         val display = when {
             rows.isNotEmpty() -> rows
             else -> when (searchEmptyState(state.loaded, q, anyContent)) {
@@ -4577,6 +4637,20 @@ class XMBViewModel @Inject constructor(
         val row = state.rows.getOrNull(index) ?: return
         if (row.type == XMBItemType.EMPTY) return
         _uiState.update { it.copy(search = it.search?.copy(selectedIndex = index)) }
+
+        // AN APP RESULT LAUNCHES, and it is handled before everything below because none of that
+        // applies to it: it belongs to no column, so there is no cursor to move first, and the
+        // rules about landing you where the thing lives would send you nowhere.
+        //
+        // Without this the row was findable and dead. searchRowCategory returns null for an app
+        // and the function returned right there, so an app could be searched for, could be seen,
+        // and could not be opened -- the shape of every "why does nothing happen" report.
+        if (row.gameId == null && row.packageName != null) {
+            closeSearch()
+            launchAppWithDisc(row.packageName, row.shelfCoverArt)
+            return
+        }
+
         val categoryId = searchRowCategory(row) ?: return
         closeSearch()
         selectCategoryById(categoryId)
@@ -9018,7 +9092,7 @@ class XMBViewModel @Inject constructor(
     }
 
     fun onCloseAppDrawer() {
-        _uiState.update { it.copy(activeAppDrawerFilter = null, pendingDrawerAction = null) }
+        _uiState.update { it.copy(activeAppDrawerFilter = null, pendingDrawerAction = null, pendingDrawerTypedChar = null) }
     }
 
     fun consumeDrawerAction() {

@@ -212,6 +212,7 @@ fun XMBShellContainer(
         onPanelPageTapped = viewModel::onPanelPageTapped,
         onRecentFilterTapped = viewModel::setRecentFilter,
         onRecentRailToggled = viewModel::toggleRecentRail,
+        onDrawerTypedCharConsumed = viewModel::onDrawerTypedCharConsumed,
         onNotificationsToggled = viewModel::toggleNotifications,
         onNotificationsDismissed = viewModel::closeNotifications,
         onNoticeTapped = viewModel::onNoticeTapped,
@@ -360,6 +361,7 @@ fun XMBShell(
     onRecentRailToggled: () -> Unit = {},
     // The notification sheet. Its open state lives in the ViewModel now, so Start opens it and
     // BACK closes it; these are the finger's way to the same handlers.
+    onDrawerTypedCharConsumed: () -> Unit = {},
     onNotificationsToggled: () -> Unit = {},
     onNotificationsDismissed: () -> Unit = {},
     onNoticeTapped: (String) -> Unit = {},
@@ -1508,6 +1510,8 @@ fun XMBShell(
                     initialFilter = initialFilter,
                     onBack = onCloseAppDrawer,
                     pendingGamepadAction = uiState.pendingDrawerAction,
+                    typedChar = uiState.pendingDrawerTypedChar,
+                    onTypedCharConsumed = onDrawerTypedCharConsumed,
                     onGamepadActionConsumed = onDrawerActionConsumed,
                     // The drawer renders its own hint pill (same system as the XMB's
                     // ContextMenuHint — see shouldShowAppDrawerHint), and its prompts are

@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -108,9 +111,18 @@ internal fun AppDrawerHeader(
         // header, and X focuses it and raises the IME. Splitting those two is what lets the
         // keyboard go away on a tap or a d-pad press while the query you typed stays on screen.
         run {
+            // A TextFieldValue, not a String, and the caret is set explicitly to the end.
+            //
+            // With a plain String the selection stays at 0 while text arrives around it, so a
+            // query seeded from outside the field — type-to-search hands the first character in
+            // before the box has focus — takes every character after it at position zero. Typing
+            // C then L produced "lc" on the device. SearchScreen learned this the same way.
+            val field = remember(searchQuery) {
+                TextFieldValue(searchQuery, selection = TextRange(searchQuery.length))
+            }
             BasicTextField(
-                value = searchQuery,
-                onValueChange = onSearchChange,
+                value = field,
+                onValueChange = { onSearchChange(it.text) },
                 singleLine = true,
                 textStyle = TextStyle(color = colors.textPrimary, fontSize = 14.sp),
                 cursorBrush = SolidColor(colors.searchBorder),

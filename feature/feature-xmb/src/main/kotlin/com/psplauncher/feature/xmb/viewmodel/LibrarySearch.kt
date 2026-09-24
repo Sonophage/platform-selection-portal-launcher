@@ -26,7 +26,7 @@ enum class SearchScope(
 ) {
     ALL(
         // Music was always in the global results; the hint just did not say so.
-        "Search", "Games, music, video, photos and books",
+        "Search", "Games, apps, music, video, photos and books",
         "Nothing to search yet", "Add a library in Settings, then search from anywhere",
     ),
     GAMES(

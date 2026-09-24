@@ -377,9 +377,10 @@ class MainActivity : ComponentActivity() {
         if (typed == 0) return false
         val ch = typed.toChar()
         if (ch.isISOControl()) return false
-        if (!xmbViewModel.typeToSearchAllowed()) return false
-        xmbViewModel.openSearchTyping(ch.toString())
-        return true
+        // The ViewModel decides WHICH search: the App Drawer's own box while it is open, the
+        // global one otherwise. It answers false when neither wants the character, and then this
+        // falls through to whatever field is really focused.
+        return xmbViewModel.onTypedCharacter(ch.toString())
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
