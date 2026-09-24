@@ -73,7 +73,8 @@ private fun List<XMBItem>.withColumnCovers(pool: List<String>): List<XMBItem> {
 }
 
 /** Rows that ARE a piece of media rather than a way into several. See [withColumnCovers]. */
-private val SINGLE_MEDIA_ITEM_TYPES = setOf(XMBItemType.MUSIC_TRACK, XMBItemType.VIDEO_FILE)
+private val SINGLE_MEDIA_ITEM_TYPES =
+    setOf(XMBItemType.MUSIC_TRACK, XMBItemType.VIDEO_FILE, XMBItemType.LIBRARY_BOOK)
 
 internal fun XMBUiState.musicRootSections(): List<XMBItem> {
     val folders = musicFolders
@@ -266,6 +267,28 @@ internal fun XMBUiState.booksRootSections(): List<XMBItem> {
     val totalBooks = shelves.sumOf { it.bookCount }
     val reader = defaultReader
     return buildList {
+        // CONTINUE READING leads, when there is something to continue — the Books column's
+        // counterpart to Now Playing and Resume.
+        //
+        // No page numbers. 6c draws "Vol. 4 · page 62 of 190" and PFP cannot know the 62: a book
+        // opens in somebody else's reader, which never reports back. The Default Reader picker
+        // does not even offer PSPLauncher, because there is no reader to offer. What IS knowable
+        // is WHEN you last opened it, which is what this says — and that much only exists because
+        // markBookOpened fires after the reader accepts the hand-off.
+        continueBook?.let { book ->
+            add(
+                XMBItem(
+                    id       = "book_${book.id}",
+                    title    = book.displayTitle,
+                    subtitle = listOfNotNull(
+                        "Continue reading",
+                        book.lastOpenedAt?.let { relativeDateTime(it) },
+                    ).joinToString("  ·  "),
+                    coverUri = book.coverUri,
+                    type     = XMBItemType.LIBRARY_BOOK,
+                )
+            )
+        }
         // The reader, first, so the app you read in is one press away whether or not you are
         // opening something from the library. Hidden when no reader is set, since there is
         // nothing to open: the picker lives in Settings.

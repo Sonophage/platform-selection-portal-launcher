@@ -629,4 +629,28 @@ class MediaColumnsTest {
             with.first { it.insideCovers.isNotEmpty() }.insideCovers,
         )
     }
+
+    @Test
+    fun `the last book opened leads the Library column, with no page numbers`() {
+        val book = com.psplauncher.core.domain.model.Book(
+            id = "b1", libraryId = "lib", uri = "content://b1",
+            displayName = "Faceless", title = "Lord of Mysteries Volume 2: Faceless",
+            coverUri = "cover://b1", lastOpenedAt = 1_700_000_000_000L,
+        )
+        val row = XMBUiState(continueBook = book, bookLibraries = listOf(bookLibrary(80)))
+            .booksRootSections().first()
+        assertEquals("Lord of Mysteries Volume 2: Faceless", row.title)
+        assertTrue(row.subtitle!!.startsWith("Continue reading"))
+        assertEquals("cover://b1", row.coverUri)
+        // The one thing 6c asks for that cannot exist. No page, so no bar — and the row keeps its
+        // own cover rather than taking four other books', like every other single-item row.
+        assertNull("a book cannot report a page", row.progressFraction)
+        assertTrue(row.insideCovers.isEmpty())
+    }
+
+    @Test
+    fun `nothing opened means no Continue reading row`() {
+        val rows = XMBUiState(bookLibraries = listOf(bookLibrary(80))).booksRootSections()
+        assertTrue(rows.none { it.subtitle?.startsWith("Continue reading") == true })
+    }
 }

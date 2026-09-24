@@ -742,6 +742,13 @@ data class XMBUiState(
     // ── Photo ─────────────────────────────────────────────────────────────
     val photoNav: PhotoNav = PhotoNav.Root,
     val booksNav: BooksNav = BooksNav.Root,
+    /**
+     * The last book you opened from PFP, for the Books column's "Continue reading" row.
+     *
+     * Only ever set by [markBookOpened], which fires once the reader has actually accepted the
+     * intent — so a book whose reader refused it never leads the column.
+     */
+    val continueBook: com.psplauncher.core.domain.model.Book? = null,
     val bookLibraries: List<com.psplauncher.core.domain.model.BookLibrary> = emptyList(),
     // Derived from every scanned book, so the Series row's count is live.
     val bookSeries: List<BookSeries> = emptyList(),
@@ -1912,6 +1919,7 @@ class XMBViewModel @Inject constructor(
         observePhoto()
         observeBooks()
         observeMediaCovers()
+        observeContinueBook()
         observeHiddenPlacements()
         collectGamepadActions()
         consumeWindowsSetupPrompt()
@@ -3474,6 +3482,23 @@ class XMBViewModel @Inject constructor(
 
     // The shelf list and the chosen reader both drive the Library root, so a change to either
     // re-renders it while the user is standing there.
+    // The last book opened from PFP, for the Continue reading row.
+    private fun observeContinueBook() {
+        viewModelScope.launch {
+            bookRepository.observeRecentlyOpenedBooks(1).collect { books ->
+                val latest = books.firstOrNull()
+                if (_uiState.value.continueBook?.id != latest?.id) {
+                    _uiState.update { it.copy(continueBook = latest) }
+                    if (currentCategory()?.id == BuiltInCategory.LIBRARY &&
+                        _uiState.value.booksNav == BooksNav.Root
+                    ) {
+                        loadItemsForCategory(currentCategory(), keepCursorOnRow = true)
+                    }
+                }
+            }
+        }
+    }
+
     private fun observeBooks() {
         viewModelScope.launch {
             bookRepository.observeLibraries().collect { libraries ->
