@@ -8,6 +8,7 @@ import com.psplauncher.core.domain.model.VideoLibrary
 import com.psplauncher.feature.xmb.music.MusicPlaybackState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -522,10 +523,10 @@ class MediaColumnsTest {
 
     // ── Scrubbers: the rows that report where you are in something ─────────────────────────
 
-    private fun video(resume: Long, duration: Long? = 600_000L) =
+    private fun video(resume: Long, duration: Long? = 600_000L, thumb: String? = "thumb://v1") =
         com.psplauncher.core.domain.model.Video(
             id = "v1", libraryId = "lib", uri = "content://v1", displayName = "A Film",
-            durationMs = duration, resumePositionMs = resume,
+            durationMs = duration, resumePositionMs = resume, thumbnailUri = thumb,
         )
 
     @Test
@@ -580,5 +581,52 @@ class MediaColumnsTest {
         // grows a progressFraction, something has invented it.
         val rows = XMBUiState(bookLibraries = listOf(bookLibrary(12))).booksRootSections()
         assertTrue("books cannot know a page", rows.none { it.progressFraction != null })
+    }
+
+    @Test
+    fun `a row about one thing keeps its own art, whatever its type`() {
+        // The art grid draws ahead of the type dispatch, so any row handed insideCovers loses its
+        // own picture. The rows that HAVE one are exactly the rows that are about a single thing —
+        // the playing track, the video you stopped — and four unrelated thumbnails on those is the
+        // opposite of what they say. The rule used to be "MUSIC_TRACK with a cover", which was true
+        // until Video grew a resume row and then silently was not.
+        val covers = MediaCovers(video = (1..12).map { "pool$it" })
+
+        val resume = XMBUiState(resumeVideo = video(resume = 150_000L), mediaCovers = covers)
+            .videoRootSections().first()
+        assertTrue("the resume row keeps its thumbnail", resume.insideCovers.isEmpty())
+        assertNotNull(resume.coverUri)
+
+        // And with NO thumbnail at all — the case the first fix got wrong, because it keyed off
+        // having art rather than being one thing. A film with no thumbnail yet must still not
+        // borrow four other films' faces.
+        val artless = XMBUiState(resumeVideo = video(resume = 150_000L, thumb = null), mediaCovers = covers)
+            .videoRootSections().first()
+        assertTrue("a thumbnail-less resume row gets no grid either", artless.insideCovers.isEmpty())
+
+        val track = MusicTrack(
+            id = "t1", folderId = "f", uri = "content://t1", displayName = "Song", artUri = "art://1",
+        )
+        val nowPlaying = XMBUiState(
+            musicPlayback = MusicPlaybackState(track = track, isPlaying = true, positionMs = 1, durationMs = 2),
+            mediaCovers = MediaCovers(music = (1..12).map { "pool$it" }),
+        ).musicRootSections().first()
+        assertTrue("the playing track keeps its album art", nowPlaying.insideCovers.isEmpty())
+    }
+
+    @Test
+    fun `an art-bearing row does not consume a grid slot`() {
+        // Otherwise the resume row appearing would slide every grid below it onto the covers that
+        // belonged to the row above — the column would visibly reshuffle for a reason the user
+        // cannot see, every time they stopped a video part-way.
+        val covers = MediaCovers(video = (1..12).map { "pool$it" })
+        val without = XMBUiState(mediaCovers = covers).videoRootSections()
+        val with = XMBUiState(resumeVideo = video(resume = 150_000L), mediaCovers = covers)
+            .videoRootSections()
+        assertEquals(
+            "the first grid row keeps the same covers either way",
+            without.first { it.insideCovers.isNotEmpty() }.insideCovers,
+            with.first { it.insideCovers.isNotEmpty() }.insideCovers,
+        )
     }
 }

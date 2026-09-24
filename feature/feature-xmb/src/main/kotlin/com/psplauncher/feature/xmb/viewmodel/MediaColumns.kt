@@ -48,18 +48,32 @@ import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.VIDEO_LIBRAR
  * Give each row in a media column its own four covers out of the column's pool.
  *
  * Applied at the END of a column's builder rather than at each `add`, so the offset is simply the
- * row's position and nobody has to keep a running index correct while editing the list. Rows that
- * already carry their own art — a Now Playing track wearing its album cover — keep it: this only
- * fills rows that had nothing of their own.
+ * row's position and nobody has to keep a running index correct while editing the list.
+ *
+ * A ROW THAT IS ONE THING GETS NO GRID. The grid is art of what is INSIDE a row, and a playing
+ * track or a resumed video has nothing inside it — it is the thing. Those rows wear their own
+ * picture: the album cover, the video's thumbnail.
+ *
+ * Decided by TYPE, not by whether the row happens to have art. The first attempt excluded rows
+ * with a coverUri, which is the same answer almost always and the wrong one exactly when it
+ * matters: a video with no thumbnail yet would have been handed four unrelated thumbnails, and a
+ * row about one film showing four other films is the failure this rule exists to prevent — at its
+ * worst on the row least able to speak for itself.
+ *
+ * They do not take a slot either: the offset counts only the rows the grid will actually fill, so
+ * a resume row appearing does not shift every grid below it onto somebody else's covers.
  */
 private fun List<XMBItem>.withColumnCovers(pool: List<String>): List<XMBItem> {
     if (pool.isEmpty()) return this
     var slot = 0
     return map { item ->
-        if (item.coverUri != null && item.type == XMBItemType.MUSIC_TRACK) item
+        if (item.type in SINGLE_MEDIA_ITEM_TYPES) item
         else item.copy(insideCovers = pool.gridSliceAt(slot++))
     }
 }
+
+/** Rows that ARE a piece of media rather than a way into several. See [withColumnCovers]. */
+private val SINGLE_MEDIA_ITEM_TYPES = setOf(XMBItemType.MUSIC_TRACK, XMBItemType.VIDEO_FILE)
 
 internal fun XMBUiState.musicRootSections(): List<XMBItem> {
     val folders = musicFolders
