@@ -90,6 +90,9 @@ fun AppDrawerScreen(
     /** Any touch interaction inside the drawer — reported to the XMB input-source tracker, which
      *  is what drives the contextual touch-navigation button. */
     onTouchInteraction: () -> Unit = {},
+    /** The Y menu's "Add to Cross Bar". The drawer knows which app; only the host knows which
+     *  column is open behind it, so the destination is decided out there. */
+    onAddToCrossBar: (String) -> Unit = {},
     /** Runs a tapped hint prompt. Routed back out to the XMB so a tap and a press take the same
      *  path: the drawer receives its actions through [pendingGamepadAction] either way. */
     onPromptTapped: ((GamepadAction) -> Unit)? = null,
@@ -201,7 +204,13 @@ fun AppDrawerScreen(
             }
             viewModel.onTouchBrowse(index)
         },
-        onMenuAction = { viewModel.onMenuAction(it) },
+        onMenuAction = { action ->
+            // Intercepted before the ViewModel, because the destination is the host's to know.
+            if (action == AppMenuAction.ADD_TO_CROSS_BAR) {
+                state.menuApp?.let { onAddToCrossBar(it.packageName) }
+            }
+            viewModel.onMenuAction(action)
+        },
         onCloseMenu = { viewModel.closeAppMenu() },
         onConfirmUninstall = { viewModel.confirmUninstall() },
         onCancelUninstall = { viewModel.cancelUninstall() },

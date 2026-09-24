@@ -1,5 +1,7 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.domain.model.BUILT_IN_CATEGORIES
+import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.GamepadAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -240,5 +242,34 @@ class AppPickerLogicTest {
         val cancelled = s.cancelConfirm()
         assertEquals(false, cancelled.confirmingRemovals)
         assertEquals(AppPickerState.CONFIRM_CANCEL, cancelled.confirmFocusedOption)
+    }
+
+    // ── categoryShowsApps ─────────────────────────────────────────────────────
+    //
+    // "Add to Cross Bar" puts an app in whichever column the drawer was opened over, and three
+    // columns never read their assigned apps. Getting this wrong writes a row that nothing draws:
+    // the toast says it worked, the database agrees, and the app is nowhere.
+
+    private fun builtIn(id: String) = BUILT_IN_CATEGORIES.first { it.id == id }
+
+    @Test
+    fun `an app can be added to the columns that list apps`() {
+        listOf("music", "videos", "photos", "network", BuiltInCategory.LIBRARY).forEach { id ->
+            assertTrue("$id builds its column from assigned apps", categoryShowsApps(builtIn(id)))
+        }
+    }
+
+    @Test
+    fun `Last Played refuses apps although it is not a gaming category`() {
+        val recents = builtIn(BuiltInCategory.RECENTLY_PLAYED)
+        // The trap: the flag says "not gaming", so !isGamingCategory alone lets the write through.
+        assertEquals(false, recents.isGamingCategory)
+        assertEquals(false, categoryShowsApps(recents))
+    }
+
+    @Test
+    fun `Settings and gaming columns refuse apps`() {
+        assertEquals(false, categoryShowsApps(builtIn(BuiltInCategory.SETTINGS)))
+        assertEquals(false, categoryShowsApps(builtIn(BuiltInCategory.GAMES)))
     }
 }

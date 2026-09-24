@@ -80,6 +80,15 @@ enum class AppFilter(val label: String, val subtitle: String) {
 
 // One row in an app's long-press mini menu.
 enum class AppMenuAction(val label: String) {
+    /**
+     * Put this app on the cross bar, in the column the drawer was opened over.
+     *
+     * 6e binds this to X. X here is Search, and stays Search: it is the only controller route to
+     * the search box, which the same pass made permanent — a pin that stranded the search field
+     * would be trading one reachable thing for another. A menu action also lets the row NAME its
+     * destination, and a pin whose destination you cannot predict is worse than one extra press.
+     */
+    ADD_TO_CROSS_BAR("Add to Cross Bar"),
     APP_INFO("App Info"),
     MARK_GAME("Mark as Game"),
     UNMARK_GAME("Unmark as Game"),
@@ -122,10 +131,12 @@ data class AppDrawerUiState(
     /** Per-filter app counts (unfiltered by search query) for the category rail. */
     val filterCounts: Map<AppFilter, Int> = emptyMap(),
 ) {
+    // Add to Cross Bar leads: it is the one action here that changes the screen you came from.
     // App Info for every app; Mark/Unmark as Game toggles library membership; Uninstall only
     // for non-system apps (guard rail).
     val menuActions: List<AppMenuAction>
         get() = buildList {
+            add(AppMenuAction.ADD_TO_CROSS_BAR)
             add(AppMenuAction.APP_INFO)
             add(if (menuAppIsGame) AppMenuAction.UNMARK_GAME else AppMenuAction.MARK_GAME)
             if (menuApp?.isSystemApp == false) add(AppMenuAction.UNINSTALL)
@@ -244,6 +255,10 @@ class AppDrawerViewModel @Inject constructor(
             AppMenuAction.UNMARK_GAME -> { setMarkedAsGame(app, marked = false); _uiState.update { it.copy(menuApp = null) } }
             // Guard rail: show an in-app confirmation before the system uninstall flow.
             AppMenuAction.UNINSTALL -> _uiState.update { it.copy(menuApp = null, confirmUninstall = app, uninstallConfirmFocused = false) }
+            // Answered by the HOST, not here. The destination is "the column the drawer is open
+            // over", and the drawer does not know which that is — it is handed a filter, not a
+            // category. AppDrawerScreen routes it out; this only closes the menu.
+            AppMenuAction.ADD_TO_CROSS_BAR -> _uiState.update { it.copy(menuApp = null) }
         }
     }
 

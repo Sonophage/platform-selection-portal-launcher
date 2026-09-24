@@ -332,14 +332,7 @@ class AppDrawerViewModelTest {
         viewModel.setFilter(AppFilter.ALL)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
-        testDispatcher.scheduler.advanceUntilIdle()
-        // Walk to the Uninstall row and select it (fake apps have no isSystemApp flag, so the
-        // Uninstall action is present for every row).
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
-        viewModel.handleGamepadAction(GamepadAction.SELECT)
-        testDispatcher.scheduler.advanceUntilIdle()
+        openUninstallPrompt()
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("PPSSPP", state.confirmUninstall?.label)
@@ -365,12 +358,21 @@ class AppDrawerViewModelTest {
     // stacked overlay with a visible cursor, SELECT has to mean "the button you are on", and the
     // button you start on has to be the harmless one.
 
-    /** Opens the uninstall prompt for PPSSPP, leaving the cursor wherever it opens. */
+    /**
+     * Opens the uninstall prompt for PPSSPP, leaving the cursor wherever it opens.
+     *
+     * Walks to whatever row Uninstall is on rather than pressing DOWN a fixed number of times.
+     * The counted version was two presses, and adding "Add to Cross Bar" to the top of the menu
+     * turned all three uninstall tests red at once while the uninstall path itself was untouched.
+     * Fake apps have no isSystemApp flag, so the Uninstall action is present for every row.
+     */
     private fun openUninstallPrompt() {
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
         testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
+        val actions = viewModel.uiState.value.menuActions
+        val target = actions.indexOf(AppMenuAction.UNINSTALL)
+        assertTrue("the menu offered no Uninstall row: $actions", target >= 0)
+        repeat(target) { viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN) }
         viewModel.handleGamepadAction(GamepadAction.SELECT)
         testDispatcher.scheduler.advanceUntilIdle()
     }

@@ -229,6 +229,7 @@ fun XMBShellContainer(
         onSettingsActionConsumed = viewModel::consumeSettingsAction,
         onPromptTapped = viewModel::onPromptTapped,
         onCloseAppDrawer = viewModel::onCloseAppDrawer,
+        onAddAppToOpenCategory = viewModel::addAppToOpenCategory,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
         onCloseGameDetail = viewModel::onCloseGameDetail,
         onOpenLibraryManager = viewModel::openLibraryManager,
@@ -366,6 +367,8 @@ fun XMBShell(
     /** Runs a tapped hint prompt, through the same dispatcher a pad press uses. */
     onPromptTapped: (com.psplauncher.core.domain.model.GamepadAction) -> Unit = {},
     onCloseAppDrawer: () -> Unit = {},
+    /** Y menu's "Add to Cross Bar": the drawer names the app, the XMB knows the column. */
+    onAddAppToOpenCategory: (String) -> Unit = {},
     onDrawerActionConsumed: () -> Unit = {},
     onCloseGameDetail: () -> Unit = {},
     onOpenLibraryManager: () -> Unit = {},
@@ -1250,6 +1253,7 @@ fun XMBShell(
                     // Drawer touches are reported to the shared input-source tracker, which is
                     // what drives the contextual touch-navigation button.
                     onTouchInteraction = onTouchInput,
+                    onAddToCrossBar = onAddAppToOpenCategory,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

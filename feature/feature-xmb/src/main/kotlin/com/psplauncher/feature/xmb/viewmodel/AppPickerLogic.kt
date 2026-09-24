@@ -1,5 +1,7 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.domain.model.BuiltInCategory
+import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.navigation.NavigationDirection
 import com.psplauncher.core.navigation.gridMove
@@ -89,3 +91,24 @@ internal fun AppPickerState.moveConfirm(action: GamepadAction): AppPickerState {
 /** Closes the modal and re-parks the cursor on Cancel for the next prompt. */
 internal fun AppPickerState.cancelConfirm(): AppPickerState =
     copy(confirmingRemovals = false, confirmFocusedOption = AppPickerState.CONFIRM_CANCEL)
+
+// ── Where an app can be assigned ──────────────────────────────────────────────
+
+/**
+ * Whether [category]'s column is built from its assigned apps.
+ *
+ * False means an app added to it lands in the database and on no screen. Three columns never call
+ * `AppCategoryRepository.appsForCategory`:
+ *  - a gaming category builds its column from the games table;
+ *  - Last Played is derived from last_played_at and nothing can be assigned to it — note it is
+ *    `isGamingCategory = false`, so the flag alone does NOT catch it;
+ *  - Settings builds its own hierarchy.
+ *
+ * Here rather than inside the ViewModel so the Last Played case can be tested: it is the one that
+ * the obvious one-line version of this predicate gets wrong, and it is a silent wrong — the write
+ * succeeds and the row simply never appears.
+ */
+internal fun categoryShowsApps(category: Category): Boolean =
+    !category.isGamingCategory &&
+        category.id != BuiltInCategory.RECENTLY_PLAYED &&
+        category.id != BuiltInCategory.SETTINGS

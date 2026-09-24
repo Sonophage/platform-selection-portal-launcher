@@ -61,6 +61,8 @@ import com.psplauncher.core.domain.model.resolve
 import com.psplauncher.core.domain.repository.GameRepository
 import com.psplauncher.core.ui.icons.GameIconStyle
 import com.psplauncher.core.ui.notification.BackgroundTaskNotifier
+import com.psplauncher.core.ui.notification.SystemToasts
+import com.psplauncher.core.ui.notification.ToastKind
 import com.psplauncher.core.ui.sound.MenuSound
 import com.psplauncher.core.ui.theme.DefaultPFPColors
 import com.psplauncher.core.ui.theme.PFPColors
@@ -8254,6 +8256,36 @@ class XMBViewModel @Inject constructor(
     fun onOpenAppDrawer() {
         // Not a literal: AppFilter.DEFAULT is the one place that decides where the menu opens.
         _uiState.update { it.copy(activeAppDrawerFilter = com.psplauncher.feature.appbar.AppFilter.DEFAULT.name) }
+    }
+
+    /**
+     * Put an app on the cross bar, in the column the drawer was opened over.
+     *
+     * "Add to Cross Bar" does not say WHERE, and the column you came from is the only destination
+     * a user can predict without being asked: the drawer opens over a category and that category
+     * is still the selected one while it is up.
+     *
+     * Writes through [AppCategoryRepository.addToCategory], the same call the category's own "Add
+     * Apps" picker makes, so an app pinned from here and one picked there are the same row.
+     *
+     * Refuses out loud rather than writing a row nothing will draw. Three columns do not read
+     * [AppCategoryRepository.appsForCategory] at all, so an app assigned to one of them is in the
+     * database and on no screen:
+     *  - a gaming category builds its column from the games table,
+     *  - Last Played is derived from last_played_at and nothing can be assigned to it (it is
+     *    `isGamingCategory = false`, so that flag alone does not catch it),
+     *  - Settings builds its own hierarchy.
+     */
+    fun addAppToOpenCategory(packageName: String) {
+        val category = currentCategory() ?: return
+        if (!categoryShowsApps(category)) {
+            SystemToasts.post("${category.name} can't hold apps", null, ToastKind.ERROR)
+            return
+        }
+        viewModelScope.launch {
+            appCategoryRepository.addToCategory(packageName, category.id)
+            SystemToasts.post("Added to ${category.name}", null, ToastKind.SUCCESS)
+        }
     }
 
     fun onCloseAppDrawer() {
