@@ -65,6 +65,23 @@ val DEFAULT_BINDINGS = listOf(
     GamepadBinding(KeyEvent.KEYCODE_ENTER,         GamepadAction.SELECT),
     GamepadBinding(KeyEvent.KEYCODE_BACK,          GamepadAction.BACK),
     GamepadBinding(KeyEvent.KEYCODE_DPAD_CENTER,   GamepadAction.SELECT),
+
+    // ── Keyboard ─────────────────────────────────────────────────────────────
+    //
+    // A keyboard already drove most of this by accident: Android sends arrow keys as DPAD_* and
+    // Enter was bound above. The rest were not, and that became a LIE the moment the Keyboard
+    // glyph family shipped — its prompts say Esc backs out, Tab searches, Space opens options, and
+    // none of those keys reached the launcher. A footer that names a key which does nothing is
+    // worse than no footer.
+    //
+    // Escape first, because backing out is the one a keyboard user reaches for before anything
+    // else and the alternative was a key that is not on the board (BACK is a phone button).
+    GamepadBinding(KeyEvent.KEYCODE_ESCAPE,        GamepadAction.BACK),
+    GamepadBinding(KeyEvent.KEYCODE_SPACE,         GamepadAction.OPEN_CONTEXT_MENU),
+    GamepadBinding(KeyEvent.KEYCODE_SHIFT_LEFT,    GamepadAction.CHANGE_SORT),
+    GamepadBinding(KeyEvent.KEYCODE_TAB,           GamepadAction.OPEN_SEARCH),
+    GamepadBinding(KeyEvent.KEYCODE_Q,             GamepadAction.PREV_CATEGORY),
+    GamepadBinding(KeyEvent.KEYCODE_E,             GamepadAction.NEXT_CATEGORY),
 )
 
 /**

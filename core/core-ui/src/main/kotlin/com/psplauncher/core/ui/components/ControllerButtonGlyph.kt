@@ -203,9 +203,14 @@ private val xbLabels = mapOf(
  * Keys, for a machine with no pad.
  *
  * The face positions take the two keys everything on a desktop already means by them — Enter
- * confirms and Escape backs out — and the D-pad takes the arrows. The shoulders are the keys
- * beside the hand that would be on the arrows, which is a guess, but a named one: nothing prints
- * a standard for "the bumper key".
+ * confirms and Escape backs out — and the D-pad takes the arrows, which Android already delivers
+ * as DPAD_* from a real keyboard.
+ *
+ * EVERY KEY NAMED HERE IS BOUND in DEFAULT_BINDINGS, and that is the whole contract of this table.
+ * It shipped for one commit naming Shift, Space, Tab, Q and E while none of them reached the
+ * launcher — a footer telling a keyboard user to press a key that does nothing. The shoulders
+ * being Q and E is still a choice rather than a standard; that nothing prints one is why the
+ * binding and the label have to be decided together, in these two files, at the same time.
  */
 private val kbLabels = mapOf(
     ControllerIcon.FACE_SOUTH to "Enter", ControllerIcon.FACE_EAST to "Esc",

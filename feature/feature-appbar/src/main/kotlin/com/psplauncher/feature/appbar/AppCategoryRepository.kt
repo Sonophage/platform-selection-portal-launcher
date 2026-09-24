@@ -40,7 +40,7 @@ class AppCategoryRepository @Inject constructor(
 
     // Emits whenever assignment or override state changes, so the XMB can re-resolve.
     fun changes(): Flow<Unit> =
-        combine(categoryDao.observeAppItems(), appOverrideDao.observeAll()) { _, _ -> Unit }
+        combine(categoryDao.observeAppItems(), appOverrideDao.observeAll()) { _, _ -> }
 
     suspend fun ensureLoaded() {
         if (cache.isEmpty()) cache = installedAppRepository.getInstalledApps()

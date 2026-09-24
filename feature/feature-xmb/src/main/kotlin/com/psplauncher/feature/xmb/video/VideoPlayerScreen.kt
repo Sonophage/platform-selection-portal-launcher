@@ -1,14 +1,3 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class)
-//
-// media3's transcoding and player-view surfaces are marked UnstableApi, which lint reports as an
-// ERROR once per usage — 47 of them across two files, which is 85% of this project's lint errors
-// and enough noise to bury the two that were real crashes. Opting in once per file is the
-// documented way to say "this code knows"; the alternative is an annotation on every function or
-// a suppression that hides the next genuine one too.
-//
-// It is a promise that these call sites get re-read when media3 is upgraded, not that the API is
-// stable. Nothing else in the app touches it.
-
 package com.psplauncher.feature.xmb.video
 
 import android.net.Uri
@@ -67,6 +56,10 @@ import kotlinx.coroutines.delay
 import timber.log.Timber
 
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+// AspectRatioFrameLayout's resize modes are media3 @UnstableApi. Suppressed rather than opted
+// into, for the reason spelled out on VideoSnapTranscoder: the annotation propagates and a
+// suppression does not.
+@Suppress("UnsafeOptInUsageError")
 private val SCREEN_MODES = listOf(
     AspectRatioFrameLayout.RESIZE_MODE_FIT to "Fit",
     AspectRatioFrameLayout.RESIZE_MODE_ZOOM to "Zoom",

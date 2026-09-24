@@ -1157,8 +1157,16 @@ fun XMBShell(
                     // Hidden from the BAR, not removed from the model: the category still exists,
                     // still holds the cursor, and the indices below map back to it, because the
                     // selection is the real list's and only the drawing is the short one.
-                    val barCategories = remember(uiState.categories) {
-                        uiState.categories.filterNot { it.id == BuiltInCategory.RECENTLY_PLAYED }
+                    // ...EXCEPT on touch, where it is the only way back.
+                    //
+                    // Hiding it fixed a controller problem: stepping right off the shelf passed
+                    // through a slot you could never see selected. A finger has no equivalent of
+                    // "step left off Emulation", so for touch the hidden slot is not tidier, it is
+                    // a page with no door. The caticon comes back the moment the last input was a
+                    // finger, and goes again on the next button press.
+                    val barCategories = remember(uiState.categories, uiState.lastInputWasTouch) {
+                        if (uiState.lastInputWasTouch) uiState.categories
+                        else uiState.categories.filterNot { it.id == BuiltInCategory.RECENTLY_PLAYED }
                     }
                     val barSelected = remember(barCategories, uiState.selectedCategoryIndex) {
                         uiState.categories.getOrNull(uiState.selectedCategoryIndex)

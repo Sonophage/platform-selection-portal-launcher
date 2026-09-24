@@ -134,7 +134,11 @@ fun WizardSplash(onBegin: () -> Unit) {
     ) {
         WaveLayers(WaveStyle.ANIMATED)
 
-        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // A plain Box. This was BoxWithConstraints and never read maxWidth or maxHeight —
+        // BoxWithConstraints subcomposes its content to hand it the constraints, so an unused
+        // scope buys a second composition pass for nothing, on the first screen a new install
+        // ever draws.
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,

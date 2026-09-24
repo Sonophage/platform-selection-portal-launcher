@@ -6584,7 +6584,7 @@ class XMBViewModel @Inject constructor(
                 // hand-off, no Game Detail composed, cursor left on this entity when the
                 // emulator closes. Two ways to start a game that started it differently would
                 // be worse than not offering the second one.
-                "play"                   -> menu.gameId?.let { launchGameDirectly(it) }
+                "play"                   -> launchGameDirectly(menu.gameId)
                 "choose_disc"             -> openDiscPickerMenu(menu.gameId)
                 "export_game"            -> exportGameFromMenu(menu.gameId)
                 "edit_app"               -> openAppDetail(menu.gameId, menu.packageName ?: return)

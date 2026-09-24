@@ -1,14 +1,3 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class)
-//
-// media3's transcoding and player-view surfaces are marked UnstableApi, which lint reports as an
-// ERROR once per usage — 47 of them across two files, which is 85% of this project's lint errors
-// and enough noise to bury the two that were real crashes. Opting in once per file is the
-// documented way to say "this code knows"; the alternative is an annotation on every function or
-// a suppression that hides the next genuine one too.
-//
-// It is a promise that these call sites get re-read when media3 is upgraded, not that the API is
-// stable. Nothing else in the app touches it.
-
 package com.psplauncher.feature.artwork.video
 
 import android.content.Context
@@ -42,6 +31,21 @@ import javax.inject.Singleton
  * device's ~2.3x density while remaining a tiny file.
  */
 @Singleton
+// media3's transcoding surface is marked @UnstableApi, which lint reports once per usage — this
+// file alone accounted for 44 of this project's lint errors, enough to bury the two that were real
+// crashes.
+//
+// @Suppress, not @OptIn and not @UnstableApi. Three attempts, and the difference matters:
+//
+//  - `@OptIn(UnstableApi::class)` compiles and silences NOTHING. UnstableApi is a lint marker and
+//    is not annotated @RequiresOptIn, and Kotlin says so in a warning.
+//  - `@UnstableApi` on this class satisfies lint here and PROPAGATES: every place that injects a
+//    VideoSnapTranscoder then becomes an unstable-API usage of its own, which turned 44 errors in
+//    one file into errors in four others.
+//
+// A lint suppression is local. It says this file knows what it is calling, and nothing outside it
+// has to know anything.
+@Suppress("UnsafeOptInUsageError")
 class VideoSnapTranscoder @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
