@@ -631,6 +631,14 @@ private fun XmbVerticalListRow(
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "xmbListRowAlpha",
     )
+    // On the same spring as the scale and the alpha above, so the bloom does not pop a frame
+    // ahead of the row it belongs to. XmbGlow's contract asks for the animated value, not a
+    // boolean, and the crossbar already honours it.
+    val glow by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "xmbRowGlow",
+    )
     // Shadow for row helper text: the subtitle is the only label with no separation treatment
     // (the title brightens + shadows when selected), so it's the text that washes out over the
     // bright half of a wallpaper. Same directional shadow idiom as PspContextMenu/ControllerHintBar.
@@ -681,11 +689,25 @@ private fun XmbVerticalListRow(
                     com.psplauncher.core.ui.icons.LocalIconAnimating provides
                         (isSelected && iconAnimatingAllowed),
                 ) {
-                XmbItemLeadingIcon(
-                    item = item,
-                    iconStyle = iconStyle,
-                    isSelected = isSelected,
-                )
+                // Wrapped rather than pushed into XmbItemLeadingIcon: that is a `when` over a
+                // dozen item types, each drawing its own shape, and the bloom is one thing behind
+                // all of them. The 4px white RING the design puts around this does NOT go here —
+                // it wraps a uniform art tile, and there is no such tile until the 2x2 art grid
+                // exists. A ring traced around a bare glyph's bounding box is not that design.
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.xmbFocusGlow(
+                        visible = glow,
+                        reach = XmbGlow.RowReach,
+                        alpha = XmbGlow.RowAlpha,
+                    ),
+                ) {
+                    XmbItemLeadingIcon(
+                        item = item,
+                        iconStyle = iconStyle,
+                        isSelected = isSelected,
+                    )
+                }
                 }
             }
 
