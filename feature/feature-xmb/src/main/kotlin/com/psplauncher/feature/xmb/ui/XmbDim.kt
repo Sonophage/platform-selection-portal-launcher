@@ -13,11 +13,14 @@ package com.psplauncher.feature.xmb.ui
  * static mock steps .9 then .6, with no third stop. The running version won, because it is the one
  * that was actually navigated and because a two-stop ramp cannot say "far away" at all.
  *
- * EVERY UNSELECTED STOP IS THEN TAKEN 20% FURTHER DOWN — "I think the dimming needs to go down
- * about 20 percent more", after watching it on the panel. Multiplied, not subtracted: a flat 0.20
- * off would have taken the far stop from .30 to .10 and all but deleted it, while leaving the near
- * stop a proportionally smaller change. The ratios between the stops are what make the ramp read
- * as one gesture, so scaling keeps it a ramp and shifting would not.
+ * EVERY UNSELECTED STOP IS THEN TAKEN FURTHER DOWN, by [PanelScale], because the published ramp
+ * read too bright in the hand. Multiplied, not subtracted: a flat amount off would take the far
+ * stop to almost nothing while changing the near stop by proportionally much less, and the ratios
+ * between the stops are what make the ramp read as one gesture rather than three alphas.
+ *
+ * ONE KNOB, not three edited literals. Tuning this by hand three times is three chances to break
+ * the proportions, and a ramp that has lost its shape still animates, still dims, and still looks
+ * almost right — the worst kind of wrong. Scaling by construction makes that impossible.
  *
  * The cursor's own stop stays at 1. It is not dimmed at all, so there is nothing to take down, and
  * scaling it would quietly fade the thing the whole cue points at.
@@ -28,7 +31,23 @@ package com.psplauncher.feature.xmb.ui
  */
 internal object XmbDim {
 
-    private val Ramp = floatArrayOf(1f, 0.68f, 0.44f, 0.24f)
+    /** The ramp as 1c publishes it, before the panel scaling. */
+    private val Published = floatArrayOf(1f, 0.85f, 0.55f, 0.30f)
+
+    /**
+     * How far the dimming was taken past the published ramp, by eye on a real 6" panel.
+     *
+     * Two passes, both his: "I think the dimming needs to go down about 20 percent more" took it
+     * to 0.80, and "it's not quite there, a little more" took it to 0.68. It is one number so the
+     * next pass is one number.
+     */
+    const val PanelScale = 0.68f
+
+    private val Ramp = FloatArray(Published.size) { i ->
+        // Index 0 is the cursor and is exempt by construction, not by a constant that happens to
+        // be 1 — so no future scale can dim the selection by accident.
+        if (i == 0) 1f else Published[i] * PanelScale
+    }
 
     /** The furthest step the ramp distinguishes. Exposed so a test can walk past it. */
     const val LastStep = 3

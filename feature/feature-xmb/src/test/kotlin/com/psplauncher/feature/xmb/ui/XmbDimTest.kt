@@ -16,15 +16,25 @@ import org.junit.Test
 class XmbDimTest {
 
     @Test
-    fun `the ramp is the running prototype's, scaled down a fifth`() {
+    fun `the ramp is the running prototype's, scaled for the panel`() {
         // 1c's logic says [1, .85, .55, .30]; 1a's mock draws .9 then .6 with no third stop. The
-        // bundle contradicts itself, the running version was chosen, and then every unselected
-        // stop was taken 20% further down on the panel. Worth stating once somewhere that fails if
-        // they quietly drift back to either of the published sets.
+        // bundle contradicts itself, the running version was chosen, and then the dimming was
+        // taken further down by eye. Stated here as the ARITHMETIC rather than as four literals,
+        // so re-tuning the scale does not mean re-typing the expectations and quietly losing the
+        // relationship they are here to hold.
         assertEquals(1.00f, XmbDim.ranked(0), 1e-6f)
-        assertEquals(0.68f, XmbDim.ranked(1), 1e-6f)
-        assertEquals(0.44f, XmbDim.ranked(2), 1e-6f)
-        assertEquals(0.24f, XmbDim.ranked(3), 1e-6f)
+        assertEquals(0.85f * XmbDim.PanelScale, XmbDim.ranked(1), 1e-6f)
+        assertEquals(0.55f * XmbDim.PanelScale, XmbDim.ranked(2), 1e-6f)
+        assertEquals(0.30f * XmbDim.PanelScale, XmbDim.ranked(3), 1e-6f)
+    }
+
+    @Test
+    fun `the scale actually dims, and never to nothing`() {
+        // The knob is tuned by eye across sessions, so it needs a floor and a ceiling that are not
+        // "whatever was typed". At 1 it stops dimming and the whole feature is off with no sign
+        // that it is; at 0 the far slots are gone from a screen they are still occupying.
+        assertTrue("the panel scale must dim something", XmbDim.PanelScale < 1f)
+        assertTrue("the panel scale must not erase the far stops", XmbDim.ranked(XmbDim.LastStep) >= 0.1f)
     }
 
     @Test
