@@ -8,8 +8,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -36,14 +39,20 @@ import com.psplauncher.core.ui.R
 // identity, so the resolver owns the per-family art and UI code stays
 // controller-agnostic.
 //
-// Art provenance (see Controller_Helper_Icon_Mapping.md):
-//   PLAYSTATION → PS5 pack,          Buttons Solid/White/128w (DualSense)
-//   XBOX        → Xbox Series pack,  Buttons Solid/White/128w
-//   NINTENDO    → Switch 2 pack,     Buttons Solid/White/128w, Pro D-Pad art
+// Art provenance: Xelu's Free Controller & Keyboard Prompts, CC0 (thoseawesomeguys.com/prompts),
+// resized to 128x128 to match what this module already shipped.
 //
-// All three are the same treatment at the same size, so a prompt row reads as one set. The
-// PlayStation glyphs were previously the PS4 Premium pack — 480px and a different look, which
-// stood out beside the flat white Xbox/Switch art.
+//   XBOX        → Xbox Series X  — grey button, COLOURED LETTER. That is what the pad looks like:
+//                                  the colour is on the glyph, not the disc.
+//   PLAYSTATION → DualShock 4    — dark button, COLOURED SYMBOL. Chosen over the pack's PS5 art
+//                                  deliberately: the DualSense prints its four symbols in white,
+//                                  so accurate PS5 art has no colour in it at all.
+//   NINTENDO    → Switch          — grey, uncoloured, which is accurate. A Switch pad prints no
+//                                  colours to follow.
+//
+// It replaced a white-silhouette set and a pass of hand-picked hex tints laid over it. The tints
+// were the wrong shape twice over — they coloured the ring and the letter together, and the values
+// were guesses at colours nobody publishes. Real art answers both: "they need to be exact".
 //
 // Nintendo has its own art for every core input, so no family ever borrows
 // another family's letters — their physical A/B and X/Y positions are reversed.
@@ -79,58 +88,6 @@ fun ControllerIcon.printedLabelFor(family: ControllerDisplayType): String? =
         ControllerDisplayType.KEYBOARD -> kbLabels
         ControllerDisplayType.TOUCH -> touchLabels
     }[this]
-
-/**
- * How much of the glyph's box the button itself occupies.
- *
- * Measured off the art rather than guessed: the ring's outer edge spans y 22..105 on a 128px
- * canvas. The fill is drawn to exactly that, so the white ring sits on the colour's edge instead
- * of floating inside it or spilling past it.
- */
-private const val GlyphDiscFraction = 0.656f
-
-/**
- * The colour a family FILLS a face button with, or null where it prints none.
- *
- * Xbox and PlayStation both colour their four face buttons and it is how people find them — green
- * is where confirm lives on an Xbox pad whatever letter is on it.
- *
- * THESE HEX VALUES ARE NOT SOURCED FROM EITHER MANUFACTURER. They are the conventional colours as
- * commonly drawn, picked to read against a dark bar. Nobody publishes an official sRGB value for
- * a moulded plastic button, and neither pack on disk carries one — the art here is white outlines.
- * If exact values are wanted they have to come from a reference someone names, and this is the one
- * place to change them.
- *
- * Nintendo is absent on purpose. A Switch pad's face buttons are unlabelled grey; colouring them
- * would be inventing a convention rather than following one.
- *
- * Face positions only. A coloured bumper or d-pad is not a thing either pad does, and tinting the
- * whole set would make a prompt row read as decoration instead of as hardware.
- */
-fun ControllerIcon.faceFillFor(family: ControllerDisplayType): Color? = when (family) {
-    ControllerDisplayType.XBOX -> xbFaceFills
-    ControllerDisplayType.PLAYSTATION -> psFaceFills
-    else -> emptyMap()
-}[this]
-
-// Xbox: A green, B red, X blue, Y yellow — by POSITION, so an X/Y swap moves the art and the
-// colour together, because both are resolved from the same position the caller asked for.
-private val xbFaceFills = mapOf(
-    ControllerIcon.FACE_SOUTH to Color(0xFF6CC24A),
-    ControllerIcon.FACE_EAST to Color(0xFFEF4A4A),
-    ControllerIcon.FACE_WEST to Color(0xFF4A90D9),
-    ControllerIcon.FACE_NORTH to Color(0xFFF2C744),
-)
-
-// PlayStation: cross blue, circle red, square pink, triangle green. The DualSense itself prints
-// them white; these are the colours the symbols have meant since the first PlayStation, and they
-// are what someone scanning a footer is looking for.
-private val psFaceFills = mapOf(
-    ControllerIcon.FACE_SOUTH to Color(0xFF7FA9E8),
-    ControllerIcon.FACE_EAST to Color(0xFFE8767D),
-    ControllerIcon.FACE_WEST to Color(0xFFE693D2),
-    ControllerIcon.FACE_NORTH to Color(0xFF74D094),
-)
 
 private val psTable = mapOf(
     ControllerIcon.FACE_SOUTH to R.drawable.ctl_ps_face_south,
@@ -314,40 +271,39 @@ fun ControllerIconGlyph(
 ) {
     val drawable = icon.drawableForOrNull(family)
     if (drawable != null) {
-        val fill = icon.faceFillFor(family)
-        if (fill == null) {
-            Image(
-                painter = painterResource(drawable),
-                contentDescription = null,
-                modifier = modifier.size(size),
-            )
-            return
-        }
-        // The CIRCLE takes the colour and the symbol stays white — which is how both pads print
-        // them. Tinting the art instead coloured the ring AND the letter inside it, so a green A
-        // was a green letter on nothing rather than a green button.
-        //
-        // The art is an outline on a transparent canvas, so the fill is drawn behind it at the
-        // ring's own diameter: the white ring lands on the colour's edge and reads as the rim.
-        Box(modifier.size(size), contentAlignment = Alignment.Center) {
-            Box(
-                Modifier
-                    .size(size * GlyphDiscFraction)
-                    .clip(CircleShape)
-                    .background(fill),
-            )
-            Image(
-                painter = painterResource(drawable),
-                contentDescription = null,
-                modifier = Modifier.size(size),
-            )
-        }
+        Image(
+            painter = painterResource(drawable),
+            contentDescription = null,
+            modifier = modifier.size(size),
+        )
         return
     }
     val label = icon.printedLabelFor(family) ?: return
-    Text(
-        text = label,
-        style = LocalTextStyle.current,
-        modifier = modifier.clearAndSetSemantics { },
-    )
+    // No art: a key or a gesture, drawn in THIS app's shape rather than in some pack's.
+    //
+    // Keyboard and Touch are the two families that ship no icons, and the owner's call was that
+    // they should look like the launcher instead of like a fourth vendor — so the label sits in
+    // the same rounded square the rail's badges and the drawer's tiles wear, at the same corner
+    // ratio. A bare word beside three families of drawn buttons read as a missing image.
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .heightIn(min = size)
+            .widthIn(min = size)
+            .clip(RoundedCornerShape(size * KeycapCornerRatio))
+            .background(Color.White.copy(alpha = 0.14f))
+            .padding(horizontal = size * KeycapPadRatio)
+            .clearAndSetSemantics { },
+    ) {
+        Text(text = label, style = LocalTextStyle.current)
+    }
 }
+
+/**
+ * The keycap's corner, as a fraction of its height — the app drawer's own ratio, a quarter of the
+ * side, which is what every other rounded square in the launcher uses.
+ */
+private const val KeycapCornerRatio = 0.25f
+
+/** Side padding for a label that is a word rather than a letter: "Enter", "Swipe left". */
+private const val KeycapPadRatio = 0.22f
