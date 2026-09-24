@@ -4,6 +4,7 @@ import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.CategoryType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -98,6 +99,35 @@ class PillActionsTest {
             "activating by index would have run '$atThatIndex' for the '${firstPill.label}' pill",
             atThatIndex != firstPill.id,
         )
+    }
+
+    /**
+     * The shelf has no pill row, so nothing may offer a way into one.
+     *
+     * pillsFor answers about the ITEM and knows nothing about the screen, and a game row on the
+     * Last Played shelf is still a game row — so every rule that reads it directly will happily
+     * open a door on a screen that draws no pills. XMBItemList is the only thing that draws them
+     * and the shelf replaces it wholesale with LastPlayedPage.
+     *
+     * This was a real bug for one commit: DOWN at the end of the recents put the cursor into an
+     * invisible row, where confirm would have run an action nobody could see themselves choosing.
+     */
+    @Test
+    fun `the pill row is never visible on the home shelf`() {
+        val onShelf = XMBUiState(
+            categories = listOf(
+                Category(
+                    id = BuiltInCategory.RECENTLY_PLAYED, name = "Last Played", iconKey = "ic_recent",
+                    type = CategoryType.BUILT_IN, position = 0,
+                ),
+            ),
+            selectedCategoryIndex = 0,
+            currentItems = listOf(game()),
+            selectedItemIndex = 0,
+        )
+        assertTrue("the fixture is not on the shelf", onShelf.onLastPlayedHome)
+        assertTrue("this row does have pills", pillsFor(game()).isNotEmpty())
+        assertFalse("a door was offered into a row that is not drawn", onShelf.pillRowVisible)
     }
 
     @Test

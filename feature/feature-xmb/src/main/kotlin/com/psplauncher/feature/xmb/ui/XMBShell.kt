@@ -113,6 +113,7 @@ import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.focusedPillIndex
 import com.psplauncher.feature.xmb.viewmodel.focusedPills
+import com.psplauncher.feature.xmb.viewmodel.pillRowVisible
 import com.psplauncher.feature.xmb.viewmodel.promptsFor
 import com.psplauncher.feature.xmb.viewmodel.railRows
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
@@ -1266,7 +1267,12 @@ fun XMBShell(
                 )
             } ?: uiState.resumeGame?.let { game ->
                 NoticeMedia(
-                    title = game.title,
+                    // displayTitle, not title. `title` is the row as the scan wrote it — the ROM's
+                    // filename with its illegal characters sanitised — so this row alone called
+                    // the game "The Elder Scrolls V_ Skyrim Special Edition" while every other
+                    // surface said it with the colon. Game.displayTitle is the one rule:
+                    // userTitleOverride, then the scraped name, then the filename.
+                    title = game.displayTitle,
                     detail = "Continue",
                     artUri = game.artworkUri ?: game.iconUri,
                     // No position to report. A bar sitting at zero would be a claim that you are
@@ -1308,7 +1314,7 @@ fun XMBShell(
                     // press does the less obvious thing: walking into a row's pill actions,
                     // which only rows that HAVE pills offer, and never on the home shelf where
                     // left and right are reserved for leaving it.
-                    leftRight = !uiState.onLastPlayedHome && uiState.focusedPills().isNotEmpty(),
+                    leftRight = uiState.pillRowVisible,
                 ),
                 // The home shelf's media filter rides in the middle of the bar. Only there: it
                 // is the only column X filters, and a row of media names over the crossbar would

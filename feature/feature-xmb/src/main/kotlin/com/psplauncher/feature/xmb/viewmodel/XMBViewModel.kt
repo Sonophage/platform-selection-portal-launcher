@@ -6111,10 +6111,14 @@ class XMBViewModel @Inject constructor(
                 }
                 if (moveItemCursor(+1)) return
                 // The bottom of the column, where DOWN has always done nothing at all. That dead
-                // press is the row's way in — on EVERY screen, including the home shelf, where
-                // left and right are reserved for leaving and the pills had no controller route
-                // in at all. It is offered only where there is something to enter.
-                if (pillPressHandled(action, state)) return
+                // press is the row's way in, and it is the only one that does not compete with a
+                // press that already means something.
+                //
+                // Guarded on the row being DRAWN, not merely on the focused item having pills.
+                // Without that this opened a door on the Last Played shelf, which has no pill row
+                // at all: the cursor went into a row nobody can see and the next confirm would
+                // have run an action nobody picked.
+                if (state.pillRowVisible && pillPressHandled(action, state)) return
                 gamepadInputHandler.cancelRepeat()
             }
             GamepadAction.NAVIGATE_LEFT -> {
@@ -6142,7 +6146,7 @@ class XMBViewModel @Inject constructor(
                     _uiState.update { it.copy(recentRailVisible = true) }
                     return
                 }
-                if (!state.onLastPlayedHome && pillPressHandled(action, state)) return
+                if (state.pillRowVisible && pillPressHandled(action, state)) return
                 val next = (state.selectedCategoryIndex - 1).coerceAtLeast(0)
                 if (next != state.selectedCategoryIndex) onCategorySelected(next)
                 else gamepadInputHandler.cancelRepeat()
@@ -6159,11 +6163,11 @@ class XMBViewModel @Inject constructor(
                 if (state.onLastPlayedHome && state.recentRailVisible) {
                     _uiState.update { it.copy(recentRailVisible = false) }
                 }
-                // The pill row does NOT take left/right on the home shelf. Stepping off the shelf
-                // is that screen's main gesture, and four pills in the way of it turn one press
-                // into five. The pills are still there to touch, and still walkable everywhere
-                // else — see pillNav for what they cost when they do apply.
-                if (!state.onLastPlayedHome && pillPressHandled(action, state)) return
+                // The shelf has no pill row — LastPlayedPage draws none, which is what
+                // pillRowVisible is for. This used to read "the pills are still there to touch"
+                // on that screen; they are not there at all. See pillNav for what they cost where
+                // they do apply.
+                if (state.pillRowVisible && pillPressHandled(action, state)) return
                 if (state.isInSubItem) { gamepadInputHandler.cancelRepeat(); return }
                 val max  = (state.categories.size - 1).coerceAtLeast(0)
                 val next = (state.selectedCategoryIndex + 1).coerceAtMost(max)

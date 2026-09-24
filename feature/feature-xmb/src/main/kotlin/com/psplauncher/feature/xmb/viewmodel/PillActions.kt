@@ -149,6 +149,22 @@ internal fun pillNav(action: GamepadAction, current: Int?, count: Int): PillNav 
  */
 data class PillCursor(val itemId: String, val index: Int)
 
+/**
+ * Whether the pill row is on screen at all.
+ *
+ * ONE definition, because the alternative just cost a real bug. The row is drawn by XMBItemList
+ * and by nothing else, and XMBItemList is the crossbar's column — the Last Played shelf replaces
+ * that whole branch with LastPlayedPage, which has no pill row in it. So a door into the pills
+ * opened on the shelf leads to a cursor sitting on a row nobody can see, and the next confirm runs
+ * an action the user never chose.
+ *
+ * Every reader takes this: the hint that says left and right walk into the row, and the input
+ * rules that let them. A comment in the ViewModel claimed for a while that the shelf's pills were
+ * "still there to touch" — they never were.
+ */
+val XMBUiState.pillRowVisible: Boolean
+    get() = !onLastPlayedHome && focusedPills().isNotEmpty()
+
 /** The pills of whatever row the column cursor is on. */
 fun XMBUiState.focusedPills(): List<XmbPill> =
     currentItems.getOrNull(selectedItemIndex)?.let(::pillsFor).orEmpty()

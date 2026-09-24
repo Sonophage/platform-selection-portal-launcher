@@ -1237,7 +1237,7 @@ class GameDetailViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 launchError = null,
-                actionMessage = "Launching ${selectedGame.title}...",
+                actionMessage = "Launching ${selectedGame.displayTitle}...",
             )
         }
         viewModelScope.launch {
@@ -1295,7 +1295,7 @@ class GameDetailViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             actionMessage = null,
-                            launchError = e.message ?: "Could not launch ${game.title}",
+                            launchError = e.message ?: "Could not launch ${game.displayTitle}",
                         )
                     }
                     return@launch
@@ -1310,7 +1310,7 @@ class GameDetailViewModel @Inject constructor(
 
             val resolved = resolveLaunchProfile(game, platform)
             if (resolved.isFailure) {
-                val reason = resolved.exceptionOrNull()?.message ?: "Could not resolve emulator for ${game.title}"
+                val reason = resolved.exceptionOrNull()?.message ?: "Could not resolve emulator for ${game.displayTitle}"
                 Timber.w(
                     "Launch blocked: gameId=${game.id}, title=${game.title}, platform=${game.platformId}, reason=$reason"
                 )

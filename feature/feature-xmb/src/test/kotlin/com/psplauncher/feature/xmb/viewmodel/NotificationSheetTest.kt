@@ -137,6 +137,26 @@ class NotificationSheetTest {
         )
     }
 
+    /**
+     * The resume row names the game the way the rest of the launcher does.
+     *
+     * Game.title is the row as the SCAN wrote it — the ROM's filename with its illegal characters
+     * sanitised — and this row read it directly, so it alone said "The Elder Scrolls V_ Skyrim
+     * Special Edition" while every other surface said it with the colon. Seen on the device, in
+     * the hint bar, beside a crossbar row spelling it correctly.
+     */
+    @Test
+    fun `the resume row uses the display title, not the filename`() {
+        val scraped = game.copy(title = "The Elder Scrolls V_ Skyrim", scrapedTitle = "The Elder Scrolls V: Skyrim")
+        assertEquals(
+            "The Elder Scrolls V: Skyrim",
+            promptsFor(state(resume = scraped)).primary?.target,
+        )
+        // And the user's own name beats the scraped one, which is the rest of displayTitle's rule.
+        val renamed = scraped.copy(userTitleOverride = "Skyrim")
+        assertEquals("Skyrim", promptsFor(state(resume = renamed)).primary?.target)
+    }
+
     @Test
     fun `the media row's verb follows what the row is`() {
         assertEquals("Pause", promptsFor(state(playing = true)).primary?.verb)
