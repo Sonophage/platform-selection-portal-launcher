@@ -15,29 +15,35 @@ import com.psplauncher.core.ui.R
  * inside an APK is an app/OEM licence negotiated per product, and a non-commercial fan launcher
  * that deliberately bundles no Sony assets is the wrong place for it.
  *
- * Inter is the substitute: a humanist sans drawn for screens, under the SIL Open Font License, so
- * it can simply ship. The full text is in LICENSES/Inter-OFL.txt.
+ * Instrument Sans is the substitute, under the SIL Open Font License, so it can simply ship. The
+ * full text is in LICENSES/InstrumentSans-OFL.txt. It replaced Inter as part of the XMB redesign;
+ * the design bundle asks for it at weights 400, 500, 600 and 700.
  *
- * ONE variable font file, not four statics. Inter's variable axis carries Thin through Black in
- * 876 KB, where four static cuts would be most of that each; [FontVariation.weight] is what picks
- * the cut. minSdk is 29, comfortably past the API 26 that variable fonts need.
+ * ONE variable font file, not four statics. The wght axis carries all four cuts in 190 KB;
+ * [FontVariation.weight] is what picks one. minSdk is 29, comfortably past the API 26 that
+ * variable fonts need.
+ *
+ * NO LIGHT. Instrument Sans's wght axis floors at 400, where Inter's ran down to 100, so there is
+ * no 300 to declare. Eleven call sites still ask for [FontWeight.Light] and Compose resolves each
+ * of them to the 400 cut, because its matching rule looks below the requested weight first and
+ * finds nothing. That is a real, deliberate change in how those eleven labels render, not an
+ * oversight: the alternative is a second font file for one weight the design never asked for.
  */
-val InterFontFamily = FontFamily(
-    interWeight(FontWeight.Light, 300),
-    interWeight(FontWeight.Normal, 400),
-    interWeight(FontWeight.Medium, 500),
-    interWeight(FontWeight.SemiBold, 600),
-    interWeight(FontWeight.Bold, 700),
+val InstrumentSansFontFamily = FontFamily(
+    instrumentSansWeight(FontWeight.Normal, 400),
+    instrumentSansWeight(FontWeight.Medium, 500),
+    instrumentSansWeight(FontWeight.SemiBold, 600),
+    instrumentSansWeight(FontWeight.Bold, 700),
 )
 
-private fun interWeight(weight: FontWeight, axis: Int): Font = Font(
-    resId = R.font.inter_variable,
+private fun instrumentSansWeight(weight: FontWeight, axis: Int): Font = Font(
+    resId = R.font.instrument_sans_variable,
     weight = weight,
     variationSettings = FontVariation.Settings(FontVariation.weight(axis)),
 )
 
 /**
- * Material's type scale with every style moved onto [InterFontFamily].
+ * Material's type scale with every style moved onto [InstrumentSansFontFamily].
  *
  * Sizes, line heights and letter spacing are left exactly as Material sets them. This is a
  * typeface change and nothing else: the screens size their own text against XmbLayoutSpec, and a
@@ -46,20 +52,20 @@ private fun interWeight(weight: FontWeight, axis: Int): Font = Font(
 internal fun pfpTypography(): Typography {
     val base = Typography()
     return Typography(
-        displayLarge = base.displayLarge.copy(fontFamily = InterFontFamily),
-        displayMedium = base.displayMedium.copy(fontFamily = InterFontFamily),
-        displaySmall = base.displaySmall.copy(fontFamily = InterFontFamily),
-        headlineLarge = base.headlineLarge.copy(fontFamily = InterFontFamily),
-        headlineMedium = base.headlineMedium.copy(fontFamily = InterFontFamily),
-        headlineSmall = base.headlineSmall.copy(fontFamily = InterFontFamily),
-        titleLarge = base.titleLarge.copy(fontFamily = InterFontFamily),
-        titleMedium = base.titleMedium.copy(fontFamily = InterFontFamily),
-        titleSmall = base.titleSmall.copy(fontFamily = InterFontFamily),
-        bodyLarge = base.bodyLarge.copy(fontFamily = InterFontFamily),
-        bodyMedium = base.bodyMedium.copy(fontFamily = InterFontFamily),
-        bodySmall = base.bodySmall.copy(fontFamily = InterFontFamily),
-        labelLarge = base.labelLarge.copy(fontFamily = InterFontFamily),
-        labelMedium = base.labelMedium.copy(fontFamily = InterFontFamily),
-        labelSmall = base.labelSmall.copy(fontFamily = InterFontFamily),
+        displayLarge = base.displayLarge.copy(fontFamily = InstrumentSansFontFamily),
+        displayMedium = base.displayMedium.copy(fontFamily = InstrumentSansFontFamily),
+        displaySmall = base.displaySmall.copy(fontFamily = InstrumentSansFontFamily),
+        headlineLarge = base.headlineLarge.copy(fontFamily = InstrumentSansFontFamily),
+        headlineMedium = base.headlineMedium.copy(fontFamily = InstrumentSansFontFamily),
+        headlineSmall = base.headlineSmall.copy(fontFamily = InstrumentSansFontFamily),
+        titleLarge = base.titleLarge.copy(fontFamily = InstrumentSansFontFamily),
+        titleMedium = base.titleMedium.copy(fontFamily = InstrumentSansFontFamily),
+        titleSmall = base.titleSmall.copy(fontFamily = InstrumentSansFontFamily),
+        bodyLarge = base.bodyLarge.copy(fontFamily = InstrumentSansFontFamily),
+        bodyMedium = base.bodyMedium.copy(fontFamily = InstrumentSansFontFamily),
+        bodySmall = base.bodySmall.copy(fontFamily = InstrumentSansFontFamily),
+        labelLarge = base.labelLarge.copy(fontFamily = InstrumentSansFontFamily),
+        labelMedium = base.labelMedium.copy(fontFamily = InstrumentSansFontFamily),
+        labelSmall = base.labelSmall.copy(fontFamily = InstrumentSansFontFamily),
     )
 }
