@@ -1316,6 +1316,15 @@ enum class XMBItemType {
     STANDARD,
     ALL_GAMES,
     FAVORITES,
+    /**
+     * A card in the Shelves column: Favorites, Playing, Completed, Backlog, Recently Added.
+     *
+     * ONE type for all five rather than five. Which shelf it is comes from the row's id through
+     * [shelfCardFor], so the thing that DRAWS a shelf and the thing that OPENS it read the same
+     * answer from the same place — five enum values would be a second list to keep in step with
+     * the first, which is the pair that has bitten this file twice.
+     */
+    SHELF,
     // The Missing bucket: games whose ROM file was gone on the last trustworthy scan. Sits beside
     // All Games / Favorites and only appears when something is actually missing.
     MISSING,
@@ -2635,7 +2644,7 @@ class XMBViewModel @Inject constructor(
                                     title    = card.title,
                                     subtitle = countLabel(card.count, "game", "games"),
                                     insideCovers = s.cardFanCovers[card.cardId].orEmpty(),
-                                    type     = XMBItemType.FAVORITES,
+                                    type     = XMBItemType.SHELF,
                                 )
                             }
                             s.copy(
@@ -7567,13 +7576,31 @@ class XMBViewModel @Inject constructor(
     private fun observeShelfCounts() {
         viewModelScope.launch {
             val marks = PlayState.entries
+            // The LISTS, not the counts. A shelf needs both — how many, to decide whether it
+            // exists at all, and the newest covers inside it, to look like what it holds the way
+            // every other card on the crossbar does. Two queries for one answer would be two
+            // answers: a card drawn from one snapshot and counted from another.
             combine(
-                marks.map { gameRepository.observePlayStateCount(it) } +
-                    gameRepository.observeRecentlyAddedCount(),
-            ) { values ->
-                marks.mapIndexed { i, state -> state to values[i] }.toMap() to values.last()
-            }.collect { (counts, recent) ->
-                _uiState.update { it.copy(playStateCounts = counts, recentlyAddedCount = recent) }
+                marks.map { gameRepository.observeByPlayState(it) } +
+                    gameRepository.observeRecentlyAdded(),
+            ) { lists ->
+                val byState = marks.mapIndexed { i, state -> state to lists[i] }.toMap()
+                byState to lists.last()
+            }.collect { (byState, recentlyAdded) ->
+                _uiState.update { state ->
+                    state.copy(
+                        playStateCounts = byState.mapValues { (_, games) -> games.size },
+                        recentlyAddedCount = recentlyAdded.size,
+                        // Merged into the map the Games root already fills, because one row asks
+                        // one question of it: "what is inside this card". Favorites' own fan is
+                        // written by observeCategories, which is where its list already is.
+                        cardFanCovers = state.cardFanCovers +
+                            byState.entries.associate { (mark, games) ->
+                                "$SHELF_MARKED_PREFIX${mark.name}" to fanCoversOf(games)
+                            } +
+                            (SHELF_RECENT_ID to fanCoversOf(recentlyAdded)),
+                    )
+                }
             }
         }
     }

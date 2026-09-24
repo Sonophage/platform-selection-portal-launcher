@@ -116,7 +116,13 @@ import com.psplauncher.core.ui.icons.systemIconRes
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.feature.xmb.viewmodel.GRID_COVER_COUNT
 import com.psplauncher.core.domain.model.PlayState
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.psplauncher.feature.xmb.viewmodel.pillsFor
+import com.psplauncher.feature.xmb.viewmodel.shelfCardFor
+import com.psplauncher.feature.xmb.viewmodel.ShelfCard
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.NewReleases
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
 import com.psplauncher.core.ui.image.rememberArtworkModel
@@ -1281,6 +1287,28 @@ private fun XmbItemLeadingIcon(
         // Missing sits beside All Games / Favorites but is not console art — it gets the same "?"
         // a help glyph, at the memory-card icon size so it lines up with
         // the cards above it. Themeable via the item_missing slot like any other vector row.
+        // A SHELF: Favorites, Playing, Completed, Backlog, Recently Added.
+        //
+        // Reached only when the row has no covers to show — the art grid above takes precedence,
+        // so a shelf with games in it looks like its games and a shelf whose games have no artwork
+        // still says what it is. Material glyphs rather than sysicon art: there is no console
+        // behind a shelf, and five new pieces of art for five states is five things to redraw the
+        // next time the theme changes.
+        item.type == XMBItemType.SHELF -> {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(LEADING_ICON_SIZE).selectedIconBloom(isSelected),
+                ) {
+                    Icon(
+                        imageVector = shelfGlyphFor(item.id),
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(LEADING_ICON_SIZE),
+                    )
+                }
+            }
+        }
         item.type == XMBItemType.MISSING -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.width(LEADING_ICON_SLOT)) {
                 Box(
@@ -1585,4 +1613,22 @@ private fun PlayStateBadge(state: PlayState, dimmed: Boolean) {
             fontWeight = FontWeight.Bold,
         )
     }
+}
+
+/**
+ * The glyph for one shelf, from the id that also opens it.
+ *
+ * Read through shelfCardFor rather than matched on strings here, so the drawing and the opening
+ * cannot disagree about which shelf a row is — and a mark the enum no longer has falls to the
+ * same neutral glyph rather than to whatever the last branch happened to be.
+ */
+private fun shelfGlyphFor(cardId: String): ImageVector = when (val shelf = shelfCardFor(cardId)) {
+    is ShelfCard.Favorites -> Icons.Filled.Star
+    is ShelfCard.RecentlyAdded -> Icons.Filled.NewReleases
+    is ShelfCard.Marked -> when (shelf.state) {
+        PlayState.PLAYING -> Icons.Filled.PlayCircle
+        PlayState.COMPLETED -> Icons.Filled.CheckCircle
+        PlayState.BACKLOG -> Icons.Filled.Bookmarks
+    }
+    null -> Icons.Filled.Star
 }
