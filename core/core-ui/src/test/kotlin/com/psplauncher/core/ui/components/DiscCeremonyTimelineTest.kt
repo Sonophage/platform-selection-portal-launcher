@@ -91,10 +91,16 @@ class DiscCeremonyTimelineTest {
 
     @Test
     fun `the part you wait through lands in the intended window`() {
-        // The brief was 3-4 seconds and is now around five: three read as a wipe on the handheld
-        // rather than as a ceremony, and the disc's exit has since moved in front of the hand-off
-        // as well. The RANGE is what this test is for, not the exact number — it exists so a
-        // phase tweak cannot quietly halve the thing or double it.
+        // The brief was 3-4 seconds and is now six: three read as a wipe on the handheld rather
+        // than as a ceremony, the disc's exit has since moved in front of the hand-off, and the
+        // redesign asked for longer again — "i would make it longer to about 6 seconds". The
+        // RANGE is what this test is for, not the exact number — it exists so a phase tweak
+        // cannot quietly halve the thing or double it.
+        //
+        // The window moves WITH the intended value rather than being widened to swallow it. Left
+        // at 4_200..6_000 it would still have passed, with the value sitting exactly on the
+        // ceiling — a guard touching the thing it guards catches nothing in one direction and
+        // fires on the next honest nudge for the wrong reason.
         //
         // What is being measured is what the user WAITS for, which ends at the hand-off.
         // Everything after it runs behind an app that is already taking the screen, so counting
@@ -102,7 +108,7 @@ class DiscCeremonyTimelineTest {
         // which is backwards.
         assertTrue(
             "the ceremony takes ${DiscCeremony.HandOffMs}ms to hand off, outside the intended window",
-            DiscCeremony.HandOffMs in 4_200..6_000,
+            DiscCeremony.HandOffMs in 5_400..6_600,
         )
     }
 

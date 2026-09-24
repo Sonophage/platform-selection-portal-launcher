@@ -257,10 +257,12 @@ object DiscCeremony {
     /** Centre stage: the disc fades up and settles at full size. */
     const val FadeInMs = 850
 
-    // The whole thing runs about four and a half seconds to the hand-off now, up from under
-    // three. The brief when this was written was "three to four seconds"; watching it on the
-    // handheld, three was not a ceremony, it was a wipe. The number that matters is HandOffMs --
-    // what the user actually waits through -- and the tail behind it is unchanged.
+    // The whole thing runs about six seconds to the hand-off now, up from four and a half. The
+    // brief when this was written was "three to four seconds"; watching it on the handheld, three
+    // was not a ceremony, it was a wipe, and four and a half was still short of what the redesign
+    // asked for -- "right now this is set to 4.5 i would make it longer to about 6 seconds". The
+    // number that matters is HandOffMs -- what the user actually waits through -- and the tail
+    // behind it is unchanged.
 
     /** It is drawn downward until its centre reaches the bottom edge — half in, half out. */
     const val SinkMs = 1150
@@ -273,8 +275,13 @@ object DiscCeremony {
      * drawn under; both are movements with an end, and stretching either just makes the disc
      * slow. The spin is the part with no destination — it can run as long as the ceremony wants
      * and still read as a machine getting up to speed.
+     *
+     * It has now absorbed that time twice. The 1500 ms that took the hand-off from 4500 to 6000
+     * went here and nowhere else, for the reason above: every other phase is a movement with a
+     * destination, and lengthening one of those makes the disc look slow rather than the ceremony
+     * look long.
      */
-    const val SpinMs = 1850
+    const val SpinMs = 3350
 
     /**
      * The disc's own departure — it shrinks away and the iris closes behind it.
