@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -226,6 +227,19 @@ class DisplaySettingsViewModel @Inject constructor(
     private val launchDiscPreferences: com.psplauncher.core.data.launch.LaunchDiscPreferences,
     private val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer,
     private val controllerLayout: ControllerLayoutRepository,
+    /**
+     * Where the disk work goes. Injected so a test can put it on its own scheduler.
+     *
+     * It was a hard-coded Dispatchers.IO in five places, and that is what made
+     * DisplaySettingsViewModelFontColorTest flaky: the test drives VIRTUAL time, the luma
+     * computation and the DataStore read hop to a REAL thread pool, and under a full-suite run
+     * that pool is contended by fifteen other modules. The wait then expires on wall-clock with
+     * the work still queued -- which reads as a product bug and is not one. The budget had
+     * already been raised 10s -> 60s once and it still timed out, because no timeout fixes a
+     * race between two clocks.
+     */
+    @com.psplauncher.feature.settings.di.SettingsIoDispatcher
+    private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val _wallpaperMessage  = MutableStateFlow<String?>(null)
@@ -315,7 +329,7 @@ class DisplaySettingsViewModel @Inject constructor(
         )
     }
         // uiMediaStore.assignments() is a directory listing — cheap, but still file IO.
-        .flowOn(Dispatchers.IO)
+        .flowOn(io)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DisplaySettingsUiState())
 
     // ── Boot / GameBoot media ─────────────────────────────────────────────────
@@ -552,7 +566,7 @@ class DisplaySettingsViewModel @Inject constructor(
             // Survey the new wallpaper BEFORE opening the transaction: edit{}'s transform may be
             // re-run under contention, and a bitmap decode is not something to repeat under a lock.
             // Free here — we are already off the main thread behind the import spinner.
-            val luma = withContext(Dispatchers.IO) {
+            val luma = withContext(io) {
                 WallpaperLuminanceProbe.survey(dest.absolutePath)
             }
             // All three keys together — even though a still import never sets the motion key, a
@@ -648,7 +662,7 @@ class DisplaySettingsViewModel @Inject constructor(
         // inSampleSize. The poster is what the XMB paints under its text while a motion wallpaper
         // loads, and live frames drift from it — protection is biased one step stronger at render
         // time when KEY_MOTION_WALLPAPER is set, rather than by fudging the numbers here.
-        val luma = withContext(Dispatchers.IO) {
+        val luma = withContext(io) {
             WallpaperLuminanceProbe.survey(posterDest.absolutePath)
         }
 
@@ -727,7 +741,7 @@ class DisplaySettingsViewModel @Inject constructor(
     /** Deletes every file in the wallpaper dir except the ones just applied (pair-safe). */
     private suspend fun pruneWallpaperDir(keep: List<File>) {
         val keepNames = keep.map { it.name }.toSet()
-        withContext(Dispatchers.IO) {
+        withContext(io) {
             wallpaperDir().listFiles()?.forEach { f ->
                 if (f.name !in keepNames) runCatching { f.delete() }
             }
@@ -748,7 +762,7 @@ class DisplaySettingsViewModel @Inject constructor(
                 it.clearWallpaperLuma()
             }
             // Then the files (prefs gone first, so nothing references them while they delete).
-            withContext(Dispatchers.IO) {
+            withContext(io) {
                 poster?.let { runCatching { File(it).delete() } }
                 motion?.let { runCatching { File(it).delete() } }
             }

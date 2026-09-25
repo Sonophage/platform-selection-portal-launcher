@@ -68,6 +68,12 @@ class DisplaySettingsViewModelFontColorTest {
                     com.psplauncher.core.domain.model.ControllerLayoutPrefs()
                 )
             },
+            // The disk work runs on the TEST scheduler, not a real pool. Without this the
+            // ViewModel's luma computation and DataStore reads hop to Dispatchers.IO while this
+            // test advances virtual time, and the wait below expires on wall-clock under a
+            // loaded full-suite run with the work still queued. Raising the budget cannot fix a
+            // race between two clocks; it had already gone 10s -> 60s and still timed out.
+            io = dispatcher,
         )
     }
 
