@@ -112,37 +112,71 @@ Measured on the real NP05J tablet (1067×668dp) on 2026-09-25:
 holds all 66 apps, the 6-row grid fills the panel and there is no band. Measure a tab with a long
 rest list before touching it. Settings and the XMB are sparse regardless.
 
-### The pattern to copy
+### Size is already the user's, so the layout's job is to FILL, not to choose
 
-`StudioGridCapacity` is the one place in this repo that sizes by measurement, and its stated rule
-is the right one: **"a larger screen gets more columns and rows, never bigger tiles."**
+Asked whether "responsive" meant more content or larger content, the owner's answer was
+**neither** — the app already has a size control, so the layout must simply show as much as fits
+at whatever size is set. That is a better answer than either option, and it makes the work
+concrete.
+
+The control is `XmbLayoutAdjust.scale` (0.6–1.8, stored **per form-factor bucket** so a handheld
+and a tablet keep separate tuning), written by the live "Adjust XMB Layout" editor. It is applied
+as a DENSITY MULTIPLIER:
+
+```kotlin
+// XMBShell.kt:621
+LocalDensity provides Density(baseDensity.density * uiScale * layoutAdjust.scale, baseDensity.fontScale)
+```
+
+Which is why no size policy is needed: everything inside that provider already grows and shrinks
+with the slider. So there are exactly two defects, and neither is about taste.
+
+**(a) The slider does not reach the screens with the dead space.** Grep finds no
+`XmbLayoutAdjust`, `layoutAdjust` or `uiScale` anywhere in feature-appbar or `SettingsScaffold`.
+The App Drawer and Settings are composed outside that provider, so the one control the user has
+over size does nothing on them.
+
+```sh
+grep -rn "XmbLayoutAdjust\|layoutAdjust\|uiScale" --include="*.kt" feature/feature-appbar/ \
+  feature/feature-settings/src/main/kotlin/com/psplauncher/feature/settings/ui/SettingsScaffold.kt
+```
+
+**(b) The counts are constants, so they cannot fill anything.** `SECTION_LIST_ROWS = 6`
+(`SectionLayout.kt:28`) and the fixed panel widths are what leave 190dp bare on a 668dp panel and
+~545dp bare beside a 522dp Settings list. A measured count — `floor(available / rowHeight)`,
+where `rowHeight` already scales with the slider — fills the panel at every size by construction.
+
+`StudioGridCapacity` is the worked example already in the repo: it sizes by measurement,
 `MIN_COLUMNS 3 / MAX_COLUMNS 8 / MAX_ROWS 6`.
 
-### The constraint that makes this real work
+### The pair that has to be guarded in the same commit
 
-`GridCells.Adaptive` **breaks D-pad navigation on every device** unless the measured column count
-is fed back into `moveSearch` / `gridMove`. The grid change is the easy half; that feedback is the
-work, and it is the part that will produce a cursor that walks off the end of a row.
+`SECTION_LIST_ROWS` is read eight times across **two concerns in two files**, and they must agree:
 
-It is also Rule 13 exactly — a column count and the arithmetic that steps through it are a pair,
-and only one of them currently exists. Guard the seam in the same commit that splits it.
+- to lay out — `GridCells.Fixed(...)` and the block's height (`AppDrawerSection.kt:126,128`)
+- to navigate — `local % ...` / `local / ...` and the column steps (`SectionLayout.kt:58-71`)
+
+```sh
+grep -rn "SECTION_LIST_ROWS" --include="*.kt" feature/feature-appbar/src/main/kotlin/
+```
+
+The moment it becomes measured, a layout that fits 9 rows while the cursor still steps by 6 walks
+the selection onto the wrong app with nothing to catch it. Rule 13, and the cheapest guard is a
+test that drives the same measured number into both. `GridCells.Adaptive` has the identical
+problem in Search and the App Picker via `moveSearch` / `gridMove`.
 
 ### Order
 
-1. **Settings root first.** One screen, no D-pad grid, no cursor arithmetic — the list simply
-   does not need to be 522dp wide on a 1067dp panel. Lowest risk, most visible.
-2. **The XMB crossbar** is a deliberate fixed composition; leave it. Its sparseness is the design.
-3. **Search and the App Picker** last, together, because they share the grid-cursor problem and
-   fixing one without the other leaves the pair half-guarded.
-
-### Open question for the owner
-
-"Responsive" has two readings and they produce different apps: **more content** (more columns,
-more rows — the Studio's rule) or **larger content** (same count, bigger tiles, for a device held
-further away). The Studio already chose the first. Confirm that holds everywhere before any of
-this is built.
-
----
+1. **Settings root.** One screen, no grid, no cursor arithmetic — just a list that has no reason
+   to be 522dp wide on a 1067dp panel. Lowest risk, most visible.
+2. **App Drawer's "Everything else".** `SECTION_LIST_ROWS` becomes measured, and `SectionLayout`
+   is handed the same number in the same commit.
+3. **Search and the App Picker together**, because they share the grid-cursor pair and fixing one
+   leaves the other half-guarded.
+4. **Extend the scale provider to the chrome screens**, or decide deliberately that chrome stays
+   at base density. Right now it is neither — it is simply unwired.
+5. **The XMB crossbar is left alone.** Its composition is deliberate and the slider already works
+   there.
 
 ## 4. Known bads — DONE
 
