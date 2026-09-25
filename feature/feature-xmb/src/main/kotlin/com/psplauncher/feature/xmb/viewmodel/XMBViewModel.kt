@@ -5424,14 +5424,23 @@ class XMBViewModel @Inject constructor(
                 if (!includeApps) return@map filter to emptyList<Pair<Long, XMBItem>>()
                 val rows = appCategoryRepository.allInstalledApps()
                     .filter { it.lastUsedAt > 0L }
+                    // Removed from the shelf by hand. Filtered here rather than at the merge for
+                    // the reason in this function's doc: one list, so ALL and APPS cannot
+                    // disagree about what is on the shelf.
+                    .filterNot { isHiddenAt(HiddenPlacement.appKey(it.packageName), HideLocationType.RECENTS) }
                     .sortedByDescending { it.lastUsedAt }
                     .take(RECENTLY_PLAYED_LIMIT)
                     .map { app ->
                         app.lastUsedAt to XMBItem(
-                            id = "recentapp_${app.packageName}",
+                            id = "$RECENT_APP_ID_PREFIX${app.packageName}",
                             title = app.label,
                             subtitle = "App",
                             packageName = app.packageName,
+                            // Says what it is. XMBItemList picks its leading art with
+                            // `isAndroidApp && packageName != null`, so without this the shelf's
+                            // app rows matched no branch and drew with no icon — and the backdrop
+                            // behind them had nothing to read either.
+                            isAndroidApp = true,
                         )
                     }
                 filter to rows
@@ -6954,7 +6963,9 @@ class XMBViewModel @Inject constructor(
     private fun openAppContextMenu(item: XMBItem, categoryIdOverride: String? = null) {
         val pkg = item.packageName ?: return
         val categoryId = categoryIdOverride ?: currentCategory()?.id
-        val items = appContextMenuItems(_uiState.value, categoryId)
+        // The shelf builds its rows with this id prefix and nothing else does, so it is the
+        // caller's honest answer to "did this row come from the home shelf".
+        val items = appContextMenuItems(_uiState.value, categoryId, onRecentShelf = item.id.startsWith(RECENT_APP_ID_PREFIX))
         val (_, overflow) = items.splitForOverflow()
 
         _uiState.update { it.copy(
@@ -7483,6 +7494,12 @@ class XMBViewModel @Inject constructor(
                     "hide_from_category" -> menu.categoryContext?.let { cat ->
                         persistHide(HiddenPlacement.appKey(pkg), menu.title, HideLocationType.CATEGORY, cat, categoryDisplayName(cat))
                     }
+                    // A hide, not a clear: UsageStatsManager owns the timestamp and offers no
+                    // way to forget one. Recoverable in Settings ▸ Hidden Items like every other
+                    // placement, which is the whole reason it is a placement.
+                    "remove_from_recent" -> persistHide(
+                        HiddenPlacement.appKey(pkg), menu.title, HideLocationType.RECENTS, "", "Recently Played",
+                    )
                     "hide_everywhere" -> appAction { appCategoryRepository.setHidden(pkg, true) }
                     "rename"    -> _uiState.update {
                         it.copy(renameAppTarget = pkg, renameAppCurrent = menu.title, renameAppText = menu.title)
@@ -10680,6 +10697,15 @@ class XMBViewModel @Inject constructor(
         // ("File not found" alone reads as permanent) because dropping the file back reactivates it.
         private const val MISSING_REASON = "File not found on last scan"
         private const val ADD_APPS_ITEM_ID = "add_apps"
+        /**
+         * The home shelf's app rows, and the only rows with this prefix.
+         *
+         * Named once because two things read it now: the builder that makes the id and the
+         * context menu asking whether a row came off the shelf. A literal in both places is
+         * the pair that stops agreeing the day the prefix changes, and the symptom would be
+         * a menu quietly missing one item.
+         */
+        internal const val RECENT_APP_ID_PREFIX = "recentapp_"
         private const val ADD_GAMES_ITEM_ID = "add_games"
         private const val FIND_GAMES_ITEM_ID = "find_games"
         // Platform id whose library is built from installed apps (picker) instead of ROM scans.

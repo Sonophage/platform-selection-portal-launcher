@@ -5,6 +5,35 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-09-24
+
+### Added
+- **Remove from Recent, for apps.** The home shelf offered it on games, videos and books but never
+  on an app, because an app's recency is not the launcher's to delete: it comes from Android's
+  UsageStatsManager, which has no way to forget a single entry. So this hides the app from the
+  shelf instead of clearing a timestamp, and like every other hide it is recoverable in
+  Settings ▸ Hidden Items rather than being permanent.
+
+- **An app with no artwork now has a background of its own** — its icon, blown up until it is
+  colour rather than picture, behind the focused row. Games have always had cover art to sit on
+  and apps had nothing but the wallpaper.
+
+  The softening is a downscale and re-upscale rather than a blur filter, deliberately: the filter
+  is RenderEffect, which does nothing at all below Android 12, and this app supports Android 10 —
+  so the "blurred" background would have been a sharp stretched icon on the older half of the
+  range, with nothing to say it had failed.
+
+### Fixed
+- **Apps on the home shelf were drawing with no icon.** The shelf built its rows without marking
+  them as Android apps, so the list's app-icon branch never matched them and they rendered as a
+  bare label. Found while giving those same rows a background.
+
+- **"Hide from Last Played" did nothing to an app on the shelf.** It wrote a per-category hide,
+  and the shelf's app rows were never filtered by one — so the row stayed exactly where it was.
+  The shelf now offers "Remove from Recent" instead, which is read, and the dead entry is gone
+  from that one menu; it still works everywhere else it appears.
+
+
 ## [1.11.0] - 2026-09-24
 
 ### Added

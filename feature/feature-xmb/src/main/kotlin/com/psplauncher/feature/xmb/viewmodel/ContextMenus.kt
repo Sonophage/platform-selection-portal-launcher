@@ -182,9 +182,17 @@ internal fun gameContextMenuItems(
  * [categoryId] is the category the app is being acted on from — null when the app is not being
  * shown inside one, which removes every per-category row at once.
  */
+/**
+ * An installed app's options.
+ *
+ * [onRecentShelf] is passed rather than derived, for the same reason the game menu passes it:
+ * only the caller knows which list the row came from. No default — a caller that forgets it would
+ * silently drop the one item that is not recoverable from anywhere else on the row.
+ */
 internal fun appContextMenuItems(
     state: XMBUiState,
     categoryId: String?,
+    onRecentShelf: Boolean,
 ): List<XMBContextMenuItem> = buildList {
     add(XMBContextMenuItem("launch", "Launch"))
     add(XMBContextMenuItem("edit_app", "Edit App Details"))
@@ -194,6 +202,10 @@ internal fun appContextMenuItems(
     // app by package) so it can live in Favorites / Collections without duplicating the app's
     // metadata. Works for every Android app, GameHub included.
     add(XMBContextMenuItem("favorite", "Add to Favorites", heading = "Library"))
+    // Sits under Library beside Favorites, where the game menu puts it, because it is the same
+    // kind of statement: something you say about the row rather than something the launcher
+    // worked out. Unlike the game's, this one cannot clear the timestamp — see RECENTS.
+    if (onRecentShelf) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent"))
     add(XMBContextMenuItem("add_to_collection", "Add to Collection"))
     add(XMBContextMenuItem("move", "Move to Category", heading = "Category"))
     add(XMBContextMenuItem("add", "Add to Category"))
@@ -201,7 +213,14 @@ internal fun appContextMenuItems(
         add(XMBContextMenuItem("remove", "Remove from Category"))
         add(XMBContextMenuItem("pin", "Pin to Category"))
         // Per-location hide (recoverable in Settings ▸ Hidden Items).
-        add(XMBContextMenuItem("hide_from_category", "Hide from ${state.categoryDisplayNameOf(categoryId)}"))
+        //
+        // NOT on the home shelf, where "Remove from Recent" above already means this and is the
+        // only one of the two that works. The shelf's app rows are filtered by RECENTS alone —
+        // a CATEGORY record against Last Played is written and then read by nothing, so the row
+        // stayed put and the menu looked broken. One intent, one item, and the one that acts.
+        if (!onRecentShelf) {
+            add(XMBContextMenuItem("hide_from_category", "Hide from ${state.categoryDisplayNameOf(categoryId)}"))
+        }
     }
     add(XMBContextMenuItem("hide_everywhere", "Hide Everywhere", heading = "Remove"))
     add(XMBContextMenuItem("rename", "Rename Shortcut"))

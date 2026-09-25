@@ -64,6 +64,41 @@ class ContextMenusTest {
     // ── Where the row came from ───────────────────────────────────────────
 
     @Test
+    fun `an app off the home shelf has no remove from recent`() {
+        val items = ids(appContextMenuItems(state(), categoryId = null, onRecentShelf = false))
+        assertFalse(
+            "an app reached from a category has no shelf entry to remove, so offering it would " +
+                "name an action with nothing to act on",
+            items.contains("remove_from_recent"),
+        )
+    }
+
+    @Test
+    fun `the home shelf offers one way to take an app off it, not two`() {
+        val cats = listOf(category(BuiltInCategory.GAMES, gaming = true), category("retro", gaming = true))
+        val shelf = ids(appContextMenuItems(state(cats), categoryId = "retro", onRecentShelf = true))
+        assertTrue("the working one is offered", shelf.contains("remove_from_recent"))
+        assertFalse(
+            "hide_from_category writes a CATEGORY record and the shelf reads only RECENTS, so " +
+                "offering it here would be a second item for one intent that does nothing",
+            shelf.contains("hide_from_category"),
+        )
+        // Off the shelf it is the only per-location hide there is, and it works.
+        val elsewhere = ids(appContextMenuItems(state(cats), categoryId = "retro", onRecentShelf = false))
+        assertTrue("still offered everywhere else", elsewhere.contains("hide_from_category"))
+    }
+
+    @Test
+    fun `an app on the home shelf can be removed from recent`() {
+        val items = ids(appContextMenuItems(state(), categoryId = null, onRecentShelf = true))
+        assertTrue(
+            "the shelf is the one place an app's recency is visible, so it is the one place it " +
+                "can be taken off — UsageStatsManager owns the timestamp and will not forget it",
+            items.contains("remove_from_recent"),
+        )
+    }
+
+    @Test
     fun `remove from recent is offered only on the home shelf`() {
         assertFalse("remove_from_recent" in ids(gameContextMenuItems(game(), state(), 1, false, null)))
         assertTrue("remove_from_recent" in ids(gameContextMenuItems(game(), state(), 1, true, null)))
@@ -205,7 +240,7 @@ class ContextMenusTest {
 
     @Test
     fun `an app outside any category loses every per-category row`() {
-        val items = ids(appContextMenuItems(state(), categoryId = null))
+        val items = ids(appContextMenuItems(state(), categoryId = null, onRecentShelf = false))
         listOf("remove", "pin", "hide_from_category").forEach {
             assertFalse("$it must not be offered with no category", it in items)
         }
@@ -217,7 +252,7 @@ class ContextMenusTest {
     @Test
     fun `hide from category names the category`() {
         val cats = listOf(category("retro"))
-        val items = appContextMenuItems(state(cats), categoryId = "retro")
+        val items = appContextMenuItems(state(cats), categoryId = "retro", onRecentShelf = false)
         assertEquals("Hide from retro", items.first { it.id == "hide_from_category" }.label)
     }
 
@@ -336,7 +371,7 @@ class ContextMenusTest {
                 }
             }
         }
-        val app = ids(appContextMenuItems(state(), "retro"))
+        val app = ids(appContextMenuItems(state(), "retro", onRecentShelf = false))
         assertEquals(app.distinct(), app)
     }
 

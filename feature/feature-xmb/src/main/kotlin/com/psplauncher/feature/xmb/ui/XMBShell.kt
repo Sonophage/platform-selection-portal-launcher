@@ -693,6 +693,16 @@ fun XMBShell(
 
             val selectedItem = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
             val selectedBg = uiState.focusedItemBackdrop?.takeIf { uiState.itemBackdropEnabled }
+            // What goes behind the focused row, as ONE value rather than two nullable ones that
+            // the Crossfade below would have to be keyed on separately. Artwork wins wherever
+            // there is any; an app that has none falls back to its own icon, which is the only
+            // image it owns. Anything with neither keeps the wallpaper, as before.
+            val backdrop: XmbBackdrop? = when {
+                selectedBg != null -> XmbBackdrop.Art(selectedBg)
+                uiState.itemBackdropEnabled && selectedItem?.isAndroidApp == true &&
+                    selectedItem.packageName != null -> XmbBackdrop.AppIcon(selectedItem.packageName)
+                else -> null
+            }
             // PS3 placement: the approved snap plays full-bleed here instead of in the tile,
             // over the still art and UNDER the legibility scrim, so the crossbar keeps the same
             // contrast it has over a still background. Same FocusedGameVideo, same gates, same
@@ -708,7 +718,7 @@ fun XMBShell(
             // every step of the cursor, so a long fade is the one animation that is always running
             // — and the wave now draws OVER it, which makes a slow swap underneath read as the
             // picture lagging behind the row that named it.
-            Crossfade(targetState = selectedBg, animationSpec = tween(180), label = "xmbGameBackground") { bg ->
+            Crossfade(targetState = backdrop, animationSpec = tween(180), label = "xmbGameBackground") { bg ->
                 if (bg != null || backgroundSnap != null) {
                     Box(Modifier.fillMaxSize()) {
                         // The clip goes UNDER the still, not over it. With a snap playing, the
@@ -721,16 +731,22 @@ fun XMBShell(
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
-                        if (bg != null) AsyncImage(
-                            model = rememberArtworkModel(bg),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                // Full-bleed with no clip to reveal: masking it then would fade
-                                // the artwork into the bare wallpaper for no reason.
-                                .then(if (backgroundSnap != null) Modifier.xmbStillOverVideo() else Modifier),
-                        )
+                        when (bg) {
+                            is XmbBackdrop.Art -> AsyncImage(
+                                model = rememberArtworkModel(bg.uri),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // Full-bleed with no clip to reveal: masking it then would fade
+                                    // the artwork into the bare wallpaper for no reason.
+                                    .then(if (backgroundSnap != null) Modifier.xmbStillOverVideo() else Modifier),
+                            )
+                            // No xmbStillOverVideo mask: an app row never has a snap playing
+                            // behind it, so there is nothing to reveal.
+                            is XmbBackdrop.AppIcon -> XmbAppIconBackdrop(bg.packageName)
+                            null -> Unit
+                        }
                         // Legibility scrim over the artwork. Deliberately light-handed: heavier
                         // alphas dim the art too much, so darker photos lose their vibrancy — the
                         // icons/labels carry their own contrast (tiles, glows, text shadows).

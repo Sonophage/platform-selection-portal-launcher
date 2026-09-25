@@ -62,7 +62,7 @@ class PillActionsTest {
 
     @Test
     fun `every app pill is a row the app menu offers`() {
-        val menu = appContextMenuItems(state(), categoryId = null).map { it.id }
+        val menu = appContextMenuItems(state(), categoryId = null, onRecentShelf = false).map { it.id }
         pillsFor(app()).forEach { pill ->
             assertTrue(
                 "pill '${pill.label}' dispatches '${pill.id}', which the app menu does not offer: $menu",
