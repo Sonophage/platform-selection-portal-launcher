@@ -187,17 +187,6 @@ class DisplaySettingsViewModelFontColorTest {
     }
 
     /** Same wait idiom as the sibling legibility test — see its KDoc. */
-    private suspend fun TestScope.eventually(reason: String, condition: suspend () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 10_000
-        while (!condition()) {
-            if (System.currentTimeMillis() > deadline) {
-                throw AssertionError("condition not met within 10s: $reason")
-            }
-            advanceUntilIdle()
-            withContext(Dispatchers.IO) { Thread.sleep(25) }
-        }
-        advanceUntilIdle()
-    }
 
     private companion object {
         // Mirrored by their string contract, like the sibling tests — these keys are private to

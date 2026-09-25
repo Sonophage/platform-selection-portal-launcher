@@ -6,6 +6,28 @@ All notable changes to PSPLauncher are documented here. This project follows
 ## [Unreleased]
 
 ### Changed
+- **The App Drawer's header is one search field.** It was `‹ Android › Recently Used` on the left,
+  a 220dp box in the middle and a magnifier labelled "Search" on the right — four things saying
+  two, both of them twice. The category tabs directly below already name the active filter and
+  underline it, and the box's own placeholder already says Search. What is left is the field, so
+  the field gets the whole row: pill-shaped, full width, the magnifier inside it. Tapping anywhere
+  on it focuses it and raises the keyboard, which is what the button used to do. Back went too —
+  it is on the bar at the bottom of every screen now.
+
+- **Settings draws the same bottom bar as everything else**, so the black pill is gone from the
+  last screen that had one. The focused row's explanation moved into the bar's middle, which is
+  empty space on every other screen; that band was 44dp and the bar is 34dp, so the list gained
+  10dp rather than paying for a second band.
+
+- **The notification sheet opens from anywhere the strip is drawn**, by Start or by pressing the
+  strip's corner — not just from the crossbar. It already took every key while open, so it is
+  navigable over the App Drawer, Settings, Search and the detail pages exactly as it is over the
+  crossbar. The bottom bar follows it: the screen underneath stops showing prompts for presses the
+  sheet has taken.
+
+  The game page is the one screen that keeps Start for itself, because the Artwork Studio lives
+  inside it and applies its queue with Start. It hands the press back the moment the Studio closes.
+
 - **The status strip is global.** The clock, the battery, the connection icons and the notification
   count stay on top of the App Drawer, Settings, Search and the game and app pages, instead of
   disappearing the moment you walked into one of them and coming back when you left. It is still
@@ -21,9 +43,6 @@ All notable changes to PSPLauncher are documented here. This project follows
   full-bleed artwork and not only over the dark wave. Measured on the device: it darkens the top
   edge by 46 of 255 and is gone by the band's bottom edge.
 
-  One thing deliberately left behind: the notification corner shows its count everywhere but is
-  only pressable on the crossbar. The sheet draws above these screens but their d-pad handling is
-  their own, and a corner that opens something you cannot walk is worse than one that does nothing.
 
 - **One bottom bar, on every screen.** Search, the App Drawer and the game and app detail pages
   each drew their own version of the controller hints — an inline row, a black pill and a pill in

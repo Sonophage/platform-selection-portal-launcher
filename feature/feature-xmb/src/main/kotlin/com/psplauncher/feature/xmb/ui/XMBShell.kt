@@ -1406,13 +1406,12 @@ fun XMBShell(
                 showSortButton = uiState.resolvedShowTouchButton && xmbContext,
                 onSortTapped = onXmbSortTapped,
                 live = liveActivity,
-                // The COUNT shows on every screen; the PRESS belongs to the crossbar for now.
-                // The sheet draws above the chrome screens (NotificationBarZ is 0.5, they are at
-                // 0), but their d-pad handling is their own -- opening it over the App Drawer
-                // would put a sheet on screen that the drawer's cursor cannot walk. A corner that
-                // opens something unnavigable is worse than one that does nothing, so it goes
-                // inert until the sheet can take the keys back from whatever is under it.
-                onLiveAreaTapped = onNotificationsToggled.takeIf { xmbContext },
+                // Pressable wherever the strip is drawn, not only on the crossbar. The sheet
+                // draws above the chrome screens (NotificationBarZ is 0.5, they are at 0) AND it
+                // already captures every key while it is open -- its branch in onGamepadAction
+                // runs before the per-screen routing, so the drawer's cursor never sees the
+                // presses meant for it.
+                onLiveAreaTapped = onNotificationsToggled,
                 // The two navigation hints, each shown only where the press does something.
                 // Shoulder: the hover panel's pages, which exist only on a game that has them.
                 // Left/right: stepping the crossbar, which a drilled-in list does not do.
@@ -1502,8 +1501,12 @@ fun XMBShell(
                 // while the rail wants Select and Close. That is item 12g's job, which redoes this
                 // bar to follow whatever is open; until then the bar is visible and its words are
                 // about the screen behind the menu.
-                visible = (uiState.showContextMenuHint || rootActionsVisible) &&
-                    uiState.stripShowsXmbContext,
+                // The sheet is the topmost thing there is, so its prompts win outright: it can be
+                // opened over the App Drawer, Settings, Search and the detail pages, each of which
+                // draws a bar of its own, and every one of those bars names presses the sheet has
+                // already taken. promptsFor answers the sheet first for the same reason.
+                visible = uiState.notificationsOpen ||
+                    ((uiState.showContextMenuHint || rootActionsVisible) && uiState.stripShowsXmbContext),
                 enter = fadeIn(tween(200)),
                 exit = ExitTransition.None,
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().zIndex(aboveContextRail),
@@ -1832,6 +1835,7 @@ fun XMBShell(
                 GameDetailScreen(
                     gameId = gameId,
                     onBack = onCloseGameDetail,
+                    onNotifications = onNotificationsToggled,
                     autoLaunch = uiState.activeGameAutoLaunch,
                     initialAction = uiState.activeGameAction,
                     initialDiscId = uiState.activeGameDiscId,

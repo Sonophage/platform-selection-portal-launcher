@@ -101,11 +101,10 @@ import androidx.compose.ui.unit.sp
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.isDirectional
 import com.psplauncher.core.ui.sound.MenuSound
-import com.psplauncher.core.ui.components.ControllerHintBar
-import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.gesture.dragToScroll
 import com.psplauncher.core.ui.theme.LocalPFPColors
@@ -419,7 +418,6 @@ internal val LocalSettingsPicker =
     compositionLocalOf { mutableStateOf<SettingsPickerRequest?>(null) }
 
 /** Two lines at [SETTINGS_HELP_TEXT_SP], reserved whether or not there is anything to say. */
-private val SETTINGS_HELP_BAND_HEIGHT = 44.dp
 private const val SETTINGS_HELP_TEXT_SP = 13
 
 /**
@@ -461,30 +459,6 @@ val SettingsDefaultHelperItems = listOf(
  * The wizard still supplies its own themed footer through the scaffold's chrome override, and
  * this is not drawn when it does.
  */
-@Composable
-private fun SettingsHelperFooter(
-    items: List<ControllerPromptItem>,
-    modifier: Modifier = Modifier,
-) {
-    val showHint = LocalSettingsShowControllerHint.current
-    val onAction = LocalSettingsPromptAction.current
-    // Removed rather than faded to alpha 0. An invisible pill that is still laid out would
-    // accept taps on a control nobody can see; as an overlay there is no layout reason to keep
-    // it measured, so it simply goes.
-    AnimatedVisibility(
-        visible = showHint,
-        enter = fadeIn(tween(200)),
-        exit = fadeOut(tween(200)),
-        modifier = modifier,
-    ) {
-        ControllerHintBar(
-            items = items.ifEmpty { SettingsDefaultHelperItems },
-            background = Color.Black.copy(alpha = 0.70f),
-            onAction = onAction,
-            modifier = Modifier.focusProperties { canFocus = false },
-        )
-    }
-}
 
 
 // ── Scaffold ──────────────────────────────────────────────────────────────────
@@ -1335,51 +1309,48 @@ fun SettingsScaffold(
                         .fillMaxWidth()
                         .dragToScroll(contentScrollState.value),
                 ) {
-                    // The focused row's explanation. A FIXED height, always: a band that grew and
-                    // shrank with each row's text would move the list under the cursor every time
-                    // the cursor moved, which is the one thing a settings list must never do.
+                    // The prompts and the focused row's explanation, in ONE band.
                     //
-                    // Hidden while the cursor is, because then there is no focused row to explain
-                    // and the last one's text would be a lie about where you are.
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(SETTINGS_HELP_BAND_HEIGHT)
-                            .padding(start = 48.dp, end = ControllerHintEdgeGap),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    // This is the shared [PfpHintBar] that the crossbar, the App Drawer, Search
+                    // and the detail pages draw, so Settings stops being the last screen with a
+                    // black pill on it. The explanation rides in the bar's centre slot, which was
+                    // empty space on every other screen.
+                    //
+                    // A FIXED height, always -- the bar's own. A band that grew and shrank with
+                    // each row's text would move the list under the cursor every time the cursor
+                    // moved, which is the one thing a settings list must never do. It is 34dp
+                    // against the old 44, so the list gains 10dp rather than paying for a second
+                    // band: stacking the bar under the explanation would have cost 78dp of a
+                    // 462dp screen, which is the strip this band replaced in the first place.
+                    //
+                    // The explanation is hidden while the cursor is, because then there is no
+                    // focused row to explain and the last one's text would be a lie about where
+                    // you are. One line now rather than two: the bar is shorter than the band,
+                    // and the room between the prompt groups is wide.
+                    if (footer == null) {
                         val help = helpText.value?.takeIf { cursorVisible.value && it.isNotBlank() }
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                            if (help != null) {
-                                Text(
-                                    text = help,
-                                    color = SettingsSubtext,
-                                    fontSize = SETTINGS_HELP_TEXT_SP.sp,
-                                    lineHeight = (SETTINGS_HELP_TEXT_SP + 4).sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = TextStyle(shadow = SettingsTextShadow),
-                                )
-                            }
-                        }
-                        // The hints share this band rather than getting one of their own.
-                        //
-                        // They used to sit below it in a full-width strip of their own: a
-                        // divider, centred prompts and 24dp of padding, about 61dp of every
-                        // screen's height, on a display that is 462dp tall. This band is already
-                        // reserved at a fixed height for the focused row's explanation, the pill
-                        // is shorter than it, and the explanation is left-aligned prose that was
-                        // never using the right-hand end. So the whole strip goes and nothing
-                        // moves. It also puts the prompts in the same corner as the XMB's and the
-                        // App Drawer's, instead of centred here and bottom right everywhere else.
-                        //
-                        // Floating it over the content was the other option and it does not fit:
-                        // the rail is 216dp and the content column up to 560dp, which on this
-                        // 821dp-wide screen leaves 45dp clear, so a ~200dp pill would have sat on
-                        // top of the rows' right-hand values.
-                        if (footer == null) {
-                            SettingsHelperFooter(items = helperFooterItems)
-                        }
+                        PfpHintBar(
+                            // Empty rather than hidden when the hints are off: the bar still has
+                            // the explanation to carry, and an AnimatedVisibility around the whole
+                            // band would collapse it and move the list.
+                            items = if (LocalSettingsShowControllerHint.current) {
+                                helperFooterItems.ifEmpty { SettingsDefaultHelperItems }
+                            } else emptyList(),
+                            onAction = LocalSettingsPromptAction.current,
+                            centre = help?.let {
+                                {
+                                    Text(
+                                        text = it,
+                                        color = SettingsSubtext,
+                                        fontSize = SETTINGS_HELP_TEXT_SP.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = TextStyle(shadow = SettingsTextShadow),
+                                    )
+                                }
+                            },
+                            modifier = Modifier.focusProperties { canFocus = false },
+                        )
                     }
                     if (footer != null) {
                         // Footer chrome (Enter / Back prompts) is display-only — never a focus

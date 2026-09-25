@@ -298,14 +298,12 @@ internal fun AppDrawerContent(
         Column(modifier = Modifier.fillMaxSize().padding(top = StatusStripHeight)) {
             // ── Header / breadcrumb bar ──────────────────────────────────
             AppDrawerHeader(
-                categoryLabel = state.activeFilter.label,
                 searchQuery = state.searchQuery,
                 searchActive = searchActive,
                 searchFocus = searchFocus,
                 onSearchToggle = onSearchToggle,
                 onSearchChange = onSearchQueryChange,
                 onSearchDone = onSearchDone,
-                onBack = onBack,
                 colors = sf,
             )
             // Thin accent divider under the header

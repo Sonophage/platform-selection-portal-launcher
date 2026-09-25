@@ -1830,6 +1830,11 @@ fun shouldShowAppDrawerHint(state: XMBUiState, idleMs: Long): Boolean =
     state.contextMenuHintEnabled &&
         state.activeAppDrawerFilter != null &&
         state.activeContextMenu == null &&
+        // The sheet can be pulled down over the drawer now, and it takes every key when it is
+        // open. A bar naming Launch and Options under a sheet that will not deliver either is a
+        // bar telling the user something untrue -- the shell's own bar, which follows whatever
+        // owns the screen, is drawn on top instead.
+        !state.notificationsOpen &&
         idleMs >= (state.contextMenuHintDelaySeconds * 1_000f).toLong()
 
 /**
@@ -6350,6 +6355,26 @@ class XMBViewModel @Inject constructor(
             if (action == GamepadAction.SELECT || action == GamepadAction.BACK) {
                 onGameBootComplete()
             }
+            return
+        }
+
+        // ── Start opens the notification sheet, from anywhere the strip is drawn ──────
+        //
+        // Above the per-screen routing below, because those branches forward EVERYTHING to the
+        // screen they name and would swallow it -- which is why Start used to work only on the
+        // crossbar, while the strip that it opens was on every screen.
+        //
+        // Gated on the strip being drawn, which is what excludes the screens that have their own
+        // use for Start: the pickers confirm with it and the Artwork Studio applies with it, and
+        // every one of those is a full-screen overlay. The sheet's own branch, further up, has
+        // already returned if it is open, so this only ever opens.
+        //
+        // The Studio is the exception the gate cannot see, because it lives INSIDE the game page
+        // and the page is chrome. GameDetailScreen keeps Start for that reason and hands it back
+        // when the Studio is closed -- its "HOME belongs to the shell, never to this page" was
+        // already written there, with nothing to hand it to.
+        if (action == GamepadAction.HOME && state.statusStripVisible && state.activeGameId == null) {
+            toggleNotifications()
             return
         }
 

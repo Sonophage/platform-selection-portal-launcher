@@ -153,6 +153,15 @@ private val DETAILS_BUTTON_WIDTH = 196.dp
 fun GameDetailScreen(
     gameId: Long,
     onBack: () -> Unit,
+    /**
+     * Start, handed back to the shell so it can open the notification sheet.
+     *
+     * The shell claims Start on every screen the status strip is drawn on, which is all of them
+     * bar the full-screen overlays -- except this one, because the Artwork Studio lives inside it
+     * and applies its queue with Start. The shell cannot see the Studio, so the page keeps the
+     * press and returns it the moment the Studio is not the thing on top.
+     */
+    onNotifications: () -> Unit = {},
     pendingGamepadAction: GamepadAction? = null,
     onGamepadActionConsumed: () -> Unit = {},
     // Show the touch header pills only when the last input was touch (AUTO), like the XMB's
@@ -238,7 +247,12 @@ fun GameDetailScreen(
     // While the Artwork Studio is open, its screen consumes the actions instead.
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null && !state.showArtworkStudio) {
-            viewModel.handleGamepadAction(pendingGamepadAction)
+            // Start is the shell's everywhere else, and it is the shell's here too the moment the
+            // Studio is not up -- see [onNotifications]. The ViewModel's own branch for it reads
+            // "HOME belongs to the shell, never to this page", which until now had nothing to
+            // hand it to and therefore did nothing at all.
+            if (pendingGamepadAction == GamepadAction.HOME) onNotifications()
+            else viewModel.handleGamepadAction(pendingGamepadAction)
             onGamepadActionConsumed()
         }
     }

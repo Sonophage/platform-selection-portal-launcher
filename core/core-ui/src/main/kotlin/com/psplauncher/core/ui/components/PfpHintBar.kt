@@ -34,8 +34,17 @@ fun PfpHintBar(
     items: List<ControllerPromptItem>,
     modifier: Modifier = Modifier,
     onAction: ((GamepadAction) -> Unit)? = null,
+    /**
+     * What sits between the two groups, centred in whatever room they leave.
+     *
+     * Settings puts the focused row's explanation here. That used to be a band of its own above
+     * the prompts, and stacking the two would have cost 78dp of a 462dp screen; the gap between
+     * the groups was already empty on every screen, and prose is exactly what it fits.
+     */
+    centre: (@Composable () -> Unit)? = null,
 ) {
-    if (items.isEmpty()) return
+    // A bar with nothing on either side but something in the middle is still a bar worth drawing.
+    if (items.isEmpty() && centre == null) return
     val (back, primary, right) = hintBarGroups(items)
 
     Row(
@@ -58,7 +67,10 @@ fun PfpHintBar(
             Group(listOf(it), onAction)
         }
 
-        Box(Modifier.weight(1f))
+        Box(
+            modifier = Modifier.weight(1f).padding(horizontal = GroupGap),
+            contentAlignment = Alignment.Center,
+        ) { centre?.invoke() }
 
         Group(right, onAction)
     }

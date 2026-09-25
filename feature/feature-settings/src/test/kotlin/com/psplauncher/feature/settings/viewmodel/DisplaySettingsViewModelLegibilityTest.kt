@@ -212,17 +212,6 @@ class DisplaySettingsViewModelLegibilityTest {
      * the same loop, sleeps on a REAL IO thread (never the scheduler thread) so wall-clock
      * work — DataStore writes — gets time to land. Same pattern as the wallpaper test.
      */
-    private suspend fun TestScope.eventually(reason: String, condition: suspend () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 10_000
-        while (!condition()) {
-            if (System.currentTimeMillis() > deadline) {
-                throw AssertionError("condition not met within 10s: $reason")
-            }
-            advanceUntilIdle()
-            withContext(Dispatchers.IO) { Thread.sleep(25) }
-        }
-        advanceUntilIdle()
-    }
 
     private companion object {
         // Mirror the (private) ViewModel keys by their string contract, like the wallpaper test.

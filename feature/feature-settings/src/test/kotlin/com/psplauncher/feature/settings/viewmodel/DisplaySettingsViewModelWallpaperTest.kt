@@ -170,17 +170,6 @@ class DisplaySettingsViewModelWallpaperTest {
      * the same loop, sleeps on a REAL IO thread (never the scheduler thread) so wall-clock
      * work — DataStore writes, file deletes — gets time to land.
      */
-    private suspend fun TestScope.eventually(reason: String, condition: suspend () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 10_000
-        while (!condition()) {
-            if (System.currentTimeMillis() > deadline) {
-                throw AssertionError("condition not met within 10s: $reason")
-            }
-            advanceUntilIdle()
-            withContext(Dispatchers.IO) { Thread.sleep(25) }
-        }
-        advanceUntilIdle()
-    }
 
     /** Polls fresh prefs snapshots until [predicate] holds, returning the settled snapshot. */
     private suspend fun TestScope.eventuallyPrefs(
