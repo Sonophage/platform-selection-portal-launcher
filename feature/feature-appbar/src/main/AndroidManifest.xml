@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        Declared HERE, in the module that calls queryUsageStats, and not only in the app's
+        manifest. Lint analyses a library against its own manifest, so the app's declaration was
+        invisible from here and the call read as unpermitted — the check was right, the module was
+        just silent about what it needs. Manifest merging unions the two, so the app is unchanged.
+
+        It is granted through Settings, not at install: InstalledAppRepository.hasUsageAccess()
+        gates every read and the shelf simply has no last-used times without it.
+    -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+</manifest>

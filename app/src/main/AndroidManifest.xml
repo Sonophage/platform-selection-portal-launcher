@@ -17,8 +17,16 @@
          storage permission, so MANAGE_EXTERNAL_STORAGE (all-files access) is no longer declared. -->
 
 
-    <!-- Launcher role — see all installed apps -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Launcher role — see all installed apps.
+
+         Lint prefers a <queries> block, and for an ordinary app it is right. This one is a
+         launcher and an emulator front end: it enumerates every launchable app for the App
+         Drawer, and it resolves arbitrary emulator packages by name to decide what can run a
+         ROM — a set the user adds to, which no static <queries> list can be written for.
+         Play's policy allows the permission for exactly this use. Suppressed, not silenced:
+         narrowing it would mean giving up detecting an emulator the user installs later. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <!-- App Drawer uninstall action — lets the system uninstaller accept our ACTION_DELETE intent
          (normal permission, auto-granted; the OS still shows its own confirmation). -->

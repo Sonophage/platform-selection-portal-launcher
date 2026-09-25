@@ -27,9 +27,7 @@ data class DetailPalette(
     val pageBottom: Color,
     /** The pinned breadcrumb band: see-through, like the App Drawer's header. */
     val header: Color,
-    /** The pinned helper-footer band: see-through, like the App Drawer's footer. */
-    val footer: Color,
-    /** The thin line under the breadcrumb and above the footer. */
+    /** The thin line under the breadcrumb. */
     val divider: Color,
     /** Row, quick-action and tile fill. */
     val rowFill: Color,
@@ -65,7 +63,6 @@ fun detailPaletteFor(pfp: PFPColors): DetailPalette {
         pageTop = drawer.backgroundDeep,
         pageBottom = drawer.backgroundMid,
         header = Color.Transparent,
-        footer = Color.Transparent,
         divider = drawer.chromeDivider,
         rowFill = rowFill,
         rowEdge = drawer.chromeDivider.copy(alpha = 0.35f),
@@ -102,7 +99,7 @@ val DetailHeroMinHeight: Dp = 120.dp
 /**
  * Everything in the page's top band below the hero: the lead-in spacer, the gap under the hero, and
  * the icon tile beside Launch over the quick actions (the taller of the two columns), plus a small
- * margin so the actions' focus ring clears the footer's divider.
+ * margin so the actions' focus ring clears the footer band.
  */
 val DetailHeroBandBelow: Dp = 16.dp + 18.dp + 124.dp + 8.dp
 

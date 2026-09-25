@@ -72,10 +72,11 @@ class DetailPaletteTest {
     }
 
     @Test
-    fun `header and footer bands are see-through like the App Drawer's`() {
-        val p = detailPaletteFor(classicBlue)
-        assertEquals(0f, p.header.alpha, 0f)
-        assertEquals(0f, p.footer.alpha, 0f)
+    fun `the header band is see-through like the App Drawer's`() {
+        // The footer band used to be asserted here too. It has no colour any more: the pinned
+        // helper footer draws the shared PfpHintBar, which brings its own scrim, so the palette
+        // entry that fed it was the last thing reading a value fixed at fully transparent.
+        assertEquals(0f, detailPaletteFor(classicBlue).header.alpha, 0f)
     }
 
     @Test

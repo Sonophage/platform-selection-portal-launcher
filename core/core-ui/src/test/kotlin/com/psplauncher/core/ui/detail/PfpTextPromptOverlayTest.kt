@@ -3,6 +3,7 @@ package com.psplauncher.core.ui.detail
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsFocused
@@ -60,7 +61,10 @@ class PfpTextPromptOverlayTest {
     /** Renders the prompt with live text state, exactly as XMBShell's wrappers drive it. */
     private fun render(initial: String = "Shooters") {
         composeRule.setContent {
-            var text by mutableStateOf(initial)
+            // remember, not a bare mutableStateOf: without it the state is rebuilt on every
+            // recomposition, so every keystroke this test types is thrown away on the next frame
+            // and the prompt can only ever be asserted against its initial value.
+            var text by remember { mutableStateOf(initial) }
             PfpScreenPreview {
                 PfpTextPromptOverlay(
                     title = "New Collection",

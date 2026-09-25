@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Declared HERE, in the module whose status strip calls registerNetworkCallback, and not
+        only in the app's manifest. Lint analyses a library against its own manifest, so the app's
+        declaration was invisible from here and the call read as unpermitted. Manifest merging
+        unions the two, so the app is unchanged. Same reason feature-appbar declares
+        PACKAGE_USAGE_STATS beside its own usage-stats read.
+
+        A normal permission, granted at install.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+</manifest>
