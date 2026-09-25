@@ -41,7 +41,7 @@ python3 tools/stale-comments/check.py --selftest
 
 ## Half-closed
 
-### 3. `PfpHintBar` migration — PARTIAL
+### 3. `PfpHintBar` migration — DONE
 
 The review found three screens building their own footer, one hiding it, and the detail pages
 drawing an inert copy. `PfpDetailHelperFooter` now takes `onAction`; `MusicBrowserScreen`,
@@ -54,8 +54,14 @@ would name the wrong ones); the options menu rewrites the bar instead of removin
 the XMB rail does. Verified in code (`AppDrawerScreen.kt:385-396`) and on the tablet on
 2026-09-25 — the drawer's menu frame shows `Back Close | Tap Select`.
 
-Left open:
-- `VideoPlayerScreen` has never been checked.
+`VideoPlayerScreen` is **not** a holdout either, now that it has been looked at. Its prompts are
+`PfpControllerHints(style = OVERLAY)` inside the transport controls — beside the time readout and
+the speed/screen-mode status, over the video. `OVERLAY` is a deliberate third style whose KDoc
+names this exact screen and gives its bug history: a themed colour comes out dark on the fixed
+black of a media scrim, which is the inverse of the bug that made `INLINE` theme-aware. A bottom
+chrome band over a playing video would be the wrong component.
+
+**This item is closed.** Every screen that should have a `PfpHintBar` has one.
 
 ```sh
 # Screens that CALL it — the "(" excludes imports, which a bare name match counts as adopters.
@@ -178,11 +184,19 @@ same rule: **the scope is named once, in whatever band the screen has for it.**
 
 Changing the two bare ones would have ADDED the redundancy a previous pass removed.
 
-### 9. Title-case the Artwork Studio's nine prompts — OPEN
+### 9. Title-case the Artwork Studio's nine prompts — DONE
 
-`ArtworkStudioScreen.kt:862-877`: `sources`, `close`, `browse / pick file`, `back`, `check`,
-`preview / apply`, `apply`, `search`, `options`. Every other screen title-cases its prompts. It is
-also the only screen with slash-compound prompt labels.
+It was the only screen with lowercase prompts, and the survey is unambiguous: eight lowercase
+labels, all of them in this one file, against roughly sixty title-cased everywhere else — with
+exact duplicates across the line (`back`/`Back`, `options`/`Options`).
+
+The slash-compounds stayed compounds. They were listed as a second oddity, but the app already
+title-cases those elsewhere — `Play / Pause`, `Apply / Toggle`, `Expand / Collapse` — so
+`Browse / Pick File` and `Preview / Apply` are in style, not out of it.
+
+```sh
+grep -rhoE 'ControllerPromptItem\([^,]+,\s*"[a-z][^"]*"' --include="*.kt" feature/ core/   # expects: no output
+```
 
 ### 10. One B label per kind of dismissal — OPEN
 

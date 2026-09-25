@@ -858,22 +858,22 @@ internal fun ArtworkStudioContent(
                 items = buildList {
                     when (state.zone) {
                         StudioZone.TABS -> {
-                            add(ControllerPromptItem(GamepadAction.SELECT, "sources"))
-                            add(ControllerPromptItem(GamepadAction.BACK, "close"))
+                            add(ControllerPromptItem(GamepadAction.SELECT, "Sources"))
+                            add(ControllerPromptItem(GamepadAction.BACK, "Close"))
                         }
                         StudioZone.SOURCES -> {
-                            add(ControllerPromptItem(GamepadAction.SELECT, "browse / pick file"))
-                            add(ControllerPromptItem(GamepadAction.BACK, "back"))
+                            add(ControllerPromptItem(GamepadAction.SELECT, "Browse / Pick File"))
+                            add(ControllerPromptItem(GamepadAction.BACK, "Back"))
                         }
                         StudioZone.GRID -> {
-                            add(ControllerPromptItem(GamepadAction.SELECT, if (state.selectsMultiple) "check" else "preview / apply"))
-                            add(ControllerPromptItem(GamepadAction.BACK, "back"))
+                            add(ControllerPromptItem(GamepadAction.SELECT, if (state.selectsMultiple) "Check" else "Preview / Apply"))
+                            add(ControllerPromptItem(GamepadAction.BACK, "Back"))
                         }
                     }
                     // START applies from any level, so its hint shows whenever this tab has changes waiting.
-                    if (state.queueSummary.hasChanges) add(ControllerPromptItem(GamepadAction.HOME, "apply"))
-                    add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "search"))
-                    add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "options"))
+                    if (state.queueSummary.hasChanges) add(ControllerPromptItem(GamepadAction.HOME, "Apply"))
+                    add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Search"))
+                    add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"))
                 },
                 modifier = Modifier.padding(top = 6.dp),
                 // The same dispatcher the pad uses, one function up. Until now a tapped prompt

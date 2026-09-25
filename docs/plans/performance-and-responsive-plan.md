@@ -204,11 +204,33 @@ problem in Search and the App Picker via `moveSearch` / `gridMove`.
 6. **The XMB crossbar is left alone.** Its composition is deliberate and the slider already works
    there.
 
-## 4. Known bads — DONE
+## 4. Known bads — STILL OPEN. The fix was insufficient and the claim was wrong.
 
-`DisplaySettingsViewModelFontColorTest > white raises no notice at all` was a race between the
-test's virtual clock and a real `Dispatchers.IO`. Dispatcher injected via `@SettingsIoDispatcher`;
-the test now runs in **0.063s** under a full 422-task run where it used to exhaust 60 seconds.
+`DisplaySettingsViewModelFontColorTest > white raises no notice at all`.
+
+**What was done:** the ViewModel's five hard-coded `Dispatchers.IO` hops were injected via
+`@SettingsIoDispatcher`, so a test can hand in its own scheduler. That is correct on its own
+merits and stays.
+
+**What was claimed:** fixed and verified, on the strength of ONE green full run in which the test
+took 0.063s where it used to exhaust 60 seconds.
+
+**What is true:** it failed again on 2026-09-25 under `./gradlew test --rerun-tasks` run
+alongside another task, with the same message — `condition not met within 60s: colour surfaced` —
+after the full 60.085s. A rerun of the same sweep passed, and two module-alone runs passed in
+0.087s and 0.058s. So it is exactly what it was before: **intermittent under load.** One green run
+is not evidence about a flake, and treating it as evidence is how this got called done.
+
+**Why the fix could not have been enough**, which the `eventually` helper already said in its own
+KDoc: the thing the test waits for is "a real DataStore write to a real file on a real thread,
+which no amount of `advanceUntilIdle` will hurry". Injecting the VIEWMODEL's dispatcher moves the
+ViewModel's hop; DataStore keeps its own scope and its own threads. The remaining race is there,
+untouched.
+
+**What would actually fix it:** make the DataStore instance test-controllable — `pfpDataStore` is
+a single app-wide delegate (`core/core-data/.../datastore/PFPDataStore.kt`), so this means giving
+it an injectable scope, not patching the test. Until then the honest options are to accept a known
+flake or to stop the test depending on a real file at all.
 
 The lesson worth keeping: **`./gradlew test --rerun` does not re-run the suite.** It forces only
 the requested task, and it reported 2719 green while 180 of 309 result files were 85 minutes old.
