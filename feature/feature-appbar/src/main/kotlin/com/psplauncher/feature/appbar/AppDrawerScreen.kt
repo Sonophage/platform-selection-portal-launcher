@@ -185,6 +185,8 @@ fun AppDrawerScreen(
 
     AppDrawerContent(
         onPromptTapped = onPromptTapped,
+        // The grid measured the panel; the ViewModel's cursor has to step by the same number.
+        onListRowsMeasured = viewModel::setSectionListRows,
         state = state,
         searchActive = searchActive,
         showControllerHint = showControllerHint,
@@ -268,6 +270,11 @@ internal fun AppDrawerContent(
     modifier: Modifier = Modifier,
     /** Runs a tapped hint prompt; null leaves the pill a legend (the previews pass nothing). */
     onPromptTapped: ((GamepadAction) -> Unit)? = null,
+    /**
+     * How many rows the compact list drew. Defaulted so the previews need not care, but the real
+     * caller MUST pass it — the cursor steps by this number and the grid lays out by it.
+     */
+    onListRowsMeasured: (Int) -> Unit = {},
 ) {
     val searchFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -365,6 +372,7 @@ internal fun AppDrawerContent(
                             onAppLaunched = onAppLaunched,
                             onAppMenu = onAppMenu,
                             colors = sf,
+                            onListRowsMeasured = onListRowsMeasured,
                         )
                     }
                 }

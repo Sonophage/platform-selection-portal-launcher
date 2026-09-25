@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -77,6 +78,12 @@ internal fun AppDrawerSection(
     onAppLaunched: (String) -> Unit,
     onAppMenu: (InstalledApp) -> Unit,
     colors: StorefrontColors,
+    /**
+     * How many rows the compact list actually drew, reported up so the cursor can step by the
+     * same number. Not optional in spirit — a caller that ignores it gets a grid that fills the
+     * panel and a cursor that still moves by six.
+     */
+    onListRowsMeasured: (Int) -> Unit = {},
 ) {
     val rowState = rememberLazyListState()
     val listState = rememberLazyGridState()
@@ -118,24 +125,38 @@ internal fun AppDrawerSection(
         if (rest.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
             SectionHeading(EverythingElse, colors)
-            LazyHorizontalGrid(
-                state = listState,
-                // Fixed rows with items flowing rightward IS the mock's `grid-auto-flow: column`:
-                // A-F down the first column, then G-L down the second. The cursor arithmetic in
-                // sectionMove assumes exactly this, which is why left and right move by six.
-                rows = GridCells.Fixed(SECTION_LIST_ROWS),
-                horizontalArrangement = Arrangement.spacedBy(ColumnGap),
-                modifier = Modifier.fillMaxWidth().height(ListRowHeight * SECTION_LIST_ROWS),
-            ) {
-                gridItemsIndexed(rest, key = { _, app -> app.packageName }) { localIndex, app ->
-                    val index = rowCount + localIndex
-                    ListRow(
-                        app = app,
-                        focused = !usingTouch && index == selectedIndex,
-                        colors = colors,
-                        onClick = { onAppTapped(index); onAppLaunched(app.packageName) },
-                        onLongClick = { onAppTapped(index); onAppMenu(app) },
-                    )
+            // The list takes the height that is LEFT, and turns it into rows.
+            //
+            // It used to be `Fixed(SECTION_LIST_ROWS)` at a fixed height, which is six rows on
+            // every screen. Six is what fits the reference handheld; on a 668dp tablet it drew
+            // 150dp of list and left the bottom third of the panel bare, because the count was a
+            // constant and nothing measured the panel. The size of a row is the user's (the
+            // scale slider is a density multiplier, so ListRowHeight grows with it) — how many
+            // fit is the layout's, and that is this division.
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                val rows = (maxHeight / ListRowHeight).toInt().coerceIn(MIN_LIST_ROWS, MAX_LIST_ROWS)
+                // Report BEFORE drawing, and only on a change: the cursor arithmetic in
+                // sectionMove has to be given this same number or left/right steps by a column
+                // height the grid is not using.
+                LaunchedEffect(rows) { onListRowsMeasured(rows) }
+                LazyHorizontalGrid(
+                    state = listState,
+                    // Fixed rows with items flowing rightward IS the mock's `grid-auto-flow:
+                    // column`: A-F down the first column, then G-L down the second.
+                    rows = GridCells.Fixed(rows),
+                    horizontalArrangement = Arrangement.spacedBy(ColumnGap),
+                    modifier = Modifier.fillMaxWidth().height(ListRowHeight * rows),
+                ) {
+                    gridItemsIndexed(rest, key = { _, app -> app.packageName }) { localIndex, app ->
+                        val index = rowCount + localIndex
+                        ListRow(
+                            app = app,
+                            focused = !usingTouch && index == selectedIndex,
+                            colors = colors,
+                            onClick = { onAppTapped(index); onAppLaunched(app.packageName) },
+                            onLongClick = { onAppTapped(index); onAppMenu(app) },
+                        )
+                    }
                 }
             }
         }
@@ -263,6 +284,18 @@ private val TileGlyph = 25.sp
 private val TileLabelSize = 12.sp
 private val ListColumnWidth = 205.dp
 private val ListRowHeight = 25.dp
+
+/**
+ * The band the measured row count is clamped into.
+ *
+ * The floor is not the design's six. On the shortest panel this app runs on, overflowing is worse
+ * than showing fewer rows — a grid taller than the space it was given draws its bottom row under
+ * the hint bar, which is the same class of bug the letter rail had. The ceiling is there so a
+ * very tall window does not turn the list into a wall of twenty near-identical rows; past a dozen
+ * the A-Z column stops being scannable, which is the only reason it is a list and not a grid.
+ */
+private const val MIN_LIST_ROWS = 4
+private const val MAX_LIST_ROWS = 12
 private val ListTileSize = 20.dp
 private val ListTileCorner = 5.dp
 private val ListGlyph = 9.sp

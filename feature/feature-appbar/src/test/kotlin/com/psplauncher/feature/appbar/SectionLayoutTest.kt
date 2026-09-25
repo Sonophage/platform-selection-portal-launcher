@@ -86,4 +86,75 @@ class SectionLayoutTest {
     fun `an empty drawer parks the cursor rather than returning a negative index`() {
         assertEquals("nothing to select", 0, move(GamepadAction.NAVIGATE_DOWN, 0, 0, 0))
     }
+
+    // ── The pair: the grid's row count and the cursor's must be the same number ──────────
+
+    /**
+     * Stepping RIGHT moves by exactly one column of the grid that was drawn.
+     *
+     * This is the whole reason [sectionMove] takes `listRows` instead of reading a constant. The
+     * list used to be six rows on every screen; it is now the panel's height divided by a row's,
+     * so a tablet draws more and a short window draws fewer. If the cursor kept stepping by six
+     * while the grid drew nine, RIGHT would land three rows up from where the eye is — a wrong
+     * app, silently, on the device with the most screen.
+     *
+     * Asserted across a range rather than at one value, because a hand-picked number is exactly
+     * how the old constant survived: it agreed with the grid on the only device anyone ran.
+     */
+    @Test
+    fun `right steps one drawn column, whatever the panel measured`() {
+        for (rows in 4..12) {
+            val firstSlot = ROW
+            val landed = sectionMove(GamepadAction.NAVIGATE_RIGHT, firstSlot, ROW, TOTAL, rows)
+            assertEquals(
+                "with a $rows-row grid, right from the list's first slot must land one column over",
+                ROW + rows,
+                landed,
+            )
+        }
+    }
+
+    /**
+     * DOWN stops at the bottom of the drawn column, not at the bottom of a remembered one.
+     *
+     * The failure this catches is the one that reads as "the cursor is stuck": on a panel that
+     * draws nine rows, a cursor that still believes in six refuses to move past the sixth and
+     * three drawn rows become unreachable.
+     */
+    @Test
+    fun `down fills the drawn column before it stops`() {
+        for (rows in 4..12) {
+            var cur = ROW
+            var steps = 0
+            while (steps < rows * 2) {
+                val next = sectionMove(GamepadAction.NAVIGATE_DOWN, cur, ROW, TOTAL, rows)
+                if (next == cur) break
+                cur = next; steps++
+            }
+            assertEquals(
+                "a $rows-row column must be walkable to its last row and no further",
+                rows - 1,
+                steps,
+            )
+        }
+    }
+
+    /** The default is the old constant, so a caller that has not measured behaves as before. */
+    @Test
+    fun `the default row count is the documented constant`() {
+        assertEquals(
+            "sectionMove's default must match the grid's fallback, or an unmeasured panel desyncs",
+            sectionMove(GamepadAction.NAVIGATE_RIGHT, ROW, ROW, TOTAL, SECTION_LIST_ROWS),
+            sectionMove(GamepadAction.NAVIGATE_RIGHT, ROW, ROW, TOTAL),
+        )
+    }
+
+    /** A measurement that arrives before layout must not divide by zero. */
+    @Test
+    fun `a zero or negative row count is survived, not crashed on`() {
+        for (rows in -3..0) {
+            sectionMove(GamepadAction.NAVIGATE_RIGHT, ROW, ROW, TOTAL, rows)
+            sectionMove(GamepadAction.NAVIGATE_DOWN, ROW, ROW, TOTAL, rows)
+        }
+    }
 }

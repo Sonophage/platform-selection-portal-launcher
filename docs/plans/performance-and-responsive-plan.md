@@ -167,10 +167,26 @@ problem in Search and the App Picker via `moveSearch` / `gridMove`.
 
 ### Order
 
-1. **Settings root.** One screen, no grid, no cursor arithmetic — just a list that has no reason
-   to be 522dp wide on a 1067dp panel. Lowest risk, most visible.
-2. **App Drawer's "Everything else".** `SECTION_LIST_ROWS` becomes measured, and `SectionLayout`
-   is handed the same number in the same commit.
+1. ~~**Settings root.**~~ **NOT A DEFECT — checked, and the reason is written down.**
+   `SETTINGS_COLUMN_MAX_WIDTH = 560.dp` is deliberate: *"leaves roughly a third of the screen
+   showing the wallpaper, which is the XMB's own proportion"* (`SettingsScaffold.kt:310-317`).
+   The space measured beside the list IS the wallpaper, on purpose. The vertical gap is a
+   seven-item list on a tall screen, and the only ways to fill it are the two readings the owner
+   already rejected. Nothing to do.
+
+   The one thing that is true: the cap is absolute dp tuned against 821dp, so the intended
+   one-third becomes one-half at 1067dp. Left alone — a 715dp settings column would trade the
+   stated proportion for a line length the same comment warns about.
+2. **App Drawer's "Everything else".** DONE. `AppDrawerSection` measures the height left to it
+   and divides by `ListRowHeight`; the count is reported up and `sectionMove` is given the same
+   number. Guarded by four tests in `SectionLayoutTest`, two of which were falsified by reverting
+   `sectionMove` to the constant (both go red with their own messages).
+
+   **Outstanding: not yet confirmed on a running device.** The complement grid only draws when a
+   tab has BOTH matched apps and a non-empty complement, and a bare emulator has neither — APPS
+   has an empty complement, GAMES and EMULATORS short-circuit to their empty states. "Mark as
+   Game" does not help: it writes an XMB platform row, while the drawer's GAMES tab reads the
+   Play Store category. Needs a device with a Play-Store-flagged game or an emulator installed.
 3. **Search and the App Picker together**, because they share the grid-cursor pair and fixing one
    leaves the other half-guarded.
 4. **Extend the scale provider to the chrome screens**, or decide deliberately that chrome stays

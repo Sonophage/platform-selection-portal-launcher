@@ -137,6 +137,15 @@ data class AppDrawerUiState(
     /** Per-filter app counts (unfiltered by search query) for the category rail. */
     val filterCounts: Map<AppFilter, Int> = emptyMap(),
     /**
+     * How many rows the compact list was DRAWN with, reported by AppDrawerSection.
+     *
+     * The other half of a pair. The grid divides the panel's height by a row's height and this is
+     * the answer, so `sectionMove` steps the cursor by a real column instead of by a constant.
+     * Six was that constant, and it is still the value here for the window between construction
+     * and the first measurement landing.
+     */
+    val sectionListRows: Int = SECTION_LIST_ROWS,
+    /**
      * How many of [visibleApps] matched [activeFilter] — the rest are the complement below them.
      *
      * [visibleApps] is the tab's own apps followed by every app that is NOT in the tab, in that
@@ -161,6 +170,7 @@ data class AppDrawerUiState(
 
     /** Where the seam falls in [visibleApps]. */
     val sectionRowCount: Int get() = sectionApps.size
+
 
     // Add to Cross Bar leads: it is the one action here that changes the screen you came from.
     // App Info for every app; Mark/Unmark as Game toggles library membership; Uninstall only
@@ -222,6 +232,13 @@ class AppDrawerViewModel @Inject constructor(
     }
 
     /** Touch tap on a grid tile: moves the (hidden) cursor there and enters touch mode. */
+    /** [AppDrawerSection] measured the panel; keep the cursor's column height in step with it. */
+    fun setSectionListRows(rows: Int) {
+        if (rows > 0 && rows != _uiState.value.sectionListRows) {
+            _uiState.update { it.copy(sectionListRows = rows) }
+        }
+    }
+
     fun onAppTapped(index: Int) {
         _uiState.update { it.copy(selectedIndex = index, usingTouch = true) }
     }
@@ -406,7 +423,7 @@ class AppDrawerViewModel @Inject constructor(
             GamepadAction.OPEN_CONTEXT_MENU -> openAppMenuForSelected()
             GamepadAction.NAVIGATE_LEFT, GamepadAction.NAVIGATE_RIGHT,
             GamepadAction.NAVIGATE_UP, GamepadAction.NAVIGATE_DOWN -> {
-                val next = sectionMove(action, cur, state.sectionRowCount, size)
+                val next = sectionMove(action, cur, state.sectionRowCount, size, state.sectionListRows)
                 // The sound follows the move, not the press: a refused move at an edge is silent,
                 // which is how the grid behaved when each direction guarded itself.
                 if (next != cur) {

@@ -19,11 +19,20 @@ import com.psplauncher.core.domain.model.GamepadAction
 // arithmetic below knows there are two shapes.
 
 /**
- * Rows in the compact list. The mock's `grid-template-rows: repeat(6, 58px)`.
+ * Rows in the compact list, when nobody has measured the panel.
  *
  * It is the fill direction as well as the height: `grid-auto-flow: column` means A-F runs DOWN
- * the first column, not across the top. So a list index is `column * SECTION_LIST_ROWS + row`,
- * and that is the whole reason left/right move by six here and by one in the top row.
+ * the first column, not across the top. So a list index is `column * listRows + row`, and that is
+ * the whole reason left/right move by a column's height here and by one in the top row.
+ *
+ * This was the only number, fixed at the mock's `repeat(6, 58px)`. On the reference handheld six
+ * rows is what fits, and on a 668dp tablet it left the bottom third of the panel bare — the list
+ * could not grow because the count was a constant rather than a measurement. [AppDrawerSection]
+ * now measures it, and this is the fallback for a caller that has not.
+ *
+ * **It is half of a pair.** The grid lays the rows out and [sectionMove] steps the cursor through
+ * them, and the two must be given the SAME number. A panel that fits nine while the cursor still
+ * steps by six walks the selection onto the wrong app, silently — see SectionLayoutTest.
  */
 const val SECTION_LIST_ROWS = 6
 
@@ -41,8 +50,19 @@ const val SECTION_LIST_ROWS = 6
  * to the row's first tile.** Deliberately symmetric and deliberately stateless: the two halves
  * have different widths and different item counts, so there is no honest "same column" to land
  * on. Remembering the tile you left would need a second cursor to keep in step with this one.
+ *
+ * [listRows] is how tall the compact list was actually DRAWN, which is the panel's height divided
+ * by a row's. It is a parameter rather than a constant because the caller that lays the grid out
+ * is the only one that knows, and both halves have to agree — stepping by six through a grid nine
+ * tall lands on a different app than the one under the cursor.
  */
-fun sectionMove(action: GamepadAction, index: Int, rowCount: Int, total: Int): Int {
+fun sectionMove(
+    action: GamepadAction,
+    index: Int,
+    rowCount: Int,
+    total: Int,
+    listRows: Int = SECTION_LIST_ROWS,
+): Int {
     if (total <= 0) return 0
     val cur = index.coerceIn(0, total - 1)
     val restCount = total - rowCount
@@ -54,21 +74,23 @@ fun sectionMove(action: GamepadAction, index: Int, rowCount: Int, total: Int): I
         else -> cur
     }
 
+    // Never zero or negative: a measured value that arrived before layout would divide by it.
+    val rows = listRows.coerceAtLeast(1)
     val local = cur - rowCount
-    val row = local % SECTION_LIST_ROWS
-    val col = local / SECTION_LIST_ROWS
+    val row = local % rows
+    val col = local / rows
     return when (action) {
         GamepadAction.NAVIGATE_UP ->
             if (row > 0) cur - 1 else if (rowCount > 0) 0 else cur
         GamepadAction.NAVIGATE_DOWN ->
-            if (row < SECTION_LIST_ROWS - 1 && local + 1 < restCount) cur + 1 else cur
+            if (row < rows - 1 && local + 1 < restCount) cur + 1 else cur
         GamepadAction.NAVIGATE_LEFT ->
-            if (col > 0) cur - SECTION_LIST_ROWS else cur
+            if (col > 0) cur - rows else cur
         GamepadAction.NAVIGATE_RIGHT -> {
             // The column to the right may be a short one — the last column holds whatever is
             // left over. Landing on its bottom entry beats refusing the press.
-            val nextColumnStart = (col + 1) * SECTION_LIST_ROWS
-            if (nextColumnStart < restCount) rowCount + minOf(local + SECTION_LIST_ROWS, restCount - 1) else cur
+            val nextColumnStart = (col + 1) * rows
+            if (nextColumnStart < restCount) rowCount + minOf(local + rows, restCount - 1) else cur
         }
         else -> cur
     }
