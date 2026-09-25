@@ -6,8 +6,11 @@ metadata is exactly what the app's own parsers read, so the UI can be driven int
 are awkward to reach with real files.
 
 Deliberate choices, each aimed at something currently untested:
-  * 30 games spanning A-Z, because the letter rail needs >=25 items and >=3 initials
-    (LetterJump.LETTER_JUMP_MIN_ITEMS / MIN_LETTERS) and it has never run on real hardware.
+  * 30 games spanning A-Z, for the letter rail (LETTER_JUMP_MIN_ITEMS / MIN_LETTERS).
+    The last four titles are deliberately OUT of alphabetical order. Item count and initial
+    count are not sufficient: letterAnchors() also refuses any list whose initials ever go
+    backwards, so on the Recently Added shelf -- which is insertion order -- these four make
+    the rail correctly absent. Drop them, or use a title-sorted list, to see it appear.
   * Music where `artist` is a CREDIT STRING and `albumArtist` is the single act, because that
     split is what the Artists column groups on.
   * One book with a series, one without, since seriesIndex is nullable and rarely exercised.

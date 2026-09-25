@@ -14,7 +14,7 @@ what the app's own parsers read.
 
 | type | count | where | notes |
 |---|---|---|---|
-| Games | 30 | `/sdcard/PFPTest/Roms/GBA/*.gba` | Extension-only placeholders. They list and open a detail page; they will **not** launch. 30 titles spanning A–Z on purpose — the letter rail needs ≥25 items and ≥3 initials (`LetterJump.kt`) and has never run on real hardware. |
+| Games | 30 | `/sdcard/PFPTest/Roms/GBA/*.gba` | Extension-only placeholders. They list and open a detail page; they will **not** launch. Titles span A–Z for the letter rail — see below. |
 | Music | 8 | `/sdcard/Music/<act>/<album>/` | Two albums. `artist` is a **credit string**, `album_artist` is the act, and they differ on two tracks — the case the Artists column groups on. |
 | Video | 3 | `/sdcard/Movies/*.mp4` | h264+aac, three different resolutions. |
 | Photos | 6 | `/sdcard/Pictures/*.jpg` | Test patterns at various aspect ratios. |
@@ -54,3 +54,36 @@ adb shell "run-as $P sqlite3 databases/pfp_database 'select tree_uri from music_
 ```
 
 Expected with the tree above: **games 30, music_tracks 8, videos 3, photos 6, books 3**.
+
+
+## Seeing the letter rail
+
+It has now been confirmed running (26 games, Konker AVD): full A–Z rail down the right edge,
+inside both chrome bands, 8 rungs down from A landing on `I` → "Iron Lantern", position held
+after release.
+
+Three things must all be true, and the count is the one people check:
+
+1. **≥25 items and ≥3 distinct initials** — `LETTER_JUMP_MIN_ITEMS` / `MIN_LETTERS`.
+2. **The list's initials must never go backwards.** `letterAnchors()` returns null otherwise, on
+   purpose — a rail over a non-alphabetical list looks right and jumps wrong. The generated set's
+   last four titles are out of order deliberately, so on **Recently Added** (insertion order) the
+   rail is correctly absent. Use a title-sorted list, or drop those four.
+3. **A real ≥400ms gap between key-down and key-up** (`SHOULDER_HOLD_MS`) on a shoulder.
+
+`adb shell input keyevent` **cannot** do (3) — it sends down and up back to back. On an emulator,
+`adb root` then `sendevent` on the keyboard device can, because `KEYCODE_PAGE_UP`/`PAGE_DOWN` are
+bound to `PREV_`/`NEXT_CATEGORY`:
+
+```sh
+adb root
+adb shell 'sendevent /dev/input/event1 1 109 1; sendevent /dev/input/event1 0 0 0'   # PAGE_DOWN down
+sleep 1                                                                              # past 400ms
+adb shell 'sendevent /dev/input/event1 1 108 1; sendevent /dev/input/event1 0 0 0; \
+           sendevent /dev/input/event1 1 108 0; sendevent /dev/input/event1 0 0 0'    # walk a rung
+adb shell 'sendevent /dev/input/event1 1 109 0; sendevent /dev/input/event1 0 0 0'   # release
+```
+
+Scancodes are Linux `input-event-codes`, not Android keycodes: 109 = `KEY_PAGEDOWN`,
+108 = `KEY_DOWN`, 60 = `KEY_F2`. Confirm they land with
+`getevent -l /dev/input/event1`. On the Konker it is simply holding L1 or R1.
