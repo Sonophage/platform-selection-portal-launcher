@@ -2,6 +2,7 @@ package com.psplauncher.core.ui.detail
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.domain.model.lightBackgroundAnchors
 import com.psplauncher.core.ui.theme.PFPColors
 import com.psplauncher.core.ui.theme.composite
@@ -135,8 +136,12 @@ class DetailPaletteTest {
 
     @Test
     fun `the hero gives up height so the primary actions clear the footer`() {
-        // The AYN Thor: 468dp tall, less the breadcrumb and the footer.
-        val viewport = 468.dp - 64.dp - DetailFooterHeight
+        // The AYN Thor: 468dp tall, less the status strip, the breadcrumb and the footer.
+        //
+        // The strip's band is in here because the page now reserves it -- it is drawn over every
+        // detail page by the shell. Leaving it out made this case 34dp roomier than the device,
+        // which is the wrong direction for a test about running out of room.
+        val viewport = 468.dp - StatusStripHeight - 64.dp - DetailFooterHeight
         val hero = detailHeroHeightFor(viewport)
         assertTrue("hero $hero must shrink below $DetailHeroHeight", hero < DetailHeroHeight)
         assertTrue("the band below the hero must fit", hero + DetailHeroBandBelow <= viewport)
@@ -144,7 +149,7 @@ class DetailPaletteTest {
 
     @Test
     fun `a message line under the actions takes its room from the hero too`() {
-        val viewport = 468.dp - 64.dp - DetailFooterHeight
+        val viewport = 468.dp - StatusStripHeight - 64.dp - DetailFooterHeight
         val withMessage = detailHeroHeightFor(viewport, messageLine = true)
         assertTrue(withMessage < detailHeroHeightFor(viewport))
         assertTrue(

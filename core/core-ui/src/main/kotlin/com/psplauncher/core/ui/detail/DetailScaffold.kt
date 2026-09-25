@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.ScrollState
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.PfpHintBar
+import com.psplauncher.core.ui.components.StatusStripHeight
 
 // ── Console-style detail page: background, scaffold, header, footer ───────────
 //
@@ -182,6 +183,13 @@ fun PfpDetailScaffold(
     PfpDetailBackground(modifier = modifier.fillMaxSize()) {
         backdrop()
         Column(modifier = Modifier.fillMaxSize()) {
+            // The status strip is drawn over this page by the shell. A Spacer rather than top
+            // padding on the Column: padding would push the FOOTER up by the same band and leave
+            // a gap along the bottom edge, where the hint bar is meant to sit flush. This pushes
+            // only the header down, and the body between them shrinks to match -- which is what
+            // LocalDetailViewportHeight reports, so detailHeroHeightFor keeps sizing the hero
+            // against the room the page actually has.
+            Spacer(Modifier.height(StatusStripHeight))
             header()
             // Hard viewport edge: nothing in the body may paint into the header or footer rows.
             BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds()) {

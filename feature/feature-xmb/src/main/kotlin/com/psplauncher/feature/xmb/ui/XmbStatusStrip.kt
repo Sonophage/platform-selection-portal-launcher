@@ -59,6 +59,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.feature.xmb.R
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -200,7 +201,17 @@ fun XmbPspStatusStrip(
     // centre the middle child between its neighbours, which moves every time the clock's width
     // or the icon set changes, and a row of tab names that drifts is worse than one that is off
     // centre by design.
-    Box(modifier.fillMaxWidth().height(StripHeight)) {
+    // The same wash the hint bar wears, upside down: opaque at the edge, gone by the band's
+    // bottom. The strip used to be drawn only over the XMB, whose wave is dark, so it needed
+    // nothing behind it. It is over the App Drawer, Settings, Search and a game's full-bleed hero
+    // artwork now, and a white clock on a game's white banner is a clock nobody can read. One
+    // band was guarded and the other was not.
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(StripHeight)
+            .background(Brush.verticalGradient(0f to StripScrim, 1f to Color.Transparent)),
+    ) {
 
         // The battery, as one hairline across the very top edge of the screen. Full bleed: it is
         // outside the content's horizontal padding on purpose, because a line that stops 20dp
@@ -562,8 +573,15 @@ private fun StripSeparator() {
  * Sized to what the content needs on THIS panel: a 26dp art tile and two lines on the left, the
  * clock on the right, and the battery hairline across the top. It was 18dp when the strip was one
  * row of text, and 28dp before the owner asked for "a little bigger".
+ *
+ * The number itself is core-ui's [StatusStripHeight], not a copy of it. The strip is drawn by the
+ * shell over the App Drawer, Settings, Search and the detail pages, and each of those pads itself
+ * down by the same band — in four modules that cannot see this one.
  */
-internal val StripHeight   = 34.dp
+internal val StripHeight   = StatusStripHeight
+
+/** The strip's own wash. The hint bar's [BarScrim] value, so the two bands match. */
+private val StripScrim = Color(0xB3060200)
 internal val StripFontSize = 10.sp
 
 /**

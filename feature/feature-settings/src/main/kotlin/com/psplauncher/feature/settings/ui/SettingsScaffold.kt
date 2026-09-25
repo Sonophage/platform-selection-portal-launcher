@@ -106,6 +106,7 @@ import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.gesture.dragToScroll
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
@@ -1156,6 +1157,13 @@ fun SettingsScaffold(
                     // all it needs to do the rest.
                     .imePadding(),
             ) {
+                // Room for the status strip, which the shell draws over this screen. A Spacer
+                // rather than top padding on the Column: padding would push the pinned footer up
+                // by the same band and leave a gap along the bottom edge. This moves only the
+                // header down, and the weighted content Box below shrinks to match -- which is
+                // what the measured viewport reads, so keep-in-view still clamps correctly.
+                Spacer(Modifier.height(StatusStripHeight))
+
                 // Header band — chrome, and therefore a SIBLING of the scrolling body, which is
                 // why a drag here used to die. dragToScroll hands it the body's own scroll state
                 // (the one the screen registered for keep-in-view), so the band drags the list.

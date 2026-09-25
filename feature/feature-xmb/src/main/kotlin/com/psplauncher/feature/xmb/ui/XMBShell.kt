@@ -827,12 +827,20 @@ fun XMBShell(
             // visually — the strip is drawn BEFORE the item list, so the list was taking the taps
             // aimed at the live-activity corner and the notification sheet would not open.
             //
-            // It drops back to 0 under a real overlay: the App Drawer and Settings are meant to
-            // cover the clock and say so. The rail and the notification sheet are the exceptions,
-            // which is what overlayKeepsChrome is for.
+            // It drops back to 0 only under a FULL-SCREEN overlay -- the video player, the photo
+            // viewer, the boot and disc ceremonies, and the modal pickers. Those own the whole
+            // screen and the strip is covered by them.
+            //
+            // It used to drop to 0 under every overlay, which meant walking into the App Drawer,
+            // Settings, Search or a game's page lost the clock, the battery and the notification
+            // corner, and walking back out found them again. Those are the launcher's own chrome:
+            // you have not left the launcher, so the launcher's strip stays on top. Which half a
+            // screen is in is XMBUiState.statusStripVisible's decision, made once, in the same
+            // partition that decides whether the screen blocks at all.
             val aboveContextRail = when {
                 uiState.activeContextMenu != null || uiState.notificationsOpen -> 1f
-                uiState.hasBlockingOverlay -> 0f
+                !uiState.statusStripVisible -> 0f
+                uiState.hasBlockingOverlay -> 1f
                 else -> XmbChromeZ
             }
 
@@ -1303,13 +1311,25 @@ fun XMBShell(
             }
             } // end: else — the crossbar, shown on every column but Last Played
 
+
+            // No launch control on the shelf itself any more. It was a spine down the right
+            // edge, then briefly a rail capsule in the same place; it is a row in the context
+            // rail now, where every other thing you can do to an item already lives.
+            } // end: XMB foreground hidden while music browser is open
+
             // The clock, the date and the battery, on EVERY column including Last Played.
             //
             // This used to live inside the else above, so the one screen that replaces the
             // crossbar was also the one screen with no status bar — while LastPlayedPage went on
             // padding itself down by StripHeight to make room for it, leaving an empty band where
-            // the time should be. Out here both branches draw it, and it is still inside the
-            // overlay guard, so the drawer and Settings cover it as before.
+            // the time should be.
+            //
+            // It is now OUTSIDE the foreground guard as well, which is what makes it global. That
+            // guard drops the XMB's clickable rows from composition whenever a screen covers
+            // them, so a tap cannot fall through to a row underneath — and it was taking the
+            // clock with them. The strip has no rows to fall through to; raising its zIndex could
+            // never have been enough while it was not composed at all. Which screens it is drawn
+            // over is XMBUiState.statusStripVisible's decision, not this guard's.
             // What the strip's left half shows. Music is the only source there is: the app's other
             // background work — scans, scrapes, imports, exports — reports through notifications
             // and publishes no progress the UI can read. The slot simply stays empty until one
@@ -1376,29 +1396,40 @@ fun XMBShell(
                     .takeIf { it > 0 }
                     ?.let { StripLiveActivity(art = null, title = countLabel(it, "notification"), detail = null) }
 
+            // The crossbar-specific halves go quiet under a chrome screen -- see
+            // XMBUiState.stripShowsXmbContext. The clock, the battery and the notification corner
+            // stay, because those are true wherever you are.
+            val xmbContext = uiState.stripShowsXmbContext
+
             XmbPspStatusStrip(
-                sortLabel = uiState.sortLabel,
-                showSortButton = uiState.resolvedShowTouchButton,
+                sortLabel = uiState.sortLabel.takeIf { xmbContext },
+                showSortButton = uiState.resolvedShowTouchButton && xmbContext,
                 onSortTapped = onXmbSortTapped,
                 live = liveActivity,
-                onLiveAreaTapped = onNotificationsToggled,
+                // The COUNT shows on every screen; the PRESS belongs to the crossbar for now.
+                // The sheet draws above the chrome screens (NotificationBarZ is 0.5, they are at
+                // 0), but their d-pad handling is their own -- opening it over the App Drawer
+                // would put a sheet on screen that the drawer's cursor cannot walk. A corner that
+                // opens something unnavigable is worse than one that does nothing, so it goes
+                // inert until the sheet can take the keys back from whatever is under it.
+                onLiveAreaTapped = onNotificationsToggled.takeIf { xmbContext },
                 // The two navigation hints, each shown only where the press does something.
                 // Shoulder: the hover panel's pages, which exist only on a game that has them.
                 // Left/right: stepping the crossbar, which a drilled-in list does not do.
                 hints = StripHints(
-                    shoulder = uiState.panelStripOpen,
+                    shoulder = uiState.panelStripOpen && xmbContext,
                     // NOT on the crossbar. Stepping left and right between categories is the
                     // first thing anyone does on this screen and does not need announcing —
                     // "the dpad hint isn't needed on the main screen". It is shown where the
                     // press does the less obvious thing: walking into a row's pill actions,
                     // which only rows that HAVE pills offer, and never on the home shelf where
                     // left and right are reserved for leaving it.
-                    leftRight = uiState.pillRowVisible,
+                    leftRight = uiState.pillRowVisible && xmbContext,
                 ),
                 // The home shelf's media filter rides in the middle of the bar. Only there: it
                 // is the only column X filters, and a row of media names over the crossbar would
                 // be naming something that column does not have.
-                centre = if (uiState.onLastPlayedHome) {
+                centre = if (uiState.onLastPlayedHome && xmbContext) {
                     {
                         RecentFilterRow(
                             filter = uiState.recentFilter,
@@ -1438,11 +1469,6 @@ fun XMBShell(
                 modifier = Modifier.zIndex(NotificationBarZ),
             )
 
-            // No launch control on the shelf itself any more. It was a spine down the right
-            // edge, then briefly a rail capsule in the same place; it is a row in the context
-            // rail now, where every other thing you can do to an item already lives.
-            } // end: XMB foreground hidden while music browser is open
-
             // Button hint pill: [ X Sort   Y Options ], with the controller-style glyphs, and
             // TAPPABLE — a tap runs the action through the same dispatcher the pad uses. Up by
             // default rather than after an idle pause (Display ▸ Button Hints, and its delay,
@@ -1464,8 +1490,7 @@ fun XMBShell(
             // these two are real bindings a user should be told about: Search is Select at the
             // root and Apps is Back at the root. The buttons could be touch-only because they
             // were touch-only affordances; a named prompt is for both hands.
-            val rootActionsVisible =
-                (!uiState.hasBlockingOverlay || uiState.overlayKeepsChrome) && !uiState.isInSubItem
+            val rootActionsVisible = uiState.stripShowsXmbContext && !uiState.isInSubItem
             AnimatedVisibility(
                 // Shown when EITHER half has something to say: the root actions are a touch
                 // affordance with their own visibility rule, and hiding them behind the hint's
@@ -1478,7 +1503,7 @@ fun XMBShell(
                 // bar to follow whatever is open; until then the bar is visible and its words are
                 // about the screen behind the menu.
                 visible = (uiState.showContextMenuHint || rootActionsVisible) &&
-                    (!uiState.hasBlockingOverlay || uiState.overlayKeepsChrome),
+                    uiState.stripShowsXmbContext,
                 enter = fadeIn(tween(200)),
                 exit = ExitTransition.None,
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().zIndex(aboveContextRail),

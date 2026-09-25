@@ -1293,15 +1293,43 @@ data class XMBUiState(
      * Split out rather than copied: [hasBlockingOverlay] and [overlayKeepsChrome] are two readings of
      * one list, and a second copy of twenty-five conditions is a second copy that stops agreeing
      * the first time a screen is added to one of them.
+     *
+     * It is now the OR of the two halves below, and that is the guard. The status strip is drawn
+     * over one half and covered by the other, so the question "does the clock show here" has to be
+     * answered for every screen that covers the XMB. Keeping one list and partitioning it means a
+     * new screen cannot be added to neither half — which, had this been a second list, is exactly
+     * what would happen: the screen would work, and the clock would quietly be wrong on it.
      */
     private val otherBlockingOverlay: Boolean
-        get() = showBootSequence ||
-            activeGameBoot != null ||
-            discCeremony != null ||
-            activeSettingsScreen != null ||
+        get() = chromeOverlay || fullscreenOverlay
+
+    /**
+     * The screens that cover the XMB but KEEP the status strip on top of them.
+     *
+     * These are the app's own chrome — a drawer, a settings tree, a search, a page about a thing.
+     * You are still in the launcher on them, and the launcher is what owns the clock, the battery
+     * and the notification corner. Before this they each covered the strip, so walking into the
+     * App Drawer lost the time and walking out found it again.
+     */
+    private val chromeOverlay: Boolean
+        get() = activeSettingsScreen != null ||
             activeAppDrawerFilter != null ||
             activeGameId != null ||
             activeAppId != null ||
+            search != null
+
+    /**
+     * The screens that take the whole screen and cover the strip with it.
+     *
+     * Two kinds, and both want the room more than they want the clock: something playing or
+     * presenting full-bleed (the video player, the photo viewer, the boot and disc ceremonies),
+     * and the modal dialogs and pickers, where a strip drawn on top would be chrome floating over
+     * a box that is deliberately the only thing you can touch.
+     */
+    private val fullscreenOverlay: Boolean
+        get() = showBootSequence ||
+            activeGameBoot != null ||
+            discCeremony != null ||
             activeVideoId != null ||
             activePhotoViewer != null ||
             colorSchemePicker != null ||
@@ -1316,11 +1344,36 @@ data class XMBUiState(
             playlistNameDialog != null ||
             musicTrackPicker != null ||
             musicBrowser != null ||
-            search != null ||
             musicPlayerVisible ||
             infoDialog != null ||
             launchRecovery != null ||
             showWindowsSetupPrompt
+
+    /**
+     * Whether the strip's contents still describe what is under it.
+     *
+     * The strip carries two kinds of thing. The clock, the battery and the notification corner are
+     * facts about the DEVICE and are true on any screen. The sort label, the shoulder and
+     * left/right hints and the home shelf's filter row are facts about the CROSSBAR — and once a
+     * chrome screen covers it, they describe a list the user is no longer looking at. The drawer
+     * showed "Title" over a grid it does not sort.
+     *
+     * The rail and the notification sheet are not covers in that sense: you are still standing on
+     * the crossbar with something open in front of it, so its context is still yours. That is what
+     * [overlayKeepsChrome] already means, and this is its third reader.
+     */
+    val stripShowsXmbContext: Boolean
+        get() = !hasBlockingOverlay || overlayKeepsChrome
+
+    /**
+     * Whether the status strip is drawn right now.
+     *
+     * Everywhere except a full-screen overlay — so the crossbar, the context rail, the
+     * notification sheet, and every chrome screen above. The strip is a fixture of the launcher
+     * rather than a part of the crossbar, which is what "those should be global" asked for.
+     */
+    val statusStripVisible: Boolean
+        get() = !fullscreenOverlay
 }
 
 /**
@@ -1747,8 +1800,9 @@ fun shouldShowContextMenuHint(state: XMBUiState, idleMs: Long): Boolean =
     state.contextMenuHintEnabled &&
         // The context rail is the one blocking overlay the pill survives — "the header and hints
         // still show on top of the context screen". It used to be excluded twice over, once here
-        // and once inside hasBlockingOverlay, which is why overlayKeepsChrome exists.
-        (!state.hasBlockingOverlay || state.overlayKeepsChrome) &&
+        // and once inside hasBlockingOverlay, which is why overlayKeepsChrome exists — and why
+        // the reading of it is a named property now rather than four copies of one expression.
+        state.stripShowsXmbContext &&
         // Every capability the pill can advertise has to be listed here, or the press works and
         // nothing on screen says so. canFilterRecents is the reason this is a list and not a
         // pair: filtering the home shelf down to a medium you have none of empties it, which
@@ -4522,7 +4576,7 @@ class XMBViewModel @Inject constructor(
 
     fun typeToSearchAllowed(): Boolean {
         val state = _uiState.value
-        return state.search == null && (!state.hasBlockingOverlay || state.overlayKeepsChrome)
+        return state.search == null && state.stripShowsXmbContext
     }
 
     /** Opens search already carrying [query] — the character that opened it. */

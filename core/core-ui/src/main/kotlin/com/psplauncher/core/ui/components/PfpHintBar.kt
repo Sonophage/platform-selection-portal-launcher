@@ -125,9 +125,6 @@ internal fun hintBarGroups(items: List<ControllerPromptItem>): HintBarGroups {
     return HintBarGroups(back, primary, items.filter { it !== back && it !== primary })
 }
 
-/** The bar's own height, for screens that have to reserve room under their content. */
-val HintBarHeight = 34.dp
-
 private val BarHeight = HintBarHeight
 private val EdgeGap = 22.dp
 private val GroupGap = 16.dp

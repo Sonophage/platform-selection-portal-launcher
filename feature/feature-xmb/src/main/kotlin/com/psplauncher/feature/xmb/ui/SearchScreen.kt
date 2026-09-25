@@ -55,6 +55,7 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.HintBarHeight
 import com.psplauncher.core.ui.components.PfpHintBar
+import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursor
@@ -143,11 +144,12 @@ fun SearchScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 40.dp)
-                // Room for the hint bar, which is NOT in this column: it is pinned to the screen
-                // edge below, so it lines up with the App Drawer's and the crossbar's instead of
-                // being inset by this screen's own 40dp gutter.
+                // Room for the two bands the shell draws over this screen: the status strip above
+                // and the hint bar below. Neither is in this column -- they are pinned to the
+                // screen edges, so they line up with the App Drawer's and the crossbar's instead
+                // of being inset by this screen's own 40dp gutter.
                 .padding(
-                    top = if (imeUp) 10.dp else 24.dp,
+                    top = StatusStripHeight + if (imeUp) 10.dp else 24.dp,
                     bottom = if (imeUp) 10.dp else 24.dp + HintBarHeight,
                 ),
         ) {

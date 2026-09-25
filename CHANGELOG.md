@@ -6,6 +6,25 @@ All notable changes to PSPLauncher are documented here. This project follows
 ## [Unreleased]
 
 ### Changed
+- **The status strip is global.** The clock, the battery, the connection icons and the notification
+  count stay on top of the App Drawer, Settings, Search and the game and app pages, instead of
+  disappearing the moment you walked into one of them and coming back when you left. It is still
+  covered by anything that owns the whole screen — the video player, the photo viewer, the boot
+  and disc ceremonies, the modal pickers.
+
+  What it says changes with where you are. The clock and the battery are facts about the device
+  and show anywhere; the sort label, the shoulder and left/right hints and the home shelf's filter
+  row describe the crossbar, so they go quiet on a screen that has covered it. The drawer was
+  briefly showing "Title" over a grid it does not sort.
+
+  The strip also wears the same wash the bottom bar does, because it is now drawn over a game's
+  full-bleed artwork and not only over the dark wave. Measured on the device: it darkens the top
+  edge by 46 of 255 and is gone by the band's bottom edge.
+
+  One thing deliberately left behind: the notification corner shows its count everywhere but is
+  only pressable on the crossbar. The sheet draws above these screens but their d-pad handling is
+  their own, and a corner that opens something you cannot walk is worse than one that does nothing.
+
 - **One bottom bar, on every screen.** Search, the App Drawer and the game and app detail pages
   each drew their own version of the controller hints — an inline row, a black pill and a pill in
   a filled footer. All four now draw the crossbar's bar: full width, at the screen edge, with back

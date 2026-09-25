@@ -45,6 +45,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.lightBackgroundAnchors
+import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 import com.psplauncher.core.ui.theme.PFPColors
@@ -290,7 +291,11 @@ internal fun AppDrawerContent(
                 )
             ),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        // The status strip is drawn over this screen by the shell, so the header starts below its
+        // band. The padding is on the content rather than the Box, so the screen's own background
+        // still runs under the strip -- the strip is a wash, not a filled bar, and a gap above the
+        // gradient would read as a black stripe across the top of the drawer.
+        Column(modifier = Modifier.fillMaxSize().padding(top = StatusStripHeight)) {
             // ── Header / breadcrumb bar ──────────────────────────────────
             AppDrawerHeader(
                 categoryLabel = state.activeFilter.label,
