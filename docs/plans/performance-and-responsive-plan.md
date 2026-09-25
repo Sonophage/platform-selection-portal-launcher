@@ -187,11 +187,21 @@ problem in Search and the App Picker via `moveSearch` / `gridMove`.
    has an empty complement, GAMES and EMULATORS short-circuit to their empty states. "Mark as
    Game" does not help: it writes an XMB platform row, while the drawer's GAMES tab reads the
    Play Store category. Needs a device with a Play-Store-flagged game or an emulator installed.
-3. **Search and the App Picker together**, because they share the grid-cursor pair and fixing one
-   leaves the other half-guarded.
-4. **Extend the scale provider to the chrome screens**, or decide deliberately that chrome stays
-   at base density. Right now it is neither — it is simply unwired.
-5. **The XMB crossbar is left alone.** Its composition is deliberate and the slider already works
+3. **Search.** DONE. The card is a fixed 2:3 with an unspecified width, so the column count WAS
+   the card's size — a fixed seven drew bigger cards on a bigger panel. The grid now measures its
+   width and divides by what a card wants (93dp, derived from what seven produced on the
+   handheld). Confirmed on both AVDs: **Konker 821dp → 7 columns, unchanged; tablet 1067dp → 9
+   columns at the same card size.** Three readers of the count now agree — the grid, the
+   ViewModel's cursor, and the scroll-back-one-row effect in `SearchScreen`, which was the one
+   nearly missed.
+
+4. **The App Picker.** Not done, and not urgent: its pair is currently self-consistent (grid and
+   `gridMove` both read `PICKER_GRID_COLUMNS = 7`), and its artwork already adapts by HEIGHT via
+   `pickerAdaptiveArtworkSize`. A wider panel there gives wider gaps rather than bigger art, which
+   is a milder defect than Search's was. Same mechanical change when it comes.
+5. **Extend the scale provider to the chrome screens**, or decide deliberately that chrome stays
+   at base density. Right now it is neither — it is simply unwired. Still open, still a decision.
+6. **The XMB crossbar is left alone.** Its composition is deliberate and the slider already works
    there.
 
 ## 4. Known bads — DONE

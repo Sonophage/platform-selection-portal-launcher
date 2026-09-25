@@ -325,6 +325,7 @@ fun XMBShellContainer(
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onSearchActivatedAt = viewModel::onSearchActivatedAt,
         onSearchBack = viewModel::closeSearch,
+        onSearchColumnsMeasured = viewModel::onSearchColumnsMeasured,
         onOpenSearch = { viewModel.openSearch(com.psplauncher.feature.xmb.viewmodel.SearchScope.ALL) },
         onMusicBrowserQueryChange = viewModel::onMusicBrowserQueryChange,
         onMusicBrowserActivatedAt = viewModel::onMusicBrowserActivatedAt,
@@ -483,6 +484,8 @@ fun XMBShell(
     onSearchQueryChange: (String) -> Unit = {},
     onSearchActivatedAt: (Int) -> Unit = {},
     onSearchBack: () -> Unit = {},
+    /** The search grid's measured column count, routed to the cursor that steps by it. */
+    onSearchColumnsMeasured: (Int) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onMusicBrowserQueryChange: (String) -> Unit = {},
     onMusicBrowserActivatedAt: (Int) -> Unit = {},
@@ -1716,6 +1719,8 @@ fun XMBShell(
                     onQueryChange = onSearchQueryChange,
                     onActivateAt = onSearchActivatedAt,
                     onBack = onSearchBack,
+                    // The grid measured its width; the cursor has to step by the same row.
+                    onColumnsMeasured = onSearchColumnsMeasured,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

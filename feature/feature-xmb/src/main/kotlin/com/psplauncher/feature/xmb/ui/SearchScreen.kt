@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +36,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +66,8 @@ import com.psplauncher.feature.xmb.viewmodel.SearchState
 import com.psplauncher.feature.xmb.viewmodel.isInstalledApp
 import com.psplauncher.core.ui.components.PfpMediaCard
 import com.psplauncher.feature.xmb.viewmodel.SEARCH_GRID_COLUMNS
+import com.psplauncher.feature.xmb.viewmodel.SEARCH_GRID_MAX_COLUMNS
+import com.psplauncher.feature.xmb.viewmodel.SEARCH_GRID_MIN_COLUMNS
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
 import androidx.compose.runtime.ReadOnlyComposable
@@ -97,14 +101,27 @@ fun SearchScreen(
     onActivateAt: (Int) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * How many columns the grid measured. The cursor steps by a whole row, so the ViewModel has
+     * to be given this same number — see SEARCH_GRID_COLUMNS.
+     */
+    onColumnsMeasured: (Int) -> Unit = {},
 ) {
     val gridState = rememberLazyGridState()
-    LaunchedEffect(state.selectedIndex, state.scrollToTopToken) {
+    // The measured count, hoisted so the three things that need it agree. It is set by the grid
+    // below; SEARCH_GRID_COLUMNS is only the value for the frame before the first measurement.
+    var columns by remember { mutableIntStateOf(SEARCH_GRID_COLUMNS) }
+    LaunchedEffect(state.selectedIndex, state.scrollToTopToken, columns) {
         if (state.rows.isNotEmpty()) {
             // A ROW back, not an item back. The list scrolled to selectedIndex - 1 to keep one
             // entry visible above the cursor; in a grid that is one column to the left, which is
             // usually the same row and scrolls nothing.
-            val target = (state.selectedIndex - SEARCH_GRID_COLUMNS).coerceIn(0, state.rows.lastIndex)
+            //
+            // THE THIRD READER of the column count, and the one that is easy to miss: the grid
+            // lays out by it, the ViewModel's cursor steps by it, and this scrolls by it. All
+            // three have to be the same number or the row kept visible above the cursor is not
+            // the row above the cursor.
+            val target = (state.selectedIndex - columns).coerceIn(0, state.rows.lastIndex)
             gridState.animateScrollToItem(target)
         }
     }
@@ -229,27 +246,43 @@ fun SearchScreen(
                     SearchResultRow(row = empty, selected = false, onClick = {})
                     Spacer(Modifier.weight(1f))
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(SEARCH_GRID_COLUMNS),
-                        state = gridState,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                        contentPadding = PaddingValues(vertical = 6.dp),
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    ) {
-                        itemsIndexed(state.rows, key = { _, row -> row.id }) { index, row ->
-                            PfpMediaCard(
-                                title = row.title,
-                                art = row.shelfCoverArt,
-                                subtitle = row.subtitle,
-                                // An app will never have art, so its tile is permanent: a letter
-                                // rather than its own name repeated under itself.
-                                initialOnly = row.isInstalledApp,
-                                focused = index == state.selectedIndex,
-                                onClick = { onActivateAt(index) },
-                                width = Dp.Unspecified,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                    // The grid measures itself and divides by what a card wants.
+                    //
+                    // It was Fixed(SEARCH_GRID_COLUMNS). Because the card is a fixed 2:3 with an
+                    // unspecified width, the column count IS the card's size — so a fixed seven
+                    // made a wider panel draw BIGGER cards rather than more of them. Card size is
+                    // the user's through the scale slider; how many fit is this division.
+                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                        val measured = ((maxWidth + SEARCH_TILE_GAP) / (SEARCH_TILE_TARGET_WIDTH + SEARCH_TILE_GAP))
+                            .toInt()
+                            .coerceIn(SEARCH_GRID_MIN_COLUMNS, SEARCH_GRID_MAX_COLUMNS)
+                        columns = measured
+                        // The cursor steps by a whole row, so it must be given the same number the
+                        // grid laid out with — stepping by seven through a nine-wide grid lands two
+                        // cards from the one under the eye.
+                        LaunchedEffect(measured) { onColumnsMeasured(measured) }
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(measured),
+                            state = gridState,
+                            horizontalArrangement = Arrangement.spacedBy(SEARCH_TILE_GAP),
+                            verticalArrangement = Arrangement.spacedBy(SEARCH_TILE_GAP),
+                            contentPadding = PaddingValues(vertical = 6.dp),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            itemsIndexed(state.rows, key = { _, row -> row.id }) { index, row ->
+                                PfpMediaCard(
+                                    title = row.title,
+                                    art = row.shelfCoverArt,
+                                    subtitle = row.subtitle,
+                                    // An app will never have art, so its tile is permanent: a
+                                    // letter rather than its own name repeated under itself.
+                                    initialOnly = row.isInstalledApp,
+                                    focused = index == state.selectedIndex,
+                                    onClick = { onActivateAt(index) },
+                                    width = Dp.Unspecified,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                 }
@@ -334,3 +367,26 @@ private fun SearchResultRow(row: XMBItem, selected: Boolean, onClick: () -> Unit
         }
     }
 }
+
+/**
+ * The width a search card wants, from which the column count is derived.
+ *
+ * Not a taste number: it is what the old fixed seven PRODUCED on the reference handheld. 821dp of
+ * panel less this screen's 40dp gutters is 741dp, and seven columns with six 14dp gaps leaves
+ * (741 - 84) / 7 = 93.86dp a card. Keeping the card at that width and letting the count float is
+ * what turns a wider panel into more results rather than larger ones — the card's size is the
+ * user's, through the scale slider. Derived from the old number precisely so the handheld keeps
+ * drawing what it drew before.
+ *
+ * **93 and not 94**, and the difference is a whole column. The count is a truncating division, so
+ * rounding the card UP past what it actually measures takes the handheld from seven to six:
+ * (741 + 14) / (94 + 14) = 6.99. SearchGridColumnsTest pins 821dp at seven for exactly this
+ * reason — it caught the 94 before it shipped.
+ *
+ * Lives here and not beside SEARCH_GRID_COLUMNS because a Dp belongs to the layout; the count is
+ * navigation math and stays in the ViewModel with the cursor that steps by it.
+ */
+private val SEARCH_TILE_TARGET_WIDTH = 93.dp
+
+/** The gap between cards, named because the column arithmetic has to subtract it. */
+private val SEARCH_TILE_GAP = 14.dp

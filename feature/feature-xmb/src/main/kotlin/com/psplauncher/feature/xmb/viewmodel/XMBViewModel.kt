@@ -503,6 +503,13 @@ data class SearchState(
     // True once the libraries have been read. Until then the overlay says so rather than
     // claiming an empty library.
     val loaded: Boolean = false,
+    /**
+     * How many columns the grid measured, so UP and DOWN step a whole real row.
+     *
+     * [SEARCH_GRID_COLUMNS] is the value for the window before the first measurement lands, and
+     * the number the handheld measures anyway.
+     */
+    val columns: Int = SEARCH_GRID_COLUMNS,
 )
 
 // Drives the "New / Rename Playlist" text dialog. When [forTrackId] is set, the freshly created
@@ -1424,8 +1431,21 @@ data class DiscCeremonyState(val art: Any?)
  * Seven, not five, because the card is a fixed 2:3 and so the column count IS the row height: at
  * five the covers were 475px tall on this screen, which pushed the second line of a long title
  * and the whole subtitle off the bottom of the panel. Widen the grid and the cards get shorter.
+ *
+ * **Seven is now the answer on the reference panel rather than the rule.** Because the count sets
+ * the card's size, a fixed seven meant a wider screen drew BIGGER cards rather than more of them
+ * — the one reading of "responsive" this app does not want, since the card's size is the user's
+ * through the scale slider. [SearchScreen] measures its own width and divides by
+ * SearchScreen's own SEARCH_TILE_TARGET_WIDTH; on the 821dp handheld that still comes to
+ * seven. This constant
+ * stays as the fallback for a window that has not been measured yet.
  */
 const val SEARCH_GRID_COLUMNS = 7
+
+
+/** Bounds on the derived count. One column is not a grid; past a dozen a 2:3 card is a stamp. */
+const val SEARCH_GRID_MIN_COLUMNS = 3
+const val SEARCH_GRID_MAX_COLUMNS = 12
 
 enum class XMBItemType {
     STANDARD,
@@ -4757,6 +4777,18 @@ class XMBViewModel @Inject constructor(
      * a row lands on the first cell of the next one, which is how reading order works and what a
      * flat index gives for free. The clamp at both ends is what stops it running off the grid.
      */
+    /** The column count the search grid last measured, or the fallback before it has. */
+    private fun searchColumns(): Int =
+        (_uiState.value.search?.columns ?: SEARCH_GRID_COLUMNS).coerceAtLeast(1)
+
+    /** [SearchScreen] measured its width; keep the cursor's row width in step with the grid's. */
+    fun onSearchColumnsMeasured(columns: Int) {
+        if (columns <= 0) return
+        val current = _uiState.value.search ?: return
+        if (current.columns == columns) return
+        _uiState.update { it.copy(search = it.search?.copy(columns = columns)) }
+    }
+
     private fun moveSearch(delta: Int) {
         val state = _uiState.value.search ?: return
         if (state.rows.isEmpty()) return
@@ -6454,8 +6486,9 @@ class XMBViewModel @Inject constructor(
                 // The results are a GRID now, so up and down move by a row and left and right by
                 // one. A list only ever needed two of these; carrying that over would have left
                 // the grid walkable one cell per press in one dimension only.
-                GamepadAction.NAVIGATE_UP    -> moveSearch(-SEARCH_GRID_COLUMNS)
-                GamepadAction.NAVIGATE_DOWN  -> moveSearch(+SEARCH_GRID_COLUMNS)
+                // A row is whatever the grid drew, not a constant — see SearchState.columns.
+                GamepadAction.NAVIGATE_UP    -> moveSearch(-searchColumns())
+                GamepadAction.NAVIGATE_DOWN  -> moveSearch(+searchColumns())
                 GamepadAction.NAVIGATE_LEFT  -> moveSearch(-1)
                 GamepadAction.NAVIGATE_RIGHT -> moveSearch(+1)
                 GamepadAction.SELECT        -> onSearchActivatedAt(state.search.selectedIndex)
