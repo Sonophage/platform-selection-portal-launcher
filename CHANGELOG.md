@@ -5,7 +5,48 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-24
+
+### Added
+- **Letter jump: an A–Z rail on long lists.** Hold a shoulder on a column long enough to be worth
+  scrolling and a rail of letters comes up the right edge; the D-pad walks it and the list moves
+  under the cursor as you go, so you read your way to the letter instead of jumping and checking.
+  Let go and you are there; Back puts the cursor exactly where it was before you started.
+
+  It works by touch too, and it has to: a control you can only reach by holding a button is one a
+  finger can never find. The rail sits quietly on every list that has one, and dragging it does
+  the same thing the shoulder does.
+
+  **The rail only offers letters the list actually contains, and only when the list is genuinely
+  in alphabetical order.** Sort a column by Date Added and the rail does not appear at all,
+  because every rung on it would point at the wrong row — and that is the kind of wrong nobody
+  reports, because it reads as the scroll position being slightly off rather than as a bug.
+
+  A shoulder tap still does what it did — walk the hover panel's pages on a game row — and it now
+  registers when you let go rather than when you press, which is what lets the same button carry
+  both gestures. Tap to page, hold to scrub.
+
 ### Changed
+- **"Add Apps" looks like the rest of the app.** The installed-app picker — the screen behind
+  Add Apps, Find Games and Add Android Apps — was the last one drawing its own chrome. It had a
+  header of its own with a back arrow, the title, a live "N Selected" count and a second magnifier
+  button labelled "Search" sitting beside a box whose placeholder already said Search, and a
+  prompt row for a footer in a style no other screen used any more.
+
+  It now draws the same search field as the App Drawer and the same bottom bar as everything else.
+  The title and the selection count moved into the bar's middle, where Settings already puts the
+  focused row's explanation. Back and the search key are named on the bar, on this screen as on
+  every other, so the four things the old header did are done by two that were already there.
+
+  The clock, the battery and the notification corner stay on top of it now as well. The picker
+  fills the screen, which is what used to hide them; filling the screen is not the same as owning
+  it. It is a grid you browse for as long as it takes to find six apps, so it keeps the launcher's
+  chrome exactly as the App Drawer does.
+
+  **Add Games keeps the clock too.** The other picker — the one behind the "Add Games" row at the
+  foot of a gaming category you made — was hiding the strip for the same reason, and it is a list
+  you browse for the same length of time. Its own styling has not been touched yet; this is only
+  the clock, the battery and the notification corner staying where they are.
 - **The App Drawer's header is one search field.** It was `‹ Android › Recently Used` on the left,
   a 220dp box in the middle and a magnifier labelled "Search" on the right — four things saying
   two, both of them twice. The category tabs directly below already name the active filter and
@@ -32,7 +73,7 @@ All notable changes to PSPLauncher are documented here. This project follows
   count stay on top of the App Drawer, Settings, Search and the game and app pages, instead of
   disappearing the moment you walked into one of them and coming back when you left. It is still
   covered by anything that owns the whole screen — the video player, the photo viewer, the boot
-  and disc ceremonies, the modal pickers.
+  and disc ceremonies, the dialogs and the small pickers you answer and dismiss.
 
   What it says changes with where you are. The clock and the battery are facts about the device
   and show anywhere; the sort label, the shoulder and left/right hints and the home shelf's filter
@@ -1610,9 +1651,16 @@ security hardening. (`versionName 1.0.0-alpha.2` / `versionCode 2`.)
 [1.7.0]: https://github.com/Sonophage/platform-selection-portal-launcher/releases/tag/v1.7.0
 [1.6.0]: https://github.com/Sonophage/platform-selection-portal-launcher/releases/tag/v1.6.0
 
-<!-- Only v1.4.0, v1.5.0, v1.6.0 and v1.7.0 exist as tags. The definitions that used to sit here
-     pointed at JohnnyCollado/PlayFieldPortal — the repository this was renamed from — and at
-     1.0.x/1.1.0/1.2.0 tags that exist in neither place, so every one of them was a 404. Deleted
-     rather than rewritten into new URLs that would 404 just as reliably.
+<!-- No compare links. The definitions that used to sit here pointed at
+     JohnnyCollado/PlayFieldPortal — the repository this was renamed from — and at tags that exist
+     in neither place, so every one of them was a 404. Deleted rather than rewritten into new URLs
+     that would 404 just as reliably.
 
-     Known gap: 1.3.0, 1.4.0 and 1.5.0 are tagged but have no section in this file. -->
+     The tags and the sections here do not line up one to one, and the count drifts every release,
+     so it is derived rather than written down. Run these instead of trusting a sentence:
+
+         git tag --sort=v:refname                                  # every tag that exists
+         grep -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md  # every section here
+
+     A tag with no section is a release nobody wrote up; a section with no tag is a release that
+     was never cut. Both have happened. -->
