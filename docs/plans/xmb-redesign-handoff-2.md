@@ -77,6 +77,10 @@ the coloured PlayStation is the PS4. See `docs/legal/controller-glyph-art.md`.
 
 ## Still open
 
+> **Superseded on 2026-09-24 (evening) by `xmb-redesign-handoff-3.md`.** Item 14 shipped, and the
+> chrome pass that followed changed several of the answers below. This section is kept as the
+> record of what was true at 12:20; read handoff-3 for what is open now.
+
 - **Tier C, untouched.** 14 (3c replaces Game Details), 15 (3e wizard restyle — 12 steps become 4),
   16 (8b live Appearance preview), 17 (artwork chain 9l→9j→8o over an untouched `ArtworkKind`).
 - **The notification sheet has never been seen with a launcher notification in it.** Both columns
