@@ -325,6 +325,7 @@ fun XMBShellContainer(
         onAppPickerApply = viewModel::onAppPickerApply,
         onAppPickerConfirmRemoval = viewModel::onAppPickerConfirmRemoval,
         onAppPickerCancelRemoval = viewModel::onAppPickerCancelRemoval,
+        onAppPickerColumnsMeasured = viewModel::onAppPickerColumnsMeasured,
         onAppPickerDismiss = viewModel::closeAppPicker,
         onGamePickerConfirm = viewModel::confirmGamePicker,
         onGamePickerDismiss = viewModel::closeGamePicker,
@@ -488,6 +489,8 @@ fun XMBShell(
     onAppPickerApply: () -> Unit = {},
     onAppPickerConfirmRemoval: () -> Unit = {},
     onAppPickerCancelRemoval: () -> Unit = {},
+    /** The picker grid's measured column count, routed to the cursor that steps by it. */
+    onAppPickerColumnsMeasured: (Int) -> Unit = {},
     onAppPickerDismiss: () -> Unit = {},
     onGamePickerConfirm: (Set<Long>, Set<Long>) -> Unit = { _, _ -> },
     onGamePickerDismiss: () -> Unit = {},
@@ -1916,6 +1919,8 @@ fun XMBShell(
                     onApply = onAppPickerApply,
                     onConfirmRemoval = onAppPickerConfirmRemoval,
                     onCancelRemoval = onAppPickerCancelRemoval,
+                    // The grid measured its width; the cursor steps by the same row.
+                    onColumnsMeasured = onAppPickerColumnsMeasured,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

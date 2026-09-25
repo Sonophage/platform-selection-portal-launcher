@@ -23,6 +23,7 @@ class AppPickerLogicTest {
         initialSelected: Set<String> = emptySet(),
         focusedIndex: Int = 0,
         query: String = "",
+        columns: Int = PICKER_GRID_COLUMNS,
     ) = AppPickerState(
         title = "Add Apps",
         target = AppPickerTarget.AndroidGames("android"),
@@ -31,6 +32,7 @@ class AppPickerLogicTest {
         initialSelected = initialSelected,
         focusedIndex = focusedIndex,
         query = query,
+        columns = columns,
     )
 
     // ── visibleApps / search ──────────────────────────────────────────────────────
@@ -271,5 +273,63 @@ class AppPickerLogicTest {
     fun `Settings and gaming columns refuse apps`() {
         assertEquals(false, categoryShowsApps(builtIn(BuiltInCategory.SETTINGS)))
         assertEquals(false, categoryShowsApps(builtIn(BuiltInCategory.GAMES)))
+    }
+
+    // ── The pair: the grid's column count and the cursor's must be the same number ────────
+
+    /**
+     * DOWN moves by exactly one drawn row, whatever the panel measured.
+     *
+     * This is why [AppPickerState.columns] exists instead of `move` reading the constant. The
+     * grid used to be a fixed seven on every screen; it is now the panel's width divided by a
+     * tile's, so a tablet draws nine and the Titan five. A cursor still stepping by seven through
+     * a nine-wide grid lands two tiles from the one under the eye — on the device with the most
+     * screen, silently.
+     *
+     * Asserted across a range rather than at one value: a hand-picked number is exactly how the
+     * old constant survived, by agreeing with the grid on the only device anyone ran.
+     */
+    @Test
+    fun `down steps one drawn row, whatever the panel measured`() {
+        val packages = (1..40).map { "p$it" }
+        for (cols in 3..12) {
+            val moved = state(packages = packages, focusedIndex = 0, columns = cols)
+                .move(GamepadAction.NAVIGATE_DOWN)
+            assertEquals(
+                "with a $cols-wide grid, down from the first tile must land one row below",
+                cols,
+                moved.focusedIndex,
+            )
+        }
+    }
+
+    /**
+     * RIGHT stops at the drawn row's edge, not at a remembered one.
+     *
+     * The failure this catches reads as "the cursor jumps a row": at a column count below the
+     * constant, a cursor that still believes in seven walks off the end of row one and reappears
+     * at the start of row two.
+     */
+    @Test
+    fun `right stops at the end of the drawn row`() {
+        val packages = (1..40).map { "p$it" }
+        for (cols in 3..12) {
+            val atRowEnd = state(packages = packages, focusedIndex = cols - 1, columns = cols)
+            val moved = atRowEnd.move(GamepadAction.NAVIGATE_RIGHT)
+            assertEquals(
+                "with a $cols-wide grid, right at the row's last tile must not wrap to the next row",
+                cols - 1,
+                moved.focusedIndex,
+            )
+        }
+    }
+
+    /** A measurement arriving before layout must not divide by zero or strand the cursor. */
+    @Test
+    fun `a zero or negative column count is survived`() {
+        for (cols in -3..0) {
+            val moved = state(focusedIndex = 2, columns = cols).move(GamepadAction.NAVIGATE_DOWN)
+            assertTrue("focus stays in range at columns=$cols", moved.focusedIndex in 0..7)
+        }
     }
 }

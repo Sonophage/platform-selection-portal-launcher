@@ -69,26 +69,23 @@ grep -rl "PfpHintBar(" --include="*.kt" feature/ | grep -v Test          # 11 on
 grep -n "hintAlpha" feature/feature-appbar/src/main/kotlin/com/psplauncher/feature/appbar/AppDrawerScreen.kt
 ```
 
-### 4. `HintBarHeight` honoured like `StatusStripHeight` — PARTIAL
+### 4. `HintBarHeight` honoured like `StatusStripHeight` — NOT A DEFECT, closed
 
-Rule 13, exactly: two constants that must agree, one guarded. `HintBarHeight` was reserved by exactly **one**
-screen, so whether content ran under the bottom band was decided per screen by accident.
+The count was 7 screens reserving the top band against 3 reserving the bottom, read as a missing
+guard. It is two correct layouts, and the two numbers are not comparable.
 
-Today: **7 reserve the top band, 3 reserve the bottom.**
+The status strip is ALWAYS drawn by the shell over these screens, so every one of them reserves
+it. The hint bar is not: `AppDrawerScreen`, `AppPickerScreen`, `GamePickerScreen` and
+`SettingsScaffold` each draw their **own** bar as the last child of a Column, where it takes its
+own space — `AppDrawerScreen`'s comment says so outright ("the bar brings its own height and
+scrim"). Reserving `HintBarHeight` there would leave a 34dp gap above a bar that is already in
+the layout.
 
-```sh
-# A reservation is a padding/height use. Filtering out imports AND comments matters here:
-# counting raw matches gives 21 and 7, which reads as "nearly even" when it is 7 against 3.
-# This prints 8 lines and 3. Seven of the eight are reservations; the eighth is the alias below.
-res() { grep -rn "$1" --include="*.kt" feature/ | grep -v ":import" | grep -vE ":\s*(//|\*)" | grep -v Test; }
-res StatusStripHeight; res HintBarHeight
-```
+The three that DO reserve it are the three where the bar overlays: `ContextMenuOverlay` and the
+letter rail sit under the shell's bar, and `SearchScreen` puts its own bar in a `Box` with
+`align(BottomCenter)` — an overlay over its own content Column, which therefore must pad for it.
 
-Reserving both: `ContextMenuOverlay.kt:70`, `SearchScreen.kt:152-153`, `XMBShell.kt:1593`.
-Reserving the top band only — **the gap**: `AppDrawerScreen.kt:301`, `SettingsScaffold.kt:1139`,
-`GamePickerScreen.kt:117`, `AppPickerScreen.kt:114`.
-(`XmbStatusStrip.kt:582` is the `StripHeight` alias, not a reservation. It is why the naive count
-says 21.)
+**The rule is: reserve the bottom band when the bar is drawn over you, not when it is beside you.**
 
 ### 5. Two test holes — HALF
 

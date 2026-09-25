@@ -50,7 +50,10 @@ internal fun AppPickerState.move(action: GamepadAction): AppPickerState {
     // Touch mode ends on the first controller input — the cursor reappears where the last
     // touch browse/tap parked it (mirrors AppDrawerViewModel).
     val base = if (usingTouch) copy(usingTouch = false) else this
-    val next = gridMove(base.focusedIndex, direction, columns = PICKER_GRID_COLUMNS, size = visible.size)
+    // The count the grid actually DREW, not the constant: a panel that fits nine while the cursor
+    // steps by seven puts RIGHT two tiles from the one under the eye, and stops LEFT at a row
+    // edge that is not on the screen.
+    val next = gridMove(base.focusedIndex, direction, columns = columns.coerceAtLeast(1), size = visible.size)
         ?: return base
     return base.copy(focusedIndex = next)
 }

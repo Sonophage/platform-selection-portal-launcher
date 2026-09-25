@@ -325,8 +325,15 @@ data class AppPickerEntry(
     val icon: android.graphics.drawable.Drawable? = null,
 )
 
-// Columns of the picker grid — one denser than the App Drawer's 6, and declared beside
-// PICKER_GRID_COLUMNS in AppPickerLogic so the layout and the navigation math can't drift.
+// Columns of the picker grid, when nobody has measured the panel.
+//
+// Seven is what the reference handheld fits and was the only number: a fixed seven spread the
+// same seven tiles across a wider screen instead of showing more of them. AppPickerScreen now
+// measures its width and divides by what a tile wants; this is the value for the frame before
+// that lands, and what 821dp measures anyway.
+//
+// It is half of a pair — the grid lays out by the count and AppPickerLogic.move steps the cursor
+// by it, so both are handed the SAME number or LEFT walks off a row edge that is not there.
 const val PICKER_GRID_COLUMNS = 7
 
 data class AppPickerState(
@@ -347,6 +354,12 @@ data class AppPickerState(
      * never the grid behind the scrim.
      */
     val confirmFocusedOption: Int = CONFIRM_CANCEL,
+    /**
+     * How many columns the grid measured, so LEFT/RIGHT stop at a real row edge and UP/DOWN step
+     * a real row. [PICKER_GRID_COLUMNS] until the first measurement lands, and what the reference
+     * handheld measures anyway.
+     */
+    val columns: Int = PICKER_GRID_COLUMNS,
     /** Mirrors AppDrawerUiState.usingTouch — hides the cursor and suppresses auto-scroll. */
     val usingTouch: Boolean = false,
 ) {
@@ -8148,6 +8161,15 @@ class XMBViewModel @Inject constructor(
     }
 
     // Touch: a tap on a tile parks the (hidden) cursor there and toggles it.
+    /** [AppPickerScreen] measured the grid; keep the cursor's row width in step with it. */
+    fun onAppPickerColumnsMeasured(columns: Int) {
+        if (columns <= 0) return
+        _uiState.update {
+            val picker = it.appPicker ?: return@update it
+            if (picker.columns == columns) it else it.copy(appPicker = picker.copy(columns = columns))
+        }
+    }
+
     fun onAppPickerTileTapped(index: Int) {
         markTouchInput()
         // While the confirmation modal is up, the grid behind the scrim is inert.

@@ -20,10 +20,17 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Three-rows guarantee on a small viewport (Robolectric JVM Compose test — the same pattern as
- * feature-settings): render the real [AppPickerScreen] with 28 apps on a w480dp-h640dp screen and
- * assert the third row of tiles fits fully above the permanent footer. Guards the
- * [pickerAdaptiveArtworkSize] contract: nothing clipped, nothing hidden under the footer.
+ * Renders the real [AppPickerScreen] with 28 apps on a w480dp-h640dp screen.
+ *
+ * **It cannot check that the third row FITS, and that is measured, not suspected.** Forcing a real
+ * 122dp overflow (artwork floored at 120dp against a 450dp viewport) leaves this test green:
+ * `boundsInRoot` is clipped to the viewport, so a tile hanging below the grid reports a bottom
+ * equal to the grid's and "nothing extends past the bottom" stays true. The sum is checked in
+ * `AppPickerRowFitTest` instead, which is falsifiable — lowering the artwork floor turns it red.
+ *
+ * What this test does still earn: the grid composes at all, tiles are composed with their labels,
+ * at least three rows are laid out, and the grid stops short of the root by the footer's height —
+ * a positional fact that clipping does not hide.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -35,8 +42,8 @@ class AppPickerThreeRowsTest {
 
     @Test
     fun `three full tile rows fit above the footer on a small screen`() {
-        // 28 tiles at 7 columns = 4 rows — more content than the 3 rows the viewport must show,
-        // so the grid has something to scroll and the assertions are meaningful.
+        // Comfortably more tiles than three rows can hold at any column count this screen
+        // measures, so the grid always has something to scroll and the assertions bite.
         val apps = (1..28).map { i ->
             AppPickerEntry(
                 packageName = "com.test.app$i",
@@ -88,17 +95,25 @@ class AppPickerThreeRowsTest {
             }
         }
 
-        // The third row must actually be composed and fully visible: with the 3-row sizing
-        // guarantee, tile 21 (row 3, last column) is on screen with its label above the footer.
-        val thirdRowTile = composeRule
-            .onAllNodesWithContentDescription("App 21", substring = true)
-            .fetchSemanticsNodes()
-        assert(thirdRowTile.isNotEmpty()) {
-            "third-row tile not composed — fewer than three rows visible in the viewport"
+        // THREE ROWS, counted as rows.
+        //
+        // This asserted that "App 21" was on screen, which is row three only while the grid is
+        // seven columns wide. The column count is measured from the panel now — this test's own
+        // w480dp qualifier gives three — so tile 21 moved to row seven and the assertion failed
+        // for a layout that is correct. The number 21 was a second copy of the column count,
+        // exactly the kind this file's footer assertion already warns about.
+        //
+        // Rows are what the contract is about, so rows are what is counted: tiles that share a
+        // top edge are a row.
+        val rowTops = visibleTiles.map { kotlin.math.round(it.boundsInRoot.top) }.distinct().sorted()
+        assert(rowTops.size >= 3) {
+            "only ${rowTops.size} full tile row(s) visible in the viewport — the sizing guarantees three"
         }
-        val thirdBottom = thirdRowTile[0].boundsInRoot.bottom
-        assert(thirdBottom <= gridBottom) {
-            "third-row tile bottom $thirdBottom extends past grid viewport bottom $gridBottom"
+        val thirdRowBottom = visibleTiles
+            .filter { kotlin.math.round(it.boundsInRoot.top) == rowTops[2] }
+            .maxOf { it.boundsInRoot.bottom }
+        assert(thirdRowBottom <= gridBottom) {
+            "third row's bottom $thirdRowBottom extends past grid viewport bottom $gridBottom"
         }
 
         // Footer-slot invariant: the permanent footer lives below the grid, so the grid may not

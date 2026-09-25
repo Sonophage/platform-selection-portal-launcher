@@ -97,6 +97,11 @@ fun AppPickerScreen(
     onConfirmRemoval: () -> Unit,
     onCancelRemoval: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * How many columns the grid measured. The cursor steps by this, so it must be the same number
+     * the grid laid out with — see PICKER_GRID_COLUMNS.
+     */
+    onColumnsMeasured: (Int) -> Unit = {},
 ) {
     val sf = deriveStorefrontColors()
     val visible = state.visibleApps()
@@ -141,6 +146,7 @@ fun AppPickerScreen(
                         onTileTapped = onTileTapped,
                         onTouchBrowse = onTouchBrowse,
                         colors = sf,
+                        onColumnsMeasured = onColumnsMeasured,
                     )
                 }
             }
@@ -249,6 +255,8 @@ private fun AppPickerGrid(
     onTileTapped: (Int) -> Unit,
     onTouchBrowse: (Int) -> Unit,
     colors: StorefrontColors,
+    /** Reported up so the cursor steps by the row the grid actually drew. */
+    onColumnsMeasured: (Int) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
 
@@ -288,23 +296,38 @@ private fun AppPickerGrid(
             }
     }
 
-    LazyVerticalGrid(
-        state = gridState,
-        columns = GridCells.Fixed(PICKER_GRID_COLUMNS),
-        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        itemsIndexed(visible, key = { _, app -> app.packageName }) { index, app ->
-            AppPickerTile(
-                entry = app,
-                isFocused = !state.usingTouch && index == state.focusedIndex,
-                isChecked = app.packageName in state.selected,
-                artworkSize = artworkSize,
-                onClick = { onTileTapped(index) },
-                colors = colors,
-            )
+    // The grid measures itself and divides by what a tile wants.
+    //
+    // It was Fixed(PICKER_GRID_COLUMNS), which spread the same seven tiles across whatever width
+    // it was given: on the 821dp handheld a tile is 99.6dp, on a 1067dp tablet the SAME seven
+    // came out 134.7dp. Tile size is the user's through the scale slider; how many fit is this
+    // division. The artwork inside already adapts by height (pickerAdaptiveArtworkSize), so this
+    // is the other axis finally doing the same thing.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // maxWidth is the whole box; the grid's own horizontal contentPadding comes off first.
+        val gridWidth = maxWidth - PICKER_GRID_SIDE_PADDING * 2
+        val columns = ((gridWidth + PICKER_TILE_GAP) / (PICKER_TILE_TARGET_WIDTH + PICKER_TILE_GAP))
+            .toInt()
+            .coerceIn(PICKER_GRID_MIN_COLUMNS, PICKER_GRID_MAX_COLUMNS)
+        LaunchedEffect(columns) { onColumnsMeasured(columns) }
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(columns),
+            contentPadding = PaddingValues(horizontal = PICKER_GRID_SIDE_PADDING, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(PICKER_TILE_GAP),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            itemsIndexed(visible, key = { _, app -> app.packageName }) { index, app ->
+                AppPickerTile(
+                    entry = app,
+                    isFocused = !state.usingTouch && index == state.focusedIndex,
+                    isChecked = app.packageName in state.selected,
+                    artworkSize = artworkSize,
+                    onClick = { onTileTapped(index) },
+                    colors = colors,
+                )
+            }
         }
     }
 }
@@ -313,7 +336,7 @@ private fun AppPickerGrid(
 
 private val TILE_BORDER = 1.dp
 // Chrome room around the artwork: outer border + 2dp gap + inner hairline on each side.
-private val FRAME_ROOM = 8.dp
+internal val FRAME_ROOM = 8.dp
 
 // ── Adaptive row sizing ──────────────────────────────────────────────────────
 //
@@ -331,15 +354,37 @@ private val FRAME_ROOM = 8.dp
 // height are already subtracted by the time this runs — there is no second copy of either number
 // here to drift from the originals.
 
-private val MIN_ARTWORK_SIZE = 48.dp
-private val MAX_ARTWORK_SIZE = 72.dp
+internal val MIN_ARTWORK_SIZE = 48.dp
+internal val MAX_ARTWORK_SIZE = 72.dp
 
-private fun pickerAdaptiveArtworkSize(viewportHeight: Dp, rows: Int = 3): Dp {
+internal fun pickerAdaptiveArtworkSize(viewportHeight: Dp, rows: Int = 3): Dp {
     // Frame room + label spacer + a 2-line 11sp label block + the tile's vertical padding.
     val tileFixedHeight = FRAME_ROOM + 6.dp + 30.dp + 8.dp
     val rowHeight = (viewportHeight - 28.dp - 14.dp * (rows - 1)) / rows
     return (rowHeight - tileFixedHeight).coerceIn(MIN_ARTWORK_SIZE, MAX_ARTWORK_SIZE)
 }
+/**
+ * The width a picker tile wants, from which the column count is derived.
+ *
+ * What the old fixed seven PRODUCED on the reference handheld: 821dp of panel less the grid's two
+ * 32dp gutters is 757dp, and seven columns with six 10dp gaps leaves (757 - 60) / 7 = 99.57dp.
+ *
+ * **99 and not 100.** The count is a truncating division, so rounding up past what a tile
+ * measures costs a whole column: (757 + 10) / (100 + 10) = 6.97, and the handheld would quietly
+ * drop to six. The same arithmetic caught the same mistake on the search grid.
+ */
+private val PICKER_TILE_TARGET_WIDTH = 99.dp
+
+/** The gap between tiles, named because the column arithmetic subtracts it. */
+private val PICKER_TILE_GAP = 10.dp
+
+/** The grid's own side gutters, named for the same reason. */
+private val PICKER_GRID_SIDE_PADDING = 32.dp
+
+/** Bounds on the derived count. Below three it is a list; past a dozen a tile is a stamp. */
+private const val PICKER_GRID_MIN_COLUMNS = 3
+private const val PICKER_GRID_MAX_COLUMNS = 12
+
 private val FOCUS_TWEEN = 120
 private val CHECK_TWEEN = 100
 
