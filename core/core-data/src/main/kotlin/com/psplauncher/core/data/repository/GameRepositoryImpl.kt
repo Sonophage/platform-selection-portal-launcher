@@ -3,7 +3,6 @@ package com.psplauncher.core.data.repository
 import com.psplauncher.core.data.database.dao.GameDao
 import com.psplauncher.core.data.database.dao.PlaySessionDao
 import com.psplauncher.core.data.database.dao.PlatformDao
-import com.psplauncher.core.data.database.entity.PlaySessionEntity
 import com.psplauncher.core.data.database.entity.toDomain
 import com.psplauncher.core.data.database.entity.toEntity
 import com.psplauncher.core.domain.model.Game

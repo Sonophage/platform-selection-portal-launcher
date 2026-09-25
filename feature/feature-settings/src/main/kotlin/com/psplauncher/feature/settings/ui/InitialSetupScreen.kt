@@ -17,7 +17,6 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.data.repository.MediaRootKind
 import com.psplauncher.core.ui.preview.CombinedPreviews

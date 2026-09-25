@@ -3,7 +3,6 @@ package com.psplauncher.launcher.di
 import android.content.Context
 import android.content.pm.LauncherApps
 import android.os.PowerManager
-import android.view.inputmethod.InputMethodManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

@@ -51,7 +51,6 @@ import com.psplauncher.core.ui.wave.WaveLayers
 import com.psplauncher.core.ui.wave.WaveStyle
 import com.psplauncher.feature.settings.ui.LocalSettingsActionConsumed
 import com.psplauncher.feature.settings.ui.LocalSettingsPendingAction
-import kotlinx.coroutines.delay
 
 /**
  * The wizard's front door: the mark on the wave, and one press to go in.

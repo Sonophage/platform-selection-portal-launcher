@@ -1,7 +1,6 @@
 package com.psplauncher.feature.xmb.ui
 
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.psplauncher.core.domain.model.IconDisplayMode
 import com.psplauncher.core.domain.model.VideoSnapPlacement

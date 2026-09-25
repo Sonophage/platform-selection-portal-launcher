@@ -4,7 +4,6 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
-import android.os.Build
 import android.os.Process
 import com.psplauncher.core.common.launch.LaunchTransition
 import android.provider.Settings

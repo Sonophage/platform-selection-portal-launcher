@@ -2,8 +2,6 @@ package com.psplauncher.core.data.database.di
 
 import android.content.Context
 import androidx.room.Room
-import androidx.room.RoomDatabase
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.psplauncher.core.data.database.PFPDatabase
 import com.psplauncher.core.data.database.dao.AppOverrideDao
 import com.psplauncher.core.data.database.dao.ArtworkImportReportDao
@@ -30,7 +28,6 @@ import com.psplauncher.core.data.database.dao.ScanTombstoneDao
 import com.psplauncher.core.data.database.dao.VideoDao
 import com.psplauncher.core.data.database.dao.VideoLibraryDao
 import com.psplauncher.core.data.database.dao.VideoPlaylistDao
-import com.psplauncher.core.data.repository.CategoryRepositoryImpl
 import com.psplauncher.core.data.repository.GameRepositoryImpl
 import com.psplauncher.core.data.repository.MusicRepositoryImpl
 import com.psplauncher.core.data.repository.BookRepositoryImpl

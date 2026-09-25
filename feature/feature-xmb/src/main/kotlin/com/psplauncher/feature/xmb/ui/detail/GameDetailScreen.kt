@@ -1,7 +1,6 @@
 package com.psplauncher.feature.xmb.ui.detail
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -35,12 +34,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -93,23 +89,18 @@ import com.psplauncher.core.ui.detail.PfpDetailHelperFooter
 import com.psplauncher.core.ui.detail.PfpDetailArtBackdrop
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
-import com.psplauncher.core.ui.detail.PfpDetailMediaTile
-import com.psplauncher.core.ui.detail.PfpDetailProgressRow
 import com.psplauncher.core.ui.detail.PfpDetailScaffold
 import com.psplauncher.core.ui.detail.PfpDetailSectionLabel
-import com.psplauncher.core.ui.detail.PfpDetailTextRow
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.core.ui.theme.menuCursorFill
 import com.psplauncher.core.ui.components.PspContextMenuOverlay
 import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.feature.xmb.ui.collection.CollectionPickerPanel
-import com.psplauncher.feature.xmb.viewmodel.gameMetadataLine
 import com.psplauncher.feature.xmb.viewmodel.relativeDate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import timber.log.Timber
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 

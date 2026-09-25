@@ -2,7 +2,6 @@ package com.psplauncher.studio
 
 import com.psplauncher.themekit.PfpThemeCodec
 import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.io.path.createTempDirectory

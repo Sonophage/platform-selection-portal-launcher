@@ -3,7 +3,6 @@ package com.psplauncher.core.ui.theme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 
@@ -110,8 +109,6 @@ private val DefaultStorefrontColors = StorefrontColors(
     menuRowSelected   = Color(0x347EE8FF),
     destructive       = Color(0xFFFF6B6B),
 )
-
-val LocalStorefrontColors = staticCompositionLocalOf { DefaultStorefrontColors }
 
 // ── Contrast helpers ───────────────────────────────────────────────────────────
 // relativeLuminance / contrastRatio / ensureReadable now live in TextLegibility.kt (same package,

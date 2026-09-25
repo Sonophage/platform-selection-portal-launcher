@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.common.format.formatByteSize
-import com.psplauncher.feature.settings.viewmodel.ArtworkImportUiState
 import com.psplauncher.feature.settings.viewmodel.ArtworkImportViewModel
 import java.util.Locale
 

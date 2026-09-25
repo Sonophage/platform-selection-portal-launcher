@@ -3,7 +3,6 @@ package com.psplauncher.feature.artwork.api
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /**
  * The Steam provider's two pure parts: which URLs an app id becomes, and what is taken from a

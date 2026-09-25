@@ -32,9 +32,7 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,9 +61,7 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.Video
 import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.ui.components.PfpHintBar
-import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
-import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.detail.PfpConfirmOverlay
 import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpMessageOverlay

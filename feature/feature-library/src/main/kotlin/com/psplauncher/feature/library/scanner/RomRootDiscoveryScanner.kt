@@ -3,7 +3,6 @@ package com.psplauncher.feature.library.scanner
 import com.psplauncher.core.data.platform.PlatformFolderHintResolver
 import com.psplauncher.core.data.repository.MemoryCardRepository
 import com.psplauncher.core.data.repository.RomRootRepository
-import com.psplauncher.core.domain.model.Platform
 import com.psplauncher.core.domain.repository.GameRepository
 import javax.inject.Inject
 import javax.inject.Singleton

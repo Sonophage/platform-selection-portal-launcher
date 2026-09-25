@@ -1,12 +1,9 @@
 package com.psplauncher.core.ui.icons
 
-import androidx.compose.foundation.Image
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 /**
  * Custom icon overrides carried by the applied `.pfptheme` (schema v3, extracted to the

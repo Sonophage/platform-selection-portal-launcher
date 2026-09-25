@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
 import android.os.PowerManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -26,7 +25,6 @@ import com.psplauncher.core.ui.motion.MotionWallpaperPolicy
 import com.psplauncher.core.ui.wave.WaveBackground
 import com.psplauncher.core.ui.wave.WaveLayers
 import com.psplauncher.core.ui.wave.WaveStyle
-import timber.log.Timber
 
 /**
  * Root background behind the XMB UI. The wallpaper automatically replaces the wave:

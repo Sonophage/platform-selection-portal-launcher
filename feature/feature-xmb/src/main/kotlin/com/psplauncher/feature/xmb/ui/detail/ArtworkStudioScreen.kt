@@ -87,8 +87,6 @@ import com.psplauncher.core.common.logging.LogRedaction
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.components.ControllerPrompt
-import com.psplauncher.core.ui.components.ControllerHintStyle
-import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge

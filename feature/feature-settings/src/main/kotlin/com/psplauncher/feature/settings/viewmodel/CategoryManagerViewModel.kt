@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.psplauncher.core.data.repository.CategoryRepositoryImpl
 import com.psplauncher.core.domain.model.BuiltInCategory
-import com.psplauncher.core.domain.model.CategoryType
 import com.psplauncher.core.ui.icons.CATEGORY_ICON_CATALOG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

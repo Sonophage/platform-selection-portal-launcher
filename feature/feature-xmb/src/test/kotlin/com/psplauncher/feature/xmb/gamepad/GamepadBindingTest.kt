@@ -2,7 +2,6 @@ package com.psplauncher.feature.xmb.gamepad
 
 import android.view.KeyEvent
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.domain.model.GamepadBinding
 import com.psplauncher.core.domain.model.GamepadMappings
 import com.psplauncher.core.domain.model.displayLabel
 import com.psplauncher.core.domain.model.keycodeDisplayName

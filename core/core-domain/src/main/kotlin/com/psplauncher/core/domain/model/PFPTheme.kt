@@ -20,7 +20,18 @@ data class PFPTheme(
     val isBuiltIn: Boolean = false,
 )
 
-// Sound events themes can provide
+/**
+ * Sound events a theme can provide — and a HALF-BUILT feature, kept rather than deleted.
+ *
+ * Nothing reads this enum. But `XmbThemeLoader.extractSoundPack` does unpack a theme's sound pack
+ * and `soundPackUri` is persisted on the theme row, so a pack is carried all the way to the
+ * database and then never played: the live vocabulary is core-ui's `MenuSound`, which the user
+ * assigns per slot in Settings ▸ Media.
+ *
+ * Deleting this would leave the extraction and the column with nothing naming the contract they
+ * were written against, which makes the remaining half harder to finish rather than easier. It
+ * stays until the pack is either played or the extraction goes with it.
+ */
 enum class ThemeSoundEvent {
     NAVIGATE_HORIZONTAL,
     NAVIGATE_VERTICAL,

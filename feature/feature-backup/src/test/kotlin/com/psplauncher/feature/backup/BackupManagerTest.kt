@@ -8,7 +8,6 @@ import com.psplauncher.core.data.database.dao.CategoryDao
 import com.psplauncher.core.data.database.dao.GameDao
 import com.psplauncher.core.data.database.dao.PlaySessionDao
 import com.psplauncher.core.data.database.entity.CategoryEntity
-import com.psplauncher.core.data.database.entity.CategoryItemEntity
 import com.psplauncher.core.data.database.entity.GameEntity
 import com.psplauncher.core.data.database.entity.PlaySessionEntity
 import com.psplauncher.core.data.repository.BackupFolderRepository

@@ -5,10 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.psplauncher.feature.xmb.preview.PreviewData
 import com.psplauncher.feature.xmb.viewmodel.XMBUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 

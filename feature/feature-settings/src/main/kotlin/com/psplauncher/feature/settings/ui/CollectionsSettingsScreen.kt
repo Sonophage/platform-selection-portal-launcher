@@ -11,14 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
@@ -29,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.mutableIntStateOf
@@ -51,7 +47,6 @@ import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameCollection
 import com.psplauncher.core.ui.icons.CATEGORY_ICON_CATALOG
 import com.psplauncher.core.ui.icons.categoryIconFor
-import com.psplauncher.feature.settings.viewmodel.CollectionsSettingsViewModel
 
 /**
  * Collections' detail step and its dialogs. The list itself lives in [CategoryManagerScreen].

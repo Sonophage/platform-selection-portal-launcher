@@ -2,7 +2,6 @@ package com.psplauncher.core.ui.media
 
 import android.media.AudioManager
 import com.psplauncher.core.domain.model.UiMediaSlot
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test

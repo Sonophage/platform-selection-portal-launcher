@@ -1,9 +1,6 @@
 package com.psplauncher.core.data.database
 
-import androidx.room.testing.MigrationTestHelper
-import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.sqlite.execSQL
-import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Rule
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner

@@ -1,6 +1,5 @@
 package com.psplauncher.feature.xmb.viewmodel
 
-import com.psplauncher.core.domain.model.PlatformIds
 import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
 
 import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
@@ -36,9 +35,7 @@ import com.psplauncher.core.ui.media.resolveGameBootAudio
 import com.psplauncher.themekit.CustomizableIcons
 import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
-import com.psplauncher.core.domain.model.CategoryType
 import com.psplauncher.core.domain.model.ControllerHintPolicy
-import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.domain.model.Game
 import com.psplauncher.core.domain.model.GameCollection
 import com.psplauncher.core.domain.model.GameContentType
@@ -76,7 +73,6 @@ import com.psplauncher.feature.appbar.LauncherShortcutRepository
 import com.psplauncher.feature.launcher.LaunchDispatchResult
 import com.psplauncher.feature.launcher.LaunchRecoveryAction
 import com.psplauncher.feature.launcher.ResolvedLaunch
-import com.psplauncher.feature.launcher.corePathFor
 import com.psplauncher.feature.artwork.api.ArtworkRepository
 import com.psplauncher.feature.library.scanner.LibraryScanner
 import com.psplauncher.feature.library.scanner.ScanStatus
@@ -87,11 +83,8 @@ import com.psplauncher.feature.xmb.gamepad.ShoulderHold
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
-import kotlin.math.roundToInt
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -109,7 +102,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 
 private fun XmbPalette.toPFPColors() = PFPColors(

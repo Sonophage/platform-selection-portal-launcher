@@ -8,8 +8,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import com.psplauncher.themekit.ColorCascade
 
@@ -175,7 +173,3 @@ fun PFPTheme(
     }
 }
 
-object PFPThemeTokens {
-    val colors: PFPColors
-        @Composable get() = LocalPFPColors.current
-}
