@@ -97,8 +97,11 @@ says 21.)
   the correct outcome**: the keyboard footer currently tells you to press a key that does nothing.
 
 ```sh
-grep -rn "promptedKeys" --include="*.kt" . | head -1     # find the test, then read the map
-sed -n '/val kbLabels/,/^\s*)/p' core/core-ui/src/main/kotlin/com/psplauncher/core/ui/components/ControllerButtonGlyph.kt
+# Count ENTRIES, not lines: kbLabels puts two per line, so `grep -c` says 8 where it is 14.
+F=core/core-ui/src/test/kotlin/com/psplauncher/core/ui/components/KeyboardPromptsAreBoundTest.kt
+sed -n '/val promptedKeys/,/^    )/p' "$F" | grep -o 'ControllerIcon\.[A-Z_]*' | sort -u | wc -l   # 11
+sed -n '/val kbLabels/,/^)/p' core/core-ui/src/main/kotlin/com/psplauncher/core/ui/components/ControllerButtonGlyph.kt \
+  | grep -o 'ControllerIcon\.[A-Z_]*' | sort -u | wc -l                                            # 14
 ```
 
 ---
@@ -142,10 +145,22 @@ grep -rl "XmbRailCapsule\|ContextMenuOverlay" --include="*.kt" .    # the rail, 
 
 ### 7. One search field — OPEN
 
-`PfpSearchField` (40dp pill) has three adopters. Two screens still roll an `OutlinedTextField` at
-`RoundedCornerShape(10.dp)`: `SearchScreen.kt:196` and `MusicBrowserScreen.kt:150`.
-`PfpSearchField.kt`'s own header says "A third copy would have learned it a third time" — there
-are three copies of the behaviour, two of them not using it.
+`PfpSearchField` (40dp pill) has **two** adopters — `AppDrawerHeader` and `AppPickerScreen`.
+(An earlier count said three; that was a grep on the NAME, which also matches the import in
+`MusicTrackPicker`. Matching the CALL, `PfpSearchField(`, gives two.)
+
+Two search boxes still roll their own `OutlinedTextField`: `SearchScreen.kt:205` and
+`MusicBrowserScreen.kt:145`.
+
+Three further `OutlinedTextField`s in feature-xmb are **not** search and are not part of this
+item: `AppDetailScreen.kt:547` ("Display Name"), `GameDetailScreen.kt:1067` ("Note") and `:1115`
+("Display Title") are labelled editors. If a shared component is ever wanted for those it is a
+different one.
+
+```sh
+grep -rl "PfpSearchField(" --include="*.kt" feature/ core/ | grep -v Test   # adopters (2 + the file itself)
+grep -rn "OutlinedTextField(" --include="*.kt" feature/feature-xmb/src/main # 2 search + 3 editors
+```
 
 ### 8. One placeholder grammar — OPEN
 
