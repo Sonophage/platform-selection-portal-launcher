@@ -18,10 +18,16 @@ class UiMediaSlotTest {
 
     // ── the roster ───────────────────────────────────────────────────────────
 
-    @Test fun `sound slots are exactly the six merged rows in roster order`() {
+    @Test fun `sound slots are exactly the eight rows in roster order`() {
         assertEquals(
             listOf(
+                // Three movement events, three rows. They shared one slot until the split; the
+                // XMB distinguishes the cursor stepping, something opening and a category
+                // changing, and a single sample for all three is what made every movement sound
+                // alike. They still share a bundled default — see UiMediaDefaultsTest.
                 "sound_scroll" to "Navigation",
+                "sound_select" to "Select / Open",
+                "sound_system_browse" to "Category Change",
                 "sound_back" to "Back / Cancel",
                 "sound_confirm" to "Confirm / Apply",
                 "sound_error" to "Error / Invalid",
@@ -42,10 +48,16 @@ class UiMediaSlotTest {
 
     // ── the collapse: removed slots ──────────────────────────────────────────
 
-    @Test fun `removed slots are gone and their keys are invalid`() {
-        assertNull(UiMediaSlot.fromKey("sound_select"), "SOUND_SELECT was merged into Navigation")
-        assertNull(UiMediaSlot.fromKey("sound_systembrowse"), "SOUND_SYSTEM_BROWSE was merged into Navigation")
-        assertFalse(UiMediaSlot.isValidKey("sound_select"))
+    @Test fun `the split restored two slots, and the old misspelt key stays invalid`() {
+        // These two were merged into Navigation and then split back out. `sound_select` returns
+        // under its original key; the other comes back as `sound_system_browse`, with the
+        // underscore the rest of the roster uses — the pre-merge key was `sound_systembrowse`
+        // and it is deliberately NOT revived. Nothing is stranded by that: pruneOrphans deletes
+        // files whose name is not a live slot key, so any sample stored under the old spelling
+        // went when the merge landed.
+        assertEquals(UiMediaSlot.SOUND_SELECT, UiMediaSlot.fromKey("sound_select"))
+        assertEquals(UiMediaSlot.SOUND_SYSTEM_BROWSE, UiMediaSlot.fromKey("sound_system_browse"))
+        assertNull(UiMediaSlot.fromKey("sound_systembrowse"), "the pre-merge spelling is not a slot")
         assertFalse(UiMediaSlot.isValidKey("sound_systembrowse"))
     }
 

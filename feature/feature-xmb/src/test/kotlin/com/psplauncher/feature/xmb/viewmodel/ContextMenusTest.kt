@@ -109,13 +109,13 @@ class ContextMenusTest {
         val none = gameContextMenuItems(game(), state(), 1, false, null)
         assertFalse("hide_here" in ids(none))
 
-        val inFavourites = gameContextMenuItems(
+        val inFavorites = gameContextMenuItems(
             game(), state(), 1, false,
             Triple(HideLocationType.FAVORITES, "", "Favorites"),
         )
         assertEquals(
             "Hide from Favorites",
-            inFavourites.first { it.id == "hide_here" }.label,
+            inFavorites.first { it.id == "hide_here" }.label,
         )
     }
 
@@ -208,7 +208,7 @@ class ContextMenusTest {
         assertFalse("pin_category" in items)
     }
 
-    // ── Favourite toggles ─────────────────────────────────────────────────
+    // ── Favorite toggles ─────────────────────────────────────────────────
 
     @Test
     fun `favourite is a toggle, never both`() {

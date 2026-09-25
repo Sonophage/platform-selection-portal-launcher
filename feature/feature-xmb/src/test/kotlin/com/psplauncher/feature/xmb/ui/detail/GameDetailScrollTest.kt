@@ -106,7 +106,7 @@ class GameDetailScrollTest {
         // is labelled for what Confirm does. Same for "Options" and the gear. Counting is the
         // assertion: zero would mean the button never rendered.
         composeRule.onAllNodesWithText("Play").assertCountEquals(2)
-        composeRule.onAllNodesWithText("Favourite").assertCountEquals(1)
+        composeRule.onAllNodesWithText("Favorite").assertCountEquals(1)
         composeRule.onAllNodesWithText("Options").assertCountEquals(2)
     }
 }

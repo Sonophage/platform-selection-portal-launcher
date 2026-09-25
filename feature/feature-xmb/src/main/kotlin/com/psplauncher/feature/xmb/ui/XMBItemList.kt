@@ -213,7 +213,7 @@ private val SelectedTextShadow = Shadow(
 private val ROW_HORIZONTAL_PADDING = 18.dp
 
 // "Text Shadow" (Display ▸ Appearance): the repo's standard directional drop shadow — the same
-// values PspContextMenu / ControllerHintBar / DetailContextMenu use — applied to XMB row
+// values PspContextMenu / ControllerHintBar use — applied to XMB row
 // subtitles. The settings scaffold's SettingsTextShadow is feature-internal, so the same idiom is
 // restated here for the shell (the XMB draws over the raw wallpaper, no scrim at all).
 val XmbTextShadow = Shadow(

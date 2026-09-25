@@ -36,7 +36,7 @@ import com.psplauncher.themekit.UiMediaLimits
 private val AUDIO_PICKER_MIME = UiMediaLimits.AUDIO_MIME.toTypedArray()
 
 /**
- * Interface ▸ Sound — the Menu Sounds toggle plus the nine sound assignments: the six menu
+ * Interface ▸ Sound — the Menu Sounds toggle plus the eleven sound assignments: the eight menu
  * sounds and the three AUDIO_TRACK rows (Boot Sound and the launch ceremony's two cues), which
  * preview through their own ExoPlayer path
  * ([com.psplauncher.core.ui.media.UiMediaAudioPlayer]) instead of SoundPool.
@@ -69,7 +69,7 @@ fun AudioSettingsScreen(
         focusRequestToken++
     }
 
-    // ONE picker for all nine rows — the pending slot is held on the ViewModel, so the callback
+    // ONE picker for all eleven rows — the pending slot is held on the ViewModel, so the callback
     // does not need to close over which row launched it.
     val soundPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()

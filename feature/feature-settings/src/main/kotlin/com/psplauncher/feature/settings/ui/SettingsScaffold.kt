@@ -297,7 +297,7 @@ val SettingsSubtext: Color
 // Directional drop shadow for text over the translucent backdrop: the settings scrim is a
 // translucent theme gradient (the wallpaper reads through BY DESIGN), so flat gray helper text
 // washes out wherever the wallpaper is bright. The repo's standard black drop shadow
-// (PspContextMenu, ControllerHintBar, DetailContextMenu) restores separation without hiding
+// (PspContextMenu, ControllerHintBar) restores separation without hiding
 // the wallpaper behind a heavier scrim.
 val SettingsTextShadow = Shadow(
     color = Color.Black.copy(alpha = 0.75f),

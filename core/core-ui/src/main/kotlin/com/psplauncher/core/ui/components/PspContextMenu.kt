@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -141,7 +142,11 @@ fun PspContextMenuOverlay(
             // ── Items ──────────────────────────────────────────────────────
             LazyColumn(
                 state = listState,
-                modifier = Modifier.padding(top = 10.dp),
+                // Bottom padding, not just top. A list longer than the panel used to end flush
+                // with the screen edge, so the last row — Remove, on a game — was cut in half
+                // even while it was the selected one. contentPadding rather than a Modifier so
+                // the gap scrolls away with the content instead of masking the last row.
+                contentPadding = PaddingValues(top = 10.dp, bottom = 32.dp),
             ) {
                 itemsIndexed(rows) { index, row ->
                     // The heading is drawn INSIDE the row's item, above it: it belongs to this

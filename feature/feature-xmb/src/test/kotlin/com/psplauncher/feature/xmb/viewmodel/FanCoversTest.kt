@@ -79,6 +79,37 @@ class FanCoversTest {
         val many = (1..50L).map { game(it, "c$it") }
         assertEquals(listOf("c50", "c49", "c48"), fanCoversOf(many, FAN_COVER_COUNT))
     }
+
+    // ── The setting both consumers have to obey ───────────────────────────
+
+    @Test
+    fun `the fan draws nothing when card art grid is off`() {
+        val covers = listOf("a.png", "b.png", "c.png", "d.png")
+        assertEquals(
+            "Card Art Grid off means the card shows its console icon — a fan of the covers from " +
+                "inside it, drawn beside that icon, is the setting obeyed by one consumer and " +
+                "ignored by the other",
+            emptyList<String>(),
+            fanCoversToDraw(covers, cardArtGrid = false),
+        )
+    }
+
+    @Test
+    fun `the fan takes its own count when card art grid is on`() {
+        val covers = listOf("a.png", "b.png", "c.png", "d.png")
+        // Four are carried on the row because the card's grid wants four; the fan wants three.
+        assertEquals(
+            "the fan takes FAN_COVER_COUNT, not everything the row carries for the grid",
+            listOf("a.png", "b.png", "c.png"),
+            fanCoversToDraw(covers, cardArtGrid = true),
+        )
+    }
+
+    @Test
+    fun `a card with nothing inside draws no fan either way`() {
+        assertEquals(emptyList<String>(), fanCoversToDraw(emptyList(), cardArtGrid = true))
+        assertEquals(emptyList<String>(), fanCoversToDraw(emptyList(), cardArtGrid = false))
+    }
 }
 
 /**

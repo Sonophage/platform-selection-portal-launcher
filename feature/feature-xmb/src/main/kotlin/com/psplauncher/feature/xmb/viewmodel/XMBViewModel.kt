@@ -1940,6 +1940,11 @@ data class XMBItem(
      * Read by two things: the fan on the right of the crossbar, and the card's own 2x2 art grid.
      * Empty for anything that is not a Games-root card, and for a card whose games have no
      * artwork — both consumers are previews of what is in there, and there is nothing to preview.
+     *
+     * BOTH are gated on the Card Art Grid setting, and they have to be: the setting means "show
+     * what is inside this card rather than its console icon", so a fan of those same covers
+     * drawn beside an icon is the setting applied to one of its two halves. The grid asked and
+     * the fan did not, until it was noticed on the device.
      */
     val insideCovers: List<String> = emptyList(),
     val gameId: Long? = null,
@@ -4675,6 +4680,30 @@ class XMBViewModel @Inject constructor(
         val state = _uiState.value.search ?: return
         val q = state.query
         val rows = buildList {
+            // APPS LEAD. They used to come last, after five libraries, which put the thing most
+            // often searched for at the bottom of a list that is capped per library — so a query
+            // matching a dozen games could push an exact app match off the visible rows entirely.
+            // Games follow, then the media libraries.
+            //
+            // The package name is in the haystack as well as the label, because half of what
+            // someone remembers about an app is what the store called it.
+            searchApps.filter { matchesSearch(q, it.label, it.packageName) }
+                .take(SEARCH_RESULTS_PER_LIBRARY)
+                .forEach { app ->
+                    add(
+                        XMBItem(
+                            id = "searchapp_${app.packageName}",
+                            title = app.label,
+                            subtitle = "App",
+                            packageName = app.packageName,
+                            // Says what it is, so XMBItemList draws its icon. Without this the
+                            // row matched no art branch and came out as a bare label — the same
+                            // omission the home shelf had, in the second of the two places that
+                            // build an app row from scratch.
+                            isAndroidApp = true,
+                        ),
+                    )
+                }
             // The platform is in the haystack because the row already PRINTS it: a list that shows
             // you "Castlevania · PlayStation" and then finds nothing for "psx castlevania" is
             // showing you a field it refuses to search. platformCache holds the display name the
@@ -4696,20 +4725,6 @@ class XMBViewModel @Inject constructor(
             searchTracks.filter { matchesSearch(q, it.displayTitle, it.artist, it.album) }
                 .take(SEARCH_RESULTS_PER_LIBRARY)
                 .forEach { add(it.toSearchRow()) }
-            // The package name is in the haystack as well as the label, because half of what
-            // someone remembers about an app is what the store called it.
-            searchApps.filter { matchesSearch(q, it.label, it.packageName) }
-                .take(SEARCH_RESULTS_PER_LIBRARY)
-                .forEach { app ->
-                    add(
-                        XMBItem(
-                            id = "searchapp_${app.packageName}",
-                            title = app.label,
-                            subtitle = "App",
-                            packageName = app.packageName,
-                        ),
-                    )
-                }
         }
         // Asks the snapshots this search is actually working from, so a scoped search reports the
         // state of ITS library rather than the app's — openSearch only fills the lists its scope
@@ -6093,6 +6108,11 @@ class XMBViewModel @Inject constructor(
     fun onLetterRailTouch(fraction: Float) {
         onUserInteraction()
         val s = _uiState.value
+        // The same guard [openLetterJump] has, and it was missing here. The rail keeps drawing
+        // behind the context rail and the notification sheet — both leave the crossbar visible —
+        // so a thumb could scrub the list underneath a menu that is supposed to own the input.
+        // Two ways into one state and only one of them was checked.
+        if (s.hasBlockingOverlay) return
         val rail = s.letterJump
             ?: letterJumpFor(s.currentItems, s.selectedItemIndex)?.also { raised ->
                 _uiState.update { it.copy(letterJump = raised) }

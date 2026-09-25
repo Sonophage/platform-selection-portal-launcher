@@ -143,13 +143,16 @@ class AudioSettingsViewModelTest {
 
     // ── the roster ───────────────────────────────────────────────────────────
 
-    @Test fun `the Sound screen lists the six menu sounds then the three presentation tracks`() =
+    @Test fun `the Sound screen lists the eight menu sounds then the three presentation tracks`() =
         runTest(dispatcher) {
-            // Order is the screen's reading order, not an implementation detail: the six ticks
-            // you hear constantly, then the three that only sound at a boundary.
+            // Order is the screen's reading order, not an implementation detail: the eight ticks
+            // you hear constantly, then the three that only sound at a boundary. The list is
+            // derived from ofKind(SOUND), so the three movement rows arriving here is the split
+            // reaching the screen without anyone wiring it.
             assertEquals(
                 listOf(
-                    "sound_scroll", "sound_back", "sound_confirm", "sound_error",
+                    "sound_scroll", "sound_select", "sound_system_browse",
+                    "sound_back", "sound_confirm", "sound_error",
                     "sound_launch", "sound_notification",
                     "boot_audio", "launch_disc_audio", "gameboot_audio",
                 ),

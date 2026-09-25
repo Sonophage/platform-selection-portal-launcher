@@ -101,8 +101,8 @@ import com.psplauncher.core.ui.detail.PfpDetailTextRow
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.core.ui.theme.menuCursorFill
-import com.psplauncher.feature.xmb.ui.DetailContextMenu
-import com.psplauncher.feature.xmb.ui.DetailMenuRow
+import com.psplauncher.core.ui.components.PspContextMenuOverlay
+import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.feature.xmb.ui.collection.CollectionPickerPanel
 import com.psplauncher.feature.xmb.viewmodel.gameMetadataLine
 import com.psplauncher.feature.xmb.viewmodel.relativeDate
@@ -244,15 +244,24 @@ fun GameDetailScreen(
             onBack()
         }
     }
+    // ONE route for this page's actions, and both ways in use it.
+    //
+    // Start is the shell's everywhere else, and it is the shell's here too the moment the Studio
+    // is not up -- see [onNotifications]. The ViewModel's own branch for it reads "HOME belongs
+    // to the shell, never to this page", which until this existed had nothing to hand it to and
+    // therefore did nothing at all.
+    //
+    // The footer's tapped prompts come through here as well, rather than through a lambda of
+    // their own. A second copy of this `when` is the pair that stops agreeing, and the half a
+    // finger uses is the half nobody would notice had drifted.
+    val routeAction: (GamepadAction) -> Unit = { action ->
+        if (action == GamepadAction.HOME) onNotifications()
+        else viewModel.handleGamepadAction(action)
+    }
     // While the Artwork Studio is open, its screen consumes the actions instead.
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null && !state.showArtworkStudio) {
-            // Start is the shell's everywhere else, and it is the shell's here too the moment the
-            // Studio is not up -- see [onNotifications]. The ViewModel's own branch for it reads
-            // "HOME belongs to the shell, never to this page", which until now had nothing to
-            // hand it to and therefore did nothing at all.
-            if (pendingGamepadAction == GamepadAction.HOME) onNotifications()
-            else viewModel.handleGamepadAction(pendingGamepadAction)
+            routeAction(pendingGamepadAction)
             onGamepadActionConsumed()
         }
     }
@@ -311,6 +320,7 @@ fun GameDetailScreen(
             showTouchControls = showTouchControls,
             onTouchInput = onTouchInput,
             viewModel = viewModel,
+            onAction = routeAction,
             modifier = modifier,
         )
     }
@@ -347,6 +357,8 @@ private fun GameDetailContent(
     showTouchControls: Boolean,
     onTouchInput: () -> Unit,
     viewModel: GameDetailViewModel,
+    /** The page's one action route, handed down rather than rebuilt — see GameDetailScreen. */
+    onAction: (GamepadAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val pfpColors = LocalPFPColors.current
@@ -426,6 +438,7 @@ private fun GameDetailContent(
             PfpDetailHelperFooter(
                 items = gameDetailHelperItems(state),
                 visible = !showTouchControls && state.cursorVisible,
+                onAction = onAction,
             )
         },
         // The game's own art, full-bleed behind the whole page. heroUri first because that is the
@@ -529,7 +542,10 @@ private fun GameDetailContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PfpDetailQuickAction(
-                label = if (game.isFavorite) "Favourited" else "Favourite",
+                // American, like the database column (is_favorite), the ViewModel's
+                // FAVORITE("Favorite") and the row pills. This button used to be the one British
+                // spelling in the app, one press away from an American one on the same page.
+                label = if (game.isFavorite) "Favorited" else "Favorite",
                 icon = Icons.Filled.Favorite,
                 focused = focus == GameDetailKeys.FAVORITE,
                 available = true,
@@ -604,10 +620,10 @@ private fun GameDetailOverlays(
         }
 
         AnimatedVisibility(state.showDetailsMenu, enter = fadeIn(), exit = fadeOut()) {
-            DetailContextMenu(
+            PspContextMenuOverlay(
                 title = game.displayTitle,
                 rows = state.visibleDetailRows.map { row ->
-                    DetailMenuRow(
+                    PspMenuRow(
                         label = when (row) {
                             DetailQuickAction.FAVORITE ->
                                 if (game.isFavorite) "Unfavorite" else "Favorite"
@@ -616,25 +632,25 @@ private fun GameDetailOverlays(
                     )
                 },
                 selectedIndex = state.detailsIndex,
-                onRowClick = { viewModel.onDetailsRowTapped(state.visibleDetailRows[it]) },
+                onRowActivated = { viewModel.onDetailsRowTapped(state.visibleDetailRows[it]) },
                 onDismiss = viewModel::closeDetailsMenu,
             )
         }
 
         AnimatedVisibility(state.showOptions, enter = fadeIn(), exit = fadeOut()) {
-            DetailContextMenu(
+            PspContextMenuOverlay(
                 title = "Options",
                 rows = sectionHeadings(state.visibleActions).let { headings ->
                     state.visibleActions.mapIndexed { index, action ->
-                        DetailMenuRow(
+                        PspMenuRow(
                             label = action.dynamicLabel(game.isFavorite, state.isFetchingArtwork),
                             isDestructive = action == DetailAction.REMOVE,
-                            section = headings[index],
+                            heading = headings[index],
                         )
                     }
                 },
                 selectedIndex = state.optionsIndex,
-                onRowClick = { viewModel.onOptionRowTapped(state.visibleActions[it]) },
+                onRowActivated = { viewModel.onOptionRowTapped(state.visibleActions[it]) },
                 onDismiss = viewModel::closeOptions,
             )
         }

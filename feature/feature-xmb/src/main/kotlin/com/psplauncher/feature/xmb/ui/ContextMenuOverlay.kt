@@ -1,6 +1,10 @@
 package com.psplauncher.feature.xmb.ui
 
 import androidx.compose.animation.core.animateFloatAsState
+import com.psplauncher.core.ui.components.StatusStripHeight
+import com.psplauncher.core.ui.components.HintBarHeight
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +28,7 @@ import com.psplauncher.feature.xmb.viewmodel.XMBContextMenuItem
 // matching the column, and the ViewModel still owns the cursor: this draws the rows it is given
 // and reports an index back. Which rows, and how many, is railRows.
 //
-// The shape of a row lives in XmbRailCapsule, which the Last Played shelf's Play control wears too.
+// The shape of a row lives in XmbRailCapsule. This is its only caller — see the note there.
 
 @Composable
 fun ContextMenuOverlay(
@@ -46,11 +50,25 @@ fun ContextMenuOverlay(
     ) {
         // Catches the press that lands anywhere else, the same job the panel's own dim did.
         Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
+        // The rail scrolls, and it stops at the chrome.
+        //
+        // It was an unbounded Column centred on the right edge: ten rows ran past both bands, so
+        // the top row was drawn behind the clock and the bottom behind the hint bar, and there
+        // was no way to reach either. The scrim's own comment reasons about staying clear of the
+        // chrome — that was about the WASH; nothing stopped the rows themselves.
+        //
+        // verticalScroll rather than a LazyColumn: a context menu is a handful of rows that are
+        // all composed anyway, and the cursor is the ViewModel's, so there is nothing to
+        // virtualise and no scroll state to keep in step with an index.
         Column(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(RailRowGap),
             modifier = Modifier
                 .align(Alignment.CenterEnd)
+                // Reserve both bands, then take what is left. The padding is OUTSIDE the scroll
+                // so the rows scroll within the gap rather than under it.
+                .padding(top = StatusStripHeight, bottom = HintBarHeight)
+                .verticalScroll(rememberScrollState())
                 .padding(end = RailEdgeGap),
         ) {
             rows.forEachIndexed { index, row ->

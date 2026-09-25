@@ -45,6 +45,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.lightBackgroundAnchors
+import com.psplauncher.core.ui.components.PspContextMenuOverlay
+import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
@@ -56,7 +58,6 @@ import com.psplauncher.feature.appbar.appdrawer.AppDrawerCategoryTabs
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerSection
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHeader
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHintBar
-import com.psplauncher.feature.appbar.appdrawer.AppDrawerOptions
 import com.psplauncher.feature.appbar.appdrawer.UninstallConfirmDialog
 
 // ── PSP-era grid App Drawer ───────────────────────────────────────────────────
@@ -378,8 +379,11 @@ internal fun AppDrawerContent(
             // can see. So the dispatcher is withheld while it is invisible, which leaves the slot
             // measured and the bar inert. This comment used to say there were no clickables to
             // worry about; that was true and is the sort of note that stops being true quietly.
+            // The menu no longer takes the bar away — it rewrites it (see AppDrawerHintBar).
+            // The uninstall confirmation still does, because that dialog is a hard boundary with
+            // its own buttons and naming the drawer's keys over it would name the wrong ones.
             val hintAlpha by animateFloatAsState(
-                targetValue = if (showControllerHint && state.menuApp == null && state.confirmUninstall == null) 1f else 0f,
+                targetValue = if (showControllerHint && state.confirmUninstall == null) 1f else 0f,
                 animationSpec = tween(200),
                 label = "appDrawerHint",
             )
@@ -388,19 +392,26 @@ internal fun AppDrawerContent(
             // hints still disappear while the last input was touch.
             AppDrawerHintBar(
                 modifier = Modifier.alpha(hintAlpha),
+                menuOpen = state.menuApp != null,
                 onAction = onPromptTapped?.takeIf { hintAlpha > 0f },
             )
         }
 
         // ── Overlays ──────────────────────────────────────────────────────
         state.menuApp?.let { app ->
-            AppDrawerOptions(
-                app = app,
-                actions = state.menuActions,
+            // The app's one context menu, the same one the detail pages and the settings
+            // screens open. It was a 280dp panel centred on the screen with a 2dp corner and a
+            // 1dp border — the same job as the right-edge panel everywhere else, in a third set
+            // of metrics. The title is the app's label, which is what the old panel's header row
+            // carried, so nothing is lost by dropping that row.
+            PspContextMenuOverlay(
+                title = app.label,
+                rows = state.menuActions.map {
+                    PspMenuRow(it.label, isDestructive = it == AppMenuAction.UNINSTALL)
+                },
                 selectedIndex = state.menuIndex,
-                onAction = onMenuAction,
+                onRowActivated = { onMenuAction(state.menuActions[it]) },
                 onDismiss = onCloseMenu,
-                colors = sf,
             )
         }
 

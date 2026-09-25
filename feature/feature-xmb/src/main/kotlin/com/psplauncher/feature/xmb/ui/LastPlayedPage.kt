@@ -144,8 +144,13 @@ fun LastPlayedPage(
                     // The artwork is the rail's touch handle. Without this the shelf is the one
                     // screen a fresh install lands on where touch can see a single item and has
                     // no way to reach the rest — the rail came in on LEFT and nothing else.
-                    // Deliberately NOT launch: Play has its own spine down the right edge, and a
-                    // page whose whole surface launches something is a page you cannot explore.
+                    // Deliberately NOT launch: a page whose whole surface launches something is
+                    // a page you cannot explore.
+                    //
+                    // This used to read "Play has its own spine down the right edge". LaunchSpine
+                    // was deleted in 6e411c41 along with SpinePromptClearance, so the shelf now
+                    // has NO touch route to launch at all — the reason given here for withholding
+                    // one outlived the control it pointed at.
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -163,10 +168,11 @@ fun LastPlayedPage(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                     // The tabs sit UNDER what they are switching, centred, between the title and
-                    // the Play legend -- the order the reference stacks them in. They used to be
+                    // the foot of the column -- the order the reference stacks them in. They used to be
                     // pinned to the top-right corner, which put the row that says "there is more
                     // to see" as far from the thing it changes as the page allows, and made it
-                    // read as chrome belonging to the status bar above it.
+                    // read as chrome belonging to the status bar above it. (It said "between the
+                    // title and the Play legend"; there is no Play legend below them any more.)
                     Spacer(Modifier.height(10.dp))
                     DetailPanelStrip(
                         // LOGO is not offered here. On a detail screen it is the resting state
@@ -274,31 +280,6 @@ fun RecentFilterRow(
     }
 }
 
-/**
- * The launch spine: a bar down the edge, in the focused item's own colour, with the word running
- * down it and a shimmer travelling through.
- *
- * It replaces a Play pill that sat in the middle of the page -- a control in the one place the
- * cursor never goes, competing with the artwork for the centre. The spine is at the edge, says
- * the same word, and is pressable.
- *
- * The colour is the AMBIENT accent, not a parameter. This page is already re-tinted from the
- * focused item's artwork -- it is why the whole screen goes red on one row and gold on the next --
- * so reading the theme gets the item's colour for free and cannot disagree with the page it sits
- * on. A second derivation would be a second answer to the same question.
- *
- * The shimmer is on the WORD, travelling top to bottom through the letters -- the bar underneath
- * is a flat wash. It is what makes an edge read as something you can press rather than as a rule:
- * a static strip of colour is chrome, and one with movement in it is an invitation.
- */
-/**
- * How far above the bottom edge the launch control ends, so the prompt pills in that corner stay
- * pressable. Sized to clear the hint bar, which is its glyph height plus its own small padding.
- *
- * Internal because the context rail's scrim insets itself by it: "how far up does the prompt row
- * reach" is one fact and the scrim needs the same answer this does.
- */
-internal val SpinePromptClearance = 52.dp
 
 @Composable
 private fun RecentCard(item: XMBItem, focused: Boolean, onClick: () -> Unit) {

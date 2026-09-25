@@ -91,7 +91,7 @@ class GameDetailNavTest {
     // ── Rows and boundaries ───────────────────────────────────────────────
 
     @Test
-    fun `the footer is Favourite, Options, Play, and neither edge wraps`() {
+    fun `the footer is Favorite, Options, Play, and neither edge wraps`() {
         val nav = readyNav()
         assertEquals(GameDetailKeys.LAUNCH, nav.focusedKey)
 

@@ -2,6 +2,7 @@ package com.psplauncher.feature.appbar.appdrawer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.PfpHintBar
@@ -19,18 +20,36 @@ import com.psplauncher.core.ui.components.PfpHintBar
 @Composable
 internal fun AppDrawerHintBar(
     modifier: Modifier = Modifier,
+    /**
+     * True while the drawer's own app menu is up.
+     *
+     * The bar used to fade to nothing here, taking the dispatcher with it, so the one moment the
+     * drawer offered a list of unfamiliar choices was the one moment nothing on screen said what
+     * B did. The XMB's context rail had already answered this the other way — it keeps its bar
+     * and rewrites it (see HintPrompts) — and two screens answering one question differently is
+     * the thing the shared bar exists to stop.
+     */
+    menuOpen: Boolean = false,
     /** Runs a tapped prompt through the drawer's own action handler. */
     onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     PfpHintBar(
-        items = listOf(
-            ControllerPromptItem(GamepadAction.BACK, "Back"),
-            ControllerPromptItem(GamepadAction.SELECT, "Launch"),
-            ControllerPromptItem(GamepadAction.PREV_CATEGORY, "Prev"),
-            ControllerPromptItem(GamepadAction.NEXT_CATEGORY, "Next"),
-            ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
-            ControllerPromptItem(GamepadAction.CHANGE_SORT, "Search"),
-        ),
+        items = if (menuOpen) {
+            listOf(
+                ControllerPromptItem(GamepadAction.BACK, "Close"),
+                ControllerPromptItem(GamepadAction.SELECT, "Select"),
+                ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Navigate"),
+            )
+        } else {
+            listOf(
+                ControllerPromptItem(GamepadAction.BACK, "Back"),
+                ControllerPromptItem(GamepadAction.SELECT, "Launch"),
+                ControllerPromptItem(GamepadAction.PREV_CATEGORY, "Prev"),
+                ControllerPromptItem(GamepadAction.NEXT_CATEGORY, "Next"),
+                ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
+                ControllerPromptItem(GamepadAction.CHANGE_SORT, "Search"),
+            )
+        },
         modifier = modifier,
         onAction = onAction,
     )

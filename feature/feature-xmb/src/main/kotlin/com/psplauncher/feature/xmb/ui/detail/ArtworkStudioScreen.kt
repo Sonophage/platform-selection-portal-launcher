@@ -85,6 +85,7 @@ import coil3.compose.AsyncImage
 import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.common.logging.LogRedaction
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.components.ControllerPrompt
 import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.PfpControllerHints
@@ -852,7 +853,10 @@ internal fun ArtworkStudioContent(
             // apply at every level, and the three hand-written lists are exactly how the old
             // "NSFW" label for X survived it being rebound to search. Paging is not listed (the
             // page line carries its LB/RB glyphs) and neither is mature (its START badge does).
-            if (!showTouchControls) PfpControllerHints(
+            // Drawn for touch too. It used to be `if (!showTouchControls)`, which made this
+            // the one screen in the app with no bottom bar at all the moment you touched it —
+            // and the Studio is the screen with the most actions and the least obvious ones.
+            PfpHintBar(
                 items = buildList {
                     when (state.zone) {
                         StudioZone.TABS -> {
@@ -873,8 +877,10 @@ internal fun ArtworkStudioContent(
                     add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "search"))
                     add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "options"))
                 },
-                style = ControllerHintStyle.OVERLAY,
                 modifier = Modifier.padding(top = 6.dp),
+                // The same dispatcher the pad uses, one function up. Until now a tapped prompt
+                // here did nothing at all.
+                onAction = actions::handleGamepadAction,
             )
         }
 

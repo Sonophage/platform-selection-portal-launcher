@@ -1,6 +1,7 @@
 package com.psplauncher.feature.xmb.viewmodel
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -90,11 +91,24 @@ class LetterJumpTest {
         val items = alphabetical(40)
         val anchors = letterAnchors(items)!!
         val cRung = anchors.indexOfFirst { it.letter == 'C' }
-        // A row partway through C, not C's first row: the rung is found by looking backwards.
-        val state = letterJumpFor(items, currentIndex = anchors[cRung].index)
+        // A row PARTWAY THROUGH C, deliberately not C's first row, and that is the whole fixture.
+        // Handed C's anchor exactly, returnIndex and targetIndex are the same number and the
+        // second assertion below compares a value to itself — it passes under any implementation,
+        // including one that dropped returnIndex entirely. It did, until this line moved.
+        val partwayThroughC = anchors[cRung].index + 1
+        val state = letterJumpFor(items, currentIndex = partwayThroughC)
         assertNotNull(state)
         assertEquals("opens where the eye already is, not at A", 'C', state!!.letter)
-        assertEquals("and remembers where to put the cursor back", anchors[cRung].index, state.returnIndex)
+        assertEquals(
+            "remembers where the cursor actually was, which is not where the rung points",
+            partwayThroughC,
+            state.returnIndex,
+        )
+        assertNotEquals(
+            "fixture is only honest while those two differ",
+            state.returnIndex,
+            state.targetIndex,
+        )
     }
 
     @Test

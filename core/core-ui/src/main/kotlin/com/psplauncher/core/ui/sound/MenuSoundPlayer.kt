@@ -59,15 +59,17 @@ enum class MenuSound {
 
     /** The user-customizable slot this event resolves through (Interface ▸ Sound).
      *
-     * SCROLL, SELECT and SYSTEM_BROWSE all land on [UiMediaSlot.SOUND_SCROLL]: the merged
-     * Navigation row is one sample covering three events — a default, not a law (75+ call sites
-     * still distinguish the events, and `MenuSound` itself is unchanged).
+     * One slot each. These three used to share [UiMediaSlot.SOUND_SCROLL] — the comment here
+     * called it "a default, not a law", and the 75+ call sites had always distinguished the
+     * events, so the merge was only ever in this `when`. Undoing it costs nothing: all three
+     * slots still fall back to the same bundled sample, so the app sounds exactly as it did
+     * until someone assigns one of the two new rows.
      */
     val slot: UiMediaSlot
         get() = when (this) {
             SCROLL -> UiMediaSlot.SOUND_SCROLL
-            SYSTEM_BROWSE -> UiMediaSlot.SOUND_SCROLL
-            SELECT -> UiMediaSlot.SOUND_SCROLL
+            SYSTEM_BROWSE -> UiMediaSlot.SOUND_SYSTEM_BROWSE
+            SELECT -> UiMediaSlot.SOUND_SELECT
             CONFIRM -> UiMediaSlot.SOUND_CONFIRM
             BACK -> UiMediaSlot.SOUND_BACK
             LAUNCH -> UiMediaSlot.SOUND_LAUNCH
@@ -118,8 +120,10 @@ class MenuSoundPlayer @Inject constructor(
         )
         .build()
 
-    // Slot -> SoundPool sample id for the BUNDLED defaults, one load per DISTINCT slot —
-    // Navigation's three events share the sfx_cursor sample by construction. Written once in init.
+    // Slot -> SoundPool sample id for the BUNDLED defaults, one load per DISTINCT slot. The
+    // three movement slots each resolve to sfx_cursor, so that sample is loaded three times over
+    // — cheap, and the alternative is a second map from res to id that would have to stay in
+    // step with this one. Written once in init.
     private val defaultIds = HashMap<UiMediaSlot, Int>()
 
     // Slot -> sample id for the USER's imported sounds. Replaced wholesale on reload, so

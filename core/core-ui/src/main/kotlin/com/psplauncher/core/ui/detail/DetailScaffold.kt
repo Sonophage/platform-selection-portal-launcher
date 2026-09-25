@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.ScrollState
+import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.components.StatusStripHeight
@@ -300,6 +301,19 @@ fun PfpDetailHelperFooter(
     items: List<ControllerPromptItem>,
     modifier: Modifier = Modifier,
     visible: Boolean = true,
+    /**
+     * Runs a tapped prompt through the page's own action handler.
+     *
+     * Null draws a bar that names buttons and does nothing to a finger, which is what every
+     * detail page had: the shared bar, in the shared slot, inert. On a device with no pad that is
+     * an action with no route at all, and on one with a pad it is a control that lies about being
+     * one.
+     *
+     * Give it the SAME function the page already hands its gamepad events — not a second lambda
+     * written for touch. Two routes to one action is the pair that stops agreeing, and the half
+     * nobody presses is the half that rots.
+     */
+    onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
@@ -314,7 +328,7 @@ fun PfpDetailHelperFooter(
         modifier = modifier.fillMaxWidth().height(DetailFooterHeight),
         contentAlignment = Alignment.BottomCenter,
     ) {
-        PfpHintBar(items = items, modifier = Modifier.alpha(alpha))
+        PfpHintBar(items = items, modifier = Modifier.alpha(alpha), onAction = onAction)
     }
 }
 

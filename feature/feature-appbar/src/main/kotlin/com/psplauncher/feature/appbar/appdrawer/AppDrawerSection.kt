@@ -55,7 +55,11 @@ import com.psplauncher.feature.appbar.SECTION_LIST_ROWS
 //
 // Monograms, not icons, by decision: a letter on a tile tinted to the current wave colour. The
 // real Android icons are a different colour each, and the point of this view is that a tab reads
-// as one block of things. The grid on All Apps still draws the icons.
+// as one block of things. The installed-app picker draws the real icons instead, from the same
+// repository — the two views want opposite things from the same data.
+//
+// This used to end "the grid on All Apps still draws the icons". There is no All Apps tab; the
+// filters are RECENT / APPS / EMULATORS / GAMES (AppDrawerViewModel).
 //
 // Sizes are the mock's pixels on its 1920x1080 frame divided by this panel's density of 2.3375,
 // the same arithmetic ToastStyle does: 140px tile -> 60dp, 480px column -> 205dp, 58px row ->

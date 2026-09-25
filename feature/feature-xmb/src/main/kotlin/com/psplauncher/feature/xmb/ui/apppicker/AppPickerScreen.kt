@@ -431,7 +431,11 @@ private fun AppPickerTile(
     }
 }
 
-// ── Removal confirmation panel (hand-built scrim + panel, like UninstallConfirmDialog) ──
+// ── Removal confirmation panel (hand-built scrim + panel) ──
+//
+// This is the last hand-built confirm in the app. UninstallConfirmDialog used to be the
+// other one and is now on core-ui's PfpConfirmOverlay; this one is not, because its cursor
+// is XMBViewModel's confirmFocusedOption rather than the overlay's own.
 //
 // A hard input boundary: while it is up, dpad LEFT/RIGHT step the highlight between Cancel
 // and Remove, SELECT activates the highlighted option, and BACK cancels — routed through

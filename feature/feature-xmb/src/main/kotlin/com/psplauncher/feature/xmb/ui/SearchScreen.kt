@@ -216,9 +216,11 @@ fun SearchScreen(
             // up, so they have nothing to pad around.
             //
             Column(modifier = Modifier.weight(1f).fillMaxWidth().imePadding()) {
-                // One mixed grid, best matches first — not grouped by medium. A list showed four
-                // results and left the right half of the screen empty; the grid shows five to a
-                // row, so a search for "final" is answered without scrolling.
+                // One mixed grid, apps first and then games and the media libraries — see
+                // rebuildSearchRows for why apps lead. A list showed four results and left the
+                // right half of the screen empty; the grid shows SEARCH_GRID_COLUMNS to a row, so
+                // a search for "final" is answered without scrolling. The number is named rather
+                // than written out here: it also drives the D-pad's up and down.
                 //
                 // The EMPTY row (the "nothing found" placeholder) is still a full-width line: a
                 // message is not a result and putting it in a cell would look like one.
@@ -264,6 +266,17 @@ fun SearchScreen(
                     ControllerPromptItem(GamepadAction.SELECT, "Open"),
                 ),
                 modifier = Modifier.align(Alignment.BottomCenter),
+                // Both prompts route to the callbacks this screen already takes. Without this the
+                // bar named two buttons and answered neither — and on a touch-only device Search
+                // drew a "Back" there was no way to press.
+                onAction = { action ->
+                    when (action) {
+                        GamepadAction.BACK -> onBack()
+                        GamepadAction.SELECT ->
+                            state.selectedIndex.takeIf { it in state.rows.indices }?.let(onActivateAt)
+                        else -> Unit
+                    }
+                },
             )
         }
     }

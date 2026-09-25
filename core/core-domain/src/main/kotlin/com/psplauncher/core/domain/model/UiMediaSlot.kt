@@ -32,8 +32,19 @@ enum class UiMediaSlot(
     val displayName: String,
     val limits: UiMediaLimits.Spec,
 ) {
-    // ── Menu sounds (Interface ▸ Sound) — the plan's seven-sound roster, in row order ──
+    // ── Menu sounds (Interface ▸ Sound), in row order ───────────────────────
+    //
+    // Navigation, Select and System Browse were ONE row for three events. The XMB's own three
+    // are distinct — the tick as the cursor steps, the heavier note as something opens, the
+    // different one as a category changes under you — and collapsing them made every movement
+    // sound the same, which is most of why the bar stopped feeling like the bar.
+    //
+    // They are three assignable slots now and all three still default to the same bundled
+    // sample, so nothing changes until a sound is put in one. The split is the part that needs
+    // code; the sounds are the part that needs an ear, and they are not mine to author.
     SOUND_SCROLL("sound_scroll", UiMediaKind.SOUND, "Navigation", UiMediaLimits.NAVIGATION),
+    SOUND_SELECT("sound_select", UiMediaKind.SOUND, "Select / Open", UiMediaLimits.NAVIGATION),
+    SOUND_SYSTEM_BROWSE("sound_system_browse", UiMediaKind.SOUND, "Category Change", UiMediaLimits.NAVIGATION),
     SOUND_BACK("sound_back", UiMediaKind.SOUND, "Back / Cancel", UiMediaLimits.BACK),
     SOUND_CONFIRM("sound_confirm", UiMediaKind.SOUND, "Confirm / Apply", UiMediaLimits.CONFIRM),
     SOUND_ERROR("sound_error", UiMediaKind.SOUND, "Error / Invalid", UiMediaLimits.ERROR),

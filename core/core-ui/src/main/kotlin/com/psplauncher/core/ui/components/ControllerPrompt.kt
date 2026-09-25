@@ -1,5 +1,6 @@
 package com.psplauncher.core.ui.components
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -61,6 +62,19 @@ val LocalControllerPromptStyle = compositionLocalOf { ControllerPromptStyle() }
  * Renders nothing when [action] is not bound to a physical button under the
  * current layout: a prompt that cannot be honoured is worse than no prompt.
  */
+/**
+ * Whether a physical controller is attached, as far as the shell knows.
+ *
+ * Defaults to TRUE so a screen that never provides it keeps the compact gamepad-first chrome —
+ * the behaviour every caller had before this existed. XMBShell provides the real answer from
+ * SystemStatus, which is the only thing that watches for pads arriving and leaving.
+ *
+ * A CompositionLocal rather than a parameter because the thing that knows (feature-xmb) sits
+ * above the thing that needs it (core-ui), and threading a boolean through every prompt list on
+ * every screen would be a parameter nobody remembers to pass — which is the same as not having it.
+ */
+val LocalControllerConnected = compositionLocalOf { true }
+
 @Composable
 fun ControllerPrompt(
     action: GamepadAction,
@@ -254,14 +268,22 @@ internal fun ControllerPromptBar(
                 labelStyle = labelStyle,
                 glyphSize = glyphSize,
                 modifier = if (tapAction == null) Modifier else Modifier
-                    // Deliberately NOT minimumInteractiveComponentSize(). That reserves 48dp of
-                    // LAYOUT, not just touch area -- a claim to the contrary was written here and
-                    // was wrong -- and it made the pill about 54dp tall on a 462dp screen, which
-                    // read as heavy padding around the text. A prompt is a glyph plus a label,
-                    // roughly 26dp tall and 90dp wide, and the width is what a thumb actually
-                    // needs to land on; the height is the axis being traded away. Under the 48dp
-                    // guideline on purpose, because this is a gamepad-first shell where the tap
-                    // is the second way in, and the owner asked for the chrome back.
+                    // 26dp WITH a pad, 48dp WITHOUT one.
+                    //
+                    // The trade written here was sound and is kept: minimumInteractiveComponentSize
+                    // reserves 48dp of LAYOUT, not just touch area, and it made the pill about
+                    // 54dp tall on a 462dp screen, which read as heavy padding around the text. A
+                    // prompt is a glyph plus a label, roughly 26dp tall and 90dp wide; the width
+                    // is what a thumb lands on and the height is the axis traded away. That is
+                    // the right trade on a gamepad-first shell where the tap is the second way in.
+                    //
+                    // It is the WRONG trade where there is no pad, because then the tap is the
+                    // only way in and the guideline exists for exactly that case. The app already
+                    // knows which it is — SystemStatus keeps controllerConnected from a live
+                    // InputDeviceListener — so this asks rather than assuming. On a handheld with
+                    // sticks attached nothing changes; on a keyboard phone or a tablet the bar
+                    // gets the height a finger needs.
+                    .then(if (LocalControllerConnected.current) Modifier else Modifier.heightIn(min = 48.dp))
                     .clip(RoundedCornerShape(6.dp))
                     .clickable(
                         role = Role.Button,

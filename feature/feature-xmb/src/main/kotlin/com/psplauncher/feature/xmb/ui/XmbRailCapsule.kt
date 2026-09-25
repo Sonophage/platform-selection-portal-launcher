@@ -24,11 +24,14 @@ import androidx.compose.ui.unit.sp
 
 // ── The rail's own shape ──────────────────────────────────────────────────────
 //
-// One file, because two surfaces wear it: the right rail's rows, and the Play control on the Last
-// Played shelf. The shelf's used to be a vertical shimmering bar down the right edge — its own
-// widget, its own metrics, its own idea of what "the thing you press" looks like. "Change the play
-// in the recent screen to do the same thing" is one look, so it is one definition; a second copy
-// of a 29dp badge with a 7dp corner is a thing that drifts the first time either is tuned.
+// ONE surface wears it today: the right rail's rows (ContextMenuOverlay).
+//
+// It was written for two. The Last Played shelf's Play control was a LaunchSpine built from
+// XmbRailRow, and this file's header argued at length that one look means one definition. That
+// commit is 6e411c41, which deleted LaunchSpine; the argument outlived the second caller by a
+// day. Left here as a note rather than as a claim, because the reasoning is still right and the
+// second caller may come back — but a comment that says "two surfaces" when there is one is the
+// kind that gets believed.
 //
 // The badge is a rounded square at the app drawer's corner ratio — a quarter of the side — so the
 // letters here and the letters in the drawer are the same object.

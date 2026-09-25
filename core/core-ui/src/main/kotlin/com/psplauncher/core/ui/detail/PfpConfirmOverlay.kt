@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 //
 // On a handheld that hides the navigation bar and neuters system Back, that is a trap with no
 // controller exit at all. So confirmations are drawn HERE, in the launcher's own window, the same
-// way PspContextMenuOverlay and DetailContextMenu already are -- which is why those work.
+// way PspContextMenuOverlay already is -- which is why that one works.
 //
 // This composable is display only. The caller owns which button the cursor is on, because the
 // cursor belongs to the navigation engine, and a second opinion about it here is how two things

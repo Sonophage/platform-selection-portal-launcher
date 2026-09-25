@@ -95,6 +95,9 @@ import com.psplauncher.core.ui.motion.rememberAppVisible
 import androidx.compose.ui.text.style.TextOverflow
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.psplauncher.core.ui.components.LocalControllerConnected
+import com.psplauncher.core.ui.components.HintBarHeight
+import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.components.DiscLaunchCeremony
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.components.XmbTouchButton
@@ -118,7 +121,7 @@ import com.psplauncher.feature.xmb.viewmodel.pillRowVisible
 import com.psplauncher.feature.xmb.viewmodel.promptsFor
 import com.psplauncher.feature.xmb.viewmodel.railRows
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
-import com.psplauncher.feature.xmb.viewmodel.FAN_COVER_COUNT
+import com.psplauncher.feature.xmb.viewmodel.fanCoversToDraw
 import com.psplauncher.feature.xmb.viewmodel.formatDuration
 import com.psplauncher.feature.xmb.viewmodel.XMBUiState
 import com.psplauncher.feature.xmb.viewmodel.XMBViewModel
@@ -128,14 +131,37 @@ import com.psplauncher.feature.xmb.viewmodel.XMBViewModel
 // height in dp always equals this baseline (scaledHeightDp = realHeightDp / (realHeightDp/baseline)
 // = baseline), i.e. every screen lays the XMB cross out in a Thor-sized vertical space and just
 // magnifies to fill — so the item windowing (1 row above / 2 below) is IDENTICAL everywhere and no
-// extra row clips in on a taller tablet. The cap only guards absurd configs; real tablets must NOT
-// be clamped or their layout height would exceed the baseline and reveal a clipped extra row.
+// extra row clips in on a taller tablet.
+//
+// The old note here claimed real tablets "must NOT be clamped or their layout height would exceed
+// the baseline and reveal a clipped extra row". The scale is minOf of BOTH ratios, so on any 16:10
+// panel — which is most Android tablets — the WIDTH ratio wins and the scaled height lands around
+// 520dp against a 468dp baseline. It already exceeds it. The clamp was never what decided that.
 private const val XMB_BASELINE_HEIGHT_DP = 468f
 // Baseline landscape WIDTH: the Thor is 1920x1080 => 832x468dp at its density (16:9). The canvas
 // scale is bounded by BOTH axes (see uiScale), so a near-square / foldable panel is limited by its
 // width instead of over-magnifying off the height ratio and overflowing horizontally.
 private const val XMB_BASELINE_WIDTH_DP = 832f
 private const val XMB_MAX_SCALE = 2.5f
+
+/**
+ * The floor, and it used to be 1.0 — which is why a screen NARROWER than the 832dp baseline could
+ * not shrink to fit and simply drew off its own right edge.
+ *
+ * On a Unihertz Titan Elite (638 x 640dp, a square QWERTY phone) the width ratio is 0.767 and was
+ * being rounded up to 1.0, so the cross was laid out for 832dp in 638dp of room and the cover fan
+ * ran past the edge. Observed on the device, not inferred.
+ *
+ * 0.75 rather than 0f: below about three quarters the item labels stop being readable at arm's
+ * length, and a cross nobody can read is not a better answer than one that overflows. A panel
+ * narrower than ~624dp will still clip, and that is the honest limit of laying every screen out
+ * in one baseline.
+ *
+ * NOTE this also moves devices that were being rounded UP. The Konker Elite is 822dp against the
+ * 832dp baseline, so it now renders at 0.987 instead of 1.0 — about a 1.3% shrink, which is the
+ * layout it was always asking for.
+ */
+private const val XMB_MIN_SCALE = 0.75f
 
 // Left margin the memory-card cross is pinned to WHILE DRILLED IN, so the game flyout takes the
 // centre-right of the screen. Small so the cross hugs the edge; the ◀ + game column ride along.
@@ -568,7 +594,7 @@ fun XMBShell(
             val uiScale = minOf(
                 maxHeight.value / XMB_BASELINE_HEIGHT_DP,
                 maxWidth.value / XMB_BASELINE_WIDTH_DP,
-            ).coerceIn(1f, XMB_MAX_SCALE)
+            ).coerceIn(XMB_MIN_SCALE, XMB_MAX_SCALE)
             // User layout tuning for THIS form factor (see XmbLayoutAdjust). The open editor's draft
             // wins; otherwise the saved bucket entry; otherwise the legacy scale + theme bar line, so
             // a device the user never tuned renders exactly as before.
@@ -582,6 +608,15 @@ fun XMBShell(
                     barLeftFraction = 0f,
                     barTopFraction = uiState.layoutSpec.barTopFraction,
                 )
+            // Whether a pad is attached, published once for the whole shell.
+            //
+            // core-ui's prompts read it to decide their tap target: compact where a pad is the
+            // first way in, 48dp where a finger is the only one. Provided here because this is
+            // the highest point that both knows the answer (SystemStatus watches for pads
+            // arriving and leaving) and contains every screen that draws a prompt.
+            CompositionLocalProvider(
+                LocalControllerConnected provides rememberSystemStatus().controllerConnected,
+            ) {
             CompositionLocalProvider(
                 LocalDensity provides Density(baseDensity.density * uiScale * layoutAdjust.scale, baseDensity.fontScale),
             ) {
@@ -1095,13 +1130,20 @@ fun XMBShell(
             // The fan of newest covers, for a Games-root card. See XmbCoverFan: it takes the
             // right-hand corner unconditionally because it and the hover panel can never both
             // apply — the panel wants a focused real GAME and this wants a card.
-            val fanCovers = uiState.currentItems.getOrNull(uiState.selectedItemIndex)
-                ?.insideCovers
-                .orEmpty()
+            //
+            // GATED ON THE SAME SETTING THE CARD IS. Card Art Grid decides whether a console card
+            // shows the covers from inside it or its console icon, and the fan is the same covers
+            // in the same breath — so turning it off used to swap the card to an icon and leave
+            // the fan sitting beside it, which is the setting half-applied. insideCovers' own doc
+            // names both consumers; only one of them was asking.
+            val fanCovers = fanCoversToDraw(
+                insideCovers = uiState.currentItems.getOrNull(uiState.selectedItemIndex)?.insideCovers.orEmpty(),
+                cardArtGrid = uiState.cardArtGrid,
+            )
             if (fanCovers.isNotEmpty()) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     XmbCoverFan(
-                        covers = fanCovers.take(FAN_COVER_COUNT),
+                        covers = fanCovers,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .offset(
@@ -1422,6 +1464,20 @@ fun XMBShell(
             // stay, because those are true wherever you are.
             val xmbContext = uiState.stripShowsXmbContext
 
+            // DRAWN AT BASE DENSITY, like every screen that reserves room for it.
+            //
+            // This is inside the XMB's scaled canvas, so a StatusStripHeight of 34dp resolved
+            // here came out at 34 x uiScale x layoutAdjust.scale — while DetailScaffold,
+            // AppDrawerScreen, SettingsScaffold, SearchScreen, AppPickerScreen and
+            // GamePickerScreen all hold back a flat 34. The two only agree at scale exactly 1.0,
+            // which is every device tested so far and no guarantee at all: the Konker clamps to
+            // 1.0 and a 16:10 tablet does not.
+            //
+            // Resetting the density rather than moving the call keeps the strip exactly where it
+            // is in the tree — same parent, same z, same alignment — and changes only the number
+            // its dp resolve against. ChromeBands says the height is core-ui's and never a copy;
+            // this is what makes that true on both sides.
+            CompositionLocalProvider(LocalDensity provides baseDensity) {
             XmbPspStatusStrip(
                 sortLabel = uiState.sortLabel.takeIf { xmbContext },
                 showSortButton = uiState.resolvedShowTouchButton && xmbContext,
@@ -1461,6 +1517,7 @@ fun XMBShell(
                 } else null,
                 modifier = Modifier.align(Alignment.TopCenter).zIndex(aboveContextRail),
             )
+            }
 
             // The notifications, pulled down from the strip they are posted into. Above the XMB
             // foreground and below everything after it, which is where the strip itself sits.
@@ -1529,7 +1586,11 @@ fun XMBShell(
                     onReleased = onLetterRailReleased,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 4.dp)
+                        // Clear of both bands. Without this the rail ran the full height of the
+                        // panel: the '#' rung was drawn inside the status strip beside the clock,
+                        // and the last letters sat behind the hint bar. The rail is chrome BESIDE
+                        // the list, so it belongs in the space the list has.
+                        .padding(top = StatusStripHeight, bottom = HintBarHeight, end = 4.dp)
                         .zIndex(XmbChromeZ),
                 )
             }
@@ -1541,10 +1602,10 @@ fun XMBShell(
                 // The rail is the one blocking overlay this survives: "the header and hints still
                 // show on top of the context screen". Everything else still takes it away.
                 //
-                // NOTE the prompts it shows are still the LIST's — Sort, Options, Search, Apps —
-                // while the rail wants Select and Close. That is item 12g's job, which redoes this
-                // bar to follow whatever is open; until then the bar is visible and its words are
-                // about the screen behind the menu.
+                // The prompts follow whatever is open: promptsFor answers the rail with
+                // back = "Close" and nothing on the right (HintPrompts), so the bar stops naming
+                // the list's Sort and Options while a menu is over it. This note used to say that
+                // was still to do.
                 // The sheet is the topmost thing there is, so its prompts win outright: it can be
                 // opened over the App Drawer, Settings, Search and the detail pages, each of which
                 // draws a bar of its own, and every one of those bars names presses the sheet has
@@ -1557,10 +1618,15 @@ fun XMBShell(
             ) {
                 // Full width and flush to the bottom edge: it IS the page's footer now, not a
                 // pill lying on the page, so it takes no inset of its own.
-                XmbHintBar(
-                    prompts = promptsFor(uiState),
-                    onAction = onPromptTapped,
-                )
+                // Base density, for the reason on the status strip above: HintBarHeight is the
+                // bar's own height AND what SearchScreen reserves under it, and the two have to
+                // be the same number.
+                CompositionLocalProvider(LocalDensity provides baseDensity) {
+                    XmbHintBar(
+                        prompts = promptsFor(uiState),
+                        onAction = onPromptTapped,
+                    )
+                }
             }
 
             // Everything from here down is a separate screen or overlay (Settings, app
@@ -1679,6 +1745,7 @@ fun XMBShell(
                     onNext = onMusicNext,
                     onSeekTo = onMusicSeekTo,
                     onBack = onMusicPlayerBack,
+                    onAction = onPromptTapped,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -1970,6 +2037,7 @@ fun XMBShell(
             } // end: base-density reset — non-XMB screens render unscaled
         } // end: XMB canvas Box
             } // end: CompositionLocalProvider (XMB-only canvas scale)
+            } // end: CompositionLocalProvider (LocalControllerConnected)
         } // end: BoxWithConstraints (uniform canvas scale)
       } // end: CompositionLocalProvider (LocalXmbIconOverrides)
     }

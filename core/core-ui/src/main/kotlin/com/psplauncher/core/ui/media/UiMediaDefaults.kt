@@ -20,7 +20,12 @@ import com.psplauncher.core.ui.R
  * forever: there is no bundled boot or GameBoot video and none should be added.
  */
 fun UiMediaSlot.bundledDefaultRes(): Int? = when (this) {
-    UiMediaSlot.SOUND_SCROLL -> R.raw.sfx_cursor
+    // The same bundled cue for all three movement events. The slots are separate so they CAN
+    // differ; out of the box they do not, because there is one cursor sample in res/raw and
+    // inventing two more is not something code can do.
+    UiMediaSlot.SOUND_SCROLL,
+    UiMediaSlot.SOUND_SELECT,
+    UiMediaSlot.SOUND_SYSTEM_BROWSE -> R.raw.sfx_cursor
     UiMediaSlot.SOUND_BACK -> R.raw.sfx_back
     UiMediaSlot.SOUND_CONFIRM -> R.raw.sfx_confirm
     UiMediaSlot.SOUND_ERROR -> R.raw.sfx_error

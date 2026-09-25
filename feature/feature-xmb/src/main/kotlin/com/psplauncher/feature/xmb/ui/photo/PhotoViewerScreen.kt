@@ -55,8 +55,8 @@ import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.menuCursorEdge
-import com.psplauncher.feature.xmb.ui.DetailContextMenu
-import com.psplauncher.feature.xmb.ui.DetailMenuRow
+import com.psplauncher.core.ui.components.PspContextMenuOverlay
+import com.psplauncher.core.ui.components.PspMenuRow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -239,16 +239,16 @@ fun PhotoViewerScreen(
 
         // ── Options menu — the shared themed context menu, like every other context menu ──
         if (state.showOptions) {
-            DetailContextMenu(
+            PspContextMenuOverlay(
                 title = "Options",
                 rows = PhotoViewerAction.entries.map { action ->
-                    DetailMenuRow(
+                    PspMenuRow(
                         label = action.label,
                         isDestructive = action == PhotoViewerAction.REMOVE,
                     )
                 },
                 selectedIndex = state.optionsIndex,
-                onRowClick = { viewModel.activate(PhotoViewerAction.entries[it]) },
+                onRowActivated = { viewModel.activate(PhotoViewerAction.entries[it]) },
                 onDismiss = viewModel::closeOptions,
             )
         }

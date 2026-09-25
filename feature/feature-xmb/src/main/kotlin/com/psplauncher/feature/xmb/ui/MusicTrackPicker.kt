@@ -1,5 +1,8 @@
 package com.psplauncher.feature.xmb.ui
 
+import androidx.compose.foundation.layout.height
+import com.psplauncher.core.domain.model.ControllerIcon
+import com.psplauncher.core.ui.components.PfpHintBar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -84,23 +87,25 @@ fun MusicTrackPicker(
             )
             .clickable(onClick = onDismiss),
     ) {
+        MusicTrackPickerHintBar(
+            selectedCount = state.selected.size,
+            playlistName = state.playlistName,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            onAction = { action ->
+                when (action) {
+                    GamepadAction.SELECT -> onActivateAt(state.selectedIndex)
+                    GamepadAction.HOME -> onConfirm()
+                    GamepadAction.BACK -> onDismiss()
+                    else -> Unit
+                }
+            },
+        )
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 28.dp)) {
             Text("Add to ${state.playlistName}", color = PickerText, fontSize = 22.sp, fontWeight = FontWeight.Light)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                modifier = Modifier.padding(top = 2.dp, bottom = 12.dp),
-            ) {
-                Text("${state.selected.size} selected", color = PickerSubtext, fontSize = 12.sp)
-                PfpControllerHints(
-                    items = listOf(
-                        ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
-                        ControllerPromptItem(GamepadAction.HOME, "Add"),
-                        ControllerPromptItem(GamepadAction.BACK, "Cancel"),
-                    ),
-                    style = ControllerHintStyle.INLINE,
-                )
-            }
+            // The count alone. Its three prompts moved to the shared bar at the foot of the
+            // screen, where the other two pickers put theirs — this was the third picker still
+            // naming its buttons in a row of its own, halfway up the page.
+            Spacer(Modifier.height(2.dp))
 
             if (state.tracks.isEmpty()) {
                 Text(
@@ -201,5 +206,39 @@ private fun PickerRow(
             )
             .padding(horizontal = 16.dp, vertical = 12.dp),
         content = content,
+    )
+}
+
+// ── The picker's footer ───────────────────────────────────────────────────────
+//
+// The shared [PfpHintBar], with the count in the centre slot — the same shape AppPickerHintBar
+// and GamePickerHintBar use, so all three pickers say the same kind of thing in the same place.
+
+@Composable
+private fun MusicTrackPickerHintBar(
+    selectedCount: Int,
+    playlistName: String,
+    modifier: Modifier = Modifier,
+    onAction: ((GamepadAction) -> Unit)? = null,
+) {
+    PfpHintBar(
+        items = listOf(
+            ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Navigate"),
+            ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
+            ControllerPromptItem(GamepadAction.HOME, "Add"),
+            ControllerPromptItem(GamepadAction.BACK, "Cancel"),
+        ),
+        modifier = modifier,
+        onAction = onAction,
+        centre = {
+            Text(
+                text = if (selectedCount == 0) "Add to $playlistName"
+                else "Add to $playlistName  ·  $selectedCount selected",
+                color = PickerSubtext,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
     )
 }

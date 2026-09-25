@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
@@ -183,7 +184,7 @@ fun MusicBrowserScreen(
             //
             // It is now. The prompts fire the same actions through the same dispatcher the pad
             // uses, so there is one place each action lives and one look for all of them.
-            PfpControllerHints(
+            PfpHintBar(
                 items = listOfNotNull(
                     ControllerPromptItem(GamepadAction.SELECT, "Open"),
                     // Sort is a no-op on playlist and group views — the ViewModel ignores it
@@ -193,7 +194,6 @@ fun MusicBrowserScreen(
                     ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                     ControllerPromptItem(GamepadAction.BACK, "Back"),
                 ),
-                style = ControllerHintStyle.INLINE,
                 onAction = { action ->
                     when (action) {
                         GamepadAction.CHANGE_SORT -> onSortTapped()

@@ -40,6 +40,21 @@ fun fanCoversOf(games: List<Game>, limit: Int = INSIDE_COVER_COUNT): List<String
     .take(limit)
 
 /**
+ * What the FAN draws, which is nothing at all when Card Art Grid is off.
+ *
+ * The setting means "show a console card as the covers from inside it, rather than its console
+ * icon". The fan is those same covers, one breath to the right — so with the setting off, a card
+ * drawn as an icon with a fan of its contents beside it is the setting obeyed by one of its two
+ * consumers and ignored by the other. That is what shipped, and it was spotted on the device
+ * rather than here.
+ *
+ * It lives beside [fanCoversOf] because this file is already where "one list, two consumers" is
+ * written down. A third consumer arriving should have to walk past this function to get the list.
+ */
+internal fun fanCoversToDraw(insideCovers: List<String>, cardArtGrid: Boolean): List<String> =
+    if (cardArtGrid) insideCovers.take(FAN_COVER_COUNT) else emptyList()
+
+/**
  * How many covers a media column keeps ready: four per row, for as many rows as a column has.
  *
  * Six rows' worth. The Music root is the longest at five sections plus Now Playing, and a column

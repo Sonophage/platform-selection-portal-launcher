@@ -82,7 +82,7 @@ class GameDetailScreenContentTest {
         assertAbsent("Emulator", "a package-backed entry must not offer an emulator action")
         // The footer is the page's whole cursor surface: heart, gear, Play.
         assertPresent("Play", "the primary action must survive an entry with no extra content")
-        assertPresent("Favourite", "the footer's first button must survive a bare entry")
+        assertPresent("Favorite", "the footer's first button must survive a bare entry")
         assertPresent("Options", "the gear is where scrape and edit live, on every entry")
         assertPresent("Back", "the helper footer must document Back")
     }

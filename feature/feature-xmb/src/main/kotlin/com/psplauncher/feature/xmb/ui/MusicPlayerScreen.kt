@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.domain.model.GamepadAction
+import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.components.ControllerHintStyle
 import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
@@ -65,6 +66,22 @@ fun MusicPlayerScreen(
     onSeekTo: (Int) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Runs a tapped prompt through the shell's [XMBViewModel.onPromptTapped], the same route the
+     * pad takes.
+     *
+     * This screen had no route at all: its prompt row named five things and answered none of
+     * them, and Options in particular had nowhere else to be reached from — no button on screen,
+     * no gesture. A finger could see the word and could not press it.
+     *
+     * The two range prompts stay legends whatever is passed here: a prompt naming LEFT and RIGHT
+     * together has no single action to fire, and PfpHintBar refuses to guess one.
+     *
+     * After [modifier], not before it: Compose's convention is that the modifier is the first
+     * optional parameter, and lint says so. Putting this above it was a new warning in a build
+     * that had none.
+     */
+    onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     val track = state.track
     Box(
@@ -154,7 +171,7 @@ fun MusicPlayerScreen(
             Spacer(Modifier.height(20.dp))
             // Every binding the player actually honours (XMBViewModel's musicPlayerVisible
             // branch), not just the two the old hint listed.
-            PfpControllerHints(
+            PfpHintBar(
                 items = listOf(
                     ControllerPromptItem(GamepadAction.SELECT, "Play / Pause"),
                     ControllerPromptItem(
@@ -168,7 +185,7 @@ fun MusicPlayerScreen(
                     ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                     ControllerPromptItem(GamepadAction.BACK, "Close"),
                 ),
-                style = ControllerHintStyle.OVERLAY,
+                onAction = onAction,
             )
         }
     }

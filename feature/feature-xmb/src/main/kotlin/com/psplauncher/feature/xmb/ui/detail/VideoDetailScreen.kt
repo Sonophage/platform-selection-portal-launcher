@@ -62,6 +62,7 @@ import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.Video
 import com.psplauncher.core.domain.model.ControllerIcon
+import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.ControllerHintStyle
@@ -74,8 +75,8 @@ import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursor
 import com.psplauncher.core.ui.theme.menuCursorEdge
-import com.psplauncher.feature.xmb.ui.DetailContextMenu
-import com.psplauncher.feature.xmb.ui.DetailMenuRow
+import com.psplauncher.core.ui.components.PspContextMenuOverlay
+import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.feature.xmb.video.VideoPlayerScreen
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
@@ -255,27 +256,26 @@ fun VideoDetailScreen(
         // Not conditional on input mode. A row that appears only for touch is a different screen
         // for touch, which is the thing being undone.
         if (!state.playing) {
-            PfpControllerHints(
+            PfpHintBar(
                 items = videoDetailHelperItems(state),
-                style = ControllerHintStyle.INLINE,
                 onAction = viewModel::handleGamepadAction,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 14.dp),
+                // Flush to the bottom edge: the bar is the page's footer, not a pill lying on it,
+                // so it takes no inset of its own. This was the last INLINE prompt row in the app.
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
 
         if (state.showOptions) {
-            DetailContextMenu(
+            PspContextMenuOverlay(
                 title = "Options",
                 rows = state.optionsActions.map { action ->
                     val label = if (action == VideoDetailAction.FAVORITE) {
                         if (video.isFavorite) "Remove from Favorites" else "Add to Favorites"
                     } else action.label
-                    DetailMenuRow(label)
+                    PspMenuRow(label)
                 },
                 selectedIndex = state.optionsIndex,
-                onRowClick = { viewModel.activate(state.optionsActions[it]) },
+                onRowActivated = { viewModel.activate(state.optionsActions[it]) },
                 onDismiss = viewModel::closeOptions,
             )
         }

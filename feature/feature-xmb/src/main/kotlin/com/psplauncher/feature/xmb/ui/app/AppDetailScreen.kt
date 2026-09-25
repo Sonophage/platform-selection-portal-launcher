@@ -72,8 +72,8 @@ import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
-import com.psplauncher.feature.xmb.ui.DetailContextMenu
-import com.psplauncher.feature.xmb.ui.DetailMenuRow
+import com.psplauncher.core.ui.components.PspContextMenuOverlay
+import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.feature.xmb.ui.collection.CollectionPickerPanel
 import com.psplauncher.feature.xmb.ui.detail.ArtworkType
 import com.psplauncher.feature.xmb.ui.detail.displayLabel
@@ -137,9 +137,13 @@ fun AppDetailScreen(
             onBack()
         }
     }
+    // ONE route, used by the pad below and by the footer's tapped prompts. See the longer note
+    // on the same pattern in GameDetailScreen: a second lambda for touch is a second answer to
+    // one question.
+    val routeAction: (GamepadAction) -> Unit = { viewModel.handleGamepadAction(it) }
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null) {
-            viewModel.handleGamepadAction(pendingGamepadAction)
+            routeAction(pendingGamepadAction)
             onGamepadActionConsumed()
         }
     }
@@ -181,25 +185,26 @@ fun AppDetailScreen(
             PfpDetailHelperFooter(
                 items = appDetailHelperItems(),
                 visible = !showTouchControls,
+                onAction = routeAction,
             )
         },
         overlay = {
         AnimatedVisibility(state.showOptions, enter = fadeIn(), exit = fadeOut()) {
-            DetailContextMenu(
+            PspContextMenuOverlay(
                 title = "Options",
-                rows = AppDetailOption.OPTIONS_MENU.map { DetailMenuRow(it.label, it.isDestructive) },
+                rows = AppDetailOption.OPTIONS_MENU.map { PspMenuRow(it.label, it.isDestructive) },
                 selectedIndex = state.optionsIndex,
-                onRowClick = { viewModel.activateOption(AppDetailOption.OPTIONS_MENU[it]) },
+                onRowActivated = { viewModel.activateOption(AppDetailOption.OPTIONS_MENU[it]) },
                 onDismiss = viewModel::closeMenus,
             )
         }
 
         AnimatedVisibility(state.showArtworkMenu, enter = fadeIn(), exit = fadeOut()) {
-            DetailContextMenu(
+            PspContextMenuOverlay(
                 title = "Artwork",
-                rows = AppDetailOption.ARTWORK_MENU.map { DetailMenuRow(it.label, it.isDestructive) },
+                rows = AppDetailOption.ARTWORK_MENU.map { PspMenuRow(it.label, it.isDestructive) },
                 selectedIndex = state.optionsIndex,
-                onRowClick = { viewModel.activateOption(AppDetailOption.ARTWORK_MENU[it]) },
+                onRowActivated = { viewModel.activateOption(AppDetailOption.ARTWORK_MENU[it]) },
                 onDismiss = viewModel::closeMenus,
             )
         }

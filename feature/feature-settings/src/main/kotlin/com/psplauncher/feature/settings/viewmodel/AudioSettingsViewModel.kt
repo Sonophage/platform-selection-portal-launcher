@@ -62,7 +62,7 @@ data class AudioSettingsUiState(
 
 /**
  * Interface ▸ Sound. Owns the Menu Sounds toggle (moved here from Display ▸ Sound), the Menu
- * Music toggle and track, and the sound assignments in [SOUND_SLOTS] — the six menu sounds plus
+ * Music toggle and track, and the sound assignments in [SOUND_SLOTS] — the eight menu sounds plus
  * three AUDIO_TRACK slots: Boot Sound (Display ▸ Boot Sequence reaches the same slot) and the
  * launch ceremony's two cues.
  *

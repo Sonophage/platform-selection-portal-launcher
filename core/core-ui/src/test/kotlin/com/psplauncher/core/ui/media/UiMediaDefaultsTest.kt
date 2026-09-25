@@ -34,10 +34,22 @@ class UiMediaDefaultsTest {
         }
     }
 
-    @Test fun `navigation covers scroll select and system browse`() {
+    @Test fun `the three movement events each have their own slot`() {
+        // Separately ASSIGNABLE is the point. They were one slot, so a user who wanted a
+        // different note when something opens could not have one.
         assertEquals(UiMediaSlot.SOUND_SCROLL, MenuSound.SCROLL.slot)
-        assertEquals(UiMediaSlot.SOUND_SCROLL, MenuSound.SELECT.slot)
-        assertEquals(UiMediaSlot.SOUND_SCROLL, MenuSound.SYSTEM_BROWSE.slot)
+        assertEquals(UiMediaSlot.SOUND_SELECT, MenuSound.SELECT.slot)
+        assertEquals(UiMediaSlot.SOUND_SYSTEM_BROWSE, MenuSound.SYSTEM_BROWSE.slot)
+    }
+
+    @Test fun `but all three still sound the same out of the box`() {
+        // The split is code; the sounds are an ear's job. Until someone assigns one of the two
+        // new rows the app must sound exactly as it did, or the split becomes a regression for
+        // everyone who did not ask for it.
+        val cursor = UiMediaSlot.SOUND_SCROLL.bundledDefaultRes()
+        assertNotNull(cursor, "the movement default must exist")
+        assertEquals(cursor, UiMediaSlot.SOUND_SELECT.bundledDefaultRes())
+        assertEquals(cursor, UiMediaSlot.SOUND_SYSTEM_BROWSE.bundledDefaultRes())
     }
 
     @Test fun `every other event keeps its own slot`() {

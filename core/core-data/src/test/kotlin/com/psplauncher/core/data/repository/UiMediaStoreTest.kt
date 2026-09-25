@@ -332,24 +332,30 @@ class UiMediaStoreTest {
     @Test
     fun `pruneOrphans removes files that are not slot keys and keeps the real ones`() = runTest {
         mediaDir().mkdirs()
-        File(mediaDir(), "sound_select.wav").writeBytes(wavBytes())
+        // The pre-merge spelling, which is still not a slot — `sound_system_browse` is.
         File(mediaDir(), "sound_systembrowse.ogg").writeBytes(wavBytes())
         File(mediaDir(), "not_a_slot.wav").writeBytes(wavBytes())
         File(mediaDir(), "staging_1725700000000.wav").writeBytes(wavBytes())
         File(mediaDir(), "${UiMediaSlot.SOUND_SCROLL.key}.wav").writeBytes(wavBytes())
+        // Both halves of the sound split, which ARE live keys now. This fixture used to store
+        // sound_select as an example orphan; if the three movement events are ever merged back
+        // into one slot, these two lines fail and say so.
+        File(mediaDir(), "${UiMediaSlot.SOUND_SELECT.key}.wav").writeBytes(wavBytes())
+        File(mediaDir(), "${UiMediaSlot.SOUND_SYSTEM_BROWSE.key}.wav").writeBytes(wavBytes())
 
         assertTrue(store.pruneOrphans(), "orphan files existed")
 
-        assertFalse(File(mediaDir(), "sound_select.wav").isFile)
         assertFalse(File(mediaDir(), "sound_systembrowse.ogg").isFile)
         assertFalse(File(mediaDir(), "not_a_slot.wav").isFile)
         assertFalse(File(mediaDir(), "staging_1725700000000.wav").isFile, "a crashed import's staging file is garbage")
         assertTrue(File(mediaDir(), "${UiMediaSlot.SOUND_SCROLL.key}.wav").isFile, "a live slot's file is kept")
+        assertTrue(File(mediaDir(), "${UiMediaSlot.SOUND_SELECT.key}.wav").isFile, "Select is its own slot now")
+        assertTrue(File(mediaDir(), "${UiMediaSlot.SOUND_SYSTEM_BROWSE.key}.wav").isFile, "so is Category Change")
     }
 
     @Test
     fun `pruneOrphans drops display-name prefs for orphaned keys only`() = runTest {
-        val orphanKey = stringPreferencesKey("ui_media_name_sound_select")
+        val orphanKey = stringPreferencesKey("ui_media_name_sound_systembrowse")
         val liveKey = UiMediaStore.displayNameKey(UiMediaSlot.SOUND_SCROLL)
         context.pfpDataStore.edit { prefs ->
             prefs[orphanKey] = "old pick.wav"
@@ -376,7 +382,7 @@ class UiMediaStoreTest {
     @Test
     fun `pruneOrphans bumps the stamp when it removed something`() = runTest {
         mediaDir().mkdirs()
-        File(mediaDir(), "sound_select.wav").writeBytes(wavBytes())
+        File(mediaDir(), "sound_systembrowse.ogg").writeBytes(wavBytes())
 
         assertTrue(store.pruneOrphans())
         assertTrue(stampPref()!! > 0L, "observers must reload after a prune")
