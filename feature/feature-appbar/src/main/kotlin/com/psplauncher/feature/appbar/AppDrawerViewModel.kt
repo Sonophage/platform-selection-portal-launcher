@@ -15,15 +15,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Apps across a drawer grid. Eight, as 6e drew it, up from six.
- *
- * The App Drawer itself no longer has a grid: All Apps was the one tab that drew one, and it is
- * gone. This is now read only by StorefrontAppDrawer, which nothing reaches either. Left here
- * rather than deleted with the grid because it is not this change's to take.
- */
-const val GRID_COLUMNS = 8
-
 // The Android Memory Card's platform id, and the sentinel platform for rows that only back an
 // app's artwork/favorites/collections without placing it in the library (mirrors XMBViewModel).
 private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"

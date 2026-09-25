@@ -235,9 +235,9 @@ fun SearchScreen(
             Column(modifier = Modifier.weight(1f).fillMaxWidth().imePadding()) {
                 // One mixed grid, apps first and then games and the media libraries — see
                 // rebuildSearchRows for why apps lead. A list showed four results and left the
-                // right half of the screen empty; the grid shows SEARCH_GRID_COLUMNS to a row, so
-                // a search for "final" is answered without scrolling. The number is named rather
-                // than written out here: it also drives the D-pad's up and down.
+                // right half of the screen empty; the grid answers a search for "final" without
+                // scrolling. How many to a row is MEASURED below, not a constant, and the same
+                // number drives the D-pad's up and down.
                 //
                 // The EMPTY row (the "nothing found" placeholder) is still a full-width line: a
                 // message is not a result and putting it in a cell would look like one.

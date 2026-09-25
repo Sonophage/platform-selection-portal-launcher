@@ -157,10 +157,34 @@ def selftest():
     return 0 if ok else 1
 
 
+# The baseline is a set of "file::symbol" keys, NOT line numbers.
+#
+# Line numbers would make the baseline stale on the first edit above a finding, and a baseline
+# that goes stale on every commit is one nobody regenerates and everybody ignores. file::symbol
+# survives code moving around inside a file, which is what actually happens.
+def key_of(path, symbol):
+    return f"{path}::{symbol}"
+
+
+def load_baseline(path):
+    p = pathlib.Path(path)
+    if not p.exists():
+        return None
+    return {
+        line.strip()
+        for line in p.read_text().splitlines()
+        if line.strip() and not line.startswith('#')
+    }
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('root', nargs='?', default='.', help='repo root to scan (default: .)')
     ap.add_argument('--selftest', action='store_true', help='check the detector, scan nothing')
+    ap.add_argument('--baseline', metavar='FILE',
+                    help='accept everything in FILE; exit 1 only on references NOT in it')
+    ap.add_argument('--write-baseline', metavar='FILE',
+                    help='record the current findings to FILE and exit 0')
     args = ap.parse_args()
 
     if args.selftest:
@@ -168,11 +192,36 @@ def main():
 
     findings = sorted(scan(args.root), key=lambda f: (str(f[0]), f[1]))
     by_file = collections.Counter(str(f[0]) for f in findings)
-    for path, line, symbol, source in findings:
+
+    if args.write_baseline:
+        keys = sorted({key_of(path, symbol) for path, _, symbol, _ in findings})
+        pathlib.Path(args.write_baseline).write_text(
+            "# Stale-comment baseline. Regenerate with --write-baseline after READING the diff.\n"
+            "# Keys are file::symbol, not line numbers, so code moving inside a file does not\n"
+            "# invalidate an entry. A key here means 'known and accepted', NOT 'correct'.\n"
+            + "\n".join(keys) + "\n"
+        )
+        print(f"wrote {len(keys)} key(s) to {args.write_baseline}")
+        return 0
+
+    baseline = load_baseline(args.baseline) if args.baseline else None
+    fresh = [f for f in findings if baseline is None or key_of(f[0], f[2]) not in baseline]
+
+    for path, line, symbol, source in (fresh if baseline is not None else findings):
         print(f"{path}:{line}: [{symbol}]  {source}")
-    print(f"\n{len(findings)} comment reference(s) with no definition, in {len(by_file)} file(s).")
-    print("Most are framework symbols, deliberate history or stated absences — read before editing.")
-    return 0
+
+    if baseline is None:
+        print(f"\n{len(findings)} comment reference(s) with no definition, in {len(by_file)} file(s).")
+        print("Most are framework symbols, deliberate history or stated absences — read before editing.")
+        return 0
+
+    if not fresh:
+        print(f"no NEW stale comment references ({len(baseline)} known, accepted).")
+        return 0
+    print(f"\n{len(fresh)} NEW comment reference(s) with no definition.")
+    print("Either fix the comment, or — if it is a framework symbol or deliberate history —")
+    print("regenerate the baseline with --write-baseline and say why in the commit.")
+    return 1
 
 
 if __name__ == '__main__':

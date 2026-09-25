@@ -162,10 +162,21 @@ grep -rl "PfpSearchField(" --include="*.kt" feature/ core/ | grep -v Test   # ad
 grep -rn "OutlinedTextField(" --include="*.kt" feature/feature-xmb/src/main # 2 search + 3 editors
 ```
 
-### 8. One placeholder grammar — OPEN
+### 8. One placeholder grammar — NOT A DEFECT, closed
 
-`"Search apps"` names its scope (`AppDrawerHeader.kt:56`, `AppPickerScreen.kt:233`). The other two
-just say `"Search"` (`SearchScreen.kt:196`, `MusicBrowserScreen.kt:150`). Falls out of item 7.
+The claim was that two screens name their scope and two do not. Read properly, all four obey the
+same rule: **the scope is named once, in whatever band the screen has for it.**
+
+- `AppDrawerHeader` is "one search field, the width of the screen. Nothing else" — no heading, so
+  the placeholder carries the scope: "Search apps".
+- `AppPickerScreen` names its scope in the hint bar, a different band from the field.
+- `SearchScreen`'s heading directly above the field is `SearchScope.label` — already "Search
+  Games", "Search Video". A placeholder repeating it would be the exact redundancy
+  `AppDrawerHeader`'s header comment records removing ("the magnifier and the word Search sat
+  beside a box whose own placeholder reads Search").
+- `MusicBrowserScreen` does the same with `state.title`.
+
+Changing the two bare ones would have ADDED the redundancy a previous pass removed.
 
 ### 9. Title-case the Artwork Studio's nine prompts — OPEN
 
@@ -187,9 +198,16 @@ Three forms for the same event:
 
 Videos has both of the first two, in two different files.
 
-### 12. Five App Drawer empty strings live in two files — OPEN
+### 12. Five App Drawer empty strings live in two files — DONE, by deletion
 
-`AppDrawerScreen.kt:432-437` and `storefront/StorefrontAppDrawer.kt:828-833`.
+The second file was `storefront/StorefrontAppDrawer.kt`, 911 lines reached by nothing.
+`AppDrawerViewModel` said so in a comment on `GRID_COLUMNS`: "read only by StorefrontAppDrawer,
+which nothing reaches either." Deleting it removes the duplicate strings, the dead screen and the
+constant whose last reader it was — a better answer than keeping two copies in step.
+
+```sh
+grep -rn "StorefrontAppDrawer" --include="*.kt" . | grep -v build   # expects: no output
+```
 
 ### 13. Named type sizes — OPEN
 
@@ -224,9 +242,22 @@ It says "All" or "Title" with no cue which knob it is, while the hint bar direct
 
 ## New work, raised after the review
 
-### N1. Wire `tools/stale-comments/check.py` to something
+### N1. Wire `tools/stale-comments/check.py` — DONE
 
-It runs and it self-tests. Nothing calls it. A gradle task or a pre-commit hook, ~10 lines.
+```sh
+./gradlew staleCommentsSelftest staleComments
+```
+
+**Baselined, not absolute.** The detector finds 48 references today and most are legitimate:
+framework symbols (`[WiFi]`, `[ENV]`), deliberate history ("Was `contextRailOnly`") and
+placeholder shapes (`openXxxContextMenu`). A check that reports fifty things already decided is
+one nobody reads — which is how it ended up wired to nothing. What is worth failing on is a NEW
+one: a comment naming something the same change just deleted, which is the mistake this codebase
+actually repeats. It caught one of mine the same hour it was wired.
+
+Baseline keys are `file::symbol`, not line numbers, so code moving inside a file does not
+invalidate an entry. Falsified both ways: a fresh stale reference fails the build and names the
+file and symbol; removing it passes again.
 
 ### N2. Responsive layout — the tablet dead space
 
