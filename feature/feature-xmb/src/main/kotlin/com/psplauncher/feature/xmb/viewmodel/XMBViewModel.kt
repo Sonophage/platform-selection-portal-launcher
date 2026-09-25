@@ -83,6 +83,7 @@ import com.psplauncher.feature.library.scanner.ScanStatus
 import com.psplauncher.feature.library.scanner.scanOutcomeMessage
 import com.psplauncher.feature.xmb.R
 import com.psplauncher.feature.xmb.gamepad.GamepadInputHandler
+import com.psplauncher.feature.xmb.gamepad.ShoulderHold
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -641,6 +642,16 @@ data class XMBUiState(
     // ── Vertical axis: games / settings items ─────────────────────────────
     val currentItems: List<XMBItem> = emptyList(),
     val selectedItemIndex: Int = 0,
+    /**
+     * The A–Z rail, up only while a shoulder is held or a finger is on it.
+     *
+     * Deliberately NOT part of the overlay partition below. The rail does not cover the crossbar
+     * — it stands beside the list the way the action pills do, the clock stays, the hint bar stays
+     * and the column keeps drawing — so it is not a screen that [otherBlockingOverlay] has to
+     * account for. What it does take is the D-pad, and that is an explicit branch in
+     * [dispatchGamepadAction] rather than a new entry in a list of things that block.
+     */
+    val letterJump: LetterJumpState? = null,
     // Non-null while drilled into a Games sub-item (a platform card, All Games, Favorites, or a
     // collection): the parent's label, which drives the two-pane "flyout" listing (parent on the
     // left, children in a centre-locked column on the right). Null = normal single-column list.
@@ -1189,8 +1200,6 @@ data class XMBUiState(
             com.psplauncher.core.domain.model.TouchNavButtonMode.ALWAYS_HIDE -> false
         }
 
-    // True whenever something is layered over the main XMB. The gamepad dispatcher uses this
-    // as a final guard so D-Pad/A never drives the category bar or item list behind an overlay.
     /**
      * True when the only thing over the XMB is one the status strip and hint bar draw ON TOP of.
      *
@@ -1284,11 +1293,14 @@ data class XMBUiState(
             !onLastPlayedHome &&
             activePillIndex() == null
 
+    // True whenever something is layered over the main XMB. The gamepad dispatcher uses this
+    // as a final guard so D-Pad/A never drives the category bar or item list behind an overlay.
     val hasBlockingOverlay: Boolean
         get() = otherBlockingOverlay || activeContextMenu != null || notificationsOpen
 
     /**
-     * Everything that covers the XMB EXCEPT the context rail.
+     * Everything that covers the XMB EXCEPT the two the chrome stays on top of: the context rail
+     * and the notification sheet.
      *
      * Split out rather than copied: [hasBlockingOverlay] and [overlayKeepsChrome] are two readings of
      * one list, and a second copy of twenty-five conditions is a second copy that stops agreeing
@@ -1310,9 +1322,22 @@ data class XMBUiState(
      * You are still in the launcher on them, and the launcher is what owns the clock, the battery
      * and the notification corner. Before this they each covered the strip, so walking into the
      * App Drawer lost the time and walking out found it again.
+     *
+     * Both pickers are here too, and they are the ones that read as a surprise: they fill the
+     * screen, which is what put them in the other half. Filling the screen is not owning it. Each
+     * is a list you browse for as long as it takes to find what you came for — the drawer's job,
+     * in the drawer's clothes — not a box you answer and dismiss.
+     *
+     * [gamePickerCategoryId] is the narrower of the two: it is reached only from the "Add Games"
+     * row at the foot of a gaming category's column, and the built-in Game category is not one of
+     * those — that column has its own builder and never draws the row. So it is only ever seen on
+     * a category the user made. That is a reason it was easy to overlook, not a reason for the
+     * clock to behave differently on it.
      */
     private val chromeOverlay: Boolean
         get() = activeSettingsScreen != null ||
+            appPicker != null ||
+            gamePickerCategoryId != null ||
             activeAppDrawerFilter != null ||
             activeGameId != null ||
             activeAppId != null ||
@@ -1323,8 +1348,14 @@ data class XMBUiState(
      *
      * Two kinds, and both want the room more than they want the clock: something playing or
      * presenting full-bleed (the video player, the photo viewer, the boot and disc ceremonies),
-     * and the modal dialogs and pickers, where a strip drawn on top would be chrome floating over
-     * a box that is deliberately the only thing you can touch.
+     * and the modal dialogs and the SMALL pickers — a colour wheel, a name box — where a strip
+     * drawn on top would be chrome floating over a box that is deliberately the only thing you
+     * can touch.
+     *
+     * "Picker" is not the test; being a box you answer is. Both the installed-app picker and the
+     * game picker are named like these and belong with the drawer instead — see [chromeOverlay].
+     * What is left under this name really is answer-and-dismiss: a colour wheel, a name box, a
+     * confirmation.
      */
     private val fullscreenOverlay: Boolean
         get() = showBootSequence ||
@@ -1337,8 +1368,6 @@ data class XMBUiState(
             xmbLayoutAdjust != null ||
             customIconSession != null ||
             saveThemeNameDialog != null ||
-            appPicker != null ||
-            gamePickerCategoryId != null ||
             renameAppTarget != null ||
             collectionNameDialog != null ||
             playlistNameDialog != null ||
@@ -1958,8 +1987,8 @@ data class XMBItem(
     // Text-only row: never draws a leading icon/tile and always shows its label, regardless of
     // selection: the row reads as plain text plus a reason rather than an icon and a title.
     val textOnly: Boolean = false,
-    // Prestige Bones earned (player-card summary row only); renders "• N [bone glyph]" after the
-    // title when greater than zero.
+    // The row's kind: what it draws as and how the column treats it (STANDARD tile, navigation
+    // row, playlist, and so on).
     val type: XMBItemType = XMBItemType.STANDARD,
 ) {
     /**
@@ -4075,6 +4104,9 @@ class XMBViewModel @Inject constructor(
 
     // Whether the device can open a camera app. Checked once (the set of camera apps doesn't
     // change while PFP is on screen) so the Photo root never shows a broken Camera item.
+    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
+    // Lint warns per call site because a library module cannot see the app module's manifest.
+    @Suppress("QueryPermissionsNeeded")
     private val cameraAvailable: Boolean by lazy {
         runCatching {
             Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
@@ -6002,7 +6034,69 @@ class XMBViewModel @Inject constructor(
                 dispatchGamepadAction(action)
             }
         }
+        viewModelScope.launch {
+            gamepadInputHandler.shoulderHolds.collect { hold ->
+                onUserInteraction()
+                when (hold) {
+                    is ShoulderHold.Start -> openLetterJump()
+                    // The fallback the handler cannot make: a hold over a list with no rail is
+                    // still a press, and the step it owed is paid here. Without this, holding a
+                    // shoulder on a short column would swallow the input entirely.
+                    is ShoulderHold.End ->
+                        if (_uiState.value.letterJump != null) closeLetterJump()
+                        else dispatchGamepadAction(hold.action)
+                }
+            }
+        }
     }
+
+    // ── Letter jump ────────────────────────────────────────────────────────────
+
+    /**
+     * Raise the rail, if this column has one.
+     *
+     * Nothing happens on a list that is short, unsorted or nearly all one letter — see
+     * [letterAnchors], which decides that by reading the list rather than by being told.
+     */
+    private fun openLetterJump() {
+        val s = _uiState.value
+        if (s.hasBlockingOverlay || s.letterJump != null) return
+        val rail = letterJumpFor(s.currentItems, s.selectedItemIndex) ?: return
+        _uiState.update { it.copy(letterJump = rail, selectedItemIndex = rail.targetIndex) }
+    }
+
+    /** Let go: the rail goes, the cursor stays where the rail put it. */
+    private fun closeLetterJump() = _uiState.update { it.copy(letterJump = null) }
+
+    /**
+     * Step the rail and take the list with it, so the column reads as it moves rather than
+     * jumping once on release. This is why it is a scrubber and not a menu.
+     */
+    private fun moveLetterJump(delta: Int) {
+        val rail = _uiState.value.letterJump ?: return
+        val next = rail.move(delta)
+        if (next === rail) return
+        menuSound.play(MenuSound.SCROLL)
+        _uiState.update { it.copy(letterJump = next, selectedItemIndex = next.targetIndex) }
+    }
+
+    /** A finger at [fraction] down the rail. Touch's way in — no hold, no shoulder. */
+    fun onLetterRailTouch(fraction: Float) {
+        onUserInteraction()
+        val s = _uiState.value
+        val rail = s.letterJump
+            ?: letterJumpFor(s.currentItems, s.selectedItemIndex)?.also { raised ->
+                _uiState.update { it.copy(letterJump = raised) }
+            }
+            ?: return
+        val next = rail.atFraction(fraction)
+        if (next === rail) return
+        menuSound.play(MenuSound.SCROLL)
+        _uiState.update { it.copy(letterJump = next, selectedItemIndex = next.targetIndex) }
+    }
+
+    /** The finger left the rail. Same ending as letting go of the shoulder. */
+    fun onLetterRailReleased() = closeLetterJump()
 
     // ── Idle hint pill ─────────────────────────────────────────────────────────
     // A configurable idle pause over an item that has a context menu, or on a list that sorts
@@ -6061,6 +6155,27 @@ class XMBViewModel @Inject constructor(
     private fun dispatchGamepadAction(action: GamepadAction) {
         markControllerInput()
         val state = _uiState.value
+
+        // ── The letter rail takes the D-pad while it is up ─────────────────────
+        //
+        // First, and above the pickers, because the rail can only exist on the crossbar: none of
+        // the branches below can be open at the same time (openLetterJump refuses while
+        // hasBlockingOverlay), so the order costs nothing and reads in the order the user sees.
+        //
+        // UP/DOWN walk the rungs. LEFT/RIGHT are swallowed rather than passed through: they would
+        // step the category out from under the list the rail is pointing at. BACK puts the cursor
+        // back where the rail found it, which is the only way out that undoes the scrub.
+        if (state.letterJump != null) {
+            when (action) {
+                GamepadAction.NAVIGATE_UP -> moveLetterJump(-1)
+                GamepadAction.NAVIGATE_DOWN -> moveLetterJump(+1)
+                GamepadAction.BACK -> _uiState.update {
+                    it.copy(letterJump = null, selectedItemIndex = state.letterJump.returnIndex)
+                }
+                else -> Unit
+            }
+            return
+        }
 
         // ── Installed-app picker captures ALL input when open ──────────────────
         if (state.appPicker != null) {

@@ -1,7 +1,6 @@
 package com.psplauncher.feature.xmb.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.text.TextStyle
@@ -29,11 +29,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerHintStyle
-import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.components.PfpHintBar
+import com.psplauncher.core.ui.components.StatusStripHeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import com.psplauncher.core.ui.theme.StorefrontColors
+import com.psplauncher.core.ui.theme.deriveStorefrontColors
 import com.psplauncher.core.ui.theme.menuCursor
 
 // Resolved per theme rather than fixed: this screen draws the theme's own background gradient,
@@ -102,56 +106,21 @@ fun GamePickerScreen(
         return
     }
 
-    val pfpColors = com.psplauncher.core.ui.theme.LocalPFPColors.current
+    val sf = deriveStorefrontColors()
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    0f to pfpColors.backgroundTop.copy(alpha = 0.94f),
-                    1f to pfpColors.backgroundBottom.copy(alpha = 0.94f),
-                )
-            )
+            // The status strip is drawn over this screen by the shell, not by this screen: the
+            // picker is chrome, so the clock and the battery stay on top of it. Reserving the
+            // strip's height is what keeps the first row from ending up underneath them — the
+            // same thing AppDrawerScreen, the detail pages and the app picker each do.
+            .padding(top = StatusStripHeight)
+            // The shared scrim, not this screen's own gradient. It used to draw the raw theme
+            // gradient at a flat 0.94 alpha, which made it read as a different surface from the
+            // App Drawer and the installed-app picker standing beside it; these anchors are
+            // solved for contrast rather than chosen. See storefrontColorsFor.
+            .background(Brush.verticalGradient(listOf(sf.backgroundDeep, sf.backgroundMid))),
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Add Games to Category",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PickerText,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
-        ) {
-            Text(
-                text = "${state.selectedGameIds.size + state.selectedCollectionIds.size} selected",
-                fontSize = 12.sp,
-                color = Color(0xFFC9C7E8),
-            )
-            PfpControllerHints(
-                items = listOf(
-                    ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
-                    // Only meaningful on a platform header, but the picker opens on one and the
-                    // bar is fixed chrome — a prompt that comes and goes as the cursor moves down
-                    // a list reads as flicker.
-                    ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Expand / Collapse"),
-                    ControllerPromptItem(GamepadAction.HOME, "Add"),
-                    ControllerPromptItem(GamepadAction.BACK, "Cancel"),
-                ),
-                style = ControllerHintStyle.INLINE,
-            )
-        }
 
         // Content
         LazyColumn(
@@ -201,7 +170,7 @@ fun GamePickerScreen(
                             .padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
                             .background(
                                 if (PICKER_COLLECTIONS_HEADER == state.selectedItemId)
-                                    Color(0xFF574DDB).copy(alpha = 0.2f)
+                                    sf.tileSelectedInner.copy(alpha = 0.2f)
                                 else
                                     Color.Transparent
                             ),
@@ -221,27 +190,64 @@ fun GamePickerScreen(
 
         }
 
-        // Bottom buttons
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
-            TextButton(
-                onClick = cancelAndClear,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Cancel", color = PickerText)
-            }
-
-            TextButton(
-                onClick = confirmAndClear,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Add (${state.selectedGameIds.size + state.selectedCollectionIds.size})", color = PickerText)
-            }
-        }
+        // ── Permanent footer: the shared bottom bar ───────────────────────
+        //
+        // Two Material3 TextButtons used to sit here, and the prompts sat under the title at the
+        // top — so this screen said "Cancel" twice, in two looks, at two ends, and named neither
+        // of the buttons that do it. One bar now, the same one every other screen draws.
+        GamePickerHintBar(
+            selectedCount = state.selectedGameIds.size + state.selectedCollectionIds.size,
+            colors = sf,
+            modifier = Modifier.fillMaxWidth(),
+            onAction = { action ->
+                when (action) {
+                    GamepadAction.BACK -> cancelAndClear()
+                    GamepadAction.SELECT -> viewModel.activateSelection()
+                    GamepadAction.OPEN_CONTEXT_MENU -> viewModel.toggleSelectedPlatform()
+                    GamepadAction.HOME -> confirmAndClear()
+                    else -> Unit
+                }
+            },
+        )
     }
+}
+
+// ── The picker's footer ───────────────────────────────────────────────────────
+//
+// The shared [PfpHintBar]. The centre slot carries what the deleted header said — the screen's
+// name and the live count — because that is context rather than a control, and it is where
+// Settings and the installed-app picker already put context.
+
+@Composable
+private fun GamePickerHintBar(
+    selectedCount: Int,
+    colors: StorefrontColors,
+    modifier: Modifier = Modifier,
+    onAction: ((GamepadAction) -> Unit)? = null,
+) {
+    PfpHintBar(
+        items = listOf(
+            ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Navigate"),
+            ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
+            // Only meaningful on a platform header, but the picker opens on one and the bar is
+            // fixed chrome — a prompt that comes and goes as the cursor moves down a list reads
+            // as flicker.
+            ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Expand / Collapse"),
+            ControllerPromptItem(GamepadAction.HOME, "Add"),
+            ControllerPromptItem(GamepadAction.BACK, "Cancel"),
+        ),
+        modifier = modifier,
+        onAction = onAction,
+        centre = {
+            Text(
+                text = if (selectedCount == 0) "Add Games" else "Add Games  ·  $selectedCount selected",
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+    )
 }
 
 @Composable
@@ -267,7 +273,7 @@ private fun PlatformGroupHeader(
             text = group.platform.displayName,
             fontSize = if (isSelected) 15.sp else 14.sp,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.8f),
+            color = if (isSelected) PickerText else PickerText.copy(alpha = 0.8f),
             modifier = Modifier
                 .weight(1f)
                 .padding(start = 8.dp),
@@ -307,7 +313,7 @@ private fun GamePickerRow(
         )
         Text(
             text = title,
-            color = if (isSelected) Color.White else Color.White.copy(alpha = 0.8f),
+            color = if (isSelected) PickerText else PickerText.copy(alpha = 0.8f),
             fontSize = if (isSelected) 14.sp else 13.sp,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             modifier = Modifier

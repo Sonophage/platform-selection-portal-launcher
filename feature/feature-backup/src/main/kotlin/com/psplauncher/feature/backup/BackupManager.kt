@@ -671,8 +671,9 @@ open class BackupManager @Inject constructor(
             // First-run wizard shown/seeded — carried so restoring onto a new device doesn't
             // re-open the wizard on top of the restored configuration.
             booleanPreferencesKey("initial_setup_seen"),
-            // Seed flag — kept so a restore over a fresh install doesn't re-seed on top of the
-            // restored data.            booleanPreferencesKey("db_seeded_v1"),
+            // db_seeded_v1 is deliberately NOT here — see deliberatelyNotBackedUp in
+            // BackupKeyDriftTest: restoring a seed marker onto a fresh device convinces it that
+            // seeding already ran.
         )
 
         private val BACKED_UP_FLOAT_KEYS = listOf(

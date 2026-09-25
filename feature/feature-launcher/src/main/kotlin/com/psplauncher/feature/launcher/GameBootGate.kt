@@ -53,14 +53,16 @@ data class GameBootRequest(
  * eight seconds, not their game.
  *
  * **One GameBoot, one switch, one asset.** GameBoot is either on or off ([GameBootPreferences]),
- * and when it is on the user either keeps the built-in five-second sequence or replaces the whole
+ * and when it is on the user either keeps the built-in sequence or replaces the whole
  * thing with a clip of their own — there is no separate sound to assign, which is why
  * [resolveGameBootAudio] has only two branches: the built-in sound plays under the built-in
  * sequence, and a custom clip is left to its own track.
  *
  * **The launch waits for the whole presentation.** [awaitPresentation] does not return until the
- * overlay reports back, and the built-in sequence runs its full five seconds in every case — the
- * motion budget drops its motion, not its length — so the emulator never takes the screen partway
+ * overlay reports back, and the built-in sequence runs its full length in every case — sized by
+ * UiMediaLimits.GAMEBOOT_SEQUENCE_MS rather than written out here, because it has already changed
+ * once — the motion budget drops its motion, not its length — so the emulator never takes the
+ * screen partway
  * through. The audio is started here rather than by the overlay only so it begins before the first
  * frame is drawn and stays in sync with a timeline that was measured against it; the overlay is
  * draw-only and can never release the player mid-clip.
@@ -157,8 +159,9 @@ class GameBootGate @Inject constructor(
             clear()
         } finally {
             // The deferred is spent either way. The REQUEST is not: the disc presentation releases
-            // the launch as it starts spinning and stays on screen for another second while the
-            // emulator loads under it, so clearing here would pull the overlay off mid-animation.
+            // the launch once the disc has GONE (DiscCeremony.HandOffMs — after the spin and the
+            // disc's exit) and stays on screen for DiscCeremony.HoldMs of black while the emulator
+            // cold-starts under it, so clearing here would pull the overlay off mid-animation.
             // [onPresentationDismissed] is what takes it down.
             completion = null
         }

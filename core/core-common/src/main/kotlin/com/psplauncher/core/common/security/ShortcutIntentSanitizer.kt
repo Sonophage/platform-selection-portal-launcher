@@ -31,6 +31,9 @@ object ShortcutIntentSanitizer {
      * installed activity). The result never carries URI-permission grants and always targets an
      * explicit, installed component.
      */
+    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
+    // Lint warns per call site because a library module cannot see the app module's manifest.
+    @Suppress("QueryPermissionsNeeded")
     fun sanitize(raw: Intent, pm: PackageManager): Intent? {
         val safe = Intent(raw).apply {
             // A captured shortcut never needs PFP to grant URI permissions — this is the file-read

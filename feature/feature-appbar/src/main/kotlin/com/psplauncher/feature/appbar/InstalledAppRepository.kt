@@ -48,6 +48,9 @@ class InstalledAppRepository @Inject constructor(
     // launch may well be gone by the time the row is updated.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
+    // Lint warns per call site because a library module cannot see the app module's manifest.
+    @Suppress("QueryPermissionsNeeded")
     suspend fun getInstalledApps(): List<InstalledApp> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val lastUsedByPackage = loadLastUsedTimestamps()

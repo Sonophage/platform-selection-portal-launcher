@@ -103,6 +103,9 @@ object MediaOpenIntent {
      * Installed apps that can handle ACTION_VIEW for [probeMimeType], without this app, one entry
      * per package, sorted by label.
      */
+    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
+    // Lint warns per call site because a library module cannot see the app module's manifest.
+    @Suppress("QueryPermissionsNeeded")
     fun handlers(context: Context, probeMimeType: String): List<MediaApp> {
         val pm = context.packageManager
         val probe = Intent(Intent.ACTION_VIEW).apply {

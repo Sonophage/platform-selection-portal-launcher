@@ -41,6 +41,9 @@ data class EmulatorSuggestion(
 class AppLaunchInspector @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
+    // Lint warns per call site because a library module cannot see the app module's manifest.
+    @Suppress("QueryPermissionsNeeded")
     fun listLaunchableApps(): List<DetectableApp> {
         val pm = context.packageManager
         val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
@@ -134,6 +137,9 @@ class AppLaunchInspector @Inject constructor(
 
     // Returns the exported activity that handles ACTION_VIEW for a content:// octet-stream ROM,
     // or null if the app declares no such handler.
+    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
+    // Lint warns per call site because a library module cannot see the app module's manifest.
+    @Suppress("QueryPermissionsNeeded")
     private fun resolveViewComponent(packageName: String): String? {
         val pm = context.packageManager
         val probe = Intent(Intent.ACTION_VIEW)

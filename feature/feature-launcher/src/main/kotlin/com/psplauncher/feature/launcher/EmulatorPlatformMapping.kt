@@ -71,6 +71,9 @@ fun EmulatorProfile.corePathFor(platformId: String): String? {
  * must point at the package that will actually load it. Non-RetroArch profiles pass through
  * untouched (their coreMap values are already package-relative or informational).
  */
+// /data/data/<pkg> is the OTHER app's private path — RetroArch's own core directory, which
+// this front end only names. getFilesDir() would resolve to us and be wrong.
+@Suppress("SdCardPath")
 fun EmulatorProfile.normalizeRetroArchCorePath(corePath: String): String {
     if (!packageName.startsWith("com.retroarch")) return corePath
     return corePath

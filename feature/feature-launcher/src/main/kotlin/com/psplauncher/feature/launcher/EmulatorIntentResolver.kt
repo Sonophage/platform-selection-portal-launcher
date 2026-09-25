@@ -210,8 +210,6 @@ class EmulatorIntentResolver @Inject constructor(
         }
     }
 
-    // True when the profile boots by launch token (the {title_id} template appears in a string or
-    // array extra) rather than by ROM file — e.g. Vita3K's AppStartParameters.
     /**
      * The profile hands the emulator a RAW FILESYSTEM PATH rather than a content URI.
      *
@@ -223,10 +221,15 @@ class EmulatorIntentResolver @Inject constructor(
         profile.intentArrayExtras.values.flatten().any { it.contains(LaunchTemplate.ROM_PATH) } ||
             profile.intentExtras.values.any { it.contains(LaunchTemplate.ROM_PATH) }
 
+    // True when the profile boots by launch token (the {title_id} template appears in a string or
+    // array extra) rather than by ROM file — e.g. Vita3K's AppStartParameters.
     private fun launchesByToken(profile: EmulatorProfile): Boolean =
         profile.intentArrayExtras.values.flatten().any { it.contains(LaunchTemplate.TITLE_ID) } ||
             profile.intentExtras.values.any { it.contains(LaunchTemplate.TITLE_ID) }
 
+    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
+    // Lint warns per call site because a library module cannot see the app module's manifest.
+    @Suppress("QueryPermissionsNeeded")
     private suspend fun buildViewIntent(game: Game, profile: EmulatorProfile): Intent {
         val uri = romLaunchUri(game, profile)
         val activityClass = profile.activityClass

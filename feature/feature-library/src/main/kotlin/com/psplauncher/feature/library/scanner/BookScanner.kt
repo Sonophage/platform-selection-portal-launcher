@@ -312,7 +312,9 @@ class BookScanner @Inject constructor(
         Uri.parse(uriString).path?.let { File(it).exists() } == true
     }.getOrDefault(false)
 
-    // Power-of-two subsample factor that brings the longest edge at or under [maxDim].
+    // Power-of-two subsample factor that leaves the longest edge at or ABOVE [maxDim] and under
+    // twice it: the loop halves only while the result would still clear [maxDim], so the decode
+    // is never downsampled past the size the caller asked for.
     private fun sampleSize(w: Int, h: Int, maxDim: Int): Int {
         var sample = 1
         var longest = maxOf(w, h)

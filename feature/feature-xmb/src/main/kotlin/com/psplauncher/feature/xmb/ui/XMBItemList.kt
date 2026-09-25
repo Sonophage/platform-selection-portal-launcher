@@ -1560,8 +1560,8 @@ private fun AppListIcon(
  * 28px label become 31dp and 12sp. 28px is also the bundle's stated legibility floor, so the
  * label lands exactly on it rather than near it.
  *
- * The focused one is filled solid white with dark text, as the mock draws it. Left and right walk
- * into the row from either side; see pillNav for what each press costs.
+ * The focused one is filled solid white with dark text, as the mock draws it. Right and down walk
+ * into the row; left only moves inside it. See pillNav for what each press costs.
  */
 @Composable
 private fun XmbActionPill(label: String, focused: Boolean, onClick: () -> Unit) {

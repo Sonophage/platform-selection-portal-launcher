@@ -255,6 +255,8 @@ fun XMBShellContainer(
         focusedPillIndex = uiState.focusedPillIndex,
         onCloseAppDrawer = viewModel::onCloseAppDrawer,
         onAddAppToOpenCategory = viewModel::addAppToOpenCategory,
+        onLetterRailTouch = viewModel::onLetterRailTouch,
+        onLetterRailReleased = viewModel::onLetterRailReleased,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
         onCloseGameDetail = viewModel::onCloseGameDetail,
         onOpenLibraryManager = viewModel::openLibraryManager,
@@ -407,6 +409,9 @@ fun XMBShell(
     onCloseAppDrawer: () -> Unit = {},
     /** Y menu's "Add to Cross Bar": the drawer names the app, the XMB knows the column. */
     onAddAppToOpenCategory: (String) -> Unit = {},
+    /** A finger somewhere down the A–Z rail, as a 0f..1f fraction of its height. */
+    onLetterRailTouch: (Float) -> Unit = {},
+    onLetterRailReleased: () -> Unit = {},
     onDrawerActionConsumed: () -> Unit = {},
     onCloseGameDetail: () -> Unit = {},
     onOpenLibraryManager: () -> Unit = {},
@@ -1408,7 +1413,7 @@ fun XMBShell(
                 live = liveActivity,
                 // Pressable wherever the strip is drawn, not only on the crossbar. The sheet
                 // draws above the chrome screens (NotificationBarZ is 0.5, they are at 0) AND it
-                // already captures every key while it is open -- its branch in onGamepadAction
+                // already captures every key while it is open -- its branch in dispatchGamepadAction
                 // runs before the per-screen routing, so the drawer's cursor never sees the
                 // presses meant for it.
                 onLiveAreaTapped = onNotificationsToggled,
@@ -1490,6 +1495,29 @@ fun XMBShell(
             // root and Apps is Back at the root. The buttons could be touch-only because they
             // were touch-only affordances; a named prompt is for both hands.
             val rootActionsVisible = uiState.stripShowsXmbContext && !uiState.isInSubItem
+
+            // ── The A–Z rail ──────────────────────────────────────────────────
+            //
+            // Only while the crossbar is the thing you are looking at: stripShowsXmbContext is
+            // already the app's answer to "do the list's own controls still describe what is on
+            // screen", and the rail is one of the list's own controls. Drawn before the bar so
+            // the bar stays on top of it.
+            //
+            // XmbLetterRail draws nothing at all unless the column has a rail, so this costs an
+            // empty composable on every short list rather than a second condition here.
+            if (uiState.stripShowsXmbContext) {
+                XmbLetterRail(
+                    items = uiState.currentItems,
+                    letterJump = uiState.letterJump,
+                    onTouch = onLetterRailTouch,
+                    onReleased = onLetterRailReleased,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 4.dp)
+                        .zIndex(XmbChromeZ),
+                )
+            }
+
             AnimatedVisibility(
                 // Shown when EITHER half has something to say: the root actions are a touch
                 // affordance with their own visibility rule, and hiding them behind the hint's

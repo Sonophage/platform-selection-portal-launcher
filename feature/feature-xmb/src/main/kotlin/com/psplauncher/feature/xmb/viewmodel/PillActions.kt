@@ -66,9 +66,9 @@ internal fun pillsFor(item: XMBItem): List<XmbPill> = when {
 
 // ── Reaching the pills with a controller ──────────────────────────────────────
 //
-// Left and right enter the row, from either side: right lands on the first pill, left on the
-// last. Walk to the far end and the NEXT press in that direction leaves the row and steps the
-// category, in one press.
+// Right and down enter the row, both landing on the first pill; left only walks the row once the
+// cursor is already in it. Walk to the far end and the NEXT press in that direction leaves the
+// row and steps the category, in one press.
 //
 // That last part is the whole rule and it was got wrong first. The recents rail's idiom is that
 // the press which falls off the end is SPENT closing the thing — but the rail has another way to

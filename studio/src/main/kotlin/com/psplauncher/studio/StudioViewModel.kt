@@ -346,10 +346,10 @@ class StudioViewModel(private val scope: CoroutineScope) {
     private val MOTION_PICK_EXTENSIONS = setOf("mp4", "m4v", "webm")
 
     /**
-     * Single entry point for every wallpaper-OR-motion pick: dispatches on extension. The
-     * launcher routes GIF/WebP/MP4/WebM to the motion path at import; the Studio mirrors that
-     * so the same file behaves the same on both sides. Only true stills (PNG/JPG/BMP) stay on
-     * the plain wallpaper flow.
+     * Single entry point for every wallpaper-OR-motion pick: dispatches on extension. Only the
+     * video extensions in [MOTION_PICK_EXTENSIONS] enter the motion gate; everything else — GIF
+     * and WebP included — stays on the plain wallpaper flow and is authored as a still. See the
+     * note on [MOTION_PICK_EXTENSIONS] for why those two are not treated as motion here.
      */
     fun onWallpaperPicked(file: File) {
         if (file.extension.lowercase() in MOTION_PICK_EXTENSIONS) importVideo(file) else stageWallpaper(file)

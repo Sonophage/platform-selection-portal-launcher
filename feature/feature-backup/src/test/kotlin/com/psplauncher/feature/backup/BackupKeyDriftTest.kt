@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  * missing several the user had actually chosen.
  *
  * This walks the source instead, so it stays true without anyone maintaining it. A new
- * preference is in the backup or in [DELIBERATELY_NOT_BACKED_UP] with a reason, or this fails.
+ * preference is in the backup or in [deliberatelyNotBackedUp] with a reason, or this fails.
  */
 class BackupKeyDriftTest {
 

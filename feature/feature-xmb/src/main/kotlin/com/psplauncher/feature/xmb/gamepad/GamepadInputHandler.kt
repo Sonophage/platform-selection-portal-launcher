@@ -68,6 +68,22 @@ private fun ScrollSpeed.tuning(): RepeatTuning = when (this) {
     ScrollSpeed.FAST     -> RepeatTuning(initialDelayMs = 180, baseIntervalMs = 90,  fastIntervalMs = 35, rampSteps = 4)
 }
 
+/** A shoulder held past [SHOULDER_HOLD_MS], and the release that ends it. */
+sealed interface ShoulderHold {
+    val action: GamepadAction
+    data class Start(override val action: GamepadAction) : ShoulderHold
+    data class End(override val action: GamepadAction) : ShoulderHold
+}
+
+/**
+ * How long a shoulder must be down before it stops being a category step and becomes a rail.
+ *
+ * Long enough that a firm tap never trips it, short enough that the rail feels like it was
+ * waiting. The repeat tunings above start at 180-350ms for a held direction; this sits past all
+ * of them so the two gestures are never confusable by feel.
+ */
+internal const val SHOULDER_HOLD_MS = 400L
+
 @Singleton
 class GamepadInputHandler @Inject constructor(
     private val remapCoordinator: RemapCoordinator,
@@ -75,6 +91,29 @@ class GamepadInputHandler @Inject constructor(
 ) {
     private val _actions = MutableSharedFlow<GamepadAction>(extraBufferCapacity = 16)
     val actions: SharedFlow<GamepadAction> = _actions.asSharedFlow()
+
+    // ── Shoulder holds ────────────────────────────────────────────────────────
+    //
+    // A held shoulder is the letter rail's way in, and it is NOT a new GamepadAction. Mappings
+    // persist as enum names with a legacy-alias table behind them, so a constant added here would
+    // land in every saved layout, in the remap screen and in the backup's key set — three places
+    // that must then agree — to express "the same button, held". A hold is a modifier on a press,
+    // so it travels beside the presses instead of among them.
+    //
+    // The press itself therefore waits for the release: one button cannot both fire on the way
+    // down and mean something else by staying down. On the crossbar a shoulder tap walks the
+    // hover panel's pages (XMBViewModel dispatches PREV/NEXT_CATEGORY to stepHoverPanelPage —
+    // they have not stepped the category there for some time, whatever the names say), and that
+    // still happens, on the release instead of the press. Shoulders do not auto-repeat (they are
+    // not directional, so no repeat job is ever armed for one), so nothing depended on the down
+    // edge.
+    // Whoever collects this owns the fallback: [ShoulderHold.End] on a list with no rail is a tap
+    // that still has to step, and only the collector knows whether a rail came up.
+    private val _shoulderHolds = MutableSharedFlow<ShoulderHold>(extraBufferCapacity = 8)
+    val shoulderHolds: SharedFlow<ShoulderHold> = _shoulderHolds.asSharedFlow()
+
+    private var shoulderJob: Job? = null
+    private var shoulderHeld: GamepadAction? = null
 
     // Current live mappings — updated from the repository flow by the ViewModel
     var currentMappings: GamepadMappings = GamepadMappings()
@@ -150,12 +189,19 @@ class GamepadInputHandler @Inject constructor(
                     if (action.isDirectional()) {
                         startRepeat(action)
                     }
+                    // A shoulder's step is deferred to ACTION_UP — see the note on
+                    // [shoulderHolds]. Everything else emits on the down edge as before.
+                    if (action.isShoulder()) {
+                        armShoulderHold(action)
+                        return true
+                    }
                     emit(action, physical = true)
                 }
                 true
             }
             KeyEvent.ACTION_UP -> {
                 if (action.isDirectional()) cancelRepeat()
+                if (action.isShoulder()) releaseShoulder(action)
                 true
             }
             else -> false
@@ -269,7 +315,7 @@ class GamepadInputHandler @Inject constructor(
 
     /**
      * Left-stick direction with hysteresis. Activation is the device-reported neutral flat (or the
-     * [STICK_DEAD_ZONE] floor); a direction engaged past activation stays engaged until deflection
+     * [STICK_DEAD_ZONE_FLOOR]); a direction engaged past activation stays engaged until deflection
      * falls below the lower release threshold.
      */
     private fun stickDirection(x: Float, y: Float, flat: Float): GamepadAction? {
@@ -314,6 +360,35 @@ class GamepadInputHandler @Inject constructor(
         val last = lastDirectionalEmitAt[action]
         return last != null && now - last < DUPLICATE_WINDOW_MS
     }
+
+    /**
+     * Arms the hold timer and swallows the down edge.
+     *
+     * With no [scope] — which is every unit test that has not been given one — the timer never
+     * runs, the hold never fires, and the release below emits the press. That is the behaviour
+     * this had before holds existed, which is what makes the fallback safe rather than lucky.
+     */
+    private fun armShoulderHold(action: GamepadAction) {
+        shoulderJob?.cancel()
+        shoulderHeld = null
+        shoulderJob = scope?.launch {
+            delay(SHOULDER_HOLD_MS)
+            shoulderHeld = action
+            _shoulderHolds.tryEmit(ShoulderHold.Start(action))
+        }
+    }
+
+    /** Release: a hold ends, anything shorter was a tap and steps now. */
+    private fun releaseShoulder(action: GamepadAction) {
+        shoulderJob?.cancel()
+        shoulderJob = null
+        val held = shoulderHeld
+        shoulderHeld = null
+        if (held != null) _shoulderHolds.tryEmit(ShoulderHold.End(held)) else emit(action, physical = true)
+    }
+
+    private fun GamepadAction.isShoulder() =
+        this == GamepadAction.PREV_CATEGORY || this == GamepadAction.NEXT_CATEGORY
 
     private fun GamepadAction.isDirectional() = this in setOf(
         GamepadAction.NAVIGATE_UP,

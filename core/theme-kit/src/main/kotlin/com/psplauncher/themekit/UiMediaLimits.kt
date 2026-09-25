@@ -73,7 +73,7 @@ object UiMediaLimits {
      */
     const val GAMEBOOT_SEQUENCE_MS  = 2_000L
     /**
-     * A user's own GameBoot clip may run twice the built-in sequence, matching the boot clip's
+     * A user's own GameBoot clip may run five times the built-in sequence, matching the boot clip's
      * ceiling: the presentation is theirs to author, and 5 s was too tight for anything with a
      * build and a payoff. The launch waits for the whole thing either way, so this is the number
      * the two watchdogs behind it are sized from (GameBootOverlay's video cap, GameBootGate's).

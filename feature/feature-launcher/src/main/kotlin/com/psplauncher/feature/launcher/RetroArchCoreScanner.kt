@@ -150,6 +150,9 @@ object RetroArchCoreScanner {
      * [RetroArchCore.absolutePath] points at RetroArch's internal core path — PFP only names the
      * core in the LIBRETRO extra; RetroArch opens it itself.
      */
+    // /data/data/<pkg> is the OTHER app's private path — RetroArch's own core directory, which
+    // this front end only names. getFilesDir() would resolve to us and be wrong.
+    @Suppress("SdCardPath")
     fun coresFor(packageName: String, installedCoreFiles: Set<String>): List<RetroArchCore> {
         val internalDir = "/data/data/$packageName/cores"
         val cores = installedCoreFiles.mapNotNull { fileName ->

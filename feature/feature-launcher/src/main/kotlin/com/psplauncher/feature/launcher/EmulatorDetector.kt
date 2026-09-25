@@ -122,8 +122,9 @@ class EmulatorDetector @Inject constructor(
      *
      * Values are read off the installed package rather than assumed, because the package itself
      * varies by ABI (com.retroarch.aarch64 here) and so therefore does every path derived from it.
-     * CONFIGFILE is `<dataDir>/retroarch.cfg`, which is where RetroArch's own
-     * UserPreferences.getDefaultConfigPath puts it, and which the device accepted verbatim.
+     * CONFIGFILE is the EXTERNAL config, `<sdcard>/Android/data/<pkg>/files/retroarch.cfg` — the
+     * file RetroArch's own launcher uses. `<dataDir>/retroarch.cfg` does NOT exist on this build
+     * and passing it boots to black; see the note in the function body, which cost an afternoon.
      */
     private fun retroArchExtras(packageName: String, corePath: String): Map<String, String> {
         val app = runCatching { context.packageManager.getApplicationInfo(packageName, 0) }.getOrNull()

@@ -137,8 +137,9 @@ data class StripHints(val shoulder: Boolean = false, val leftRight: Boolean = fa
 // and a number beside it.
 //
 // Sized to THIS screen rather than to the design's own frame: the mock's band is about 85dp tall
-// on a 1920x1080 sheet, which is a fifth of this panel's height. 28dp is what the two lines and
-// the art tile actually need, against the 18dp the strip had before.
+// on a 1920x1080 sheet, which is a fifth of this panel's height. 34dp is what the two lines and
+// the art tile need now — 18dp when the strip was one row of text, 28dp before the owner asked
+// for "a little bigger". The number itself is core-ui's StatusStripHeight, never a copy.
 
 @Composable
 fun XmbPspStatusStrip(

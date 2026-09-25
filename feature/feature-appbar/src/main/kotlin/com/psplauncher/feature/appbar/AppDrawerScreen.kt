@@ -61,8 +61,11 @@ import com.psplauncher.feature.appbar.appdrawer.UninstallConfirmDialog
 
 // ── PSP-era grid App Drawer ───────────────────────────────────────────────────
 //
-// Grid-centric and artwork-first: a header/breadcrumb, a horizontal category tab row, and a
-// 6-column application grid over an accent-derived gradient (see deriveStorefrontColors). The
+// A full-width search field, a horizontal category tab row, and per-tab sections: the tab's own
+// apps as one sideways-scrolling row of large tiles above a LazyHorizontalGrid whose columns run
+// off to the right (see AppDrawerSection) — all over an accent-derived gradient (see
+// deriveStorefrontColors). The breadcrumb is gone and so is the 6-column vertical grid; that grid
+// survives only in the preserved storefront layout named below. The
 // controller hint pill is a permanent footer row below the grid that fades in/out via alpha, so
 // the slot's height is reserved whether or not the pill is showing and grid geometry never
 // shifts; the pre-redesign storefront layout (vertical rail + command bar) is preserved for the

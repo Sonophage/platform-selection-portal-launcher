@@ -35,7 +35,8 @@ internal fun AppPickerState.toggle(pkg: String): AppPickerState {
 
 /**
  * Grid move over `visibleApps()` using the shared [gridMove] rules — no wrap in any direction,
- * no-op on an empty list. Returns the state unchanged when the move is illegal.
+ * no-op on an empty list. An illegal move leaves the cursor where it is, but still clears touch
+ * mode, so what comes back is not always the receiver.
  */
 internal fun AppPickerState.move(action: GamepadAction): AppPickerState {
     val visible = visibleApps()

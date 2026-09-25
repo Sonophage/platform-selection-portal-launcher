@@ -239,7 +239,7 @@ class NavigationEngine(
 
     // ── Test seams ───────────────────────────────────────────────────────────────
 
-    /** Direct access for tests: the active context's focused key. */
+    /** Direct access for tests: the active navigation context itself. */
     internal fun activeContextForTest(): NavigationContext = active
 
     /**

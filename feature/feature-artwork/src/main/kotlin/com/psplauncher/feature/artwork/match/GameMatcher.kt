@@ -72,7 +72,8 @@ interface MatchEvidenceSource {
 
     /**
      * Every game the provider returns for [query], scoped to [platformId] where the provider can.
-     * Only called for providers whose capability says they return more than one (SteamGridDB today).
+     * Only called for providers whose capability says they return more than one — ScreenScraper,
+     * IGDB and SteamGridDB today; Steam has no title endpoint.
      */
     suspend fun searchByTitle(
         provider: MatchProvider,
@@ -92,8 +93,9 @@ interface MatchEvidenceSource {
  *
  * The order is the whole design: the strongest evidence wins and stops the search, so a game with
  * a saved id never spends a network call on a title lookup, and an ambiguous title is a miss
- * rather than a guess. Tiers 4-6 (ranked suggestions) are deferred because only one provider can
- * return more than one game (AD-4); they arrive as extra branches below [tierThree], not a rewrite.
+ * rather than a guess. Tiers 4-6 (ranked suggestions) are deferred because the ranked picker does
+ * not exist yet, not because the search cannot return candidates — three providers do (AD-4); they
+ * arrive as extra branches below [tierThree], not a rewrite.
  */
 class GameMatcher(private val evidence: MatchEvidenceSource) {
 

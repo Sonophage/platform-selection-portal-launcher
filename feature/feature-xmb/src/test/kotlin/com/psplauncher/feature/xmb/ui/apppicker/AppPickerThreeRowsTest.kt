@@ -7,7 +7,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.unit.dp
+import com.psplauncher.core.ui.components.HintBarHeight
 import com.psplauncher.core.ui.preview.PfpScreenPreview
 import com.psplauncher.feature.xmb.viewmodel.AppPickerEntry
 import com.psplauncher.feature.xmb.viewmodel.AppPickerState
@@ -101,11 +101,14 @@ class AppPickerThreeRowsTest {
             "third-row tile bottom $thirdBottom extends past grid viewport bottom $gridBottom"
         }
 
-        // Footer-slot invariant: the permanent footer (prompt bar + its vertical padding) lives
-        // below the grid, so the grid may not run to the root bottom edge — there must be real
-        // clearance equal to at least the footer's own vertical padding.
+        // Footer-slot invariant: the permanent footer lives below the grid, so the grid may not
+        // run to the root bottom edge — there must be real clearance of at least the bar's height.
         val rootBottom = composeRule.onRoot().fetchSemanticsNode().boundsInRoot.bottom
-        val minFooterSlot = with(composeRule.density) { 24.dp.toPx() } // footer padding (12dp × 2)
+        // The footer is core-ui's shared PfpHintBar now, so the clearance this asserts is read
+        // from HintBarHeight rather than copied here as a number. The old footer was an INLINE
+        // prompt row with 12dp of padding either side, and "24" written in this test was the
+        // second copy of that — the copy that would have kept passing after the bar changed.
+        val minFooterSlot = with(composeRule.density) { HintBarHeight.toPx() }
         assert(gridBottom <= rootBottom - minFooterSlot) {
             "grid viewport bottom $gridBottom runs into the footer slot (root bottom $rootBottom)"
         }

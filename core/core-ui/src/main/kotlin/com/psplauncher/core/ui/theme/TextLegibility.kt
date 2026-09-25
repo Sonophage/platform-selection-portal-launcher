@@ -179,8 +179,9 @@ const val XMB_SCRIM_BOTTOM_ALPHA = 0.90f
  * The outcome of resolving a requested text color against a known background.
  *
  * [adjusted] is what raises the user-facing notice, and it is deliberately distinct from
- * [meetsTarget]: a color can be adjusted and still short of the bar (the caller then escalates to
- * a contrast plate), or unadjusted and passing (the common case, no notice).
+ * [meetsTarget]: a color can be unadjusted and still short of the bar — the clamp refused to move
+ * it that far, and the caller escalates to a contrast plate — or unadjusted and passing (the
+ * common case, no notice).
  */
 @Immutable
 data class ResolvedTextColor(

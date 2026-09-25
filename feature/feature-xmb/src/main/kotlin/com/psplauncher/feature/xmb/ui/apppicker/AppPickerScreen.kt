@@ -1,11 +1,7 @@
 package com.psplauncher.feature.xmb.ui.apppicker
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,9 +25,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,27 +39,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
-import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.domain.model.GamepadAction
-import com.psplauncher.core.ui.components.ControllerHintStyle
-import com.psplauncher.core.ui.components.PfpControllerHints
-import com.psplauncher.core.ui.components.ControllerPromptItem
+import com.psplauncher.core.ui.components.PfpCheckBadge
+import com.psplauncher.core.ui.components.PfpSearchField
+import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.theme.StorefrontColors
 import com.psplauncher.core.ui.theme.deriveStorefrontColors
 import com.psplauncher.feature.xmb.viewmodel.AppPickerEntry
@@ -79,11 +64,21 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 // ── Installed-app picker (grid) ───────────────────────────────────────────────
 //
 // The shared picker for the Android library ("Find Games" / "Add Android Apps") and the
-// Video / Music / Photo "Add Apps" flows. Reads as a simplified App Drawer: same storefront
-// theming (deriveStorefrontColors — never LocalPFPColors.accentColor, which presets resolve
-// to white), a header with back + live selection count, an inline search, a controller-first
-// tile grid, and a permanent controller prompt footer row below the grid (always visible, so
-// grid geometry never depends on it).
+// Video / Music / Photo "Add Apps" flows. It is the app's own chrome, and it is built out of the
+// app's chrome: core-ui's [PfpSearchField] for the header and [PfpHintBar] for the footer, the
+// same two the App Drawer draws.
+//
+// It used to draw neither. It had a 56dp header of its own — a ‹ back arrow, the title, a live
+// "N Selected" count and a second magnifier button labelled "Search" beside a box that already
+// said Search — and an INLINE prompt row for a footer, which was a fourth look at the bar every
+// other screen had settled on. The title and the count moved to the bar's centre slot, and the
+// rest went: B and the search key are named on the bar now, on this screen as on every other.
+//
+// It is also drawn UNDER the global status strip rather than over it. The picker fills the screen,
+// but filling the screen is not the same as owning it: you are still inside the launcher here, the
+// same as in the drawer or Settings, so the clock, the battery and the notification corner stay.
+// That is [XMBUiState.chromeOverlay]'s half of the partition, and the top padding below is what
+// keeps this screen's own content clear of the strip drawn on top of it.
 //
 // Stateless: driven entirely by [AppPickerState] plus callbacks, so the XMB shell wires it
 // exactly like every other overlay. Focus and selection are independent layers — the check
@@ -110,19 +105,20 @@ fun AppPickerScreen(
         modifier = modifier
             .fillMaxSize()
             // No whole-background dismiss tap: with a grid and a search field it is an easy
-            // accidental cancel. Back and the header's ‹ are the exits.
+            // accidental cancel. Back and the bar's B are the exits.
             .background(Brush.verticalGradient(listOf(sf.backgroundDeep, sf.backgroundMid))),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        // The strip is drawn over this screen by the shell, not by this screen. Reserving its
+        // height here is the same thing AppDrawerScreen and the detail pages do, and it is why
+        // the header below can never end up underneath the clock.
+        Column(modifier = Modifier.fillMaxSize().padding(top = StatusStripHeight)) {
             AppPickerHeader(
                 state = state,
-                onBack = onHeaderBack,
                 onSearchToggle = onSearchToggle,
                 onSearchChange = onSearchChange,
                 onSearchDone = onSearchDone,
                 colors = sf,
             )
-            Box(Modifier.fillMaxWidth().height(1.dp).background(sf.chromeDivider))
 
             // BoxWithConstraints puts the viewport height in composition scope, so the adaptive
             // artwork size is resolved BEFORE the first tile composes — tiles render at their
@@ -149,14 +145,29 @@ fun AppPickerScreen(
                 }
             }
 
-            // ── Permanent footer: controller prompt bar (never fades) ──────
-            Box(Modifier.fillMaxWidth().height(1.dp).background(sf.chromeDivider))
-            AppPickerFooter(
+            // ── Permanent footer: the shared bottom bar (never fades) ──────
+            //
+            // Always drawn, so grid geometry never depends on whether prompts are showing.
+            // Tapping a prompt runs the same callback the pad press runs — the bar knows the
+            // action, and this screen already holds the callback for each one.
+            AppPickerHintBar(
+                title = state.title,
+                selectedCount = state.selected.size,
                 confirmingRemovals = state.confirmingRemovals,
                 colors = sf,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                onAction = { action ->
+                    when (action) {
+                        GamepadAction.BACK ->
+                            if (state.confirmingRemovals) onCancelRemoval() else onHeaderBack()
+                        GamepadAction.SELECT ->
+                            if (state.confirmingRemovals) onConfirmRemoval()
+                            else onTileTapped(state.focusedIndex)
+                        GamepadAction.CHANGE_SORT -> onSearchToggle(true)
+                        GamepadAction.HOME -> onApply()
+                        else -> Unit
+                    }
+                },
             )
         }
 
@@ -176,14 +187,17 @@ fun AppPickerScreen(
     }
 }
 
-// ── Header: ‹ + title on the left, selection count + search on the right ──────
+// ── Header: one search field, the width of the screen ─────────────────────────
+//
+// The App Drawer's header in a second place. The field, the caret rule and the magnifier are
+// core-ui's [PfpSearchField]; what is left here is the picker's placement of it and the focus
+// handshake, which belongs to whoever owns the FocusRequester.
 
 private val HEADER_HEIGHT = 56.dp
 
 @Composable
 private fun AppPickerHeader(
     state: AppPickerState,
-    onBack: () -> Unit,
     onSearchToggle: (Boolean) -> Unit,
     onSearchChange: (String) -> Unit,
     onSearchDone: () -> Unit,
@@ -212,100 +226,16 @@ private fun AppPickerHeader(
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(
-                text = "\u2039",
-                color = colors.textSecondary,
-                fontSize = 18.sp,
-                modifier = Modifier
-                    .clickable { onBack() }
-                    .padding(end = 8.dp),
-            )
-            Text(
-                text = state.title,
-                color = colors.textPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable { onBack() },
-            )
-        }
-
-        Text(
-            text = "${state.selected.size} Selected",
-            color = colors.textSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(end = 16.dp),
+        PfpSearchField(
+            query = state.query,
+            active = state.searchActive,
+            focusRequester = searchFocus,
+            placeholder = "Search apps",
+            onActivate = { onSearchToggle(true) },
+            onQueryChange = onSearchChange,
+            onDone = onSearchDone,
+            colors = colors,
         )
-
-        AnimatedVisibility(visible = state.searchActive, enter = fadeIn(), exit = fadeOut()) {
-            BasicTextField(
-                value = state.query,
-                onValueChange = onSearchChange,
-                singleLine = true,
-                textStyle = TextStyle(color = colors.textPrimary, fontSize = 14.sp),
-                cursorBrush = SolidColor(colors.searchBorder),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSearchDone() }, onDone = { onSearchDone() }),
-                decorationBox = { inner ->
-                    Box {
-                        if (state.query.isEmpty()) Text(
-                            "Search\u2026",
-                            color = colors.textSecondary.copy(alpha = 0.6f),
-                            fontSize = 14.sp,
-                        )
-                        inner()
-                    }
-                },
-                modifier = Modifier
-                    .width(220.dp)
-                    .focusRequester(searchFocus)
-                    .background(colors.searchField, RoundedCornerShape(2.dp))
-                    .border(1.dp, colors.searchBorder, RoundedCornerShape(2.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            )
-        }
-
-        Spacer(Modifier.width(16.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable { onSearchToggle(!state.searchActive) },
-        ) {
-            // Hand-drawn magnifier — no icon vector.
-            Canvas(modifier = Modifier.size(18.dp)) {
-                val strokeW = 1.8f.dp.toPx()
-                val cx = size.width * 0.42f
-                val cy = size.height * 0.42f
-                val r = size.width * 0.30f
-                drawCircle(
-                    color = colors.textSecondary,
-                    radius = r,
-                    center = Offset(cx, cy),
-                    style = Stroke(strokeW),
-                )
-                drawLine(
-                    color = colors.textSecondary,
-                    start = Offset(cx + r * 0.70f, cy + r * 0.70f),
-                    end = Offset(
-                        cx + r * 0.70f + size.width * 0.22f,
-                        cy + r * 0.70f + size.height * 0.22f,
-                    ),
-                    strokeWidth = strokeW,
-                    cap = StrokeCap.Round,
-                )
-            }
-            Spacer(Modifier.width(5.dp))
-            Text(
-                if (state.searchActive) "Clear" else "Search",
-                color = colors.textSecondary,
-                fontSize = 13.sp,
-            )
-        }
     }
 }
 
@@ -381,7 +311,6 @@ private fun AppPickerGrid(
 
 // ── Tile: focus chrome (drawer-faithful) + independent selection check badge ──
 
-private val ARTWORK_SIZE = 72.dp
 private val TILE_BORDER = 1.dp
 // Chrome room around the artwork: outer border + 2dp gap + inner hairline on each side.
 private val FRAME_ROOM = 8.dp
@@ -397,6 +326,10 @@ private val FRAME_ROOM = 8.dp
 // The picker guarantees three full rows are visible with nothing clipped: on a short viewport
 // the artwork shrinks from its 72dp resting size toward the 48dp floor so a row always fits
 // three times between the header and the footer. Tall viewports never inflate past 72dp.
+//
+// It measures the room it is actually given, so the status strip's reserved height and the bar's
+// height are already subtracted by the time this runs — there is no second copy of either number
+// here to drift from the originals.
 
 private val MIN_ARTWORK_SIZE = 48.dp
 private val MAX_ARTWORK_SIZE = 72.dp
@@ -476,7 +409,7 @@ private fun AppPickerTile(
                 Spacer(Modifier.size(artworkSize))
             }
             // Check badge — upper-right, independent of focus; survives the cursor leaving.
-            com.psplauncher.core.ui.components.PfpCheckBadge(
+            PfpCheckBadge(
                 fill = colors.tileSelectedEdge,
                 markColor = colors.backgroundDeep,
                 modifier = Modifier
@@ -496,38 +429,6 @@ private fun AppPickerTile(
             lineHeight = 13.sp,
         )
     }
-}
-
-// ── Footer: controller prompt bar (glyphs resolve from LocalControllerPromptStyle) ──
-
-@Composable
-private fun AppPickerFooter(
-    confirmingRemovals: Boolean,
-    colors: StorefrontColors,
-    modifier: Modifier = Modifier,
-) {
-    // While the removal-confirmation modal is up the prompt describes the modal's controls —
-    // the grid behind the scrim is inert.
-    val items = if (confirmingRemovals) {
-        listOf(
-            ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Choose"),
-            ControllerPromptItem(GamepadAction.SELECT, "Confirm"),
-            ControllerPromptItem(GamepadAction.BACK, "Cancel"),
-        )
-    } else {
-        listOf(
-            ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Navigate"),
-            ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
-            ControllerPromptItem(GamepadAction.CHANGE_SORT, "Search"),
-            ControllerPromptItem(GamepadAction.HOME, "Apply"),
-            ControllerPromptItem(GamepadAction.BACK, "Cancel"),
-        )
-    }
-    PfpControllerHints(
-        items = items,
-        style = ControllerHintStyle.INLINE,
-        modifier = modifier,
-    )
 }
 
 // ── Removal confirmation panel (hand-built scrim + panel, like UninstallConfirmDialog) ──

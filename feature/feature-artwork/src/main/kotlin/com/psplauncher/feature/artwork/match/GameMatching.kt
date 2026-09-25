@@ -102,7 +102,7 @@ object ProviderCapabilities {
 
     val all: List<ProviderCapability> get() = MatchProvider.entries.map { table.getValue(it) }
 
-    /** Providers that can back a Change Match picker — the four with a title endpoint. */
+    /** Providers that can back a Change Match picker — the three with a title endpoint (all but Steam). */
     val searchable: List<MatchProvider> get() = all.filter { it.supportsTitleSearch }.map { it.provider }
 
     /** Providers a metadata preset can be built from. */
@@ -132,7 +132,9 @@ data class GameCandidate(
  * How much evidence stands behind a match, strongest first.
  *
  * Tiers 4-6 (ranked suggestions, fuzzy title, edition disambiguation) are deliberately absent:
- * they need multi-result search that only SteamGridDB has (AD-4). They join this enum as extra
+ * the matcher treats an ambiguous title as a miss rather than guessing, and only the user picks
+ * between candidates (AD-4). Three providers return multiple titles now, so what is missing is
+ * the ranked picker, not the search. They join this enum as extra
  * entries below [EXACT_TITLE] when the follow-up plan lands — the matcher branches on the tier it
  * produced, so adding one is additive.
  */

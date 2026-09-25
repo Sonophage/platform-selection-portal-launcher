@@ -44,9 +44,10 @@ import kotlinx.coroutines.delay
  * the middle — fades up in the centre of the screen, sinks toward the bottom while it spins up and
  * the room goes dark, and then fades out onto whatever opened.
  *
- * **The hand-off is timed to the fade, not to the end.** [onHandOff] fires as the disc starts
- * fading out, so the app's own cold start happens *under* the last half-second of animation
- * instead of after it. The ceremony costs the user the time up to that point and no more.
+ * **The hand-off waits for the disc to be gone.** [onHandOff] fires once the disc's exit has
+ * finished and the screen is black, so the app's own cold start happens *under* the 900ms hold
+ * that follows rather than over a disc that is still visibly leaving. The ceremony costs the user
+ * the time up to that point and no more.
  *
  * **Draw-only.** It owns no launch and no player: it reports two moments and the caller decides
  * what they mean. That is what lets the same overlay sit in front of four unrelated launch paths,
@@ -57,7 +58,7 @@ import kotlinx.coroutines.delay
 fun DiscLaunchCeremony(
     /** The cover: a uri for anything on disk, or a Drawable. Null draws the blank disc. */
     art: Any?,
-    /** Start the thing. Fires once, as the fade-out begins. */
+    /** Start the thing. Fires once, after the disc's exit has finished. */
     onHandOff: () -> Unit,
     /** The overlay has nothing left to draw and should be removed. Fires once. */
     onFinished: () -> Unit,
@@ -506,7 +507,8 @@ object DiscCeremony {
     // The disc used to simply fade up in the middle of an empty screen. It now arrives the way it
     // would out of a shelf: the CASE appears first, then slides left while the disc rolls out from
     // behind it on an arc, and the case is gone before the sink starts. The whole exchange fits
-    // inside the fade-in that was already there — 850ms, unchanged — so nothing downstream moves.
+    // inside the fade-in — 1700ms, the same window the fade-in already owned — so nothing
+    // downstream moves.
 
     /** The case fades up on its own, before anything comes out of it. */
     const val CaseInMs = 500

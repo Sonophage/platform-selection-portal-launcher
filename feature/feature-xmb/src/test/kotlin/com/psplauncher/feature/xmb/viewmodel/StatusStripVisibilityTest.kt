@@ -15,7 +15,8 @@ import org.junit.Test
  * TWO QUESTIONS, and they are different, which is why there are two properties:
  *
  *  - IS IT DRAWN. No on a full-screen overlay — the video player, the photo viewer, the boot and
- *    disc ceremonies, the modal pickers. Yes everywhere else.
+ *    disc ceremonies, the dialogs and the small boxes you answer and dismiss. Yes everywhere
+ *    else, including the two pickers: filling the screen is not the same as owning it.
  *  - DO ITS WORDS STILL APPLY. The clock and the battery are facts about the device and are true
  *    anywhere. The sort label, the shoulder and left/right hints and the home shelf's filter row
  *    are facts about the CROSSBAR, and on a chrome screen they describe a list the user is no
@@ -46,6 +47,18 @@ class StatusStripVisibilityTest {
             "Search" to crossbar().copy(search = SearchState(scope = SearchScope.ALL)),
             "Game detail" to crossbar().copy(activeGameId = 1L),
             "App detail" to crossbar().copy(activeAppId = 1L),
+            // Both pickers fill the screen, which is what used to put them in the other half.
+            // They are lists you browse, not boxes you answer, so they keep the launcher's chrome
+            // exactly as the drawer does. Written down here because the partition is 25 conditions
+            // and this file is the only place the intent behind each one is recorded.
+            "App picker" to crossbar().copy(
+                appPicker = AppPickerState(
+                    title = "Add Apps",
+                    target = AppPickerTarget.CategoryShortcuts("cat"),
+                    apps = emptyList(),
+                ),
+            ),
+            "Game picker" to crossbar().copy(gamePickerCategoryId = "cat"),
         )
         chrome.forEach { (name, state) ->
             assertTrue("$name must still cover the crossbar", state.hasBlockingOverlay)

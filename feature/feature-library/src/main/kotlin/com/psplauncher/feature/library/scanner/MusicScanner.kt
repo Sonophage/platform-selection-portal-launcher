@@ -34,15 +34,6 @@ sealed interface MusicScanResult {
 }
 
 /**
- * Whether a quick scan may carry a track's cached album art over (pure — unit-tested).
- *
- * A track that declares **no** art returns true, and that is the case that is easy to get wrong.
- * "Has no art file" and "has art that has gone missing" look identical from the row, but only the
- * second is a reason to reparse: treating both as a reason turns every quick scan into a deep one
- * for every track without embedded art, which is silent and just makes scanning slow forever.
- * [BookQuickScanTest] documents the same trap for covers.
- */
-/**
  * Whether a quick scan may carry this track's row over untouched.
  *
  * Three conditions, and each of them was a bug before it was a condition.
@@ -71,6 +62,15 @@ internal fun canReuseMusicMetadata(
     return musicArtStillOnDisk(prior.artUri, artExists)
 }
 
+/**
+ * Whether a quick scan may carry a track's cached album art over (pure — unit-tested).
+ *
+ * A track that declares **no** art returns true, and that is the case that is easy to get wrong.
+ * "Has no art file" and "has art that has gone missing" look identical from the row, but only the
+ * second is a reason to reparse: treating both as a reason turns every quick scan into a deep one
+ * for every track without embedded art, which is silent and just makes scanning slow forever.
+ * [BookQuickScanTest] documents the same trap for covers.
+ */
 internal fun musicArtStillOnDisk(artUri: String?, exists: (String) -> Boolean): Boolean {
     if (artUri.isNullOrBlank()) return true
     // Plain string handling rather than Uri.parse, which is an Android stub returning null off the
@@ -88,7 +88,9 @@ internal fun musicArtStillOnDisk(artUri: String?, exists: (String) -> Boolean): 
  *
  * Two modes (both prune tracks whose files are gone):
  *  - **Missing** ([deep] = false): a file whose `lastModified` is unchanged reuses its existing row
- *    verbatim — no MediaMetadataRetriever/art cost. Only new/changed files are probed.
+ *    verbatim — no MediaMetadataRetriever/art cost — but only when its cached art is still on disk
+ *    and the row was read since `album_artist` existed (see [canReuseMusicMetadata]). Everything
+ *    else is probed.
  *  - **Deep** ([deep] = true): every file's metadata and album art is re-read.
  */
 @Singleton

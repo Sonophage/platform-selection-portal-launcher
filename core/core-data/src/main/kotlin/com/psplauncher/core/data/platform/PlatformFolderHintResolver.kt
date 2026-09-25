@@ -17,7 +17,9 @@ import javax.inject.Singleton
 class PlatformFolderHintResolver @Inject constructor() {
 
     // Key  = lowercase folder segment (exact match)
-    // Value = platform ID matching PlatformSeeder
+    // Value = platform ID matching PlatformSeeder — except "dos", "ports" and "scummvm" below,
+    //         which no seeded platform has yet, so a hit on those folder names resolves to an id
+    //         the database does not contain.
     private val hints: Map<String, String> = mapOf(
 
         // ── Sony — ES-DE canonical first, then common aliases ──────────────

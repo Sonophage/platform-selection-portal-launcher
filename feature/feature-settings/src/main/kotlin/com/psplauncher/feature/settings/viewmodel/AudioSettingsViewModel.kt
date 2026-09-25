@@ -196,8 +196,8 @@ class AudioSettingsViewModel @Inject constructor(
     fun dismissReset() { _confirmResetVisible.value = false }
 
     /**
-     * "Reset Sound to Defaults": clears every SOUND slot PLUS Boot Sound (it is a row on this
-     * screen) and restores the Menu Sounds toggle. Never touches the boot video or GameBoot's
+     * "Reset Sound to Defaults": clears every SOUND slot PLUS the three AUDIO_TRACK rows on this
+     * screen (Boot Sound and the launch ceremony's two cues) and restores the Menu Sounds toggle. Never touches the boot video or GameBoot's
      * clip — those belong to their own screens' resets.
      */
     fun confirmReset() = viewModelScope.launch {
