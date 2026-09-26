@@ -13,7 +13,7 @@ import com.psplauncher.core.ui.components.rowsShown
 import com.psplauncher.core.ui.components.foldedIntoGroups
 
 class PillActionsTest {
-    private fun state(directLaunch: Boolean = true) = XMBUiState(
+    private fun state() = XMBUiState(
         categories = listOf(
             Category(
                 id = BuiltInCategory.GAMES, name = "Game", iconKey = "ic_games",
@@ -21,7 +21,6 @@ class PillActionsTest {
             ),
         ),
         selectedCategoryIndex = 0,
-        directLaunch = directLaunch,
     )
 
     private fun game(isFavorite: Boolean = false, androidApp: Boolean = false) = XMBItem(
@@ -34,9 +33,9 @@ class PillActionsTest {
         id = "a1", title = "Spotify", packageName = "com.spotify.music",
     )
 
-    private fun gameMenuIds(item: XMBItem, directLaunch: Boolean = true) = gameContextMenuItems(
+    private fun gameMenuIds(item: XMBItem) = gameContextMenuItems(
         item = item,
-        state = state(directLaunch),
+        state = state(),
         discCount = 1,
         onRecentShelf = false,
         hideLocation = null,

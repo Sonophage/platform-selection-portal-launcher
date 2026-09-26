@@ -24,13 +24,11 @@ class ContextMenusTest {
         selectedCategoryIndex: Int = 0,
         selectedCollectionId: Long? = null,
         selectedPlatformId: String? = null,
-        directLaunch: Boolean = false,
     ) = XMBUiState(
         categories = categories,
         selectedCategoryIndex = selectedCategoryIndex,
         selectedCollectionId = selectedCollectionId,
         selectedPlatformId = selectedPlatformId,
-        directLaunch = directLaunch,
     )
 
     private fun game(
@@ -332,10 +330,10 @@ class ContextMenusTest {
 
     @Test
     fun `play is in every game menu and drawn in none of them`() {
-        listOf(true, false).forEach { direct ->
-            listOf(true, false).forEach { shelf ->
-                val where = "direct=$direct shelf=$shelf"
-                val items = gameContextMenuItems(game(), state(directLaunch = direct), 1, shelf, null)
+        listOf(true, false).forEach { shelf ->
+            run {
+                val where = "shelf=$shelf"
+                val items = gameContextMenuItems(game(), state(), 1, shelf, null)
                 val play = items.firstOrNull { it.action == "play" }
                 assertTrue("$where: no play entry left to dispatch by id", play != null)
                 assertTrue("$where: Play is drawn in the menu", play!!.hidden)
@@ -360,12 +358,10 @@ class ContextMenusTest {
 
     @Test
     fun `view game details is offered either way`() {
-        listOf(true, false).forEach { direct ->
-            assertTrue(
-                "direct=$direct",
-                "game_details" in ids(gameContextMenuItems(game(), state(directLaunch = direct), 1, false, null)),
-            )
-        }
+        assertTrue(
+            "the menu cannot reach the game's own pages",
+            "game_details" in ids(gameContextMenuItems(game(), state(), 1, false, null)),
+        )
     }
 
     @Test

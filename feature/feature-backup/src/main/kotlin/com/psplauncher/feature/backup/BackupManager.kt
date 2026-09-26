@@ -555,7 +555,6 @@ open class BackupManager @Inject constructor(
 
         booleanPreferencesKey("artwork_crop_preview_enabled"),
 
-            booleanPreferencesKey("pref_direct_game_launch"),
 
             booleanPreferencesKey("artwork_import_move_files"),
             booleanPreferencesKey("pref_dl_manuals"),

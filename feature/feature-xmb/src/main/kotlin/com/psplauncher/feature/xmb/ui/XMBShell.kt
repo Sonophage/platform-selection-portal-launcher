@@ -690,7 +690,6 @@ fun XMBShell(
                     content = uiState.hoverPanelContent,
                     page = uiState.effectivePanelPage,
                     listState = recentsListState,
-                    directLaunch = uiState.directLaunch,
                     filter = uiState.recentFilter,
                     railVisible = uiState.recentRailVisible,
                     onPageTapped = onPanelPageTapped,

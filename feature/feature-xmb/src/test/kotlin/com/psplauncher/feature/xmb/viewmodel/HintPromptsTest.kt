@@ -18,7 +18,6 @@ class HintPromptsTest {
     private fun state(
         items: List<XMBItem> = listOf(XMBItem(id = "g", title = "All Games", type = XMBItemType.ALL_GAMES)),
         selected: Int = 0,
-        directLaunch: Boolean = true,
         menu: XMBContextMenu? = null,
 
         drilled: String? = null,
@@ -31,7 +30,6 @@ class HintPromptsTest {
         ),
         currentItems = items,
         selectedItemIndex = selected,
-        directLaunch = directLaunch,
         activeContextMenu = menu,
         selectedPlatformId = drilled,
     )
@@ -47,8 +45,7 @@ class HintPromptsTest {
     @Test
     fun `a game's verb follows direct launch, because that setting IS the question`() {
         val game = listOf(XMBItem(id = "1", title = "Crisis Core", gameId = 1L))
-        assertEquals("Play", promptsFor(state(items = game, directLaunch = true)).primary?.verb)
-        assertEquals("Details", promptsFor(state(items = game, directLaunch = false)).primary?.verb)
+        assertEquals("Play", promptsFor(state(items = game)).primary?.verb)
     }
 
     @Test

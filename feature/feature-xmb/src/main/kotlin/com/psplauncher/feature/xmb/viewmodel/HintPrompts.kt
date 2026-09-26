@@ -10,9 +10,9 @@ data class XmbPrompts(
     val right: List<XmbPrompt>,
 )
 
-internal fun primaryVerbFor(item: XMBItem?, directLaunch: Boolean): String? = when {
+internal fun primaryVerbFor(item: XMBItem?): String? = when {
     item == null || item.type == XMBItemType.EMPTY -> null
-    item.gameId != null -> if (directLaunch) "Play" else "Details"
+    item.gameId != null -> "Play"
     item.type == XMBItemType.MUSIC_TRACK -> "Play"
     item.type == XMBItemType.VIDEO_FILE -> "Play"
     item.type == XMBItemType.LIBRARY_BOOK -> "Read"
@@ -51,7 +51,7 @@ fun promptsFor(state: XMBUiState): XmbPrompts {
 
     state.activeContextMenu?.let { menu ->
         val row = menu.selectedIndex?.let { state.menuRows().getOrNull(it) }
-        val primaryVerb = primaryVerbFor(focused, state.directLaunch)
+        val primaryVerb = primaryVerbFor(focused)
         return XmbPrompts(
             primary = when {
                 row != null -> XmbPrompt(GamepadAction.SELECT, "Select", row.label)
@@ -75,7 +75,7 @@ fun promptsFor(state: XMBUiState): XmbPrompts {
     }
 
     return XmbPrompts(
-        primary = primaryVerbFor(focused, state.directLaunch)?.let {
+        primary = primaryVerbFor(focused)?.let {
             XmbPrompt(GamepadAction.SELECT, it, focused?.title)
         },
 

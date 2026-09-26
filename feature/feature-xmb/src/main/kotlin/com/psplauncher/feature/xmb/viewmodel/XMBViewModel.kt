@@ -542,7 +542,6 @@ data class XMBUiState(
 
     val activeGameDiscId: Long? = null,
 
-    val directLaunch: Boolean = false,
     val activeAppId: Long? = null,
 
     val activeAppCollectionCategoryId: String = BuiltInCategory.GAMES,
@@ -1239,7 +1238,6 @@ class XMBViewModel @Inject constructor(
     private val iconDisplayPreferences: com.psplauncher.core.data.repository.IconDisplayPreferences,
     private val artworkStore: com.psplauncher.feature.artwork.store.ArtworkStore,
     private val artworkAccent: com.psplauncher.core.data.repository.ArtworkAccent,
-    private val gameLaunchPreferences: com.psplauncher.core.data.repository.GameLaunchPreferences,
     private val windowsLibrarySetup: com.psplauncher.core.data.repository.WindowsLibrarySetup,
     private val pcShortcutImporter: com.psplauncher.feature.launcher.PcShortcutImporter,
     private val pcGameScanner: com.psplauncher.feature.settings.pc.PcGameScanner,
@@ -6475,16 +6473,11 @@ class XMBViewModel @Inject constructor(
 
         val silentRow = item?.id in setOf(NO_GAMES_ITEM_ID, EMPTY_COLLECTION_ITEM_ID, EMPTY_CATEGORY_ITEM_ID)
 
-        val opensGameDetail = item?.gameId != null && item.isRealGame
-        val launches = if (opensGameDetail) {
-            _uiState.value.directLaunch
-        } else {
-            item?.launchIntentUri != null ||
-                (item?.shortcutId != null && item.packageName != null) ||
-                item?.packageName != null
-        }
+        val launchesGame = item?.gameId != null && item.isRealGame
+        val launches = item?.launchIntentUri != null ||
+            (item?.shortcutId != null && item.packageName != null) ||
+            item?.packageName != null
 
-        val launchesGame = opensGameDetail && _uiState.value.directLaunch
         val event = when {
             silentRow -> null
             launchesGame -> null
@@ -6584,11 +6577,7 @@ class XMBViewModel @Inject constructor(
         }
 
         if (item?.gameId != null && item.isRealGame) {
-            if (_uiState.value.directLaunch) {
-                launchGameDirectly(item.gameId)
-            } else {
-                _uiState.update { it.copy(activeGameId = item.gameId, activeGameAutoLaunch = false) }
-            }
+            launchGameDirectly(item.gameId)
             return
         }
 
@@ -7655,11 +7644,6 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch {
             iconDisplayPreferences.lingerDelaySecondsFlow.collect { seconds ->
                 icon1LingerMs = (seconds * 1_000f).toLong()
-            }
-        }
-        viewModelScope.launch {
-            gameLaunchPreferences.directLaunchFlow.collect { direct ->
-                _uiState.update { it.copy(directLaunch = direct) }
             }
         }
     }

@@ -57,8 +57,6 @@ fun LastPlayedPage(
     page: DetailPanelPage,
     listState: LazyListState,
 
-    directLaunch: Boolean,
-
     filter: RecentFilter,
 
     railVisible: Boolean,

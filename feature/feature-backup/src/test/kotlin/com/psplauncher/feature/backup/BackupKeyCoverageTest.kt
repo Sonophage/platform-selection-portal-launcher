@@ -66,7 +66,6 @@ class BackupKeyCoverageTest {
     @Test
     fun `launch and artwork behaviour is backed up`() {
         assertCovered(
-            "pref_direct_game_launch",
             "artwork_import_move_files",
             "pref_dl_manuals",
             "pref_dl_video_snaps",
