@@ -539,7 +539,7 @@ data class XMBUiState(
     val pendingDrawerAction: GamepadAction? = null,
 
     val pendingDrawerTypedChar: String? = null,
-    val isFetchingArtwork: Boolean = false,
+    val artworkFetchTitle: String? = null,
 
     val artworkStudioGameId: Long? = null,
 
@@ -6788,14 +6788,14 @@ class XMBViewModel @Inject constructor(
 
     private fun fetchArtworkFor(gameId: Long) {
         closeContextMenu()
-        if (_uiState.value.isFetchingArtwork) return
+        if (_uiState.value.artworkFetchTitle != null) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isFetchingArtwork = true) }
             val before = gameRepository.getById(gameId)
+            _uiState.update { it.copy(artworkFetchTitle = before?.displayTitle ?: "this game") }
             val result = artworkRepository.fetchArtworkForGame(gameId, before?.title.orEmpty())
             val updated = gameRepository.getById(gameId)
             artworkRepository.evictFromImageCache((artRefsOf(before) + artRefsOf(updated)).toSet())
-            _uiState.update { it.copy(isFetchingArtwork = false) }
+            _uiState.update { it.copy(artworkFetchTitle = null) }
             SystemToasts.post(
                 when {
                     result.success -> "Artwork updated"

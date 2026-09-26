@@ -998,7 +998,12 @@ fun XMBShell(
                 )
             }
 
+            val busyActivity = uiState.artworkFetchTitle?.let {
+                StripLiveActivity(art = null, title = "Refreshing artwork", detail = it)
+            }
+
             val liveActivity = flash?.let { StripLiveActivity(art = null, title = it.title, detail = it.message) }
+                ?: busyActivity
                 ?: musicActivity
                 ?: (notifications.size + androidNotices.size)
                     .takeIf { it > 0 }
