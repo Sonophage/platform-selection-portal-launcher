@@ -21,7 +21,8 @@ import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.components.PspContextMenuOverlay
-import com.psplauncher.core.ui.components.PspMenuRow
+import com.psplauncher.core.ui.components.MenuRow
+import com.psplauncher.core.ui.components.MenuState
 import com.psplauncher.feature.settings.viewmodel.LogsSettingsViewModel
 import timber.log.Timber
 import java.io.File
@@ -39,7 +40,7 @@ fun LogsSettingsScreen(
 
     var menuFor by remember { mutableStateOf<String?>(null) }
     var menuIndex by remember { mutableIntStateOf(0) }
-    val menuRows = listOf(PspMenuRow("Share"))
+    val menuRows = listOf(MenuRow("share", "Share"))
 
     Box(modifier = modifier) {
     SettingsPageScaffold(
@@ -109,9 +110,7 @@ fun LogsSettingsScreen(
 
     menuFor?.let { name ->
         PspContextMenuOverlay(
-            title          = name,
-            rows           = menuRows,
-            selectedIndex  = menuIndex,
+            state          = MenuState(name, menuRows, selectedIndex = menuIndex),
             onRowActivated = { index ->
                 if (index == 0) shareLogFile(context, name)
                 menuFor = null

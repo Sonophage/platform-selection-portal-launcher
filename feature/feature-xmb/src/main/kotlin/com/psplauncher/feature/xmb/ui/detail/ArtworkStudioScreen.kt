@@ -1123,11 +1123,13 @@ internal fun ArtworkStudioContent(
         if (state.actionsOpen && !state.showFileInfo) {
             val menuActions = state.availableActions
             com.psplauncher.core.ui.components.PspContextMenuOverlay(
-                title = STUDIO_TABS[state.tabIndex].label,
-                rows = menuActions.map {
-                    com.psplauncher.core.ui.components.PspMenuRow(it.label, isDestructive = it == StudioAction.CLEAR)
-                },
-                selectedIndex = state.resolvedActionsIndex,
+                state = com.psplauncher.core.ui.components.MenuState(
+                    title = STUDIO_TABS[state.tabIndex].label,
+                    rows = menuActions.map {
+                        com.psplauncher.core.ui.components.MenuRow(it, it.label, isDestructive = it == StudioAction.CLEAR, confirms = false)
+                    },
+                    selectedIndex = state.resolvedActionsIndex,
+                ),
                 onRowActivated = { index -> menuActions.getOrNull(index)?.let(actions::runAction) },
                 onDismiss = actions::closeActions,
 
@@ -1137,11 +1139,13 @@ internal fun ArtworkStudioContent(
 
         state.confirmPrompt?.let { prompt ->
             com.psplauncher.core.ui.components.PspContextMenuOverlay(
-                title = prompt.title,
-                rows = prompt.rows.map {
-                    com.psplauncher.core.ui.components.PspMenuRow(it.label, isDestructive = it.isDestructive)
-                },
-                selectedIndex = prompt.selectedIndex,
+                state = com.psplauncher.core.ui.components.MenuState(
+                    title = prompt.title,
+                    rows = prompt.rows.map {
+                        com.psplauncher.core.ui.components.MenuRow(it, it.label, isDestructive = it.isDestructive, confirms = false)
+                    },
+                    selectedIndex = prompt.selectedIndex,
+                ),
                 onRowActivated = actions::resolveConfirm,
                 onDismiss = actions::dismissConfirm,
                 scrim = Color(0xA6000000),
@@ -1151,11 +1155,13 @@ internal fun ArtworkStudioContent(
         if (state.leavePromptOpen) {
             val waiting = state.selection.size + state.removals.size
             com.psplauncher.core.ui.components.PspContextMenuOverlay(
-                title = if (waiting == 1) "1 change not applied" else "$waiting changes not applied",
-                rows = StudioLeaveChoice.entries.map {
-                    com.psplauncher.core.ui.components.PspMenuRow(it.label, isDestructive = it == StudioLeaveChoice.DISCARD)
-                },
-                selectedIndex = state.leavePromptIndex,
+                state = com.psplauncher.core.ui.components.MenuState(
+                    title = if (waiting == 1) "1 change not applied" else "$waiting changes not applied",
+                    rows = StudioLeaveChoice.entries.map {
+                        com.psplauncher.core.ui.components.MenuRow(it, it.label, isDestructive = it == StudioLeaveChoice.DISCARD, confirms = false)
+                    },
+                    selectedIndex = state.leavePromptIndex,
+                ),
                 onRowActivated = { index -> actions.resolveLeavePrompt(StudioLeaveChoice.entries[index]) },
                 onDismiss = { actions.resolveLeavePrompt(StudioLeaveChoice.STAY) },
                 scrim = Color(0xA6000000),
@@ -1244,21 +1250,25 @@ internal fun ArtworkStudioContent(
             if (state.cropOptionsOpen) {
                 val currentShape = CropShapeChoice.of(state.cropProfileOverride)
                 com.psplauncher.core.ui.components.PspContextMenuOverlay(
-                    title = "CROP OPTIONS",
-                    rows = state.cropOptionRows.map { row ->
-                        val shape = row.shape
-                        if (shape == null) {
-                            com.psplauncher.core.ui.components.PspMenuRow(
-                                if (state.cropPreviewEnabled) "Live Preview: On" else "Live Preview: Off",
-                            )
-                        } else {
-                            com.psplauncher.core.ui.components.PspMenuRow(
-                                "Shape: ${shape.label}",
-                                checked = shape == currentShape,
-                            )
-                        }
-                    },
-                    selectedIndex = state.cropOptionsIndex,
+                    state = com.psplauncher.core.ui.components.MenuState(
+                        title = "CROP OPTIONS",
+                        rows = state.cropOptionRows.map { row ->
+                            val shape = row.shape
+                            if (shape == null) {
+                                com.psplauncher.core.ui.components.MenuRow(
+                                    row,
+                                    if (state.cropPreviewEnabled) "Live Preview: On" else "Live Preview: Off",
+                                )
+                            } else {
+                                com.psplauncher.core.ui.components.MenuRow(
+                                    row,
+                                    "Shape: ${shape.label}",
+                                    checked = shape == currentShape,
+                                )
+                            }
+                        },
+                        selectedIndex = state.cropOptionsIndex,
+                    ),
                     onRowActivated = actions::activateCropOption,
                     onDismiss = actions::closeCropOptions,
                     scrim = Color(0xA6000000),

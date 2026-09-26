@@ -72,7 +72,6 @@ import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursor
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.core.ui.components.PspContextMenuOverlay
-import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.feature.xmb.video.VideoPlayerScreen
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
@@ -227,15 +226,8 @@ fun VideoDetailScreen(
 
         if (state.showOptions) {
             PspContextMenuOverlay(
-                title = "Options",
-                rows = state.optionsActions.map { action ->
-                    val label = if (action == VideoDetailAction.FAVORITE) {
-                        if (video.isFavorite) "Remove from Favorites" else "Add to Favorites"
-                    } else action.label
-                    PspMenuRow(label)
-                },
-                selectedIndex = state.optionsIndex,
-                onRowActivated = { viewModel.activate(state.optionsActions[it]) },
+                state = state.optionsMenu,
+                onRowActivated = viewModel::onOptionRowActivated,
                 onDismiss = viewModel::closeOptions,
             )
         }

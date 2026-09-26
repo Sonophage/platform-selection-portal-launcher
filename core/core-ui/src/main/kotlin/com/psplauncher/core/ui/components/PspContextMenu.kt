@@ -41,15 +41,6 @@ import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 
-data class PspMenuRow(
-    val label: String,
-    val isDestructive: Boolean = false,
-
-    val checked: Boolean = false,
-
-    val opensSubmenu: Boolean = false,
-)
-
 const val NoMenuSelection = -1
 
 private val TextDropShadow = Shadow(
@@ -59,18 +50,18 @@ private val TextDropShadow = Shadow(
 )
 
 @Composable
-fun PspContextMenuOverlay(
-    title: String,
-    rows: List<PspMenuRow>,
-    selectedIndex: Int,
+fun <T> PspContextMenuOverlay(
+    state: MenuState<T>,
     onRowActivated: (index: Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 
-    subtitle: String? = null,
-
     scrim: Color = XmbScrim,
 ) {
+    val title = state.title
+    val subtitle = state.subtitle
+    val rows = state.rowsShown()
+    val selectedIndex = state.selectedIndex ?: NoMenuSelection
     val listState = rememberLazyListState()
 
     LaunchedEffect(selectedIndex) {
@@ -258,18 +249,15 @@ private val RailDestructive = Color(0xFFE2606A)
 @Composable
 fun PspContextMenuPreview() {
     val rows = listOf(
-        PspMenuRow("Play"),
-        PspMenuRow("Information"),
-        PspMenuRow("Add to Favorites", checked = true),
-        PspMenuRow("Settings", opensSubmenu = true),
-        PspMenuRow("Remove From Library", isDestructive = true),
+        MenuRow("play", "Play"),
+        MenuRow("info", "Information"),
+        MenuRow("fav", "Add to Favorites", checked = true),
+        MenuRow<String>(null, "Settings", MenuGroup.SETTINGS, opensSubmenu = true),
+        MenuRow("remove", "Remove From Library", isDestructive = true),
     )
     PfpPreview {
         PspContextMenuOverlay(
-            title = "Gran Turismo 4",
-            subtitle = "Library",
-            rows = rows,
-            selectedIndex = 1,
+            state = MenuState("Gran Turismo 4", rows, subtitle = "Library", selectedIndex = 1),
             onRowActivated = {},
             onDismiss = {},
         )

@@ -14,6 +14,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.psplauncher.core.ui.components.moved
+import com.psplauncher.core.ui.components.back
+import com.psplauncher.core.ui.components.chose
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.MenuSelect
+import com.psplauncher.core.ui.components.MenuRow
+import com.psplauncher.core.ui.components.MenuGroup
 
 private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
 
@@ -35,12 +42,12 @@ enum class AppFilter(val label: String, val subtitle: String) {
     }
 }
 
-enum class AppMenuAction(val label: String) {
-    ADD_TO_CROSS_BAR("Add to Cross Bar"),
-    APP_INFO("App Info"),
-    MARK_GAME("Mark as Game"),
-    UNMARK_GAME("Unmark as Game"),
-    UNINSTALL("Uninstall"),
+enum class AppMenuAction(val label: String, val group: MenuGroup) {
+    ADD_TO_CROSS_BAR("Add to Cross Bar", MenuGroup.MAIN),
+    APP_INFO("App Info", MenuGroup.SETTINGS),
+    MARK_GAME("Mark as Game", MenuGroup.LIBRARY),
+    UNMARK_GAME("Unmark as Game", MenuGroup.LIBRARY),
+    UNINSTALL("Uninstall", MenuGroup.REMOVE),
 }
 
 data class AppDrawerUiState(
@@ -59,7 +66,7 @@ data class AppDrawerUiState(
     val hasUsageAccess: Boolean = false,
 
     val menuApp: InstalledApp? = null,
-    val menuIndex: Int = 0,
+    val appMenu: MenuState<AppMenuAction>? = null,
 
     val confirmUninstall: InstalledApp? = null,
 
@@ -83,6 +90,20 @@ data class AppDrawerUiState(
             add(if (menuAppIsGame) AppMenuAction.UNMARK_GAME else AppMenuAction.MARK_GAME)
             if (menuApp?.isSystemApp == false) add(AppMenuAction.UNINSTALL)
         }
+
+    internal fun menuStateFor(app: InstalledApp): MenuState<AppMenuAction> = MenuState(
+        title = app.label,
+        rows = menuActions.map {
+            MenuRow(
+                action = it,
+                label = it.label,
+                group = it.group,
+                isDestructive = it == AppMenuAction.UNINSTALL,
+                confirms = false,
+            )
+        },
+        selectedIndex = 0,
+    )
 }
 
 @HiltViewModel
@@ -163,7 +184,7 @@ class AppDrawerViewModel @Inject constructor(
 
     fun openAppMenu(app: InstalledApp) {
         menuSound.play(MenuSound.SELECT)
-        _uiState.update { it.copy(menuApp = app, menuIndex = 0, menuAppIsGame = false) }
+        _uiState.update { it.copy(menuApp = app, menuAppIsGame = false).let { s -> s.copy(appMenu = s.menuStateFor(app)) } }
 
         viewModelScope.launch {
             val entry = gameRepository.getAppEntry(app.packageName)
@@ -181,7 +202,24 @@ class AppDrawerViewModel @Inject constructor(
         openAppMenu(app)
     }
 
-    fun closeAppMenu() = _uiState.update { it.copy(menuApp = null) }
+    fun closeAppMenu() = _uiState.update { it.copy(menuApp = null, appMenu = null) }
+
+    private fun moveAppMenu(delta: Int) = _uiState.update { s ->
+        s.copy(appMenu = s.appMenu?.moved(delta))
+    }
+
+    private fun backOutOfAppMenu() {
+        val parent = _uiState.value.appMenu?.back()
+        if (parent == null) closeAppMenu() else _uiState.update { it.copy(appMenu = parent) }
+    }
+
+    fun onMenuRowActivated(index: Int) {
+        when (val chosen = _uiState.value.appMenu?.chose(index)) {
+            is MenuSelect.Replace -> _uiState.update { it.copy(appMenu = chosen.state) }
+            is MenuSelect.Run -> onMenuAction(chosen.action)
+            else -> Unit
+        }
+    }
 
     fun onMenuAction(action: AppMenuAction) {
         val app = _uiState.value.menuApp ?: return
@@ -262,11 +300,11 @@ class AppDrawerViewModel @Inject constructor(
 
             if (actions.isEmpty()) return
             when (action) {
-                GamepadAction.NAVIGATE_UP   -> _uiState.update { s -> s.copy(menuIndex = (s.menuIndex - 1 + actions.size) % actions.size) }
-                GamepadAction.NAVIGATE_DOWN -> _uiState.update { s -> s.copy(menuIndex = (s.menuIndex + 1) % actions.size) }
-                GamepadAction.SELECT        -> onMenuAction(actions[state.menuIndex.coerceIn(0, actions.size - 1)])
+                GamepadAction.NAVIGATE_UP   -> moveAppMenu(-1)
+                GamepadAction.NAVIGATE_DOWN -> moveAppMenu(+1)
+                GamepadAction.SELECT        -> onMenuRowActivated(state.appMenu?.selectedIndex ?: 0)
 
-                GamepadAction.BACK               -> closeAppMenu()
+                GamepadAction.BACK               -> backOutOfAppMenu()
                 GamepadAction.OPEN_CONTEXT_MENU  -> closeAppMenu()
                 GamepadAction.CHANGE_SORT        -> closeAppMenu()
                 else -> Unit

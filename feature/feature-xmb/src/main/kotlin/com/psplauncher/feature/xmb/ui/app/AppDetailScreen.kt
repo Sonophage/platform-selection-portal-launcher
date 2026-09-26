@@ -70,7 +70,6 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.core.ui.components.PspContextMenuOverlay
-import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.feature.xmb.ui.collection.CollectionPickerPanel
 import com.psplauncher.feature.xmb.ui.detail.ArtworkType
 import com.psplauncher.feature.xmb.ui.detail.displayLabel
@@ -174,20 +173,16 @@ fun AppDetailScreen(
         overlay = {
         AnimatedVisibility(state.showOptions, enter = fadeIn(), exit = fadeOut()) {
             PspContextMenuOverlay(
-                title = "Options",
-                rows = AppDetailOption.OPTIONS_MENU.map { PspMenuRow(it.label, it.isDestructive) },
-                selectedIndex = state.optionsIndex,
-                onRowActivated = { viewModel.activateOption(AppDetailOption.OPTIONS_MENU[it]) },
+                state = AppDetailOption.menu("Options", AppDetailOption.OPTIONS_MENU, state.optionsIndex),
+                onRowActivated = { viewModel.onMenuRowActivated(AppDetailOption.OPTIONS_MENU, it) },
                 onDismiss = viewModel::closeMenus,
             )
         }
 
         AnimatedVisibility(state.showArtworkMenu, enter = fadeIn(), exit = fadeOut()) {
             PspContextMenuOverlay(
-                title = "Artwork",
-                rows = AppDetailOption.ARTWORK_MENU.map { PspMenuRow(it.label, it.isDestructive) },
-                selectedIndex = state.optionsIndex,
-                onRowActivated = { viewModel.activateOption(AppDetailOption.ARTWORK_MENU[it]) },
+                state = AppDetailOption.menu("Artwork", AppDetailOption.ARTWORK_MENU, state.optionsIndex),
+                onRowActivated = { viewModel.onMenuRowActivated(AppDetailOption.ARTWORK_MENU, it) },
                 onDismiss = viewModel::closeMenus,
             )
         }
