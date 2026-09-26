@@ -87,29 +87,36 @@ letter rail sit under the shell's bar, and `SearchScreen` puts its own bar in a 
 
 **The rule is: reserve the bottom band when the bar is drawn over you, not when it is beside you.**
 
-### 5. Two test holes — HALF
+### 5. Two test holes — DONE
 
-- `LetterJumpTest`'s `returnIndex` assertion — **CLOSED.** The fixture now opens at
-  `anchors[cRung].index + 1` and an `assertNotEquals` keeps the two values apart, so the assertion
-  can fail. It was comparing a value to itself.
-- `promptedKeys` derived from `kbLabels` — **OPEN.** `kbLabels` has 14 entries;
-  `KeyboardPromptsAreBoundTest.promptedKeys` hand-lists 11. Unchecked: `DPAD_ALL`, `START`,
-  `SYSTEM`. The hole is exactly where the bug is: `START` prints "F1", there is no `KEYCODE_F1` in
-  `DEFAULT_BINDINGS`, and `GamepadAction.HOME` — the Apply verb in four pickers — is bound to
-  `KEYCODE_BUTTON_START` and nothing else. **Deriving the map will turn this test red, which is
-  the correct outcome**: the keyboard footer currently tells you to press a key that does nothing.
+- `LetterJumpTest`'s `returnIndex` assertion — closed earlier; it had been comparing a value to
+  itself.
+- `promptedKeys` derived from `kbLabels` — **closed, and it found a live bug.**
+
+The hand-written list was 11 positions against a label table of 14, so three were never checked.
+It is now derived from the label table itself, and what it reported was real:
+
+**`START` printed "F1" and F1 was bound to nothing.** `GamepadAction.HOME` had exactly one
+binding, `KEYCODE_BUTTON_START` — so the four pickers that prompt it (Game, App, Music Track,
+Artwork Studio) drew "F1 Apply" / "F1 Add" at a key that did nothing, and **Apply was gamepad-only
+on a machine with no gamepad**. `KEYCODE_F1` is now bound to `HOME`; it types no character, so it
+costs no keystroke.
+
+**`SYSTEM` prints "Home" and is bound on no input at all** — `KEYCODE_BUTTON_MODE` appears in no
+binding and no prompt anywhere asks for the position. That is dead weight rather than a lie told
+to a keyboard user, so it is exempted — by a rule that **un-exempts itself**: the exemption is
+computed as "positions no input reaches", so the moment anything binds it, it drops out and the
+test goes red if the keyboard still cannot get there.
+
+Two derivation mistakes were made getting here and both are recorded in the test: treating "has no
+gamepad position" as "is a keyboard key" reported all four arrow keys unreachable (a keyboard
+sends them as `KEYCODE_DPAD_*`, which ARE gamepad positions), and the composite `DPAD_ALL` — the
+"◀▶" glyph, which no keycode resolves to in any family — had to be named as a legend rather than
+a key.
 
 ```sh
-# Count ENTRIES, not lines: kbLabels puts two per line, so `grep -c` says 8 where it is 14.
-F=core/core-ui/src/test/kotlin/com/psplauncher/core/ui/components/KeyboardPromptsAreBoundTest.kt
-sed -n '/val promptedKeys/,/^    )/p' "$F" | grep -o 'ControllerIcon\.[A-Z_]*' | sort -u | wc -l   # 11
-sed -n '/val kbLabels/,/^)/p' core/core-ui/src/main/kotlin/com/psplauncher/core/ui/components/ControllerButtonGlyph.kt \
-  | grep -o 'ControllerIcon\.[A-Z_]*' | sort -u | wc -l                                            # 14
+./gradlew :core:core-ui:testDebugUnitTest --tests '*KeyboardPromptsAreBound*'
 ```
-
----
-
-## Open
 
 ### 6. One action-language for the action menus — MOSTLY DONE
 

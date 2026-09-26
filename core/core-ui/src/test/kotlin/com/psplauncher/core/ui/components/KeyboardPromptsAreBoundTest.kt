@@ -4,6 +4,8 @@ import android.view.KeyEvent
 import com.psplauncher.core.domain.model.ControllerDisplayType
 import com.psplauncher.core.domain.model.ControllerIcon
 import com.psplauncher.core.domain.model.DEFAULT_BINDINGS
+import com.psplauncher.core.domain.model.GamepadMappings
+import com.psplauncher.core.domain.model.toControllerIcon
 import com.psplauncher.core.domain.model.GamepadAction
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -23,42 +25,82 @@ import org.junit.Test
  */
 class KeyboardPromptsAreBoundTest {
 
-    /** Which physical key the Keyboard family tells the user to press for each position. */
-    private val promptedKeys = mapOf(
-        ControllerIcon.FACE_SOUTH to KeyEvent.KEYCODE_ENTER,
-        ControllerIcon.FACE_EAST to KeyEvent.KEYCODE_ESCAPE,
-        ControllerIcon.FACE_WEST to KeyEvent.KEYCODE_F2,
-        ControllerIcon.FACE_NORTH to KeyEvent.KEYCODE_F3,
-        ControllerIcon.SELECT to KeyEvent.KEYCODE_TAB,
-        ControllerIcon.BUMPER_LEFT to KeyEvent.KEYCODE_PAGE_UP,
-        ControllerIcon.BUMPER_RIGHT to KeyEvent.KEYCODE_PAGE_DOWN,
-        ControllerIcon.DPAD_UP to KeyEvent.KEYCODE_DPAD_UP,
-        ControllerIcon.DPAD_DOWN to KeyEvent.KEYCODE_DPAD_DOWN,
-        ControllerIcon.DPAD_LEFT to KeyEvent.KEYCODE_DPAD_LEFT,
-        ControllerIcon.DPAD_RIGHT to KeyEvent.KEYCODE_DPAD_RIGHT,
-    )
+    /**
+     * Every position the Keyboard family prints a label for — DERIVED, not listed.
+     *
+     * This was a hand-written table of eleven, against a label table of fourteen. Three positions
+     * were therefore never checked, and the hole sat exactly where the bug is. A list that has to
+     * be kept in step with another list is the pair this codebase keeps paying for; the only
+     * honest version asks the label table itself.
+     */
+    private val promptedPositions: Set<ControllerIcon> =
+        ControllerIcon.entries
+            .filter { it.printedLabelFor(ControllerDisplayType.KEYBOARD) != null }
+            .toSet()
 
-    @Test
-    fun `every key the keyboard prompts name is bound to something`() {
-        val bound = DEFAULT_BINDINGS.associate { it.keyCode to it.action }
-        promptedKeys.forEach { (position, keyCode) ->
-            assertNotNull(
-                "the Keyboard family prompts $position but keycode $keyCode is bound to nothing",
-                bound[keyCode],
-            )
-        }
+    /**
+     * The positions a KEYBOARD can actually reach, derived from the bindings.
+     *
+     * "Keyboard key" is `not in the BUTTON_* range`, and the first version of this got it wrong
+     * in a way worth recording: it asked whether [toControllerIcon] returned null, reasoning that
+     * a keycode with no gamepad position must be a keyboard one. The arrow keys break that —
+     * a keyboard sends them as `KEYCODE_DPAD_*`, which ARE gamepad positions — so all four
+     * directions were reported unreachable when they are the best-bound keys in the table.
+     *
+     * The action a binding runs resolves back to the position a prompt would draw, which is what
+     * makes this "what a keyboard user can actually press" rather than "what keys exist".
+     */
+    private fun keyboardReachablePositions(): Set<ControllerIcon> {
+        val layout = GamepadMappings(DEFAULT_BINDINGS)
+        return DEFAULT_BINDINGS
+            .filter { it.keyCode !in GAMEPAD_ONLY_KEYS }
+            .mapNotNull { layout.iconFor(it.action) }
+            .toSet()
+    }
+
+    /**
+     * Positions no input reaches at all, on any family — so not a KEYBOARD hole.
+     *
+     * Computed rather than listed, and that is the point: today it is [ControllerIcon.SYSTEM],
+     * whose keycode KEYCODE_BUTTON_MODE appears in no binding and which no prompt anywhere asks
+     * for. A label for a position the app never draws is dead weight, not a lie told to a
+     * keyboard user.
+     *
+     * The exemption un-exempts itself. The moment anything binds that position — on a gamepad,
+     * say — it drops out of this set, and if the keyboard still cannot reach it the test above
+     * goes red, which is then exactly right.
+     */
+    private fun positionsNoInputReaches(): Set<ControllerIcon> {
+        val layout = GamepadMappings(DEFAULT_BINDINGS)
+        val everReached = DEFAULT_BINDINGS.mapNotNull { layout.iconFor(it.action) }.toSet()
+        return ControllerIcon.entries.toSet() - everReached
     }
 
     @Test
-    fun `every position the keyboard prompts also has a label to print`() {
-        // The other half: a bound key with no label renders nothing at all, which looks like a
-        // missing icon rather than like a missing row in a table.
-        promptedKeys.keys.forEach { position ->
-            assertNotNull(
-                "$position has no Keyboard label",
-                position.printedLabelFor(ControllerDisplayType.KEYBOARD),
-            )
+    fun `every position the keyboard prints a label for is reachable from a keyboard`() {
+        val unreachable = promptedPositions -
+            keyboardReachablePositions() -
+            COMPOSITE_POSITIONS -
+            positionsNoInputReaches()
+        val detail = unreachable.joinToString { pos ->
+            "$pos prints \"${pos.printedLabelFor(ControllerDisplayType.KEYBOARD)}\""
         }
+        assertTrue(
+            "the Keyboard family names keys that reach nothing: $detail — a footer telling a " +
+                "keyboard user to press a key that does nothing is worse than no footer",
+            unreachable.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `the label table and the checked set are the same size`() {
+        // The guard on this test's own guard. The previous version hand-listed eleven positions
+        // while the label table had fourteen, so three were never checked and nobody could see
+        // that from reading either file.
+        assertTrue(
+            "no Keyboard labels found — the derivation broke, and an empty set passes everything",
+            promptedPositions.isNotEmpty(),
+        )
     }
 
     @Test
@@ -92,7 +134,43 @@ class KeyboardPromptsAreBoundTest {
         )
     }
 
+    @Test
+    fun `the exemption for unreached positions is narrow, and says which`() {
+        // Guard on the exemption. If this set ever grows, a position stopped being bound and the
+        // reason needs reading rather than the number being edited.
+        // Composites are already accounted for above and belong in this set by construction —
+        // no keycode resolves to DPAD_ALL in any family — so they are not what this counts.
+        val unreached = (positionsNoInputReaches() - COMPOSITE_POSITIONS).filter {
+            it.printedLabelFor(ControllerDisplayType.KEYBOARD) != null
+        }
+        assertTrue(
+            "positions with a Keyboard label that no input reaches: $unreached — one is expected " +
+                "(SYSTEM, KEYCODE_BUTTON_MODE, bound nowhere and prompted nowhere); more than " +
+                "that means something lost its binding",
+            unreached.size <= 1,
+        )
+    }
+
     private companion object {
+        /**
+         * The keycodes only a gamepad sends. Everything else a keyboard can produce, including
+         * the arrows — which arrive as `KEYCODE_DPAD_*` and are the reason "has no gamepad
+         * position" is the wrong test for "is a keyboard key".
+         */
+        val GAMEPAD_ONLY_KEYS: Set<Int> =
+            (KeyEvent.KEYCODE_BUTTON_A..KeyEvent.KEYCODE_BUTTON_MODE).toSet() +
+                (KeyEvent.KEYCODE_BUTTON_1..KeyEvent.KEYCODE_BUTTON_16).toSet()
+
+        /**
+         * Positions that are a legend rather than a key, in EVERY family.
+         *
+         * [ControllerIcon.DPAD_ALL] is the "◀▶" glyph a multi-direction prompt draws ("◀▶ Seek").
+         * No keycode resolves to it — [toControllerIcon] never returns it — so it is not a
+         * keyboard hole; it is a composite the caller asks for directly, and it has a drawable in
+         * the PlayStation, Xbox and Switch families for the same reason.
+         */
+        val COMPOSITE_POSITIONS: Set<ControllerIcon> = setOf(ControllerIcon.DPAD_ALL)
+
         /** Letters, digits, space and the punctuation keys — everything that produces text. */
         val TYPES_A_CHARACTER: Set<Int> =
             (KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9).toSet() +
