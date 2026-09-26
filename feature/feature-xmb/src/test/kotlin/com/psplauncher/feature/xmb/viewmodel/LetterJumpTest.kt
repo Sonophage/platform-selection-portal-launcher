@@ -1,5 +1,9 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.ui.components.LETTER_JUMP_MIN_ITEMS
+import com.psplauncher.core.ui.components.at
+import com.psplauncher.core.ui.components.move
+import com.psplauncher.core.ui.components.initialOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
@@ -100,11 +104,11 @@ class LetterJumpTest {
     }
 
     @Test
-    fun `a finger at each end of the rail lands on each end rung`() {
+    fun `a rung the rail could not have drawn clamps instead of throwing`() {
         val state = letterJumpFor(alphabetical(40), currentIndex = 20)!!
-        assertEquals("top of the rail is the first rung", 0, state.atFraction(0f).cursor)
-        assertEquals("bottom of the rail is the last", state.anchors.lastIndex, state.atFraction(1f).cursor)
-        assertEquals("out of range clamps rather than throwing", 0, state.atFraction(-5f).cursor)
+        assertEquals("the first rung is reachable", 0, state.at(0).cursor)
+        assertEquals("the last rung is reachable", state.anchors.lastIndex, state.at(999).cursor)
+        assertEquals("a negative rung clamps rather than throwing", 0, state.at(-5).cursor)
     }
 
     @Test

@@ -21,6 +21,10 @@ import com.psplauncher.core.ui.components.MenuState
 import com.psplauncher.core.ui.components.MenuSelect
 import com.psplauncher.core.ui.components.MenuRow
 import com.psplauncher.core.ui.components.MenuGroup
+import com.psplauncher.core.ui.components.LetterJumpState
+import com.psplauncher.core.ui.components.at
+import com.psplauncher.core.ui.components.letterJumpFor
+import com.psplauncher.core.ui.components.move
 
 private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
 
@@ -78,10 +82,14 @@ data class AppDrawerUiState(
 
     val sectionListRows: Int = SECTION_LIST_ROWS,
 
+    val letterJump: LetterJumpState? = null,
+
 ) {
     val visibleApps: List<InstalledApp> get() = sectionApps + otherApps
 
     val sectionRowCount: Int get() = sectionApps.size
+
+    val gridIndex: Int get() = (selectedIndex - sectionRowCount).coerceAtLeast(0)
 
     val menuActions: List<AppMenuAction>
         get() = buildList {
@@ -139,12 +147,12 @@ class AppDrawerViewModel @Inject constructor(
 
     fun setFilter(filter: AppFilter) {
         if (filter != _uiState.value.activeFilter) menuSound.play(MenuSound.SYSTEM_BROWSE)
-        _uiState.update { it.copy(activeFilter = filter, selectedIndex = 0) }
+        _uiState.update { it.copy(activeFilter = filter, selectedIndex = 0, letterJump = null) }
         applyFilter()
     }
 
     fun setSearchQuery(query: String) {
-        _uiState.update { it.copy(searchQuery = query, selectedIndex = 0) }
+        _uiState.update { it.copy(searchQuery = query, selectedIndex = 0, letterJump = null) }
         applyFilter()
     }
 
@@ -279,8 +287,62 @@ class AppDrawerViewModel @Inject constructor(
         appRepository.openUsageAccessSettings()
     }
 
+    fun openLetterJump() {
+        val state = _uiState.value
+        if (state.menuApp != null || state.confirmUninstall != null || state.letterJump != null) return
+        val rail = letterJumpFor(state.otherApps.map { it.label }, state.gridIndex) ?: return
+        landOn(rail)
+    }
+
+    fun closeLetterJump() = _uiState.update { it.copy(letterJump = null) }
+
+    fun onLetterRailTouch(rung: Int) {
+        val state = _uiState.value
+        if (state.menuApp != null || state.confirmUninstall != null) return
+        val rail = state.letterJump
+            ?: letterJumpFor(state.otherApps.map { it.label }, state.gridIndex) ?: return
+        val next = rail.at(rung)
+        if (next === rail && state.letterJump != null) return
+        landOn(next)
+    }
+
+    fun onLetterRailReleased() = closeLetterJump()
+
+    private fun moveLetterJump(delta: Int) {
+        val rail = _uiState.value.letterJump ?: return
+        val next = rail.move(delta)
+        if (next === rail) return
+        landOn(next)
+    }
+
+    private fun landOn(rail: LetterJumpState) {
+        menuSound.play(MenuSound.SCROLL)
+        _uiState.update {
+            it.copy(
+                letterJump = rail,
+                selectedIndex = it.sectionRowCount + rail.targetIndex,
+                usingTouch = false,
+            )
+        }
+    }
+
     fun handleGamepadAction(action: GamepadAction) {
         val state = _uiState.value
+
+        state.letterJump?.let { rail ->
+            when (action) {
+                GamepadAction.NAVIGATE_LEFT  -> moveLetterJump(-1)
+                GamepadAction.NAVIGATE_RIGHT -> moveLetterJump(+1)
+                GamepadAction.BACK -> _uiState.update {
+                    it.copy(
+                        letterJump = null,
+                        selectedIndex = it.sectionRowCount + rail.returnIndex,
+                    )
+                }
+                else -> Unit
+            }
+            return
+        }
 
         state.confirmUninstall?.let {
             when (action) {
@@ -374,6 +436,6 @@ class AppDrawerViewModel @Inject constructor(
             .filter { app -> !state.activeFilter.matches(app) }
             .filter { app -> query.isEmpty() || app.label.lowercase().contains(query) }
 
-        _uiState.update { it.copy(sectionApps = filtered, otherApps = rest, filterCounts = counts) }
+        _uiState.update { it.copy(sectionApps = filtered, otherApps = rest, filterCounts = counts, letterJump = null) }
     }
 }

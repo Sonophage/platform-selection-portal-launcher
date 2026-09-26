@@ -59,6 +59,7 @@ import com.psplauncher.feature.appbar.appdrawer.AppDrawerHeader
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHintBar
 import com.psplauncher.feature.appbar.appdrawer.UninstallConfirmDialog
 import com.psplauncher.core.ui.components.rowsShown
+import com.psplauncher.core.ui.components.XmbLetterBar
 
 @OptIn(ExperimentalComposeUiApi::class)
 
@@ -82,6 +83,8 @@ fun AppDrawerScreen(
 
     showControllerHint: Boolean = false,
 
+    letterRailHeld: Boolean = false,
+
     onTouchInteraction: () -> Unit = {},
 
     onAddToCrossBar: (String) -> Unit = {},
@@ -96,7 +99,8 @@ fun AppDrawerScreen(
 
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null) {
-            val overlayOpen = state.menuApp != null || state.confirmUninstall != null || searchActive
+            val overlayOpen = state.menuApp != null || state.confirmUninstall != null ||
+                searchActive || state.letterJump != null
             when {
                 searchActive && pendingGamepadAction == GamepadAction.BACK -> {
                     searchActive = false
@@ -120,6 +124,10 @@ fun AppDrawerScreen(
             }
             onGamepadActionConsumed()
         }
+    }
+
+    LaunchedEffect(letterRailHeld) {
+        if (letterRailHeld) viewModel.openLetterJump() else viewModel.closeLetterJump()
     }
 
     LaunchedEffect(typedChar) {
@@ -201,6 +209,8 @@ fun AppDrawerScreen(
             }
             viewModel.onMenuAction(action)
         },
+            onLetterRailTouch = viewModel::onLetterRailTouch,
+        onLetterRailReleased = viewModel::onLetterRailReleased,
         onCloseMenu = { viewModel.closeAppMenu() },
         onConfirmUninstall = { viewModel.confirmUninstall() },
         onCancelUninstall = { viewModel.cancelUninstall() },
@@ -231,6 +241,9 @@ internal fun AppDrawerContent(
     onGrantUsageAccess: () -> Unit,
     modifier: Modifier = Modifier,
     onMenuRowActivated: (Int) -> Unit = {},
+
+    onLetterRailTouch: (Int) -> Unit = {},
+    onLetterRailReleased: () -> Unit = {},
 
     onPromptTapped: ((GamepadAction) -> Unit)? = null,
 
@@ -321,6 +334,15 @@ internal fun AppDrawerContent(
                         )
                     }
                 }
+            }
+
+            if (state.sectionRowCount > 0) {
+                XmbLetterBar(
+                    titles = remember(state.otherApps) { state.otherApps.map { it.label } },
+                    cursor = state.letterJump?.cursor,
+                    onTouch = onLetterRailTouch,
+                    onReleased = onLetterRailReleased,
+                )
             }
 
             val hintAlpha by animateFloatAsState(

@@ -242,7 +242,7 @@ private val RailPadEnd = 4.dp
 private val RailPadV = 4.dp
 private val RailGap = 10.dp
 private val RailMaxText = 300.dp
-private val RailInk = Color(0xFF1A0C03)
+internal val RailInk = Color(0xFF1A0C03)
 private val RailDestructive = Color(0xFFE2606A)
 
 @CombinedPreviews

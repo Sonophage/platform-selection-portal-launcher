@@ -91,6 +91,9 @@ import com.psplauncher.feature.library.scanner.ScanStatus
 import com.psplauncher.feature.library.scanner.scanOutcomeMessage
 import com.psplauncher.feature.xmb.R
 import com.psplauncher.feature.xmb.gamepad.GamepadInputHandler
+import com.psplauncher.core.ui.components.LetterJumpState
+import com.psplauncher.core.ui.components.at
+import com.psplauncher.core.ui.components.move
 import com.psplauncher.feature.xmb.gamepad.ShoulderHold
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -542,6 +545,8 @@ data class XMBUiState(
     val pendingSettingsAction: GamepadAction? = null,
     val activeAppDrawerFilter: String? = null,
     val pendingDrawerAction: GamepadAction? = null,
+
+    val drawerLetterRailHeld: Boolean = false,
 
     val pendingDrawerTypedChar: String? = null,
     val artworkFetchTitle: String? = null,
@@ -4431,6 +4436,10 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch {
             gamepadInputHandler.shoulderHolds.collect { hold ->
                 onUserInteraction()
+                if (_uiState.value.activeAppDrawerFilter != null) {
+                    _uiState.update { it.copy(drawerLetterRailHeld = hold is ShoulderHold.Start) }
+                    return@collect
+                }
                 when (hold) {
                     is ShoulderHold.Start -> openLetterJump()
 
@@ -4459,7 +4468,7 @@ class XMBViewModel @Inject constructor(
         _uiState.update { it.copy(letterJump = next, selectedItemIndex = next.targetIndex) }
     }
 
-    fun onLetterRailTouch(fraction: Float) {
+    fun onLetterRailTouch(rung: Int) {
         onUserInteraction()
         val s = _uiState.value
 
@@ -4469,7 +4478,7 @@ class XMBViewModel @Inject constructor(
                 _uiState.update { it.copy(letterJump = raised) }
             }
             ?: return
-        val next = rail.atFraction(fraction)
+        val next = rail.at(rung)
         if (next === rail) return
         menuSound.play(MenuSound.SCROLL)
         _uiState.update { it.copy(letterJump = next, selectedItemIndex = next.targetIndex) }
@@ -7213,7 +7222,7 @@ class XMBViewModel @Inject constructor(
     }
 
     fun onCloseAppDrawer() {
-        _uiState.update { it.copy(activeAppDrawerFilter = null, pendingDrawerAction = null, pendingDrawerTypedChar = null) }
+        _uiState.update { it.copy(activeAppDrawerFilter = null, pendingDrawerAction = null, pendingDrawerTypedChar = null, drawerLetterRailHeld = false) }
     }
 
     fun consumeDrawerAction() {

@@ -86,6 +86,7 @@ import com.psplauncher.core.ui.components.PspContextMenuOverlay
 import com.psplauncher.core.ui.components.HintBarHeight
 import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.components.DiscLaunchCeremony
+import com.psplauncher.core.ui.components.XmbLetterRail
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.preview.DevicePreviews
 import com.psplauncher.core.ui.preview.PfpPreview
@@ -366,7 +367,7 @@ fun XMBShell(
 
     onAddAppToOpenCategory: (String) -> Unit = {},
 
-    onLetterRailTouch: (Float) -> Unit = {},
+    onLetterRailTouch: (Int) -> Unit = {},
     onLetterRailReleased: () -> Unit = {},
     onDrawerActionConsumed: () -> Unit = {},
     onCloseArtworkStudio: () -> Unit = {},
@@ -1069,8 +1070,8 @@ fun XMBShell(
 
             if (uiState.stripShowsXmbContext && chromeFade > 0f) {
                 XmbLetterRail(
-                    items = uiState.currentItems,
-                    letterJump = uiState.letterJump,
+                    titles = remember(uiState.currentItems) { uiState.currentItems.map { it.title } },
+                    cursor = uiState.letterJump?.cursor,
                     onTouch = onLetterRailTouch,
                     onReleased = onLetterRailReleased,
                     modifier = Modifier
@@ -1151,6 +1152,7 @@ fun XMBShell(
                     onGamepadActionConsumed = onDrawerActionConsumed,
 
                     showControllerHint = uiState.showAppDrawerHint,
+                    letterRailHeld = uiState.drawerLetterRailHeld,
                     onPromptTapped = onPromptTapped,
 
                     onTouchInteraction = onTouchInput,
