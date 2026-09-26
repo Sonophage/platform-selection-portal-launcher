@@ -3257,7 +3257,7 @@ class XMBViewModel @Inject constructor(
      * copies would drift the moment one gained an entry.
      */
     private fun musicAddActions(): List<XMBItem> = buildList {
-        // Getting-started prompt: opens Settings → Music. Drops away once a root has been scanned
+        // Getting-started prompt: opens Settings ▸ Music. Drops away once a root has been scanned
         // (even if it found no tracks), since the root is then managed in Settings.
         if (_uiState.value.musicFolders.none { it.lastScannedAt != null }) add(addMusicFolderItem())
         add(addMusicAppsItem())
@@ -3368,8 +3368,8 @@ class XMBViewModel @Inject constructor(
 
     private fun emptyAllMusicItem(): XMBItem = XMBItem(
         id       = EMPTY_CATEGORY_ITEM_ID,
-        title    = "No music found",
-        subtitle = "Add a music folder in Settings → Music",
+        title    = "No music yet",
+        subtitle = "Add a music folder in Settings ▸ Music",
         type     = XMBItemType.EMPTY,
     )
 
@@ -3543,7 +3543,7 @@ class XMBViewModel @Inject constructor(
     )
 
     // One card per video library, drillable into its videos. The root folder is managed in
-    // Settings → Video, so there is no add row here.
+    // Settings ▸ Video, so there is no add row here.
     private fun videoLibraryItems(libraries: List<com.psplauncher.core.domain.model.VideoLibrary>): List<XMBItem> {
         val rows = libraries.map { lib ->
             XMBItem(
@@ -3559,7 +3559,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id = EMPTY_CATEGORY_ITEM_ID,
                     title = "No video libraries yet",
-                    subtitle = "Set a root folder in Settings → Video",
+                    subtitle = "Set a root folder in Settings ▸ Video",
                     type = XMBItemType.EMPTY,
                 ),
             )
@@ -3615,8 +3615,8 @@ class XMBViewModel @Inject constructor(
 
     private fun emptyAllVideosItem(): XMBItem = XMBItem(
         id       = EMPTY_CATEGORY_ITEM_ID,
-        title    = "No videos found",
-        subtitle = "Add a video library in Settings → Video",
+        title    = "No videos yet",
+        subtitle = "Add a video library in Settings ▸ Video",
         type     = XMBItemType.EMPTY,
     )
 
@@ -4192,7 +4192,7 @@ class XMBViewModel @Inject constructor(
     )
 
     // One folder card per Album, drillable into its photos. The root folder is managed in
-    // Settings → Photo, so there is no add row here.
+    // Settings ▸ Photo, so there is no add row here.
     private fun photoAlbumItems(libraries: List<com.psplauncher.core.domain.model.PhotoLibrary>): List<XMBItem> {
         val rows = libraries.map { lib ->
             XMBItem(
@@ -4207,7 +4207,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id = EMPTY_CATEGORY_ITEM_ID,
                     title = "No albums yet",
-                    subtitle = "Set a root folder in Settings → Photo",
+                    subtitle = "Set a root folder in Settings ▸ Photo",
                     type = XMBItemType.EMPTY,
                 ),
             )
@@ -4237,7 +4237,7 @@ class XMBViewModel @Inject constructor(
 
     private fun emptyAllPhotosItem(): XMBItem = XMBItem(
         id       = EMPTY_CATEGORY_ITEM_ID,
-        title    = "No photos found",
+        title    = "No photos yet",
         subtitle = "Add a photo library and scan it",
         type     = XMBItemType.EMPTY,
     )
@@ -4245,7 +4245,7 @@ class XMBViewModel @Inject constructor(
     private fun emptyLibraryPhotosItem(): XMBItem = XMBItem(
         id       = EMPTY_CATEGORY_ITEM_ID,
         title    = "No photos in this album",
-        subtitle = "Scan it from its ⚙ Options menu or in Settings → Photo",
+        subtitle = "Scan it from its ⚙ Options menu or in Settings ▸ Photo",
         type     = XMBItemType.EMPTY,
     )
 
@@ -5347,7 +5347,7 @@ class XMBViewModel @Inject constructor(
     }
 
     // Music folder context-menu actions, dispatched from activateContextMenuItem. Folder management
-    // now lives in Settings → Music; this is retained for the scan/enable/remove paths it backs.
+    // now lives in Settings ▸ Music; this is retained for the scan/enable/remove paths it backs.
     private fun handleMusicFolderAction(folderId: String, itemId: String) {
         when (itemId) {
             "scan_folder" -> scanMusicFolder(folderId)
@@ -9456,7 +9456,7 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    // Bridge from Library Settings → the shared installed-app picker. Closes the settings overlay
+    // Bridge from Library Settings ▸ the shared installed-app picker. Closes the settings overlay
     // and opens the same picker the XMB Android card uses, so apps are added the one way.
     fun openAndroidLibraryPicker() {
         _uiState.update { it.copy(activeSettingsScreen = null, pendingSettingsAction = null) }

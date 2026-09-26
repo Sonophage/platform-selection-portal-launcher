@@ -1375,8 +1375,7 @@ abstract class PFPDatabase : RoomDatabase() {
          * Drops `unmatched_roms`.
          *
          * The table, its entity and its DAO were declared and then never used: nothing wrote a
-         * row and nothing read one, and the Settings screen its comment promised ("Settings →
-         * Library → Unmatched ROMs") does not exist. The scanner's own `UnmatchedRom` is a
+         * row and nothing read one, and the Settings screen its comment promised ("Settings ▸ * Library → Unmatched ROMs") does not exist. The scanner's own `UnmatchedRom` is a
          * different, live type — a result it hands back in memory — and is untouched by this.
          *
          * A real DROP rather than the retire-in-place that ScanTombstoneEntity got. That one is

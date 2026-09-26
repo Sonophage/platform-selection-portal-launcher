@@ -49,7 +49,7 @@ class MusicIntentResolver @Inject constructor(
             intent = buildIntent(track, defaultPlayerPackage),
             chooserTitle = "Play music with…",
             noHandlerMessage =
-                "No music player could open this track. Install a player or pick one in Settings → Music.",
+                "No music player could open this track. Install a player or pick one in Settings ▸ Music.",
             logLabel = "music track \"${track.displayTitle}\"",
         )
 

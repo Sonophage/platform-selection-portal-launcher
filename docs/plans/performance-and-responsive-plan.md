@@ -232,6 +232,17 @@ a single app-wide delegate (`core/core-data/.../datastore/PFPDataStore.kt`), so 
 it an injectable scope, not patching the test. Until then the honest options are to accept a known
 flake or to stop the test depending on a real file at all.
 
+**More evidence, 2026-09-25:** the flake moved to a SIBLING —
+`DisplaySettingsViewModelGameBootTest > a fresh install shows the toggle on and turning it off
+persists` timed out at the same 60s, with `UncompletedCoroutinesError: the test body did not run
+to completion`. That is the diagnosis confirming itself: the race belongs to DataStore, not to one
+test, so it surfaces wherever the load lands.
+
+It also exposed an inconsistency: only `FontColorTest` was passing `io = dispatcher`. The other
+three classes still built the ViewModel with the real `Dispatchers.IO`, so the partial improvement
+was never applied to them. All four now inject it. **This does not make them deterministic** — it
+removes the ViewModel's half of the race and leaves DataStore's.
+
 The lesson worth keeping: **`./gradlew test --rerun` does not re-run the suite.** It forces only
 the requested task, and it reported 2719 green while 180 of 309 result files were 85 minutes old.
 Use `--rerun-tasks`, and check the result files' ages before believing a green run.

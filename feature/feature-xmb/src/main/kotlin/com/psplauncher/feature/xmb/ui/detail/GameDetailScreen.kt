@@ -909,7 +909,11 @@ internal fun gameDetailHelperItems(state: GameDetailUiState): List<ControllerPro
         listOf(
             ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Navigate"),
             ControllerPromptItem(GamepadAction.SELECT, "Choose"),
-            ControllerPromptItem(GamepadAction.BACK, "Cancel"),
+            // Close, not Cancel: closeEmulatorPicker() only hides the panel, and a pick has
+            // already written through setPreferredEmulator by the time B is pressed. There is
+            // nothing pending to abandon — which is why the collection picker beside it, and the
+            // playlist picker on VideoDetailScreen, both say Close for the same shape.
+            ControllerPromptItem(GamepadAction.BACK, "Close"),
         )
     state.collectionPicker.visible ->
         listOf(

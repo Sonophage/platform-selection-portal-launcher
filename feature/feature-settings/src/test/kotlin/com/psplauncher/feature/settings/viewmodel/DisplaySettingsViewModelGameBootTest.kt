@@ -56,6 +56,11 @@ class DisplaySettingsViewModelGameBootTest {
                     com.psplauncher.core.domain.model.ControllerLayoutPrefs()
                 )
             },
+            // The disk work runs on the TEST scheduler, not a real pool — the same injection
+            // FontColorTest takes, and for the same reason. It does NOT make these tests
+            // deterministic on its own: DataStore keeps its own scope and threads, which is the
+            // race that still makes this class flaky under load. It removes the ViewModel's half.
+            io = dispatcher,
         )
     }
 

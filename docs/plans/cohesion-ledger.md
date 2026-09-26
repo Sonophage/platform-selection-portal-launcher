@@ -202,19 +202,50 @@ title-cases those elsewhere — `Play / Pause`, `Apply / Toggle`, `Expand / Coll
 grep -rhoE 'ControllerPromptItem\([^,]+,\s*"[a-z][^"]*"' --include="*.kt" feature/ core/   # expects: no output
 ```
 
-### 10. One B label per kind of dismissal — OPEN
+### 10. One B label per kind of dismissal — DONE, and it was four words for four meanings
 
-Four in use: "Back", "Close", "Cancel", plus lowercase "back"/"close" in the Studio (item 9).
-"Apps" at the crossbar root is documented and defensible; the other three are not.
+The item read as four labels for one job. Read against the call sites it is one rule, already in
+force, and the rule is about what pressing B COSTS:
 
-### 11. One empty-state grammar — OPEN
+- **Back** — you leave the page. Nothing dismissed, nothing abandoned. ("Apps" at the crossbar
+  root is the documented exception: there B opens the drawer rather than going anywhere.)
+- **Close** — an overlay goes away and it already did whatever it does.
+- **Cancel** — something is PENDING and B abandons it.
+- **Done** — you were editing, it applied as you went, and you are finished. ("Close" would be
+  true and would read as though the work were being thrown away.)
 
-Three forms for the same event:
-- `XMBViewModel.kt:3341 / 3588 / 4210` — "No X found"
-- `LibrarySearch.kt:34-50` — "No X yet", with a concrete next step
-- `XmbNotificationBar.kt:183` — a third form
+`VideoDetailScreen` follows it exactly across five states. `GameDetailScreen` follows it across
+nine — **with one violation**, now fixed: its emulator picker said "Cancel" while its own
+collection picker and the video page's playlist picker said "Close" for the identical shape, and
+`closeEmulatorPicker()` reverts nothing.
 
-Videos has both of the first two, in two different files.
+The rule was tacit. It is now written where the prompts are built (`ControllerPrompt.kt`), so the
+next person choosing a word has something to choose against.
+
+### 11. One empty-state grammar — DONE, and the two forms mean two things
+
+Listed as three competing forms. Two of them are a real distinction the app mostly kept:
+
+- **"No X yet"** — nothing has been ADDED. Pairs with a hint saying how ("Set a root folder in
+  Settings ▸ Media ▸ Music").
+- **"No X found"** — a search or a scan came back empty. Something was looked for.
+- **"No matches"** — a QUERY matched nothing, which is a third thing and correctly its own words.
+
+Four genuine violations, all in the same direction — "found" where nothing was searched:
+`XMBViewModel`'s `emptyAllMusicItem`, `emptyAllVideosItem` and `emptyAllPhotosItem` each said
+"No X found" under a subtitle reading "Add a … folder in Settings", while `LibrarySearch` already
+said "No X yet" for the identical state. `AppDrawerScreen` said "No games found" three lines above
+its own "No recently used apps yet". All four now say "yet".
+
+Every surviving "found" is a real lookup: a remote scrape, a folder scan, a core scan, a launcher
+scan.
+
+**Bonus, found on the way**: the same breadcrumb was written with three different arrows —
+`▸` (63), `→` (19), `>` (6). User-facing strings are now all `▸`; the remainder are comments.
+
+```sh
+grep -rn '"[^"]*Settings →' --include="*.kt" feature/ core/ | grep -v build   # expects: no output
+```
 
 ### 12. Five App Drawer empty strings live in two files — DONE, by deletion
 
@@ -227,17 +258,34 @@ constant whose last reader it was — a better answer than keeping two copies in
 grep -rn "StorefrontAppDrawer" --include="*.kt" . | grep -v build   # expects: no output
 ```
 
-### 13. Named type sizes — OPEN
+### 13. Named type sizes — NOT A CLEANUP. Do not do it as written.
 
-26 distinct `.sp` literals across 68 files. The back chevron is 16sp on the detail page and 18sp in
-two others; a list row title is 15sp, 16sp and 18/22sp in three places; a section heading is 9sp,
-11sp and 13sp.
+The item says "26 distinct `.sp` literals across 68 files", scoped to "six named sizes". Both
+halves are wrong in a way that matters.
 
-Scope deliberately bounded: **six named sizes in core-ui and the twenty highest-traffic call
-sites**, not all 68 files.
+**The count conflates three properties.** Of the `.sp` literals, 334 are `fontSize`, 19 are
+`lineHeight` and 8 are `letterSpacing` — and every one of the sub-5sp values the count treated as
+a tiny font size (`0.8`, `1`, `1.4`, `1.6`, `2`, `2.4`) is letter spacing. There are about 24
+distinct font sizes, not 26 of anything.
+
+**And collapsing them is a redesign, not a rename.** The sizes are a smooth ramp:
+
+| size | uses | | size | uses |
+|---|---|---|---|---|
+| 12sp | 105 | | 15sp | 32 |
+| 13sp | 47 | | 10sp | 24 |
+| 14sp | 45 | | 16sp | 15 |
+| 11sp | 43 | | 18sp | 13 |
+
+Six names cannot hold twenty-four values without changing about 150 call sites' actual appearance
+— merging 13 and 14 alone moves 92 of them. That is a typographic pass someone should decide to
+do, not a tidy-up that falls out of naming things.
+
+**What is worth doing**: name the eight sizes that carry 89% of the usage and adopt them in new
+code. Retrofitting the existing 334 call sites buys nothing until the ramp itself is a decision.
 
 ```sh
-grep -rho "[0-9]\+\.sp" --include="*.kt" feature/ core/ | sort -u | wc -l
+grep -rhoE "fontSize\s*=\s*[0-9]+(\.[0-9]+)?\.sp" --include="*.kt" feature/ core/ | sort | uniq -c | sort -rn
 ```
 
 ### 14. Four tab treatments — OPEN
