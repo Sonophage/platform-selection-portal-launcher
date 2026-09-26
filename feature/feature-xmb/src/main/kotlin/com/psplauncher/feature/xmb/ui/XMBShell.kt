@@ -1365,6 +1365,44 @@ fun XMBShell(
                 )
             }
 
+            uiState.artworkStudioGameId?.let { gameId ->
+                ArtworkStudioScreen(
+                    gameId = gameId,
+                    onClose = onCloseArtworkStudio,
+                    pendingGamepadAction = uiState.pendingArtworkStudioAction,
+                    onGamepadActionConsumed = onArtworkStudioActionConsumed,
+                    showTouchControls = uiState.resolvedShowTouchButton,
+                    onTouchInput = onTouchInput,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            uiState.manualViewer?.let { manual ->
+                ManualViewerOverlay(
+                    source = manual.uri,
+                    title = manual.title,
+                    page = manual.page,
+                    scrollSteps = manual.scrollSteps,
+                    onPageCount = onManualPageCount,
+                    onPrevPage = onManualPrevPage,
+                    onNextPage = onManualNextPage,
+                    onClose = onCloseManual,
+                )
+            }
+
+            uiState.metadataPreview?.let { preview ->
+                MetadataPreviewPanel(
+                    ui = preview,
+                    focusFill = menuCursorFill(),
+                    focusEdge = menuCursorEdge(),
+                    onSelectPolicy = onMetadataPolicy,
+                    onCycleSource = onMetadataSource,
+                    onToggleField = onMetadataField,
+                    onApply = onMetadataApply,
+                    onClose = onCloseMetadata,
+                )
+            }
+
             uiState.activeAppId?.let { appId ->
                 AppDetailScreen(
                     gameId = appId,
