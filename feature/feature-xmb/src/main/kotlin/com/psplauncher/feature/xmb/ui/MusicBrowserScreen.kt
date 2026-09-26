@@ -27,7 +27,6 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +52,10 @@ import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import com.psplauncher.core.ui.theme.deriveStorefrontColors
+import com.psplauncher.core.ui.components.PfpSearchField
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
 
 // Resolved per theme rather than fixed white: on a pale scheme the selected row was the
 // brightest thing on an already bright wallpaper. See PFPTheme.
@@ -82,6 +85,11 @@ fun MusicBrowserScreen(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    // The field is never auto-focused here — the browser is for reading, not typing —
+    // but PfpSearchField needs a requester to own, and tapping it still focuses.
+    val searchFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val sf = deriveStorefrontColors()
     LaunchedEffect(state.selectedIndex, state.scrollToTopToken) {
         if (state.rows.isNotEmpty()) {
             val target = (state.selectedIndex - 1).coerceIn(0, state.rows.lastIndex)
@@ -137,24 +145,25 @@ fun MusicBrowserScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // Always-visible search bar.
-            OutlinedTextField(
-                value = state.query,
-                onValueChange = onQueryChange,
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = SecondaryText) },
-                placeholder = { Text("Search", color = SecondaryText.copy(alpha = 0.7f)) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = PrimaryText,
-                    unfocusedTextColor = PrimaryText,
-                    focusedBorderColor = menuCursorEdge(),
-                    unfocusedBorderColor = Color(0x33FFFFFF),
-                    cursorColor = menuCursorEdge(),
-                    focusedContainerColor = Color(0x22FFFFFF),
-                    unfocusedContainerColor = Color(0x14FFFFFF),
-                ),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth(),
+            // The shared field, and this one had the bug it exists to prevent.
+            //
+            // It passed a plain String to OutlinedTextField, which leaves the selection at 0
+            // while text arrives around it — so a query seeded from outside the field takes every
+            // character after it at position zero: type C then L and the box reads "lc".
+            // PfpSearchField carries a TextFieldValue with the caret pinned past the text, which
+            // is the whole reason it was extracted rather than copied a third time.
+            //
+            // `active` is true because this bar is always visible and always live; there is no
+            // closed state for it to dim into.
+            PfpSearchField(
+                query = state.query,
+                active = true,
+                focusRequester = searchFocus,
+                placeholder = "Search",
+                onActivate = {},
+                onQueryChange = onQueryChange,
+                onDone = { keyboard?.hide() },
+                colors = sf,
             )
 
             Spacer(Modifier.height(12.dp))

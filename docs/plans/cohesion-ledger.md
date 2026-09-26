@@ -153,23 +153,23 @@ grep -rl "PspContextMenuOverlay" --include="*.kt" . | grep -v Test   # the one p
 grep -rl "XmbRailCapsule\|ContextMenuOverlay" --include="*.kt" .    # the rail, still separate
 ```
 
-### 7. One search field — OPEN
+### 7. One search field — DONE
 
-`PfpSearchField` (40dp pill) has **two** adopters — `AppDrawerHeader` and `AppPickerScreen`.
-(An earlier count said three; that was a grep on the NAME, which also matches the import in
-`MusicTrackPicker`. Matching the CALL, `PfpSearchField(`, gives two.)
+`PfpSearchField` has four callers now: `AppDrawerHeader`, `AppPickerScreen`, `SearchScreen` and
+`MusicBrowserScreen`. No screen rolls its own search box.
 
-Two search boxes still roll their own `OutlinedTextField`: `SearchScreen.kt:205` and
-`MusicBrowserScreen.kt:145`.
+**`MusicBrowserScreen` had the bug the component exists to prevent.** It passed a plain `String`
+to `OutlinedTextField`, which leaves the selection at 0 while text arrives around it — so a query
+seeded from outside the field takes every character after it at position zero, and typing C then L
+reads "lc". `SearchScreen` had its own fix for the same thing; `PfpSearchField`'s header already
+named both screens as having learned it separately.
 
-Three further `OutlinedTextField`s in feature-xmb are **not** search and are not part of this
-item: `AppDetailScreen.kt:547` ("Display Name"), `GameDetailScreen.kt:1067` ("Note") and `:1115`
-("Display Title") are labelled editors. If a shared component is ever wanted for those it is a
-different one.
+Three `OutlinedTextField`s remain in feature-xmb and are **not** search: "Display Name", "Note"
+and "Display Title" are labelled editors, a different component's job.
 
 ```sh
-grep -rl "PfpSearchField(" --include="*.kt" feature/ core/ | grep -v Test   # adopters (2 + the file itself)
-grep -rn "OutlinedTextField(" --include="*.kt" feature/feature-xmb/src/main # 2 search + 3 editors
+grep -rl "PfpSearchField(" --include="*.kt" feature/ core/ | grep -v Test     # 4 callers + the file
+grep -rn "OutlinedTextField(" --include="*.kt" feature/feature-xmb/src/main   # 3 editors, 0 search
 ```
 
 ### 8. One placeholder grammar — NOT A DEFECT, closed
@@ -288,16 +288,47 @@ code. Retrofitting the existing 334 call sites buys nothing until the ramp itsel
 grep -rhoE "fontSize\s*=\s*[0-9]+(\.[0-9]+)?\.sp" --include="*.kt" feature/ core/ | sort | uniq -c | sort -rn
 ```
 
-### 14. Four tab treatments — OPEN
+### 14. Four tab treatments — THREE, and the rule is the surface
 
-Four visual answers to "pick one of these views": the App Drawer's filter row, the game detail
-page's tabs, the Artwork Studio's tabs, and the detail pills row.
+One of the four is not a tab treatment. The "detail pills row" is
+`PillActions.kt`, whose own header calls it "a short row of ACTIONS" — Details, Favorite, Open
+with, Collection — each dispatching a context-menu id. It picks no view.
 
-### 15. The subtitle slot does four jobs — OPEN
+The three that do pick a view already follow a rule, and it is the SURFACE they sit on:
 
-In the Music column the first row's subtitle is a count ("3966 tracks") and the two beneath it are
-instructions ("Browse by who made it" / "Browse by release") — same slot, same column, two
-grammars stacked. The counts exist; the Artists screen prints them.
+| row | look | sits on |
+|---|---|---|
+| App Drawer filter row | text + animated 2dp accent underline, no fill | the screen's own chrome |
+| `DetailPanelStrip` | soft capsule of light on the current, bare labels either side | over artwork |
+| Artwork Studio destinations | accent-filled chip with a border, scrolling, LB/RB at both ends | over a media scrim |
+
+**Underline on chrome, filled shape over media** — and the reason is written at
+`DetailPanelStrip`: a filled shape stays readable "over artwork it does not control", which an
+underline does not.
+
+What is genuinely left is narrow: the capsule and the chip are two filled looks for the same
+situation. Converging them changes the appearance of one of them, and the Studio's follows an
+approved mock — so it is a design decision, not a cleanup.
+
+### 15. The subtitle slot does four jobs — REAL, and gated on the data layer
+
+The slot carries counts ("3966 tracks"), instructions ("Browse by who made it"), status
+("Now Playing · artist") and content lists ("Recently Watched, Favorites & Playlists").
+
+The inconsistency is narrower than "four jobs" and it is inside ONE column. Photo, Video and Books
+use counts throughout. **Music does not**: Songs says a count, while Artists, Albums and Playlists
+say what the row is for. The counts exist — the Artists screen prints them.
+
+**It is not a string edit.** `musicRootSections()` is a pure extension on `XMBUiState` and sees
+only folder rows carrying a pre-aggregated `trackCount`; it has no track list. An artist count is
+worse than a lookup: `artistGroups()` counts MEMBERSHIPS, not tracks, because a duet is one track
+and two rows, and it needs the solo-credit evidence pass to split joint credits at all. Albums and
+Playlists are cheaper, but doing those two and not Artists puts a new inconsistency inside the
+same column.
+
+**What it needs:** artist / album / playlist counts pre-aggregated in the data layer beside
+`trackCount`, so the column builder stays pure. Then all four rows say how many, like every other
+media column.
 
 ### 16. The status strip's centre is unlabelled — OPEN
 
@@ -361,20 +392,18 @@ Unmeasured; nothing here is verified yet.
 The Titan Elite's keyboard reports `KEYBOARD | TOUCH | TOUCH_MT` on `sub_touch`. Owner wants it
 usable for swipe gestures. Unscoped.
 
-### N5. `XMBViewModel` is 10,925 lines
+### N6. The known-bad test — ACCEPTED, not fixed
 
-Split proposed, never written up. Proposal only — no split without a plan on the table first.
+`DisplaySettingsViewModel*Test` flakes under full-suite load, moving between classes — it has
+timed out in `FontColorTest` and in `GameBootTest`, both at the 60s wall clock. Owner's call on
+2026-09-25: **ignore it.**
 
-```sh
-wc -l feature/feature-xmb/src/main/kotlin/com/psplauncher/feature/xmb/viewmodel/XMBViewModel.kt
-```
+Recorded so nobody re-diagnoses it from scratch: the race is DataStore's, not the ViewModel's.
+All four test classes now inject the ViewModel's dispatcher, which removes half of it; `pfpDataStore`
+keeps its own scope and threads, which is the half that still bites. Raising the budget is not a
+fix — it went 10s → 60s once already and still times out.
 
-### N6. The known-bad test
-
-`DisplaySettingsViewModelFontColorTest > white raises no notice at all` times out at the 60s
-`eventually()` budget under full-suite load and passes in isolation. `xmb-redesign-handoff-3.md`
-already raised it 10s→60s and it still times out. **Raising it a third time is fitting the test to
-the machine.** It wants a deterministic dispatcher or a virtual clock.
+**It is a flake, not a red test.** One green sweep says nothing about it in either direction.
 
 ### N7. Unresolved flag
 
