@@ -102,7 +102,7 @@ class ContextMenuHintStateTest {
     fun `recomputing lowers a flag whose gate no longer holds`() {
         val stale = eligibleState().copy(
             showContextMenuHint = true,
-            activeGameId = 1L,
+            activeAppId = 1L,
         )
         assertFalse(stale.withHintsShownNow().showContextMenuHint)
     }
@@ -122,7 +122,7 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `does not show when a blocking overlay is up`() {
-        val s = eligibleState().copy(activeGameId = 1L)
+        val s = eligibleState().copy(activeAppId = 1L)
         assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
@@ -136,7 +136,7 @@ class ContextMenuHintStateTest {
     fun `a context menu on top of a REAL blocking overlay still hides it`() {
         val s = eligibleState().copy(
             activeContextMenu = XMBContextMenu(state = MenuState(title = "X", rows = emptyList())),
-            activeGameId = 1L,
+            activeAppId = 1L,
         )
         assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }

@@ -346,17 +346,6 @@ class ContextMenusTest {
     }
 
     @Test
-    fun `every deep-linked Details row names a real DetailAction`() {
-        val deepLinked = listOf("ARTWORK", "METADATA", "MANUAL", "REFRESH")
-        deepLinked.forEach { name ->
-            assertTrue(
-                "the Details submenu writes detail_$name, which DetailAction does not have",
-                com.psplauncher.feature.xmb.ui.detail.DetailAction.entries.any { it.name == name },
-            )
-        }
-    }
-
-    @Test
     fun `view game details is offered either way`() {
         assertTrue(
             "the menu cannot reach the game's own pages",

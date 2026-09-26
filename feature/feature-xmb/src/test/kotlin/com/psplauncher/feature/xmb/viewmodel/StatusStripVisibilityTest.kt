@@ -20,7 +20,6 @@ class StatusStripVisibilityTest {
             "App Drawer" to crossbar().copy(activeAppDrawerFilter = "DEFAULT"),
             "Settings" to crossbar().copy(activeSettingsScreen = "settings_display"),
             "Search" to crossbar().copy(search = SearchState(scope = SearchScope.ALL)),
-            "Game detail" to crossbar().copy(activeGameId = 1L),
             "App detail" to crossbar().copy(activeAppId = 1L),
 
             "App picker" to crossbar().copy(

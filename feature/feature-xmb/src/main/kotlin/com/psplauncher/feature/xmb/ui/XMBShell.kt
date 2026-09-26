@@ -104,7 +104,6 @@ import com.psplauncher.feature.xmb.ui.app.AppDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.ArtworkStudioScreen
 import com.psplauncher.feature.xmb.ui.detail.ManualViewerOverlay
 import com.psplauncher.feature.xmb.ui.detail.MetadataPreviewPanel
-import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.focusedPillIndex
@@ -213,7 +212,6 @@ fun XMBShellContainer(
         onLetterRailTouch = viewModel::onLetterRailTouch,
         onLetterRailReleased = viewModel::onLetterRailReleased,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
-        onCloseGameDetail = viewModel::onCloseGameDetail,
         onCloseArtworkStudio = viewModel::closeArtworkStudio,
         onArtworkStudioActionConsumed = viewModel::consumeArtworkStudioAction,
         onManualPageCount = viewModel::setManualPageCount,
@@ -227,7 +225,6 @@ fun XMBShellContainer(
         onCloseMetadata = viewModel::closeMetadataPreview,
         onOpenLibraryManager = viewModel::openLibraryManager,
         onGoToLibrary = viewModel::goToLibrary,
-        onGameDetailActionConsumed = viewModel::consumeGameDetailAction,
         onCloseVideoDetail = viewModel::onCloseVideoDetail,
         onVideoDetailActionConsumed = viewModel::consumeVideoDetailAction,
         onClosePhotoViewer = viewModel::onClosePhotoViewer,
@@ -374,7 +371,6 @@ fun XMBShell(
     onLetterRailTouch: (Float) -> Unit = {},
     onLetterRailReleased: () -> Unit = {},
     onDrawerActionConsumed: () -> Unit = {},
-    onCloseGameDetail: () -> Unit = {},
     onCloseArtworkStudio: () -> Unit = {},
     onArtworkStudioActionConsumed: () -> Unit = {},
     onManualPageCount: (Int) -> Unit = {},
@@ -388,7 +384,6 @@ fun XMBShell(
     onCloseMetadata: () -> Unit = {},
     onOpenLibraryManager: () -> Unit = {},
     onGoToLibrary: () -> Unit = {},
-    onGameDetailActionConsumed: () -> Unit = {},
     onCloseVideoDetail: () -> Unit = {},
     onVideoDetailActionConsumed: () -> Unit = {},
     onClosePhotoViewer: () -> Unit = {},
@@ -534,7 +529,7 @@ fun XMBShell(
             ) {
         Box(modifier = Modifier.fillMaxSize()) {
             val waveCovered = uiState.showBootSequence ||
-                uiState.activeVideoId != null || uiState.activeGameId != null ||
+                uiState.activeVideoId != null ||
                 uiState.activePhotoViewer != null ||
                 uiState.activeAppId != null || uiState.activeAppDrawerFilter != null ||
                 uiState.musicPlayerVisible ||
@@ -702,7 +697,6 @@ fun XMBShell(
                 uiState.musicBrowser == null &&
                 uiState.search == null &&
                 uiState.activeSettingsScreen == null &&
-                uiState.activeGameId == null &&
                 uiState.activeVideoId == null &&
                 uiState.activeAppId == null &&
                 uiState.activePhotoViewer == null &&
@@ -1380,60 +1374,6 @@ fun XMBShell(
                     pendingGamepadAction = uiState.pendingGamePickerAction,
                     onGamepadActionConsumed = onGamePickerActionConsumed,
                     modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            uiState.activeGameId?.let { gameId ->
-                GameDetailScreen(
-                    gameId = gameId,
-                    onBack = onCloseGameDetail,
-                    onNotifications = onNotificationsToggled,
-                    autoLaunch = uiState.activeGameAutoLaunch,
-                    initialAction = uiState.activeGameAction,
-                    initialDiscId = uiState.activeGameDiscId,
-                    pendingGamepadAction = uiState.pendingGameDetailAction,
-                    onGamepadActionConsumed = onGameDetailActionConsumed,
-                    showTouchControls = uiState.resolvedShowTouchButton,
-                    onTouchInput = onTouchInput,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            uiState.artworkStudioGameId?.let { gameId ->
-                ArtworkStudioScreen(
-                    gameId = gameId,
-                    onClose = onCloseArtworkStudio,
-                    pendingGamepadAction = uiState.pendingArtworkStudioAction,
-                    onGamepadActionConsumed = onArtworkStudioActionConsumed,
-                    showTouchControls = uiState.resolvedShowTouchButton,
-                    onTouchInput = onTouchInput,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            uiState.manualViewer?.let { manual ->
-                ManualViewerOverlay(
-                    source = manual.uri,
-                    title = manual.title,
-                    page = manual.page,
-                    scrollSteps = manual.scrollSteps,
-                    onPageCount = onManualPageCount,
-                    onPrevPage = onManualPrevPage,
-                    onNextPage = onManualNextPage,
-                    onClose = onCloseManual,
-                )
-            }
-
-            uiState.metadataPreview?.let { preview ->
-                MetadataPreviewPanel(
-                    ui = preview,
-                    focusFill = menuCursorFill(),
-                    focusEdge = menuCursorEdge(),
-                    onSelectPolicy = onMetadataPolicy,
-                    onCycleSource = onMetadataSource,
-                    onToggleField = onMetadataField,
-                    onApply = onMetadataApply,
-                    onClose = onCloseMetadata,
                 )
             }
 

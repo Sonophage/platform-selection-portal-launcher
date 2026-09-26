@@ -539,7 +539,6 @@ data class XMBUiState(
     val pendingDrawerAction: GamepadAction? = null,
 
     val pendingDrawerTypedChar: String? = null,
-    val pendingGameDetailAction: GamepadAction? = null,
     val isFetchingArtwork: Boolean = false,
 
     val artworkStudioGameId: Long? = null,
@@ -552,13 +551,9 @@ data class XMBUiState(
 
     val metadataPreviewGameId: Long? = null,
 
-    val activeGameId: Long? = null,
 
-    val activeGameAutoLaunch: Boolean = false,
 
-    val activeGameAction: String? = null,
 
-    val activeGameDiscId: Long? = null,
 
     val activeAppId: Long? = null,
 
@@ -797,7 +792,6 @@ data class XMBUiState(
             appPicker != null ||
             gamePickerCategoryId != null ||
             activeAppDrawerFilter != null ||
-            activeGameId != null ||
             activeAppId != null ||
             search != null
 
@@ -4782,7 +4776,7 @@ class XMBViewModel @Inject constructor(
             return
         }
 
-        if (action == GamepadAction.HOME && state.statusStripVisible && state.activeGameId == null) {
+        if (action == GamepadAction.HOME && state.statusStripVisible) {
             toggleNotifications()
             return
         }
@@ -4806,10 +4800,6 @@ class XMBViewModel @Inject constructor(
             }
             state.artworkStudioGameId != null -> {
                 _uiState.update { it.copy(pendingArtworkStudioAction = action) }
-                return
-            }
-            state.activeGameId != null -> {
-                _uiState.update { it.copy(pendingGameDetailAction = action) }
                 return
             }
             state.activeAppId != null -> {
@@ -5360,10 +5350,6 @@ class XMBViewModel @Inject constructor(
                             placeholder = "Anything you want to remember about this game",
                         ))}
                     }
-                    "open" -> _uiState.update {
-                        it.copy(activeGameId = gid, activeGameAutoLaunch = false, activeGameAction = null)
-                    }
-
                     "ARTWORK"  -> openArtworkStudio(gid)
                     "MANUAL"   -> openManualFor(gid)
                     "METADATA" -> openMetadataPreviewFor(gid)
@@ -5531,7 +5517,6 @@ class XMBViewModel @Inject constructor(
                 XMBContextMenuItem("detail_METADATA", "Update Metadata"),
                 XMBContextMenuItem("detail_MANUAL", "Manual"),
                 XMBContextMenuItem("detail_REFRESH", "Refresh Artwork"),
-                XMBContextMenuItem("detail_open", "Open Game Details"),
             )), gameId = gameId))}
     }
 
@@ -6632,7 +6617,7 @@ class XMBViewModel @Inject constructor(
         }
 
         if (item?.gameId != null) {
-            _uiState.update { it.copy(activeGameId = item.gameId) }
+            openContextMenuForFocusedItem()
             return
         }
         if (item?.platformId != null) {
@@ -6967,7 +6952,6 @@ class XMBViewModel @Inject constructor(
     private val MANUAL_MAX_SCROLL_STEPS_ = 20
 
     private fun launchGameDirectly(gameId: Long, discId: Long? = null) {
-        _uiState.update { it.copy(activeGameId = null, activeGameAutoLaunch = false, activeGameDiscId = null, activeGameAction = null) }
         viewModelScope.launch {
             val selected = gameRepository.getById(gameId) ?: run {
                 Timber.w("Direct launch requested for missing game id=$gameId")
@@ -7056,25 +7040,6 @@ class XMBViewModel @Inject constructor(
             is LaunchDispatchResult.Rejected -> Timber.w("Direct launch rejected: ${result.message}")
             LaunchDispatchResult.Accepted -> Unit
         }
-    }
-
-    fun onCloseGameDetail() {
-        _uiState.update {
-            it.copy(
-                activeGameId = null,
-                activeGameAutoLaunch = false,
-                activeGameDiscId = null,
-
-                activeGameAction = null,
-                pendingGameDetailAction = null,
-            )
-        }
-
-        loadItemsForCategory(currentCategory(), keepCursorOnRow = true)
-    }
-
-    fun consumeGameDetailAction() {
-        _uiState.update { it.copy(pendingGameDetailAction = null) }
     }
 
     private fun openAppDetail(knownGameId: Long?, packageName: String) {
