@@ -642,6 +642,12 @@ fun XMBShell(
                 glowScale = waveGlow,
             )
 
+            val chromeFade by animateFloatAsState(
+                if (uiState.activeContextMenu != null) 0f else 1f,
+                tween(ChromeFadeMs),
+                label = "chromeFade",
+            )
+
             val aboveContextRail = when {
                 uiState.activeContextMenu != null || uiState.notificationsOpen -> 1f
                 !uiState.statusStripVisible -> 0f
@@ -869,6 +875,7 @@ fun XMBShell(
                             XMBItemList(
                                 onPillActivated = onPillActivated,
                                 focusedPillIndex = focusedPillIndex,
+                                pillFade = chromeFade,
                                 items = uiState.currentItems,
                                 selectedIndex = itemSelectedIndex,
                                 onItemSelected = onItemTap,
@@ -1037,13 +1044,7 @@ fun XMBShell(
 
             val rootActionsVisible = uiState.stripShowsXmbContext && !uiState.isInSubItem
 
-            val letterRailFade by animateFloatAsState(
-                if (uiState.activeContextMenu != null) 0f else 1f,
-                tween(LetterRailFadeMs),
-                label = "letterRailFade",
-            )
-
-            if (uiState.stripShowsXmbContext && letterRailFade > 0f) {
+            if (uiState.stripShowsXmbContext && chromeFade > 0f) {
                 XmbLetterRail(
                     items = uiState.currentItems,
                     letterJump = uiState.letterJump,
@@ -1053,7 +1054,7 @@ fun XMBShell(
                         .align(Alignment.CenterEnd)
 
                         .padding(top = StatusStripHeight, bottom = HintBarHeight, end = 4.dp)
-                        .alpha(letterRailFade)
+                        .alpha(chromeFade)
                         .zIndex(XmbChromeZ),
                 )
             }
@@ -1563,5 +1564,5 @@ private const val NotificationBarZ = 0.5f
 
 private const val XmbChromeZ = 0.6f
 
-private const val LetterRailFadeMs = 160
+private const val ChromeFadeMs = 160
 
