@@ -50,7 +50,7 @@ fun promptsFor(state: XMBUiState): XmbPrompts {
     }
 
     state.activeContextMenu?.let { menu ->
-        val row = menu.selectedIndex?.let { state.railRows().getOrNull(it) }
+        val row = menu.selectedIndex?.let { state.menuRows().getOrNull(it) }
         val primaryVerb = primaryVerbFor(focused, state.directLaunch)
         return XmbPrompts(
             primary = when {

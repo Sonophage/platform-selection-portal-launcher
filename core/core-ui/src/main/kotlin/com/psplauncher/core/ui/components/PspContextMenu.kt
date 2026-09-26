@@ -46,6 +46,8 @@ data class PspMenuRow(
     val heading: String? = null,
 )
 
+const val NoMenuSelection = -1
+
 private val PanelWidth = 300.dp
 
 private val TextDropShadow = Shadow(

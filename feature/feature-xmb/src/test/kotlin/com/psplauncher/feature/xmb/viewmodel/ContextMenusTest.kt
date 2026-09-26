@@ -334,10 +334,10 @@ class ContextMenusTest {
                 val items = gameContextMenuItems(game(), state(directLaunch = direct), 1, shelf, null)
                 val play = items.firstOrNull { it.id == "play" }
                 assertTrue("$where: no play entry left to dispatch by id", play != null)
-                assertTrue("$where: Play is drawn in the rail", play!!.hidden)
+                assertTrue("$where: Play is drawn in the menu", play!!.hidden)
                 assertFalse(
-                    "$where: Play reached the rail anyway",
-                    "play" in railRows(items, pillIds = emptySet()).map { it.id },
+                    "$where: Play reached the menu anyway",
+                    "play" in menuRows(items, pillIds = emptySet()).map { it.id },
                 )
             }
         }
@@ -366,7 +366,7 @@ class ContextMenusTest {
 
     @Test
     fun `a heading belongs to a row, and every group has exactly one`() {
-        val items = gameContextMenuItems(game(), state(), 2, true, null)
+        val items = gameContextMenuItems(game(), state(), 2, true, null).inMenuOrder()
         val headings = items.mapNotNull { it.heading }
         assertEquals("a heading is repeated", headings.distinct(), headings)
         assertTrue("no groups at all", headings.isNotEmpty())
@@ -380,51 +380,22 @@ class ContextMenusTest {
 
         val all = listOf(main, shooters, category("rpgs", gaming = true))
 
-        val fromMain = gameContextMenuItems(game(), state(all, 0), 1, false, null)
+        val fromMain = gameContextMenuItems(game(), state(all, 0), 1, false, null).inMenuOrder()
         assertEquals("Category", fromMain.first { it.id == "add_category" }.heading)
 
-        val fromCustom = gameContextMenuItems(game(), state(all, 1), 1, false, null)
+        val fromCustom = gameContextMenuItems(game(), state(all, 1), 1, false, null).inMenuOrder()
         assertEquals("Category", fromCustom.first { it.id == "move_category" }.heading)
         assertEquals(null, fromCustom.first { it.id == "remove_category" }.heading)
     }
 
-    private fun rows(n: Int, headingsAt: Set<Int> = emptySet()) =
-        (0 until n).map { XMBContextMenuItem("r$it", "Row $it", heading = "G$it".takeIf { _ -> it in headingsAt }) }
-
     @Test
-    fun `a menu that fits is not collapsed`() {
-        val short = rows(CONTEXT_MENU_MAX_ROWS)
-        assertEquals(short to emptyList<XMBContextMenuItem>(), short.splitForOverflow())
-        assertEquals(short, short.withOverflowRow())
-    }
+    fun `the groups a game menu uses are the shared ones, in rank order`() {
+        val groups = gameContextMenuItems(game(), state(), 2, true, null)
+            .inMenuOrder()
+            .map { it.group }
 
-    @Test
-    fun `More costs a row of the budget, so the panel never grows`() {
-        val long = rows(20)
-        assertEquals(CONTEXT_MENU_MAX_ROWS, long.withOverflowRow().size)
-        assertEquals(MENU_MORE_ITEM_ID, long.withOverflowRow().last().id)
-    }
-
-    @Test
-    fun `the split lands on a group boundary, so no heading is stranded`() {
-        val items = rows(20, headingsAt = setOf(3, 6, 11))
-        val (visible, overflow) = items.splitForOverflow()
-        assertEquals(6, visible.size)
-        assertEquals("r6", overflow.first().id)
-        assertEquals(items.size, visible.size + overflow.size)
-    }
-
-    @Test
-    fun `with no boundary to use, it splits on the budget rather than not at all`() {
-        val (visible, overflow) = rows(20).splitForOverflow()
-        assertEquals(CONTEXT_MENU_MAX_ROWS - 1, visible.size)
-        assertEquals(20 - (CONTEXT_MENU_MAX_ROWS - 1), overflow.size)
-    }
-
-    @Test
-    fun `nothing is lost between the visible menu and More`() {
-        val items = gameContextMenuItems(game(), state(), 3, true, null)
-        val (visible, overflow) = items.splitForOverflow()
-        assertEquals(ids(items), ids(visible) + ids(overflow))
+        assertEquals("a group is split in two", groups.distinct(), groups.distinct().sortedBy { it.ordinal })
+        assertEquals("the menu does not open on its main action", MenuGroup.MAIN, groups.first())
+        assertEquals("something outranks the removals", MenuGroup.REMOVE, groups.last())
     }
 }

@@ -63,19 +63,19 @@ class PillActionsTest {
     }
 
     @Test
-    fun `the rail cannot address a pill, so a menu index cannot either`() {
+    fun `the menu cannot address a pill, so a menu index cannot either`() {
         val item    = game()
         val menu    = gameContextMenuItems(item, state(), discCount = 1, onRecentShelf = false, hideLocation = null)
         val pillIds = pillsFor(item).map { it.id }.toSet()
-        val rail    = railRows(menu, pillIds)
+        val rows    = menuRows(menu, pillIds)
 
         assertTrue(
-            "the rail drew a pill's own action: ${rail.map { it.id }.filter { it in pillIds }}",
-            rail.none { it.id in pillIds },
+            "the menu drew a pill's own action: ${rows.map { it.id }.filter { it in pillIds }}",
+            rows.none { it.id in pillIds },
         )
 
         val firstPill = pillsFor(item).first()
-        val atThatIndex = rail.getOrNull(menu.indexOfFirst { it.id == firstPill.id })?.id
+        val atThatIndex = rows.getOrNull(menu.indexOfFirst { it.id == firstPill.id })?.id
         assertTrue(
             "activating by index would have run '$atThatIndex' for the '${firstPill.label}' pill",
             atThatIndex != firstPill.id,

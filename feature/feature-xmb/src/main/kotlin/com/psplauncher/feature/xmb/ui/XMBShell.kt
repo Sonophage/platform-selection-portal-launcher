@@ -82,6 +82,9 @@ import com.psplauncher.core.ui.motion.rememberAppVisible
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.psplauncher.core.ui.components.LocalControllerConnected
+import com.psplauncher.core.ui.components.NoMenuSelection
+import com.psplauncher.core.ui.components.PspContextMenuOverlay
+import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.core.ui.components.HintBarHeight
 import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.components.DiscLaunchCeremony
@@ -102,7 +105,7 @@ import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.focusedPillIndex
 import com.psplauncher.feature.xmb.viewmodel.pillRowVisible
 import com.psplauncher.feature.xmb.viewmodel.promptsFor
-import com.psplauncher.feature.xmb.viewmodel.railRows
+import com.psplauncher.feature.xmb.viewmodel.menuRows
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.fanCoversToDraw
 import com.psplauncher.feature.xmb.viewmodel.formatDuration
@@ -1165,10 +1168,18 @@ fun XMBShell(
 
             uiState.activeContextMenu?.let { menu ->
 
-                ContextMenuOverlay(
-                    rows = uiState.railRows(),
-                    selectedIndex = menu.selectedIndex,
-                    onItemActivated = onContextMenuItemActivated,
+                PspContextMenuOverlay(
+                    title = menu.title,
+                    rows = uiState.menuRows().map {
+                        PspMenuRow(
+                            label = it.label,
+                            isDestructive = it.isDestructive,
+                            checked = it.checked,
+                            heading = it.heading,
+                        )
+                    },
+                    selectedIndex = menu.selectedIndex ?: NoMenuSelection,
+                    onRowActivated = onContextMenuItemActivated,
                     onDismiss = onContextMenuDismiss,
                 )
             }

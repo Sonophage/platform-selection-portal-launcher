@@ -209,7 +209,7 @@ private fun NoticeCard(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(RailCorner))
+            .clip(RoundedCornerShape(NotificationChipCorner))
 
             .background(
                 if (focused) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.07f),
@@ -283,7 +283,7 @@ private fun MediaRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(RailCorner))
+            .clip(RoundedCornerShape(NotificationChipCorner))
             .background(if (focused) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.07f))
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
@@ -390,3 +390,5 @@ object NotificationBarStyle {
     const val TitleSp = 13f
     const val DetailSp = 12f
 }
+
+private val NotificationChipCorner = 7.dp

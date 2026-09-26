@@ -120,7 +120,7 @@ data class XMBContextMenu(
     val title: String,
     val items: List<XMBContextMenuItem>,
 
-    val overflow: List<XMBContextMenuItem> = emptyList(),
+    val pendingConfirmId: String? = null,
 
     val selectedIndex: Int? = null,
 
@@ -174,6 +174,8 @@ data class XMBContextMenuItem(
     val isDestructive: Boolean = false,
 
     val checked: Boolean = false,
+
+    val group: MenuGroup = MenuGroup.MAIN,
 
     val heading: String? = null,
 
@@ -4624,7 +4626,7 @@ class XMBViewModel @Inject constructor(
 
                 GamepadAction.SELECT        -> {
                     val menu = state.activeContextMenu
-                    val picked = menu?.selectedIndex?.let { state.railRows().getOrNull(it) }
+                    val picked = menu?.selectedIndex?.let { state.menuRows().getOrNull(it) }
                     when {
                         picked != null -> activateContextMenuItem(picked.id)
                         menu?.primaryId != null -> activateContextMenuItem(menu.primaryId)
@@ -5073,13 +5075,10 @@ class XMBViewModel @Inject constructor(
             onRecentShelf = onRecentShelf,
             hideLocation = currentHideLocation(),
         )
-        val (visible, overflow) = items.splitForOverflow()
-
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
                 title       = item.title,
-                items       = items.withOverflowRow(),
-                overflow    = overflow,
+                items       = items,
                 gameId      = item.gameId,
                 packageName = item.packageName,
                 shortcutId  = item.shortcutId,
@@ -5122,13 +5121,10 @@ class XMBViewModel @Inject constructor(
         val categoryId = categoryIdOverride ?: currentCategory()?.id
 
         val items = appContextMenuItems(_uiState.value, categoryId, onRecentShelf = item.id.startsWith(RECENT_APP_ID_PREFIX))
-        val (_, overflow) = items.splitForOverflow()
-
         _uiState.update { it.copy(
             activeContextMenu = XMBContextMenu(
                 title           = item.title,
-                items           = items.withOverflowRow(),
-                overflow        = overflow,
+                items           = items,
                 gameId          = item.gameId,
                 packageName     = pkg,
                 categoryContext = categoryId,
@@ -5193,7 +5189,7 @@ class XMBViewModel @Inject constructor(
         val state = _uiState.value
         val menu = state.activeContextMenu ?: return
 
-        val rows = state.railRows()
+        val rows = state.menuRows()
         if (rows.isEmpty()) return
 
         val current = menu.selectedIndex ?: return run {
@@ -5207,6 +5203,19 @@ class XMBViewModel @Inject constructor(
     private fun activateContextMenuItem(itemId: String) {
         val state  = _uiState.value
         val menu   = state.activeContextMenu ?: return
+
+        if (itemId == CONFIRM_NO_ID) {
+            closeContextMenu()
+            return
+        }
+        if (itemId == CONFIRM_YES_ID) {
+            menu.pendingConfirmId?.let { activateContextMenuItem(it) } ?: closeContextMenu()
+            return
+        }
+        menu.confirmSwapFor(itemId)?.let { confirm ->
+            _uiState.update { it.copy(activeContextMenu = confirm) }
+            return
+        }
 
         if (itemId.startsWith("cat_") && menu.gameId != null && menu.categoryContext != null && menu.pendingAppAction != null) {
             val gameId = menu.gameId
@@ -5491,28 +5500,10 @@ class XMBViewModel @Inject constructor(
                 "icon_display"           -> openIconDisplayPickerMenu(menu.gameId)
                 "play_state"             -> openPlayStatePickerMenu(menu.gameId)
 
-                "remove_game"            -> _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-                    title  = "Remove \"${menu.title}\" from Library?",
-                    items  = removeGameConfirmItems(),
-                    gameId = menu.gameId,
-                ))}
-                "confirm_remove_game"    -> {
+                "remove_game", "remove_missing" -> {
                     val gid = menu.gameId
                     appAction { removeGameFromLibrary(gid) }
                 }
-                "cancel_remove_game"     -> Unit
-
-                "remove_missing"         -> _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-                    title  = "Permanently remove \"${menu.title}\"?",
-                    items  = removeMissingConfirmItems(),
-                    gameId = menu.gameId,
-                ))}
-                "confirm_remove_missing" -> {
-                    val gid = menu.gameId
-
-                    appAction { removeGameFromLibrary(gid) }
-                }
-                "cancel_remove_missing"  -> Unit
                 "hide_here"              -> currentHideLocation()?.let { (type, id, label) ->
                     persistHide(HiddenPlacement.gameKey(menu.gameId), menu.title, type, id, label)
                 }
@@ -6001,7 +5992,7 @@ class XMBViewModel @Inject constructor(
                 return@launch
             }
 
-            if ((menu.items + menu.overflow).none { it.id == pillId }) {
+            if (menu.items.none { it.id == pillId }) {
                 Timber.w("Pill '$pillId' is not offered by the focused row's menu")
                 closeContextMenu()
                 return@launch
@@ -6011,7 +6002,7 @@ class XMBViewModel @Inject constructor(
     }
 
     fun onContextMenuItemActivatedAt(index: Int) {
-        val id = _uiState.value.railRows().getOrNull(index)?.id ?: return
+        val id = _uiState.value.menuRows().getOrNull(index)?.id ?: return
         _uiState.update { it.copy(activeContextMenu = it.activeContextMenu?.copy(selectedIndex = index)) }
         activateContextMenuItem(id)
     }

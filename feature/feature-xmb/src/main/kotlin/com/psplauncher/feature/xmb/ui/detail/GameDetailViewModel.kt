@@ -38,6 +38,7 @@ import com.psplauncher.feature.launcher.LaunchDispatchResult
 import com.psplauncher.feature.launcher.ResolvedLaunch
 import com.psplauncher.feature.launcher.byLaunchPreference
 import com.psplauncher.feature.launcher.supportsPlatform
+import com.psplauncher.feature.xmb.viewmodel.MenuGroup
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -203,23 +204,22 @@ data class MetadataPreviewUi(
     val applyIndex: Int get() = rows.size
 }
 
-enum class DetailAction(val label: String, val section: String) {
-    FAVORITE("Favorite", ORGANIZE_SECTION),
-    COLLECTIONS("Collections", ORGANIZE_SECTION),
+enum class DetailAction(val label: String, val group: MenuGroup) {
+    FAVORITE("Favorite", MenuGroup.LIBRARY),
+    COLLECTIONS("Collections", MenuGroup.LIBRARY),
 
-    RENAME("Edit Title", EDIT_SECTION),
-    EDIT("Edit Note", EDIT_SECTION),
-    ARTWORK("Artwork", EDIT_SECTION),
-    METADATA("Update Metadata", EDIT_SECTION),
-    REFRESH("Refresh", EDIT_SECTION),
+    EMULATOR("Emulator", MenuGroup.SETTINGS),
+    SAVES("Saves", MenuGroup.SETTINGS),
+    MANUAL("Manual", MenuGroup.SETTINGS),
+    RENAME("Edit Title", MenuGroup.SETTINGS),
+    EDIT("Edit Note", MenuGroup.SETTINGS),
+    ARTWORK("Artwork", MenuGroup.SETTINGS),
+    METADATA("Update Metadata", MenuGroup.SETTINGS),
+    REFRESH("Refresh", MenuGroup.SETTINGS),
+    LOCATION("Open Location", MenuGroup.SETTINGS),
+    EXPORT("Export Game", MenuGroup.SETTINGS),
 
-    EMULATOR("Emulator", PLAY_SECTION),
-    SAVES("Saves", PLAY_SECTION),
-    MANUAL("Manual", PLAY_SECTION),
-
-    LOCATION("Open Location", FILE_SECTION),
-    EXPORT("Export Game", FILE_SECTION),
-    REMOVE("Remove", FILE_SECTION),
+    REMOVE("Remove", MenuGroup.REMOVE),
 }
 
 enum class DetailQuickAction(val label: String) {
@@ -231,13 +231,8 @@ enum class DetailQuickAction(val label: String) {
 
 fun sectionHeadings(actions: List<DetailAction>): List<String?> =
     actions.mapIndexed { index, action ->
-        action.section.takeIf { it != actions.getOrNull(index - 1)?.section }
+        action.group.heading.takeIf { action.group != actions.getOrNull(index - 1)?.group }
     }
-
-private const val ORGANIZE_SECTION = "Organize"
-private const val EDIT_SECTION = "Edit"
-private const val PLAY_SECTION = "Play"
-private const val FILE_SECTION = "File"
 
 internal const val DEFAULT_EMULATOR_SENTINEL = "default"
 
