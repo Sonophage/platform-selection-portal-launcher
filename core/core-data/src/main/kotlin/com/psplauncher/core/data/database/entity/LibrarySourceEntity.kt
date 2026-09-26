@@ -13,7 +13,7 @@ data class LibrarySourceEntity(
     // Absolute folder path — e.g. /storage/emulated/0/ROMs/PS2
     val path: String,
 
-    // Human label shown in Settings ▸ Library
+    // Human label shown in Settings → Library
     val label: String,
 
     @ColumnInfo(name = "is_enabled")

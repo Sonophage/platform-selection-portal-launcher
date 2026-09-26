@@ -34,7 +34,8 @@ import com.psplauncher.feature.xmb.viewmodel.XMBViewModel.Companion.VIDEO_LIBRAR
  */
 
 // Music root: the static items (Now Playing, when something is playing; Playlist; Music Apps)
-// followed by the single "All Music" memory-card item. The root folder is managed in Settings ▸ // Music; a getting-started "Add Music Folder" row shows until a root has been added and scanned
+// followed by the single "All Music" memory-card item. The root folder is managed in Settings →
+// Music; a getting-started "Add Music Folder" row shows until a root has been added and scanned
 // (keyed off the scan completing, not the track count), then drops away.
 /**
  * The Music root's own sections, without the app rows.
@@ -120,17 +121,11 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
                 type     = XMBItemType.MEMORY_CARD,
             )
         )
-        // Artists, Albums and Playlists carry a COUNT, like Songs above them and like every row in
-        // the Game, Video, Photo and Library columns. They used to carry an instruction -- "Browse
-        // by who made it" -- so the four rows of one column answered two different questions, and
-        // the only column in the app whose rows would not tell you how much was behind them was
-        // the one you open most. The numbers come pre-aggregated on the state because this
-        // function is pure and sees only the folder rows; see [XMBUiState.musicArtistCount].
         add(
             XMBItem(
                 id       = MUSIC_ARTISTS_ITEM_ID,
                 title    = "Artists",
-                subtitle = countLabel(musicArtistCount, "artist", "artists"),
+                subtitle = "Browse by who made it",
                 type     = XMBItemType.MUSIC_ARTISTS,
             )
         )
@@ -138,7 +133,7 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
             XMBItem(
                 id       = MUSIC_ALBUMS_ITEM_ID,
                 title    = "Albums",
-                subtitle = countLabel(musicAlbumCount, "album", "albums"),
+                subtitle = "Browse by release",
                 type     = XMBItemType.MUSIC_ALBUMS,
             )
         )
@@ -146,7 +141,7 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
             XMBItem(
                 id       = PLAYLISTS_ITEM_ID,
                 title    = "Playlists",
-                subtitle = countLabel(musicPlaylistCount, "playlist", "playlists"),
+                subtitle = "Build and play your own track lists",
                 type     = XMBItemType.PLAYLIST,
             )
         )
@@ -155,7 +150,7 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
 
 // Video root: browse rows first (Collections, Video Libraries), then the Video Apps counterpart
 // directly above the "Videos" memory card (second-to-bottom). The root folder is managed in
-// Settings ▸ Video; a getting-started "Add Videos" row shows until a root has been added and
+// Settings → Video; a getting-started "Add Videos" row shows until a root has been added and
 // scanned (keyed off the scan completing, not the video count), then drops away.
 /** The Video root's own sections, without the app rows (see [musicRootSections]). */
 /**
@@ -226,7 +221,7 @@ internal fun XMBUiState.videoRootSections(): List<XMBItem> {
 // Photo root, PSP-style: Camera (when a camera app exists) and Albums first, then the Photo Apps
 // counterpart directly above the "Photos" memory card (second-to-bottom), with the "Add Photo
 // Library" row last — it disappears once a library has been scanned (further libraries are added
-// from Settings ▸ Photo).
+// from Settings → Photo).
 /** The Photo root's own sections, without the app rows (see [musicRootSections]). */
 // cameraAvailable is a PackageManager query the ViewModel caches, not state — so it comes in
 // as an argument rather than being half-copied to here.

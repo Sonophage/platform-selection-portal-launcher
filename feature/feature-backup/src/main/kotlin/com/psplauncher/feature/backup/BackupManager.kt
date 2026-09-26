@@ -96,7 +96,7 @@ open class BackupManager @Inject constructor(
         val backupFolder = backupFolderRepository.get()
         if (backupFolder.isNullOrBlank()) {
             return BackupResult.Failure(
-                "No backup folder set. Choose one under Settings ▸ Backup & Restore → Backup Folder."
+                "No backup folder set. Choose one under Settings → Backup & Restore → Backup Folder."
             )
         }
         return runCatching {
@@ -160,7 +160,7 @@ open class BackupManager @Inject constructor(
         val exported = exportToBackupFolder(backupFolder, tempFile, fileName)
         tempFile.delete()
         if (exported == null) {
-            error("Could not write to the backup folder. Re-link it under Settings ▸ Folder Access.")
+            error("Could not write to the backup folder. Re-link it under Settings → Folder Access.")
         }
         fileName
     }.fold(

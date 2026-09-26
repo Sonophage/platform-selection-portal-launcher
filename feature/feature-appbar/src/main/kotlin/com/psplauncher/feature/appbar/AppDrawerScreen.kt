@@ -449,9 +449,7 @@ private fun EmptyDrawerMessage(
         Text(
             text = when {
                 hasQuery -> "No apps match your search"
-                // "yet", not "found": nothing was searched for — hasQuery is handled above, and
-                // the RECENT branch three lines down already says "yet" for the same condition.
-                filter == AppFilter.GAMES -> "No games yet"
+                filter == AppFilter.GAMES -> "No games found"
                 filter == AppFilter.EMULATORS -> "No emulators installed"
                 filter == AppFilter.RECENT && !hasUsageAccess -> "Usage access needed"
                 filter == AppFilter.RECENT -> "No recently used apps yet"

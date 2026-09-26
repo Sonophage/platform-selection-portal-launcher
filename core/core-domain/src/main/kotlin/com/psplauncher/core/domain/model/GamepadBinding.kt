@@ -92,20 +92,6 @@ val DEFAULT_BINDINGS = listOf(
     GamepadBinding(KeyEvent.KEYCODE_F3,            GamepadAction.OPEN_CONTEXT_MENU),
     GamepadBinding(KeyEvent.KEYCODE_PAGE_UP,       GamepadAction.PREV_CATEGORY),
     GamepadBinding(KeyEvent.KEYCODE_PAGE_DOWN,     GamepadAction.NEXT_CATEGORY),
-    /**
-     * F1 applies, because the footer has been telling keyboard users so all along.
-     *
-     * [GamepadAction.HOME] was bound to KEYCODE_BUTTON_START and nothing else, while the Keyboard
-     * glyph family prints "F1" for that position. So four pickers — Game, App, Music Track and the
-     * Artwork Studio — drew "F1 Apply" / "F1 Add" at a key that reached nothing, and Apply was
-     * gamepad-only on a machine with no gamepad. The label was not wrong about intent; the
-     * binding was simply missing.
-     *
-     * F1 types no character, so it costs no keystroke — the constraint the rest of the keyboard
-     * block is built on. KeyboardPromptsAreBoundTest found this the moment its hand-written list
-     * of eleven positions was replaced by the label table's fourteen.
-     */
-    GamepadBinding(KeyEvent.KEYCODE_F1,            GamepadAction.HOME),
 )
 
 /**

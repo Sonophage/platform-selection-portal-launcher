@@ -260,9 +260,9 @@ private fun NoticeCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(RailCorner))
-            // A filled card rather than a ring. This was "the rail's white capsule", back when
-            // the crossbar had a rail to borrow from; the shape stayed when the rail did not,
-            // because a fill and a ring are two ways of saying "you are here" and one is enough.
+            // The focused card takes the rail's white capsule rather than a ring: this sheet and
+            // the context rail are the same idea in two directions, and a second way of saying
+            // "you are here" is a second thing to keep in step.
             .background(
                 if (focused) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.07f),
             )
@@ -433,37 +433,11 @@ private val RowGap = 8.dp
 private val ColumnGap = 22.dp
 private val EdgeGap = 20.dp
 
-// ── Two values that used to belong to the context rail ────────────────────────
-//
-// They lived in XmbRailCapsule.kt, which existed for the crossbar's own options rail — a column
-// of capsules with initial badges up the right edge. That rail is gone: the crossbar's menu is
-// the same panel every other menu in the app draws, and its file went with it. These two had a
-// second consumer and so outlived it.
-
-/**
- * The corner the sheet's cards are cut at.
- *
- * 7dp, measured off the design against a 1920x1080 frame at this panel's density of 2.3375 — a
- * 67px badge with a 16px corner. Kept at the number the rail used rather than rounded to 8, so
- * the sheet's cards are the shape they have always been.
- */
-internal val RailCorner = 7.dp
-
-/**
- * The wash this sheet lays down.
- *
- * Ramped top-to-bottom off the top edge. It was shared with the context rail, which ramped the
- * same colour left-to-right off the right edge — "one surface treatment used twice" — and the
- * rail is gone, so this is now simply the sheet's. [SheetScrim] below is the DARKER one this
- * sheet uses for its body; see the note there for why there are two.
- */
-internal val XmbScrim = Color(0xC4080301)
-
 /** How many each column shows. It is a glance, not a shade — forty would run off the screen. */
 private const val ColumnRows = 5
 
 /**
- * Darker than [XmbScrim], the wash this sheet lays over the screen, deliberately.
+ * Darker than the rail's [XmbScrim], deliberately.
  *
  * The rail lays short labels along an edge and wants the wallpaper to keep showing through; this
  * lays sentences across the middle of the screen over whatever art is behind them, and at the

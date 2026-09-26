@@ -183,33 +183,6 @@ fun ControllerPromptGlyphs(
 }
 
 /**
- * ── What B is called ──────────────────────────────────────────────────────────
- *
- * Four words, because there are four things B does, and a prompt that names the wrong one is a
- * prompt that lies about whether pressing it costs you anything.
- *
- *  - **Back** — you leave this page and go where you came from. Nothing is dismissed and nothing
- *    is abandoned. The crossbar root is the documented exception: there B says "Apps", because
- *    there it opens the drawer rather than going anywhere.
- *  - **Close** — an overlay on top goes away. Whatever it did, it already did: the emulator and
- *    collection pickers on the game page, and the playlist picker on the video page, all write
- *    through on the pick, so B has nothing to undo.
- *  - **Cancel** — something is PENDING and pressing B abandons it. A destructive confirm, a title
- *    or note being edited, a staged selection in the Game / App / Music Track pickers, an
- *    unsaved layout adjustment.
- *  - **Done** — you were editing, the changes are already applied, and you are finished. Used by
- *    the custom-icon overlay, where every pick lands as it is made. "Close" would be true and
- *    would read as though the work were being thrown away.
- *
- * The test is what B COSTS. If pressing it loses work, it is Cancel; if it loses nothing and
- * something is covering the screen, it is Close; if it loses nothing and nothing is covering the
- * screen, it is Back.
- *
- * This was tacit and nearly held: GameDetailScreen labelled its emulator picker "Cancel" while
- * its own collection picker and the video page's playlist picker said "Close" for the identical
- * shape — and closeEmulatorPicker() reverts nothing.
- */
-/**
  * One entry in a [ControllerPromptBar]. [actions] names a single input or a set
  * that share a label.
  *

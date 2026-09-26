@@ -630,24 +630,6 @@ data class XMBUiState(
     val musicNav: MusicNav = MusicNav.Root,
     val musicFolders: List<com.psplauncher.core.domain.model.MusicFolder> = emptyList(),
     /**
-     * How many artists, albums and playlists the Music column's rows stand for.
-     *
-     * Pre-aggregated here because [musicRootSections] is a pure extension on this state and sees
-     * only the folder rows, which carry a track count and nothing else. Without these, three of
-     * the four Music rows had to say what they were FOR — "Browse by who made it" — while Songs
-     * beside them said how many, and every other media column counted throughout.
-     *
-     * The artist number is NOT `COUNT(DISTINCT artist)`. A track's artist tag is a credit line,
-     * so grouping on it counts credit COMBINATIONS — one performer scattered across a dozen rows
-     * and no row for the performer alone. It is `artistGroups().size`, the same pass the Artists
-     * screen draws, which groups on the album artist and splits joint credits on the library's
-     * own evidence. That is also why it is a count of MEMBERSHIPS: a duet is one track and two
-     * rows, and it is an artist in each.
-     */
-    val musicArtistCount: Int = 0,
-    val musicAlbumCount: Int = 0,
-    val musicPlaylistCount: Int = 0,
-    /**
      * Newest-first artwork for each media column's rows to slice, four per row.
      *
      * One pool per column rather than one list per row: a column's rows are cuts of the same
@@ -2427,37 +2409,11 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch {
             musicRepository.observeFolders().collect { folders ->
                 _uiState.update { it.copy(musicFolders = folders) }
-                // The counts the Music rows show, recomputed when the library changes.
-                //
-                // Keyed on FOLDERS rather than on the tracks themselves: a folder's trackCount
-                // moves whenever its tracks are replaced, so a scan re-emits here, while playing
-                // a song — which writes lastPlayedAt on one row — does not. Observing the tracks
-                // would regroup four thousand of them every time you pressed play.
-                //
-                // Off the main thread: this reads the whole track table and runs the same two
-                // grouping passes the browser runs, and it runs on every scan tick.
-                runCatching {
-                    withContext(Dispatchers.Default) {
-                        val tracks = musicRepository.observeAllTracks().first()
-                        tracks.artistGroups().size to tracks.albumGroups().size
-                    }
-                }.onSuccess { (artists, albums) ->
-                    _uiState.update {
-                        it.copy(musicArtistCount = artists, musicAlbumCount = albums)
-                    }
-                }
                 if (currentCategory()?.id == BuiltInCategory.MUSIC &&
                     _uiState.value.musicNav == MusicNav.Root
                 ) {
                     loadItemsForCategory(currentCategory())
                 }
-            }
-        }
-        viewModelScope.launch {
-            // Playlists are the user's own lists, so they change without the library changing —
-            // their own flow rather than a folder-keyed read.
-            musicRepository.observePlaylists().collect { playlists ->
-                _uiState.update { it.copy(musicPlaylistCount = playlists.size) }
             }
         }
         viewModelScope.launch {
@@ -3301,7 +3257,7 @@ class XMBViewModel @Inject constructor(
      * copies would drift the moment one gained an entry.
      */
     private fun musicAddActions(): List<XMBItem> = buildList {
-        // Getting-started prompt: opens Settings ▸ Music. Drops away once a root has been scanned
+        // Getting-started prompt: opens Settings → Music. Drops away once a root has been scanned
         // (even if it found no tracks), since the root is then managed in Settings.
         if (_uiState.value.musicFolders.none { it.lastScannedAt != null }) add(addMusicFolderItem())
         add(addMusicAppsItem())
@@ -3412,8 +3368,8 @@ class XMBViewModel @Inject constructor(
 
     private fun emptyAllMusicItem(): XMBItem = XMBItem(
         id       = EMPTY_CATEGORY_ITEM_ID,
-        title    = "No music yet",
-        subtitle = "Add a music folder in Settings ▸ Music",
+        title    = "No music found",
+        subtitle = "Add a music folder in Settings → Music",
         type     = XMBItemType.EMPTY,
     )
 
@@ -3587,7 +3543,7 @@ class XMBViewModel @Inject constructor(
     )
 
     // One card per video library, drillable into its videos. The root folder is managed in
-    // Settings ▸ Video, so there is no add row here.
+    // Settings → Video, so there is no add row here.
     private fun videoLibraryItems(libraries: List<com.psplauncher.core.domain.model.VideoLibrary>): List<XMBItem> {
         val rows = libraries.map { lib ->
             XMBItem(
@@ -3603,7 +3559,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id = EMPTY_CATEGORY_ITEM_ID,
                     title = "No video libraries yet",
-                    subtitle = "Set a root folder in Settings ▸ Video",
+                    subtitle = "Set a root folder in Settings → Video",
                     type = XMBItemType.EMPTY,
                 ),
             )
@@ -3659,8 +3615,8 @@ class XMBViewModel @Inject constructor(
 
     private fun emptyAllVideosItem(): XMBItem = XMBItem(
         id       = EMPTY_CATEGORY_ITEM_ID,
-        title    = "No videos yet",
-        subtitle = "Add a video library in Settings ▸ Video",
+        title    = "No videos found",
+        subtitle = "Add a video library in Settings → Video",
         type     = XMBItemType.EMPTY,
     )
 
@@ -4236,7 +4192,7 @@ class XMBViewModel @Inject constructor(
     )
 
     // One folder card per Album, drillable into its photos. The root folder is managed in
-    // Settings ▸ Photo, so there is no add row here.
+    // Settings → Photo, so there is no add row here.
     private fun photoAlbumItems(libraries: List<com.psplauncher.core.domain.model.PhotoLibrary>): List<XMBItem> {
         val rows = libraries.map { lib ->
             XMBItem(
@@ -4251,7 +4207,7 @@ class XMBViewModel @Inject constructor(
                 XMBItem(
                     id = EMPTY_CATEGORY_ITEM_ID,
                     title = "No albums yet",
-                    subtitle = "Set a root folder in Settings ▸ Photo",
+                    subtitle = "Set a root folder in Settings → Photo",
                     type = XMBItemType.EMPTY,
                 ),
             )
@@ -4281,7 +4237,7 @@ class XMBViewModel @Inject constructor(
 
     private fun emptyAllPhotosItem(): XMBItem = XMBItem(
         id       = EMPTY_CATEGORY_ITEM_ID,
-        title    = "No photos yet",
+        title    = "No photos found",
         subtitle = "Add a photo library and scan it",
         type     = XMBItemType.EMPTY,
     )
@@ -4289,7 +4245,7 @@ class XMBViewModel @Inject constructor(
     private fun emptyLibraryPhotosItem(): XMBItem = XMBItem(
         id       = EMPTY_CATEGORY_ITEM_ID,
         title    = "No photos in this album",
-        subtitle = "Scan it from its ⚙ Options menu or in Settings ▸ Photo",
+        subtitle = "Scan it from its ⚙ Options menu or in Settings → Photo",
         type     = XMBItemType.EMPTY,
     )
 
@@ -5391,7 +5347,7 @@ class XMBViewModel @Inject constructor(
     }
 
     // Music folder context-menu actions, dispatched from activateContextMenuItem. Folder management
-    // now lives in Settings ▸ Music; this is retained for the scan/enable/remove paths it backs.
+    // now lives in Settings → Music; this is retained for the scan/enable/remove paths it backs.
     private fun handleMusicFolderAction(folderId: String, itemId: String) {
         when (itemId) {
             "scan_folder" -> scanMusicFolder(folderId)
@@ -9500,7 +9456,7 @@ class XMBViewModel @Inject constructor(
         }
     }
 
-    // Bridge from Library Settings ▸ the shared installed-app picker. Closes the settings overlay
+    // Bridge from Library Settings → the shared installed-app picker. Closes the settings overlay
     // and opens the same picker the XMB Android card uses, so apps are added the one way.
     fun openAndroidLibraryPicker() {
         _uiState.update { it.copy(activeSettingsScreen = null, pendingSettingsAction = null) }

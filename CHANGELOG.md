@@ -5,6 +5,42 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-09-26
+
+**A rollback.** The tree is 1.11.1 plus the three tiers of backlog work that came before the
+cohesion pass, and none of the cohesion pass itself. 1.12.0 shipped and is still downloadable;
+this undoes it rather than pretending it did not happen.
+
+### Changed
+- **The crossbar's context menu is the rail again.** Actions stack as small lettered circles
+  against the right edge and the focused one grows leftward into a capsule carrying its name.
+  1.12.0 had replaced it with the same 300dp panel the app drawer and the detail page use; this
+  puts the rail back.
+
+- **The size slider moves the crossbar only, as it did before 1.12.0.** The chrome screens, the
+  clock-and-battery strip and the hint bar go back to the device's own density.
+
+### Removed
+Everything else 1.12.0 added is gone with it, because it was reverted as one range rather than
+picked apart:
+
+- the Music column's artist / album / playlist counts — those three rows say what they are for
+  again;
+- the ⇅ on the controller's sort label;
+- the detail panel's tabs in the Studio's chip style;
+- **F1 is unbound again**, while four sheets still print "F1 Apply" in their footer;
+- **the app picker's third row is clipped again** on a 338dp panel;
+- the music browser's search caret resets on every keystroke again;
+- the charging shimmer redraws behind full-screen pages again;
+- the corrected B label and the four empty states.
+
+### Fixed
+- **One thing was deliberately kept back from the revert.** Three of the four
+  `DisplaySettingsViewModel*Test` classes had gained `io = dispatcher`, which removes the
+  ViewModel's half of a DataStore race. Reverting it took the mitigation out and the suite went
+  red in `GameBootTest` on the next full run. It is 15 lines, test-only, and has nothing to do
+  with context menus, so it stays.
+
 ## [1.12.0] - 2026-09-26
 
 A cohesion pass: the surfaces that had drifted into having a look of their own are brought back

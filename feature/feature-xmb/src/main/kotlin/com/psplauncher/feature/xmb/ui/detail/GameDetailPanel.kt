@@ -52,7 +52,6 @@ import androidx.compose.ui.draw.clip
 import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.feature.xmb.ui.Icon1VideoOverlay
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
-import com.psplauncher.core.ui.theme.menuCursorEdge
 
 // ── The Game Detail panel ────────────────────────────────────────────────────
 //
@@ -88,14 +87,7 @@ private val PanelTextShadow = Shadow(
     blurRadius = 5f,
 )
 
-/**
- * The tab's shape, and it is the Artwork Studio's chip rather than a capsule of its own.
- *
- * These two rows answer the same question — "which of these views" — over the same kind of
- * surface, and they answered it two ways: a 50%-rounded capsule here, a 6dp chip there. One of
- * them had to give and the Studio's is the one drawn against an approved mock.
- */
-private val StripTabShape = RoundedCornerShape(6.dp)
+private val StripTabShape = RoundedCornerShape(percent = 50)
 private val StripTabGap: Dp = 6.dp
 private val StripShoulderSize: Dp = 13.dp
 private val PanelCardShape = RoundedCornerShape(14.dp)
@@ -142,23 +134,18 @@ fun DetailPanelStrip(
             Box(
                 modifier = Modifier
                     .clip(StripTabShape)
-                    // The Studio's chip treatment: the current tab takes the cursor accent at
-                    // 0.28, the rest a flat white at 0.07 rather than nothing at all. Every tab
-                    // reads as a tab that way, which is what a row of them is for, and the accent
-                    // says "you are here" in the colour the rest of the app already uses for a
-                    // cursor.
-                    //
-                    // It was white-at-0.12 on the current tab and transparent on the others: one
-                    // fill, several gaps. That stayed readable over artwork, which was the point,
-                    // and the accent fill does the same job without needing the reader to notice
-                    // an absence.
-                    //
-                    // Still NO border. The Studio draws one when its tab ZONE has the cursor —
-                    // this row has no separate zone to be in, the shoulders walk it from
-                    // anywhere, so a border here would mark a state that does not exist.
+                    // Selected is a filled capsule; the rest are outlines. One fill and several
+                    // outlines says "you are here" without a second colour, which is what keeps
+                    // the row readable over artwork it does not control.
+                    // Very light, or nothing. The selected tab's fill is a hint that it is
+                    // filled at all; what actually says "you are here" is the brighter edge and
+                    // the brighter label.
+                    // No outline at all. The current tab is a soft capsule of light and the
+                    // rest are bare labels -- a border on every tab drew five boxes across the
+                    // artwork, and a border on only the current one was a second way of saying
+                    // what its fill and its label already say.
                     .background(
-                        if (selected) menuCursorEdge().copy(alpha = 0.28f)
-                        else Color.White.copy(alpha = 0.07f),
+                        if (selected) Color.White.copy(alpha = 0.12f) else Color.Transparent,
                         StripTabShape,
                     )
                     .then(
@@ -170,14 +157,10 @@ fun DetailPanelStrip(
             ) {
                 Text(
                     text = page.label.uppercase(),
-                    color = if (selected) Color.White else Color.White.copy(alpha = 0.62f),
-                    // Small, and NOT the Studio's 10.5sp even though the chip is now its chip.
-                    // This row is drawn in two places: on the Last Played shelf and the crossbar
-                    // it sits INSIDE the XMB canvas, which carries the crossbar's auto-fit on top
-                    // of the user's scale, so a size chosen against the reference at 1x came out
-                    // a third bigger again on this device and read as a headline rather than as
-                    // chrome. The Studio's row is on a chrome screen and takes neither. Same
-                    // shape, different scaling context, so the sizes stay apart on purpose.
+                    color = if (selected) Color.White else Color.White.copy(alpha = 0.55f),
+                    // Small. These sit INSIDE the XMB canvas, which the user can scale, so a
+                    // size chosen against the reference at 1x came out a third bigger again on
+                    // this device -- the row was reading as a headline rather than as chrome.
                     fontSize = 8.sp,
                     letterSpacing = 0.8.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,

@@ -287,7 +287,7 @@ private fun androidx.compose.foundation.layout.BoxScope.StatusStrip(model: XmbPr
 }
 
 /**
- * Context-menu preview — replicates core-ui's PspContextMenu.kt: right-edge 300dp column over a
+ * Context-menu preview — replicates ContextMenuOverlay.kt: right-edge 300dp column over a
  * light scrim; panel backdrop = waveColor@75%; selected row carries the accent cursor glow
  * (transparent → menuCursorEdge@40% left-to-right); destructive rows stay red.
  */

@@ -108,23 +108,10 @@ class HintPromptsTest {
     }
 
     @Test
-    fun `the bar never names the sort knob — the strip owns it whole`() {
-        // This assertion replaces "Sort and Filter are never both offered", which counted them
-        // and allowed up to one. With neither offered any more that check passed at zero, which
-        // is the shape of a test that cannot fail: it would have gone on passing if the prompt
-        // came back in a third form.
-        //
-        // The contract now is that the bar does not name this button at all. The knob and its
-        // value are one fact and the status strip states it whole — "⇅ All", "⇅ Title" — where
-        // the bar used to carry the knob ("Filter") and the strip the value ("All"), two halves
-        // in two bands with neither complete.
-        val cases = listOf(state(), state(drilled = "psp"))
-        cases.forEach { st ->
-            val right = promptsFor(st).right.map { it.verb }
-            assertTrue(
-                "the bar must not name the sort knob; got $right",
-                right.none { it == "Sort" || it == "Filter" },
-            )
-        }
+    fun `Sort and Filter are one button and never both`() {
+        // They are the same press doing two jobs. Both at once would be the bar promising X does
+        // two different things to the same list.
+        val right = promptsFor(state()).right.map { it.verb }
+        assertTrue("Sort and Filter both offered: $right", right.count { it == "Sort" || it == "Filter" } <= 1)
     }
 }

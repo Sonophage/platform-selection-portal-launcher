@@ -9,9 +9,22 @@ from the review. Status is `DONE`, `PARTIAL` or `OPEN`.
 **Each item carries the command that decides it.** Run the command; do not trust the status line.
 A status is a claim with a date on it and it drifts exactly like the claim it replaced.
 
-Every numbered item 1–16 is resolved as of 2026-09-26 — which makes the `Closed` / `Half-closed`
-headings below history rather than an index. What is still open is in the `N` items at the foot.
-This sentence is a claim with a date on it too; the status line of every item is in one place:
+> **REVERTED on 2026-09-26, at the owner's instruction.** The tree was rolled back to `5f3f4eaa`
+> and released as 1.13.0. **Do not read the `DONE` markers below as describing the shipping app.**
+> Items 5, 6, 7, 9, 10, 11, 12, 15 and 16 were done and are now undone; items 1, 2, 3 and N1
+> predate `5f3f4eaa` and survive. The reason given was the context menu's sizing.
+>
+> The entries are kept as written because their *evidence* is still good — five items were
+> re-verified as not defects, and that is worth more than the status lines. Check any item
+> against the tree before acting on it:
+>
+> ```sh
+> git log --oneline 5f3f4eaa..v1.12.0   # exactly what was undone
+> ```
+
+Every numbered item 1–16 was resolved as of 2026-09-26 — see the note above for which of those
+survived the rollback. What is still open is in the `N` items at the foot. This sentence is a
+claim with a date on it too; the status line of every item is in one place:
 
 ```sh
 grep -E '^### ' docs/plans/cohesion-ledger.md
