@@ -60,7 +60,7 @@ fun promptsFor(state: XMBUiState): XmbPrompts {
                     XmbPrompt(GamepadAction.SELECT, primaryVerb, focused?.title)
                 else -> null
             },
-            back = XmbPrompt(GamepadAction.BACK, "Close"),
+            back = XmbPrompt(GamepadAction.BACK, if (menu.parent == null) "Close" else "Back"),
             right = emptyList(),
         )
     }

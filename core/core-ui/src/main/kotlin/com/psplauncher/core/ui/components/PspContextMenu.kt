@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,6 +46,8 @@ data class PspMenuRow(
     val isDestructive: Boolean = false,
 
     val checked: Boolean = false,
+
+    val opensSubmenu: Boolean = false,
 )
 
 const val NoMenuSelection = -1
@@ -63,6 +66,8 @@ fun PspContextMenuOverlay(
     onRowActivated: (index: Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+
+    subtitle: String? = null,
 
     scrim: Color = XmbScrim,
 ) {
@@ -102,8 +107,23 @@ fun PspContextMenuOverlay(
                 maxLines = 2,
                 textAlign = TextAlign.End,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = RailMaxText).padding(bottom = RailTitleGap),
+                modifier = Modifier.widthIn(max = RailMaxText),
             )
+
+            Text(
+                text = subtitle.orEmpty(),
+                color = Color.White.copy(alpha = 0.62f),
+                fontSize = RailSubtitleSize,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp,
+                style = TextStyle(shadow = TextDropShadow),
+                maxLines = 1,
+                textAlign = TextAlign.End,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = RailMaxText),
+            )
+
+            Spacer(Modifier.height(RailTitleGap))
 
             LazyColumn(
                 state = listState,
@@ -124,6 +144,7 @@ fun PspContextMenuOverlay(
                         focused = index == selectedIndex,
                         destructive = row.isDestructive,
                         checked = row.checked,
+                        opensSubmenu = row.opensSubmenu,
                         dim = dim,
                         onClick = { onRowActivated(index) },
                     )
@@ -139,6 +160,7 @@ private fun XmbRailRow(
     focused: Boolean,
     destructive: Boolean,
     checked: Boolean,
+    opensSubmenu: Boolean,
     dim: Float,
     onClick: () -> Unit,
 ) {
@@ -174,12 +196,17 @@ private fun XmbRailRow(
             )
         }
         Spacer(Modifier.width(RailGap))
-        XmbRailBadge(label = label, filled = focused, tint = tint)
+        XmbRailBadge(label = label, filled = focused, opensSubmenu = opensSubmenu, tint = tint)
     }
 }
 
 @Composable
-private fun XmbRailBadge(label: String, filled: Boolean, tint: Color? = null) {
+private fun XmbRailBadge(
+    label: String,
+    filled: Boolean,
+    opensSubmenu: Boolean = false,
+    tint: Color? = null,
+) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -188,6 +215,7 @@ private fun XmbRailBadge(label: String, filled: Boolean, tint: Color? = null) {
             .background(
                 when {
                     filled -> tint ?: RailInk
+                    opensSubmenu -> Color.White
                     tint != null -> tint.copy(alpha = 0.22f)
                     else -> Color.White.copy(alpha = 0.12f)
                 },
@@ -195,7 +223,11 @@ private fun XmbRailBadge(label: String, filled: Boolean, tint: Color? = null) {
     ) {
         Text(
             text = label.trim().firstOrNull()?.uppercase() ?: "?",
-            color = if (filled) Color.White else Color.White.copy(alpha = 0.85f),
+            color = when {
+                filled -> Color.White
+                opensSubmenu -> RailInk
+                else -> Color.White.copy(alpha = 0.85f)
+            },
             fontSize = RailGlyphSize,
             fontWeight = FontWeight.Bold,
         )
@@ -212,6 +244,7 @@ private const val DimFadeMs = 160
 private val RailGlyphSize = 13.sp
 private val RailTextSize = 13.sp
 private val RailTitleSize = 26.sp
+private val RailSubtitleSize = 12.sp
 private val RailTitleGap = 22.dp
 private val RailPadStart = 14.dp
 private val RailPadEnd = 4.dp
@@ -228,12 +261,13 @@ fun PspContextMenuPreview() {
         PspMenuRow("Play"),
         PspMenuRow("Information"),
         PspMenuRow("Add to Favorites", checked = true),
-        PspMenuRow("Assign Album"),
+        PspMenuRow("Settings", opensSubmenu = true),
         PspMenuRow("Remove From Library", isDestructive = true),
     )
     PfpPreview {
         PspContextMenuOverlay(
             title = "Gran Turismo 4",
+            subtitle = "Library",
             rows = rows,
             selectedIndex = 1,
             onRowActivated = {},

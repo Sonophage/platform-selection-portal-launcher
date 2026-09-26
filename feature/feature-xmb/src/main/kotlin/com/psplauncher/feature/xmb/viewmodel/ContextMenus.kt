@@ -5,13 +5,27 @@ import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.HideLocationType
 import com.psplauncher.core.domain.model.PlatformIds
 
-enum class MenuGroup {
-    MAIN,
-    LIBRARY,
-    SETTINGS,
-    CATEGORY,
-    REMOVE,
+enum class MenuGroup(val label: String?) {
+    MAIN(null),
+    LIBRARY("Library"),
+    SETTINGS("Settings"),
+    CATEGORY("Category"),
+    REMOVE("Remove"),
 }
+
+internal const val GROUP_ROW_PREFIX = "group_"
+
+internal fun groupRowId(group: MenuGroup) = "$GROUP_ROW_PREFIX${group.name}"
+
+internal fun groupOfRowId(id: String): MenuGroup? =
+    id.removePrefix(GROUP_ROW_PREFIX).takeIf { it != id }?.let { name ->
+        MenuGroup.entries.firstOrNull { it.name == name }
+    }
+
+internal fun XMBContextMenuItem.staysAtRoot(): Boolean =
+    group == MenuGroup.MAIN || isDestructive || id in ROOT_PINNED_IDS
+
+internal val ROOT_PINNED_IDS = setOf("favorite", "unfavorite", "video_favorite")
 
 internal fun XMBUiState.currentCategoryOrNull(): Category? =
     categories.getOrNull(selectedCategoryIndex)
@@ -260,6 +274,27 @@ internal fun collectionRowContextMenuItems(
 internal fun List<XMBContextMenuItem>.inMenuOrder(): List<XMBContextMenuItem> =
     sortedBy { it.group.ordinal }
 
+internal fun List<XMBContextMenuItem>.withSubmenuRows(): List<XMBContextMenuItem> =
+    inMenuOrder()
+        .groupBy { it.group }
+        .toSortedMap(compareBy { it.ordinal })
+        .flatMap { (group, rows) ->
+            val pinned = rows.filter { it.staysAtRoot() && !it.isDestructive }
+            val bundled = rows.filterNot { it.staysAtRoot() }
+
+            pinned + when (bundled.size) {
+                0, 1 -> bundled
+                else -> listOf(
+                    XMBContextMenuItem(
+                        id = groupRowId(group),
+                        label = group.label ?: group.name,
+                        group = group,
+                        opensSubmenu = true,
+                    ),
+                )
+            } + rows.filter { it.isDestructive }
+        }
+
 internal const val CONFIRM_YES_ID = "confirm_destructive"
 internal const val CONFIRM_NO_ID = "cancel_destructive"
 
@@ -275,9 +310,22 @@ internal fun destructiveConfirmItems(verb: String): List<XMBContextMenuItem> = l
 internal fun XMBContextMenu.confirmSwapFor(itemId: String): XMBContextMenu? {
     val row = items.firstOrNull { it.id == itemId && it.needsConfirm() } ?: return null
     return copy(
-        title            = "$title — ${row.label}?",
+        subtitle         = "${row.label}?",
         items            = destructiveConfirmItems(row.label),
         selectedIndex    = 0,
         pendingConfirmId = itemId,
+        parent           = this,
+    )
+}
+
+internal fun XMBContextMenu.submenuFor(itemId: String): XMBContextMenu? {
+    val group = groupOfRowId(itemId) ?: return null
+    val rows = items.filter { it.group == group && !it.staysAtRoot() }
+    if (rows.isEmpty()) return null
+    return copy(
+        subtitle      = group.label,
+        items         = rows,
+        selectedIndex = 0,
+        parent        = this,
     )
 }

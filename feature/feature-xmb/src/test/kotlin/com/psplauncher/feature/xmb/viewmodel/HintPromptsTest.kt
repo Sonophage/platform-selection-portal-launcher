@@ -97,4 +97,23 @@ class HintPromptsTest {
         val right = promptsFor(state()).right.map { it.verb }
         assertTrue("Sort and Filter both offered: $right", right.count { it == "Sort" || it == "Filter" } <= 1)
     }
+
+    @Test
+    fun `inside a submenu Back climbs a level, and the hint says so`() {
+        val root = XMBContextMenu(
+            title = "Gran Turismo 4",
+            items = listOf(
+                XMBContextMenuItem("icon_display", "Icon Display", group = MenuGroup.SETTINGS),
+                XMBContextMenuItem("file_location", "View File Location", group = MenuGroup.SETTINGS),
+            ),
+        )
+        assertEquals("Close", promptsFor(state(menu = root)).back.verb)
+
+        val submenu = root.submenuFor(groupRowId(MenuGroup.SETTINGS))
+        assertEquals(
+            "Back would close the whole menu while claiming to close it, losing the root",
+            "Back",
+            promptsFor(state(menu = submenu)).back.verb,
+        )
+    }
 }

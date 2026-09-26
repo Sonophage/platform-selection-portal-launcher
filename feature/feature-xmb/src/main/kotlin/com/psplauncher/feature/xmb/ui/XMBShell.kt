@@ -1170,11 +1170,13 @@ fun XMBShell(
 
                 PspContextMenuOverlay(
                     title = menu.title,
+                    subtitle = menu.subtitle,
                     rows = uiState.menuRows().map {
                         PspMenuRow(
                             label = it.label,
                             isDestructive = it.isDestructive,
                             checked = it.checked,
+                            opensSubmenu = it.opensSubmenu,
                         )
                     },
                     selectedIndex = menu.selectedIndex ?: NoMenuSelection,

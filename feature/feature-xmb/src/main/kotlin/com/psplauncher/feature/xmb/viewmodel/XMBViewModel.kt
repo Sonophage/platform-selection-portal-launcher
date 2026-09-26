@@ -120,6 +120,10 @@ data class XMBContextMenu(
     val title: String,
     val items: List<XMBContextMenuItem>,
 
+    val subtitle: String? = null,
+
+    val parent: XMBContextMenu? = null,
+
     val pendingConfirmId: String? = null,
 
     val selectedIndex: Int? = null,
@@ -176,6 +180,8 @@ data class XMBContextMenuItem(
     val checked: Boolean = false,
 
     val group: MenuGroup = MenuGroup.MAIN,
+
+    val opensSubmenu: Boolean = false,
 
     val hidden: Boolean = false,
 )
@@ -4631,7 +4637,7 @@ class XMBViewModel @Inject constructor(
                         else -> Unit
                     }
                 }
-                GamepadAction.BACK,
+                GamepadAction.BACK                   -> popContextMenu()
                 GamepadAction.OPEN_CONTEXT_MENU      -> closeContextMenu()
                 else -> Unit
             }
@@ -5203,7 +5209,12 @@ class XMBViewModel @Inject constructor(
         val menu   = state.activeContextMenu ?: return
 
         if (itemId == CONFIRM_NO_ID) {
-            closeContextMenu()
+            popContextMenu()
+            return
+        }
+
+        menu.submenuFor(itemId)?.let { submenu ->
+            _uiState.update { it.copy(activeContextMenu = submenu) }
             return
         }
         if (itemId == CONFIRM_YES_ID) {
@@ -6007,6 +6018,10 @@ class XMBViewModel @Inject constructor(
 
     fun closeContextMenu() {
         _uiState.update { it.copy(activeContextMenu = null) }
+    }
+
+    fun popContextMenu() {
+        _uiState.update { it.copy(activeContextMenu = it.activeContextMenu?.parent) }
     }
 
     private fun openAppPicker(target: AppPickerTarget, title: String) {

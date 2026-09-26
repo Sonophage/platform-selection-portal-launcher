@@ -63,8 +63,101 @@ class MenuRowsTest {
         )
         assertEquals(
             listOf("first", "second", "third"),
-            menuRows(menu, pillIds = emptySet()).map { it.id },
+            menuRows(menu, pillIds = emptySet(), bundle = false).map { it.id },
         )
     }
 
+    @Test
+    fun `a group of two or more collapses into one row that opens a submenu`() {
+        val menu = listOf(
+            row("play"),
+            row("emulator", MenuGroup.SETTINGS),
+            row("icons", MenuGroup.SETTINGS),
+        )
+        val rows = menuRows(menu, pillIds = emptySet())
+
+        assertEquals(listOf("play", groupRowId(MenuGroup.SETTINGS)), rows.map { it.id })
+        assertEquals("the submenu row is not marked as one", true, rows.last().opensSubmenu)
+        assertEquals("Settings", rows.last().label)
+    }
+
+    @Test
+    fun `a group of one is hoisted to the root rather than hidden behind a press`() {
+        val menu = listOf(row("play"), row("icons", MenuGroup.SETTINGS))
+        val rows = menuRows(menu, pillIds = emptySet())
+
+        assertEquals(listOf("play", "icons"), rows.map { it.id })
+        assertEquals("a lone row was buried in a submenu", false, rows.last().opensSubmenu)
+    }
+
+    @Test
+    fun `the rows that must always be one press away stay at the root`() {
+        val menu = listOf(
+            row("play"),
+            row("favorite", MenuGroup.LIBRARY),
+            row("mark_as", MenuGroup.LIBRARY),
+            row("collections", MenuGroup.LIBRARY),
+            row("hide", MenuGroup.REMOVE),
+            row("remove_game", MenuGroup.REMOVE, destructive = true),
+        )
+        val rows = menuRows(menu, pillIds = emptySet()).map { it.id }
+
+        assertEquals(
+            listOf("play", "favorite", groupRowId(MenuGroup.LIBRARY), "hide", "remove_game"),
+            rows,
+        )
+    }
+
+    @Test
+    fun `a submenu is not bundled again, which would make it unreachable`() {
+        val menu = listOf(
+            row("play"),
+            row("emulator", MenuGroup.SETTINGS),
+            row("icons", MenuGroup.SETTINGS),
+            row("location", MenuGroup.SETTINGS),
+        )
+        val parent = XMBContextMenu(title = "Gran Turismo 4", items = menu)
+        val submenu = parent.submenuFor(groupRowId(MenuGroup.SETTINGS))
+
+        assertEquals("no submenu was built", true, submenu != null)
+        assertEquals(
+            listOf("emulator", "icons", "location"),
+            menuRows(submenu!!.items, pillIds = emptySet(), bundle = false).map { it.id },
+        )
+        assertEquals("the submenu cannot be backed out of", parent, submenu.parent)
+        assertEquals("the title stopped naming the object", "Gran Turismo 4", submenu.title)
+        assertEquals("Settings", submenu.subtitle)
+        assertEquals("the cursor is not on the first row", 0, submenu.selectedIndex)
+    }
+
+    @Test
+    fun `a row that stays at the root is never pulled into a submenu`() {
+        val menu = listOf(
+            row("favorite", MenuGroup.LIBRARY),
+            row("mark_as", MenuGroup.LIBRARY),
+            row("collections", MenuGroup.LIBRARY),
+        )
+        val submenu = XMBContextMenu(title = "x", items = menu).submenuFor(groupRowId(MenuGroup.LIBRARY))
+
+        assertEquals(listOf("mark_as", "collections"), submenu!!.items.map { it.id })
+    }
+
+
+    @Test
+    fun `the delete is still the last row once its group is bundled`() {
+        val menu = listOf(
+            row("play"),
+            row("hide_here", MenuGroup.REMOVE),
+            row("hide_everywhere", MenuGroup.REMOVE),
+            row("remove_game", MenuGroup.REMOVE, destructive = true),
+        )
+        val rows = menuRows(menu, pillIds = emptySet()).map { it.id }
+
+        assertEquals(
+            "the delete floated above the rows it should sit under",
+            "remove_game",
+            rows.last(),
+        )
+        assertEquals(listOf("play", groupRowId(MenuGroup.REMOVE), "remove_game"), rows)
+    }
 }
