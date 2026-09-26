@@ -5,6 +5,77 @@ All notable changes to PSPLauncher are documented here. This project follows
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-26
+
+A cohesion pass: the surfaces that had drifted into having a look of their own are brought back
+onto the app's shared chrome, and the sweep found four live bugs on the way.
+
+### Added
+- **The Music column's rows count, like every other column's.** Songs said "42 tracks" while
+  Artists, Albums and Playlists beside it said "Browse by who made it", "Browse by release" and
+  "Build and play your own track lists" — so Music was the only column in the app where a row
+  would not tell you whether there was anything behind it.
+
+  The artist number is the number of rows the Artists screen will actually have, not the number of
+  distinct artist tags. A track's artist tag is a credit line, so counting those counts credit
+  *combinations* — one performer scattered across a dozen rows and no row for the performer alone.
+
+- **The controller's sort control says which way it sorts.** It carries a ⇅ now; it was a bare
+  label sitting next to controls that all looked the same.
+
+### Changed
+- **Every context menu in the app is now the same menu.** Four were in circulation — the crossbar's
+  own options rail, the game detail panel's, the app drawer's, and the shared one — each with its
+  own width, corner radius, cursor and heading style. All four are now `PspContextMenuOverlay`.
+  `ContextMenuOverlay.kt`, `XmbRailCapsule.kt`, `DetailContextMenu.kt`, `AppDrawerOptions` and
+  `StorefrontAppDrawer.kt` are deleted — about 1,500 lines of duplicate menu.
+
+  The crossbar's menu kept the one thing that was genuinely its own: it opens with **nothing**
+  selected, so A still belongs to the row underneath it rather than to the menu's first entry.
+
+- **The size slider scales the whole app, not just the crossbar.** It always read as a global
+  setting and always said so on the label; it reached the cross and nothing else. The clock and
+  battery strip, the button hints and the full-screen chrome now scale with it too.
+
+- **The detail panel's tabs look like the Studio's tabs.** Two rows answering the same question —
+  "which of these views" — in two different looks: a rounded capsule with a white fill against the
+  Studio's 6dp chip with the accent colour on the current one. The Studio's is drawn against an
+  approved mock, so it is the one that stays.
+
+- **One search field everywhere.** The remaining screens that drew their own search box now draw
+  the App Drawer's.
+
+- **The hint bar no longer offers Filter and Sort where they do nothing**, and the Studio's button
+  prompts are title-cased like every other prompt in the app.
+
+### Fixed
+- **The app picker's third row was cut off.** On a 338dp-tall panel the grid needed 356dp, so the
+  bottom row was clipped by 18dp with nothing to say it was there — visible on the smaller of the
+  two handhelds and not on the tablet, which is why it survived this long. The grid now derives its
+  column count from the space it has, and the artwork's floor came down from 48dp to 40dp so three
+  rows fit where three rows are drawn.
+
+  The test that was supposed to catch this could not fail, and is replaced by one that can: the old
+  one asserted against `boundsInRoot`, which is clipped to the viewport, so a row pushed off the
+  bottom reported a tidy in-bounds rectangle. The new one sums the rows' heights instead.
+
+- **F1 did nothing while four screens printed "F1 Apply".** The key was named in the footer of the
+  filter and sort sheets and was bound to no action at all. A footer naming a key that does nothing
+  is worse than no footer, so there is now a test that walks every key the keyboard prompts name
+  and checks each one reaches something.
+
+- **The music browser's search box moved the caret to the end on every keystroke**, the same bug
+  the other search fields had already been fixed for.
+
+- **One button prompt named B where the button was A**, and four screens showed an empty list with
+  no word about why it was empty.
+
+### Removed
+- **The charging shimmer no longer runs when you are not looking at it.** The battery icon's
+  animation kept redrawing behind the app drawer, the pickers and every full-screen page —
+  723 frames over 12 seconds on the app drawer alone, for an icon that was not on screen. It now
+  runs on the crossbar and nowhere else.
+
 ## [1.11.1] - 2026-09-24
 
 ### Added

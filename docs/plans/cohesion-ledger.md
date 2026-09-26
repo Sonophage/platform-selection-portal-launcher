@@ -9,6 +9,14 @@ from the review. Status is `DONE`, `PARTIAL` or `OPEN`.
 **Each item carries the command that decides it.** Run the command; do not trust the status line.
 A status is a claim with a date on it and it drifts exactly like the claim it replaced.
 
+Every numbered item 1–16 is resolved as of 2026-09-26 — which makes the `Closed` / `Half-closed`
+headings below history rather than an index. What is still open is in the `N` items at the foot.
+This sentence is a claim with a date on it too; the status line of every item is in one place:
+
+```sh
+grep -E '^### ' docs/plans/cohesion-ledger.md
+```
+
 ---
 
 ## Closed
@@ -300,7 +308,7 @@ What is genuinely left is narrow: the capsule and the chip are two filled looks 
 situation. Converging them changes the appearance of one of them, and the Studio's follows an
 approved mock — so it is a design decision, not a cleanup.
 
-### 15. The subtitle slot does four jobs — REAL, and gated on the data layer
+### 15. The subtitle slot does four jobs — DONE (a11daa91)
 
 The slot carries counts ("3966 tracks"), instructions ("Browse by who made it"), status
 ("Now Playing · artist") and content lists ("Recently Watched, Favorites & Playlists").
@@ -316,9 +324,18 @@ and two rows, and it needs the solo-credit evidence pass to split joint credits 
 Playlists are cheaper, but doing those two and not Artists puts a new inconsistency inside the
 same column.
 
-**What it needs:** artist / album / playlist counts pre-aggregated in the data layer beside
-`trackCount`, so the column builder stays pure. Then all four rows say how many, like every other
-media column.
+**What it needed, and what was done:** the three counts are pre-aggregated onto `XMBUiState`
+beside `musicFolders`, so the column builder stays pure. They are computed where `observeMusic`
+already collects `observeFolders` — a scan moves a folder's `trackCount` and re-emits, while
+playing a song writes `lastPlayedAt` on one row and does not, so observing the tracks directly
+would have regrouped the whole library on every press of play. Artists is `artistGroups().size`,
+the same call `rebuildBrowserGroupRows` makes, so the number on the row is the number of rows the
+screen behind it will have. The grouping runs on `Dispatchers.Default`; `viewModelScope` is the
+main thread and this reads the whole track table.
+
+The guard asks the row list whether every subtitle starts with a digit rather than naming the
+three rows that changed, so a fifth Music row is checked without anyone remembering. Falsified by
+reverting Albums to "Browse by release".
 
 ### 16. The status strip's centre is unlabelled — DONE
 
