@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -90,6 +91,7 @@ fun XmbLetterRail(
 
             verticalArrangement = Arrangement.spacedBy(0.dp),
             modifier = Modifier
+                .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = TAB_CORNER, bottomStart = TAB_CORNER))
                 .background(
                     Brush.horizontalGradient(
