@@ -187,6 +187,11 @@ typealias XMBContextMenuItem = MenuRow<String>
 
 data class CollectionNameDialogState(
     val title: String,
+
+    val subtitle: String? = null,
+
+    val resetLabel: String? = null,
+
     val initialText: String = "",
 
     val text: String = initialText,
@@ -5335,6 +5340,8 @@ class XMBViewModel @Inject constructor(
                         closeContextMenu()
                         _uiState.update { it.copy(collectionNameDialog = CollectionNameDialogState(
                             title = "Edit Title",
+                            subtitle = "The name shown in the launcher and used when scraping artwork.",
+                            resetLabel = "Use Scanned Name",
                             initialText = game.displayTitle,
                             editTitleGameId = gid,
                             placeholder = "Leave blank to use the scanned name",
@@ -5345,6 +5352,7 @@ class XMBViewModel @Inject constructor(
                         closeContextMenu()
                         _uiState.update { it.copy(collectionNameDialog = CollectionNameDialogState(
                             title = "Edit Note",
+                            subtitle = "Kept with the game. Only you see it.",
                             initialText = game.userNote.orEmpty(),
                             editNoteGameId = gid,
                             placeholder = "Anything you want to remember about this game",

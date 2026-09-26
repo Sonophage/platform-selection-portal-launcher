@@ -88,6 +88,7 @@ import com.psplauncher.core.ui.detail.PfpDetailScaffold
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 
 private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
 
@@ -192,18 +193,17 @@ fun AppDetailScreen(
             enter   = fadeIn(),
             exit    = fadeOut(),
         ) {
-            Box(
-                Modifier.fillMaxSize().background(Color(0xCC000000)),
-                contentAlignment = Alignment.Center,
-            ) {
-                AppNameEditor(
-                    text      = state.nameText,
-                    onChange  = viewModel::onNameTextChanged,
-                    onSave    = viewModel::confirmNameEdit,
-                    onReset   = viewModel::resetNameToDefault,
-                    onCancel  = viewModel::cancelNameEdit,
-                )
-            }
+            PfpTextPromptOverlay(
+                title         = "Change Display Name",
+                subtitle      = "Sets the display name used in the launcher and for artwork scraping.",
+                value         = state.nameText,
+                placeholder   = "Display Name",
+                onValueChange = viewModel::onNameTextChanged,
+                onConfirm     = viewModel::confirmNameEdit,
+                onCancel      = viewModel::cancelNameEdit,
+                resetLabel    = "Reset to Default",
+                onReset       = viewModel::resetNameToDefault,
+            )
         }
 
         AnimatedVisibility(
@@ -476,66 +476,6 @@ private fun AppArtworkPicker(
                 color    = TextMuted.copy(alpha = 0.5f),
                 fontSize = 10.sp,
             )
-        }
-    }
-}
-
-@Composable
-private fun AppNameEditor(
-    text: String,
-    onChange: (String) -> Unit,
-    onSave: () -> Unit,
-    onReset: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .widthIn(max = 480.dp)
-            .fillMaxWidth(0.9f)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xF20A0A14))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("Change Display Name", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Text(
-            "Sets the display name used in the launcher and for artwork scraping.",
-            color    = TextMuted,
-            fontSize = 11.sp,
-        )
-        OutlinedTextField(
-            value          = text,
-            onValueChange  = onChange,
-            label          = { Text("Display Name", color = TextMuted) },
-            modifier       = Modifier.fillMaxWidth(),
-            colors         = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor   = menuCursorEdge(),
-                unfocusedBorderColor = Color(0x44FFFFFF),
-                focusedTextColor     = TextPrimary,
-                unfocusedTextColor   = TextPrimary,
-                cursorColor          = menuCursorEdge(),
-            ),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Words,
-                imeAction      = ImeAction.Done,
-            ),
-            keyboardActions = KeyboardActions(onDone = { onSave() }),
-            singleLine      = true,
-        )
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onReset) {
-                Text("Reset to Default", color = TextMuted, fontSize = 12.sp)
-            }
-            Row {
-                TextButton(onClick = onCancel) { Text("Cancel", color = TextMuted) }
-                TextButton(onClick = onSave) {
-                    Text("Save", color = menuCursorEdge(), fontWeight = FontWeight.SemiBold)
-                }
-            }
         }
     }
 }

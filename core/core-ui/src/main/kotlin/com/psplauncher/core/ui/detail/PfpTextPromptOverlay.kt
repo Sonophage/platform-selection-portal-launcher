@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.Alignment
 
 @Composable
 fun PfpTextPromptOverlay(
@@ -32,6 +34,9 @@ fun PfpTextPromptOverlay(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    resetLabel: String? = null,
+    onReset: (() -> Unit)? = null,
     confirmLabel: String = "Save",
     cancelLabel: String = "Cancel",
 ) {
@@ -41,6 +46,10 @@ fun PfpTextPromptOverlay(
 
     PfpOverlayCard(onScrimTap = onCancel, modifier = modifier) {
         PfpOverlayTitle(title)
+        subtitle?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, color = DetailTextMuted, fontSize = 11.sp)
+        }
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             value = value,
@@ -63,10 +72,22 @@ fun PfpTextPromptOverlay(
             keyboardActions = KeyboardActions(onDone = { onConfirm() }),
         )
         Spacer(Modifier.height(6.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                if (onReset != null) Arrangement.SpaceBetween else Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onReset != null && resetLabel != null) {
+                TextButton(onClick = onReset) {
+                    Text(resetLabel, color = DetailTextMuted, fontSize = 12.sp)
+                }
+            }
+            Row {
             TextButton(onClick = onCancel) { Text(cancelLabel, color = DetailTextMuted) }
             TextButton(onClick = onConfirm) {
                 Text(confirmLabel, color = detailPalette().focus, fontWeight = FontWeight.SemiBold)
+            }
             }
         }
     }
