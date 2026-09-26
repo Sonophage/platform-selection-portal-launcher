@@ -1037,7 +1037,13 @@ fun XMBShell(
 
             val rootActionsVisible = uiState.stripShowsXmbContext && !uiState.isInSubItem
 
-            if (uiState.stripShowsXmbContext) {
+            val letterRailFade by animateFloatAsState(
+                if (uiState.activeContextMenu != null) 0f else 1f,
+                tween(LetterRailFadeMs),
+                label = "letterRailFade",
+            )
+
+            if (uiState.stripShowsXmbContext && letterRailFade > 0f) {
                 XmbLetterRail(
                     items = uiState.currentItems,
                     letterJump = uiState.letterJump,
@@ -1047,6 +1053,7 @@ fun XMBShell(
                         .align(Alignment.CenterEnd)
 
                         .padding(top = StatusStripHeight, bottom = HintBarHeight, end = 4.dp)
+                        .alpha(letterRailFade)
                         .zIndex(XmbChromeZ),
                 )
             }
@@ -1555,4 +1562,6 @@ private fun PreviewXMBRedTheme() {
 private const val NotificationBarZ = 0.5f
 
 private const val XmbChromeZ = 0.6f
+
+private const val LetterRailFadeMs = 160
 
