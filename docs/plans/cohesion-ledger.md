@@ -361,7 +361,7 @@ Unmeasured; nothing here is verified yet.
 The Titan Elite's keyboard reports `KEYBOARD | TOUCH | TOUCH_MT` on `sub_touch`. Owner wants it
 usable for swipe gestures. Unscoped.
 
-### N5. `XMBViewModel` is 10,878 lines
+### N5. `XMBViewModel` is 10,925 lines
 
 Split proposed, never written up. Proposal only — no split without a plan on the table first.
 

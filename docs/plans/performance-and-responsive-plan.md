@@ -96,7 +96,7 @@ Blocked on hardware. No code until (1) answers yes.
 
 ---
 
-## 3. Responsive layout — PLANNED
+## 3. Responsive layout — 4 of 6 DONE
 
 Owner: *"fix the dead space the app should be responsive."*
 
@@ -195,10 +195,11 @@ problem in Search and the App Picker via `moveSearch` / `gridMove`.
    ViewModel's cursor, and the scroll-back-one-row effect in `SearchScreen`, which was the one
    nearly missed.
 
-4. **The App Picker.** Not done, and not urgent: its pair is currently self-consistent (grid and
-   `gridMove` both read `PICKER_GRID_COLUMNS = 7`), and its artwork already adapts by HEIGHT via
-   `pickerAdaptiveArtworkSize`. A wider panel there gives wider gaps rather than bigger art, which
-   is a milder defect than Search's was. Same mechanical change when it comes.
+4. **The App Picker.** DONE. Same change: the grid measures its width and divides by a 99dp
+   target tile (what the old fixed seven produced on the handheld — 100dp would have truncated it
+   to six). `AppPickerState.columns` carries the measurement to `gridMove`, guarded across 3..12
+   columns and falsified. It also exposed that `AppPickerThreeRowsTest` could never fail, and that
+   the three-row guarantee holds only above a 356dp grid viewport.
 5. **Extend the scale provider to the chrome screens**, or decide deliberately that chrome stays
    at base density. Right now it is neither — it is simply unwired. Still open, still a decision.
 6. **The XMB crossbar is left alone.** Its composition is deliberate and the slider already works
