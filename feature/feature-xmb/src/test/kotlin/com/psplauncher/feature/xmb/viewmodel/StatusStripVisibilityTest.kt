@@ -3,6 +3,7 @@ package com.psplauncher.feature.xmb.viewmodel
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuState
 
 class StatusStripVisibilityTest {
     private fun crossbar() = XMBUiState(showBootSequence = false)
@@ -61,7 +62,7 @@ class StatusStripVisibilityTest {
     @Test
     fun `the rail and the sheet keep both the strip and its crossbar context`() {
         val rail = crossbar().copy(
-            activeContextMenu = XMBContextMenu(title = "Options", items = emptyList()),
+            activeContextMenu = XMBContextMenu(state = MenuState(title = "Options", rows = emptyList())),
         )
         assertTrue(rail.statusStripVisible)
         assertTrue("the rail is not a cover; the crossbar is still underneath it", rail.stripShowsXmbContext)
@@ -75,7 +76,7 @@ class StatusStripVisibilityTest {
     fun `a rail over a chrome screen does not restore the crossbar's context`() {
         val state = crossbar().copy(
             activeAppDrawerFilter = "DEFAULT",
-            activeContextMenu = XMBContextMenu(title = "Options", items = emptyList()),
+            activeContextMenu = XMBContextMenu(state = MenuState(title = "Options", rows = emptyList())),
         )
         assertTrue("the drawer still keeps the clock", state.statusStripVisible)
         assertFalse("the crossbar is two screens away", state.stripShowsXmbContext)

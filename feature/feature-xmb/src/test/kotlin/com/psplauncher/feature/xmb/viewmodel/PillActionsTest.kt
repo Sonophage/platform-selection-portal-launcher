@@ -7,6 +7,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuGroup
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.rowsShown
+import com.psplauncher.core.ui.components.foldedIntoGroups
 
 class PillActionsTest {
     private fun state(directLaunch: Boolean = true) = XMBUiState(
@@ -36,7 +40,7 @@ class PillActionsTest {
         discCount = 1,
         onRecentShelf = false,
         hideLocation = null,
-    ).map { it.id }
+    ).mapNotNull { it.action }
 
     @Test
     fun `every game pill is a row the game menu offers`() {
@@ -53,7 +57,7 @@ class PillActionsTest {
 
     @Test
     fun `every app pill is a row the app menu offers`() {
-        val menu = appContextMenuItems(state(), categoryId = null, onRecentShelf = false).map { it.id }
+        val menu = appContextMenuItems(state(), categoryId = null, onRecentShelf = false).mapNotNull { it.action }
         pillsFor(app()).forEach { pill ->
             assertTrue(
                 "pill '${pill.label}' dispatches '${pill.id}', which the app menu does not offer: $menu",
@@ -67,15 +71,15 @@ class PillActionsTest {
         val item    = game()
         val menu    = gameContextMenuItems(item, state(), discCount = 1, onRecentShelf = false, hideLocation = null)
         val pillIds = pillsFor(item).map { it.id }.toSet()
-        val rows    = menuRows(menu, pillIds)
+        val rows    = MenuState("Gran Turismo 4", menu, withheld = pillIds).rowsShown()
 
         assertTrue(
-            "the menu drew a pill's own action: ${rows.map { it.id }.filter { it in pillIds }}",
-            rows.none { it.id in pillIds },
+            "the menu drew a pill's own action: ${rows.mapNotNull { it.action }.filter { it in pillIds }}",
+            rows.none { it.action in pillIds },
         )
 
         val firstPill = pillsFor(item).first()
-        val atThatIndex = rows.getOrNull(menu.indexOfFirst { it.id == firstPill.id })?.id
+        val atThatIndex = rows.getOrNull(menu.indexOfFirst { it.action == firstPill.id })?.action
         assertTrue(
             "activating by index would have run '$atThatIndex' for the '${firstPill.label}' pill",
             atThatIndex != firstPill.id,

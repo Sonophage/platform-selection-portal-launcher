@@ -9,6 +9,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuGroup
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.rowsShown
+import com.psplauncher.core.ui.components.foldedIntoGroups
 
 class ContextMenusTest {
     private fun category(id: String, gaming: Boolean = false) = Category(
@@ -40,7 +44,7 @@ class ContextMenusTest {
         subtitle = subtitle,
     )
 
-    private fun ids(items: List<XMBContextMenuItem>) = items.map { it.id }
+    private fun ids(items: List<XMBContextMenuItem>) = items.map { it.action }
 
     @Test
     fun `choose disc appears only for a multi-disc set`() {
@@ -100,7 +104,7 @@ class ContextMenusTest {
         )
         assertEquals(
             "Hide from Favorites",
-            inFavorites.first { it.id == "hide_here" }.label,
+            inFavorites.first { it.action == "hide_here" }.label,
         )
     }
 
@@ -125,7 +129,7 @@ class ContextMenusTest {
         val items = gameContextMenuItems(
             game(), state(selectedPlatformId = XMBViewModel.MISSING_PLATFORM_ID), 1, false, null,
         )
-        assertEquals(listOf("remove_missing"), items.filter { it.isDestructive }.map { it.id })
+        assertEquals(listOf("remove_missing"), items.filter { it.isDestructive }.map { it.action })
 
         assertFalse("remove_game" in ids(items))
     }
@@ -218,7 +222,7 @@ class ContextMenusTest {
     fun `hide from category names the category`() {
         val cats = listOf(category("retro"))
         val items = appContextMenuItems(state(cats), categoryId = "retro", onRecentShelf = false)
-        assertEquals("Hide from retro", items.first { it.id == "hide_from_category" }.label)
+        assertEquals("Hide from retro", items.first { it.action == "hide_from_category" }.label)
     }
 
     @Test
@@ -332,12 +336,12 @@ class ContextMenusTest {
             listOf(true, false).forEach { shelf ->
                 val where = "direct=$direct shelf=$shelf"
                 val items = gameContextMenuItems(game(), state(directLaunch = direct), 1, shelf, null)
-                val play = items.firstOrNull { it.id == "play" }
+                val play = items.firstOrNull { it.action == "play" }
                 assertTrue("$where: no play entry left to dispatch by id", play != null)
                 assertTrue("$where: Play is drawn in the menu", play!!.hidden)
                 assertFalse(
                     "$where: Play reached the menu anyway",
-                    "play" in menuRows(items, pillIds = emptySet()).map { it.id },
+                    "play" in MenuState("t", items).rowsShown().map { it.action },
                 )
             }
         }
@@ -372,15 +376,15 @@ class ContextMenusTest {
         val all = listOf(main, shooters, category("rpgs", gaming = true))
 
         listOf(0 to "add_category", 1 to "move_category").forEach { (index, id) ->
-            val rows = gameContextMenuItems(game(), state(all, index), 1, false, null).inMenuOrder()
-            val category = rows.filter { it.group == MenuGroup.CATEGORY }.map { it.id }
+            val rows = gameContextMenuItems(game(), state(all, index), 1, false, null).sortedBy { it.group.ordinal }
+            val category = rows.filter { it.group == MenuGroup.CATEGORY }.map { it.action }
 
             assertTrue("no category rows at all from slot $index", category.isNotEmpty())
             assertTrue("'$id' is not among the category rows", id in category)
             assertEquals(
                 "the category rows are not contiguous",
                 category,
-                rows.map { it.id }.filter { it in category },
+                rows.map { it.action }.filter { it in category },
             )
         }
     }
@@ -388,7 +392,7 @@ class ContextMenusTest {
     @Test
     fun `the groups a game menu uses are the shared ones, in rank order`() {
         val groups = gameContextMenuItems(game(), state(), 2, true, null)
-            .inMenuOrder()
+            .sortedBy { it.group.ordinal }
             .map { it.group }
 
         assertEquals("a group is split in two", groups.distinct(), groups.distinct().sortedBy { it.ordinal })

@@ -1,15 +1,9 @@
 package com.psplauncher.feature.xmb.viewmodel
 
-internal fun menuRows(
-    all: List<XMBContextMenuItem>,
-    pillIds: Set<String>,
-    bundle: Boolean = true,
-): List<XMBContextMenuItem> {
-    val visible = all.filterNot { it.hidden || it.id in pillIds }
-    return if (bundle) visible.withSubmenuRows() else visible.inMenuOrder()
-}
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.rowsShown
 
-fun XMBUiState.menuRows(): List<XMBContextMenuItem> {
-    val menu = activeContextMenu ?: return emptyList()
-    return menuRows(menu.items, focusedPills().map { it.id }.toSet(), bundle = menu.parent == null)
-}
+internal fun XMBUiState.menuWithPills(): MenuState<String>? =
+    activeContextMenu?.state?.copy(withheld = focusedPills().map { it.id }.toSet())
+
+fun XMBUiState.menuRows(): List<XMBContextMenuItem> = menuWithPills()?.rowsShown().orEmpty()

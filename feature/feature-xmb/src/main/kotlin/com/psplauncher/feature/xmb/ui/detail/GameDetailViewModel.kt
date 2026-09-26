@@ -38,7 +38,7 @@ import com.psplauncher.feature.launcher.LaunchDispatchResult
 import com.psplauncher.feature.launcher.ResolvedLaunch
 import com.psplauncher.feature.launcher.byLaunchPreference
 import com.psplauncher.feature.launcher.supportsPlatform
-import com.psplauncher.feature.xmb.viewmodel.MenuGroup
+import com.psplauncher.core.ui.components.MenuGroup
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow

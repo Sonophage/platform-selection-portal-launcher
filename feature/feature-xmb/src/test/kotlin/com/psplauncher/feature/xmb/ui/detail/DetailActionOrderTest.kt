@@ -1,6 +1,6 @@
 package com.psplauncher.feature.xmb.ui.detail
 
-import com.psplauncher.feature.xmb.viewmodel.MenuGroup
+import com.psplauncher.core.ui.components.MenuGroup
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

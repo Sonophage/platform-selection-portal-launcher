@@ -4,28 +4,7 @@ import com.psplauncher.core.domain.model.BuiltInCategory
 import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.HideLocationType
 import com.psplauncher.core.domain.model.PlatformIds
-
-enum class MenuGroup(val label: String?) {
-    MAIN(null),
-    LIBRARY("Library"),
-    SETTINGS("Settings"),
-    CATEGORY("Category"),
-    REMOVE("Remove"),
-}
-
-internal const val GROUP_ROW_PREFIX = "group_"
-
-internal fun groupRowId(group: MenuGroup) = "$GROUP_ROW_PREFIX${group.name}"
-
-internal fun groupOfRowId(id: String): MenuGroup? =
-    id.removePrefix(GROUP_ROW_PREFIX).takeIf { it != id }?.let { name ->
-        MenuGroup.entries.firstOrNull { it.name == name }
-    }
-
-internal fun XMBContextMenuItem.staysAtRoot(): Boolean =
-    group == MenuGroup.MAIN || isDestructive || id in ROOT_PINNED_IDS
-
-internal val ROOT_PINNED_IDS = setOf("favorite", "unfavorite", "video_favorite")
+import com.psplauncher.core.ui.components.MenuGroup
 
 internal fun XMBUiState.currentCategoryOrNull(): Category? =
     categories.getOrNull(selectedCategoryIndex)
@@ -61,9 +40,10 @@ internal fun gameContextMenuItems(
 
         add(
             XMBContextMenuItem(
-                id = if (item.isFavorite) "unfavorite" else "favorite",
+                action = if (item.isFavorite) "unfavorite" else "favorite",
                 label = if (item.isFavorite) "Remove from Favorites" else "Add to Favorites",
                 group = MenuGroup.LIBRARY,
+                pinnedToRoot = true,
             ),
         )
 
@@ -120,7 +100,7 @@ internal fun appContextMenuItems(
     add(XMBContextMenuItem("launch", "Launch"))
 
     add(XMBContextMenuItem("mark_game", "Mark as Game", group = MenuGroup.LIBRARY))
-    add(XMBContextMenuItem("favorite", "Add to Favorites", group = MenuGroup.LIBRARY))
+    add(XMBContextMenuItem("favorite", "Add to Favorites", group = MenuGroup.LIBRARY, pinnedToRoot = true))
     if (onRecentShelf) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent", group = MenuGroup.LIBRARY))
     add(XMBContextMenuItem("add_to_collection", "Add to Collection", group = MenuGroup.LIBRARY))
 
@@ -150,12 +130,12 @@ internal fun videoFileContextMenuItems(
     if (resumePositionMs > 0) add(XMBContextMenuItem("video_resume", "Resume"))
     add(XMBContextMenuItem("video_details", "Details"))
 
-    add(XMBContextMenuItem("video_favorite", if (isFavorite) "Remove from Favorites" else "Add to Favorites", group = MenuGroup.LIBRARY))
+    add(XMBContextMenuItem("video_favorite", if (isFavorite) "Remove from Favorites" else "Add to Favorites", group = MenuGroup.LIBRARY, pinnedToRoot = true))
     add(XMBContextMenuItem("video_add_playlist", "Add to Playlist", group = MenuGroup.LIBRARY))
     if (hasWatchStamp) add(XMBContextMenuItem("video_remove_recent", "Remove from Recent", group = MenuGroup.LIBRARY))
 
     if (inPlaylist) {
-        add(XMBContextMenuItem("video_remove_playlist", "Remove from this Playlist", isDestructive = true, group = MenuGroup.REMOVE))
+        add(XMBContextMenuItem("video_remove_playlist", "Remove from this Playlist", isDestructive = true, confirms = false, group = MenuGroup.REMOVE))
     }
     add(XMBContextMenuItem("video_remove", "Remove From Library", isDestructive = true, group = MenuGroup.REMOVE))
 }
@@ -200,7 +180,7 @@ internal fun musicTrackContextMenuItems(
     if (hasPlayStamp) add(XMBContextMenuItem("remove_from_recent", "Remove from Recent", group = MenuGroup.LIBRARY))
 
     if (playlistId != null) {
-        add(XMBContextMenuItem("remove_from_playlist", "Remove from this Playlist", isDestructive = true, group = MenuGroup.REMOVE))
+        add(XMBContextMenuItem("remove_from_playlist", "Remove from this Playlist", isDestructive = true, confirms = false, group = MenuGroup.REMOVE))
     }
     add(XMBContextMenuItem("remove_track", "Remove From Library", isDestructive = true, group = MenuGroup.REMOVE))
 }
@@ -269,63 +249,4 @@ internal fun collectionRowContextMenuItems(
     )
 
     add(XMBContextMenuItem("delete_collection", "Delete Collection", isDestructive = true, group = MenuGroup.REMOVE))
-}
-
-internal fun List<XMBContextMenuItem>.inMenuOrder(): List<XMBContextMenuItem> =
-    sortedBy { it.group.ordinal }
-
-internal fun List<XMBContextMenuItem>.withSubmenuRows(): List<XMBContextMenuItem> =
-    inMenuOrder()
-        .groupBy { it.group }
-        .toSortedMap(compareBy { it.ordinal })
-        .flatMap { (group, rows) ->
-            val pinned = rows.filter { it.staysAtRoot() && !it.isDestructive }
-            val bundled = rows.filterNot { it.staysAtRoot() }
-
-            pinned + when (bundled.size) {
-                0, 1 -> bundled
-                else -> listOf(
-                    XMBContextMenuItem(
-                        id = groupRowId(group),
-                        label = group.label ?: group.name,
-                        group = group,
-                        opensSubmenu = true,
-                    ),
-                )
-            } + rows.filter { it.isDestructive }
-        }
-
-internal const val CONFIRM_YES_ID = "confirm_destructive"
-internal const val CONFIRM_NO_ID = "cancel_destructive"
-
-internal val CONFIRM_EXEMPT_IDS = setOf("video_remove_playlist", "remove_from_playlist")
-
-internal fun XMBContextMenuItem.needsConfirm(): Boolean = isDestructive && id !in CONFIRM_EXEMPT_IDS
-
-internal fun destructiveConfirmItems(verb: String): List<XMBContextMenuItem> = listOf(
-    XMBContextMenuItem(CONFIRM_NO_ID, "Cancel"),
-    XMBContextMenuItem(CONFIRM_YES_ID, verb, isDestructive = true),
-)
-
-internal fun XMBContextMenu.confirmSwapFor(itemId: String): XMBContextMenu? {
-    val row = items.firstOrNull { it.id == itemId && it.needsConfirm() } ?: return null
-    return copy(
-        subtitle         = "${row.label}?",
-        items            = destructiveConfirmItems(row.label),
-        selectedIndex    = 0,
-        pendingConfirmId = itemId,
-        parent           = this,
-    )
-}
-
-internal fun XMBContextMenu.submenuFor(itemId: String): XMBContextMenu? {
-    val group = groupOfRowId(itemId) ?: return null
-    val rows = items.filter { it.group == group && !it.staysAtRoot() }
-    if (rows.isEmpty()) return null
-    return copy(
-        subtitle      = group.label,
-        items         = rows,
-        selectedIndex = 0,
-        parent        = this,
-    )
 }
