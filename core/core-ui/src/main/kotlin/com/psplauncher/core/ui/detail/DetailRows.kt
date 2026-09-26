@@ -29,19 +29,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// ── Full-width information rows ───────────────────────────────────────────────
-//
-// The approved direction replaces a collection of floating Material cards with full-width
-// rows on the page's accent surface. Every row here shares one visual language: a recessed accent
-// fill with a lifted accent edge, a thin bright accent edge when the controller
-// cursor is on it, and no size change under focus.
-//
-// Rows are deliberately one node each: the controller cursor moves between rows, so a row must be
-// tall enough to read as a target and stable enough that focusing it never reflows the page.
-
 private val RowShape = RoundedCornerShape(10.dp)
 
-/** Shared row chrome: fill, edge, focus ring and padding for every full-width information row. */
 @Composable
 private fun RowShell(
     focused: Boolean,
@@ -53,7 +42,7 @@ private fun RowShell(
         modifier = modifier
             .fillMaxWidth()
             .clip(RowShape)
-            // Fill first, so the focus lift paints over the opaque row rather than under it.
+
             .background(DetailRowFill, RowShape)
             .detailFocusRing(
                 focused = focused,
@@ -71,12 +60,6 @@ private fun RowShell(
     }
 }
 
-/**
- * A labelled row carrying a progress figure: value line plus a bar.
- *
- * Progress never depends on colour alone — the earned/total pair and the percentage are both
- * spelled out, and the bar is only the quick read.
- */
 @Composable
 fun PfpDetailProgressRow(
     label: String,
@@ -132,7 +115,6 @@ fun PfpDetailProgressRow(
     }
 }
 
-/** A thin progress bar. Sized in layout (not Canvas) so it turns up in semantics trees. */
 @Composable
 fun PfpDetailProgressBar(
     progress: Float,
@@ -160,10 +142,6 @@ fun PfpDetailProgressBar(
     }
 }
 
-/**
- * A long-text row (the game description). Collapsed it shows a few readable lines; expanding is a
- * Confirm away, and the row grows in place rather than pushing the text into a fixed-height box.
- */
 @Composable
 fun PfpDetailTextRow(
     label: String,
@@ -203,13 +181,6 @@ fun PfpDetailTextRow(
     }
 }
 
-/**
- * The structured information band: one row surface whose fields wrap from a single horizontal band
- * into multiple rows as the page narrows, so no field is ever squeezed or clipped.
- *
- * Cells are plain composables ([PfpDetailField]) rather than data, because each field can be its own
- * focusable node (the emulator field opens a picker) and must therefore carry its own click target.
- */
 @Composable
 fun PfpDetailFieldBand(
     focused: Boolean,
@@ -221,7 +192,7 @@ fun PfpDetailFieldBand(
         modifier = modifier
             .fillMaxWidth()
             .clip(RowShape)
-            // Fill first, so the focus lift paints over the opaque row rather than under it.
+
             .background(DetailRowFill, RowShape)
             .detailFocusRing(
                 focused = focused,
@@ -239,7 +210,6 @@ fun PfpDetailFieldBand(
     }
 }
 
-/** One field inside a [PfpDetailFieldBand]. */
 @Composable
 fun PfpDetailField(
     label: String,
@@ -305,12 +275,6 @@ fun PfpDetailField(
     }
 }
 
-/**
- * A wrapping grid of equally sized cells, without pulling in the experimental FlowRow.
- *
- * The column count is derived from the real available width (a 210dp minimum cell), so the same
- * band renders three across on a wide landscape handheld and one or two when the page narrows.
- */
 @Composable
 private fun WrappingFieldGrid(
     modifier: Modifier = Modifier,
@@ -354,5 +318,4 @@ private fun WrappingFieldGrid(
     }
 }
 
-/** Vertical spacing between stacked page rows. */
 val DetailRowSpacing: Dp = 12.dp

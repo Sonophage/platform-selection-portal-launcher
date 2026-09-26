@@ -5,14 +5,7 @@ import com.psplauncher.core.domain.model.KnownEmulatorPackages
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * Structural invariants for the curated catalog. Every rule here encodes an assumption the
- * detector or resolver relies on; a violation would produce a profile that cannot launch.
- */
 class KnownEmulatorCatalogTest {
-
-    // Mirrors PlatformSeeder.kt — update together. "symbian" is a documented exception:
-    // EKA2L1 predates a seeded Symbian platform.
     private val seededPlatformIds = setOf(
         "psx", "ps2", "psp", "ps3", "psvita",
         "nes", "snes", "n64", "gb", "gbc", "gba", "nds", "n3ds", "gc", "wii", "wiiu",
@@ -60,8 +53,7 @@ class KnownEmulatorCatalogTest {
                 entry.attachRomData || entry.intentExtras.values.any {
                     it.contains("{rom_uri}") || it.contains("{rom_path}")
                 } ||
-                    // ID-launch entries (e.g. Vita3K) boot an installed title by {title_id} and
-                    // deliver no ROM file by design.
+
                     (entry.intentExtras.values + entry.intentArrayExtras.values.flatten())
                         .any { it.contains("{title_id}") }
             }
@@ -82,7 +74,6 @@ class KnownEmulatorCatalogTest {
 
     @Test
     fun `activity classes are fully qualified`() {
-        // ComponentName(pkg, cls) does not expand manifest-style ".Relative" names.
         val relative = KnownEmulatorCatalog.entries
             .mapNotNull { entry -> entry.activityClass?.let { entry.suggestedName to it } }
             .filter { (_, cls) -> !cls.contains('.') || cls.startsWith('.') }
@@ -91,9 +82,6 @@ class KnownEmulatorCatalogTest {
 
     @Test
     fun `ARMSX family boots via ACTION_VIEW content uri into the manifest activity`() {
-        // Pinned against the shipped manifests (ARMSX1 0.1.3, ARMSX2, ARMSX3 0.9.7.3): the
-        // exported activity has a scheme-only VIEW filter (content/file, no MIME) and no
-        // extras. All three share the com.armsx2.* frontend classes despite their packages.
         val expected = mapOf(
             "com.nanodata.armsx" to ("com.armsx2.Main" to "psx"),
             "com.armsx2"         to ("com.armsx2.MainActivity" to "ps2"),
@@ -113,8 +101,6 @@ class KnownEmulatorCatalogTest {
 
     @Test
     fun `X1 BOX boots via ACTION_VIEW into its exported LauncherActivity`() {
-        // Pinned against the X1 BOX 1.2.5 manifest: LauncherActivity is the only exported
-        // activity (MainActivity is not), with a scheme-only VIEW filter (content/file).
         val entry = KnownEmulatorCatalog.entries.singleOrNull { "com.izzy2lost.x1box" in it.packageNames }
         assertTrue(entry != null, "No catalog entry for X1 BOX")
         assertTrue(entry.intentType == IntentType.ACTION_VIEW, "X1 BOX: expected ACTION_VIEW")

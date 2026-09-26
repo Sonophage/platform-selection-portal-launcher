@@ -33,7 +33,6 @@ class MusicRepositoryImpl @Inject constructor(
     private val trackDao: MusicTrackDao,
     private val playlistDao: PlaylistDao,
 ) : MusicRepository {
-
     override fun observeFolders(): Flow<List<MusicFolder>> =
         folderDao.observeAll().map { list -> list.map { it.toDomain() } }
 
@@ -68,8 +67,6 @@ class MusicRepositoryImpl @Inject constructor(
         folderDao.setEnabled(id, enabled, System.currentTimeMillis())
 
     override suspend fun removeFolder(id: String) {
-        // Tracks cascade-delete via the foreign key, but delete explicitly too so behaviour is
-        // identical whether or not foreign keys are enforced on the connection.
         trackDao.deleteForFolder(id)
         folderDao.delete(id)
         Timber.i("Music folder removed: $id")
@@ -114,8 +111,6 @@ class MusicRepositoryImpl @Inject constructor(
             else prefs[KEY_DEFAULT_PLAYER] = packageName
         }
     }
-
-    // ── Playlists ───────────────────────────────────────────────────────────────
 
     override fun observePlaylists(): Flow<List<Playlist>> =
         playlistDao.observeAllWithCounts().map { rows ->

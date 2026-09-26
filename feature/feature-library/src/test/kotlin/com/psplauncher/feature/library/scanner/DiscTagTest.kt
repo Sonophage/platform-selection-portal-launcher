@@ -4,13 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * The pure disc-tag parser: every tag form real dumps use parses to the right number and a title
- * with only the tag removed, while non-tag titles (including ones containing the word "disc") are
- * left alone. See docs/plans/README.md (C1).
- */
 class DiscTagTest {
-
     @Test
     fun `parenthesized Disc N parses`() {
         val tag = parseDiscTag("Final Fantasy VII (Disc 1) (USA)")

@@ -2,22 +2,10 @@ package com.psplauncher.themekit
 
 import kotlinx.serialization.json.Json
 
-/**
- * Serialization + sanitization for per-theme [XmbLayoutSpec] overrides.
- *
- * The launcher persists an applied theme's layout as a single prefs string; the Studio and
- * the codec read specs from untrusted manifests. Every read path funnels through
- * [sanitize] so a hostile or hand-mangled theme can never wedge the XMB offscreen or blow
- * text/icons up to absurd sizes — values clamp into workable ranges, NaN/Infinity fall
- * back to the field's default.
- */
 object XmbLayoutSpecCodec {
-
     const val BAR_TOP_MIN = 0.05f
     const val BAR_TOP_MAX = 0.45f
 
-    // Compact (no prettyPrint — this is a prefs value); lenient on unknown keys so newer
-    // specs still decode on older builds.
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -26,7 +14,6 @@ object XmbLayoutSpecCodec {
     fun encode(spec: XmbLayoutSpec): String =
         json.encodeToString(XmbLayoutSpec.serializer(), sanitize(spec))
 
-    /** Lenient decode: null on malformed input, sanitized otherwise. */
     fun decode(encoded: String?): XmbLayoutSpec? {
         if (encoded.isNullOrBlank()) return null
         return runCatching { json.decodeFromString(XmbLayoutSpec.serializer(), encoded) }
@@ -34,7 +21,6 @@ object XmbLayoutSpecCodec {
             ?.let(::sanitize)
     }
 
-    /** Clamps every field into a safe, renderable range. */
     fun sanitize(spec: XmbLayoutSpec): XmbLayoutSpec {
         val d = XmbLayoutSpec.DEFAULT
         return XmbLayoutSpec(

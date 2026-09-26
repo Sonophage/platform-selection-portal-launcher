@@ -14,30 +14,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
-/**
- * Series and cover art both come out of the package document, and the two ways an EPUB can state
- * either of them are not interchangeable. Calibre writes EPUB 2 shaped `name`/`content` metas;
- * a tool following EPUB 3 writes a refined collection and a manifest property. A reader that knows
- * only one convention reports "no series" for half a library and looks like a scan bug rather than
- * a parser gap, so both are pinned here.
- *
- * This runs under Robolectric because the parser is `android.util.Xml`, and that is deliberate.
- * The first version parsed with `DocumentBuilderFactory` so these tests could stay on a plain JVM,
- * and every one of them passed while the parser returned null for all 80 books on the device:
- * Android's DOM factory refuses the `disallow-doctype-decl` feature that the host's Xerces accepts.
- * A test that cannot run the code the device runs is not testing the parser.
- *
- * The archives below are built as real ZIPs rather than fixture files, so the test exercises the
- * same [com.psplauncher.core.archive.BoundedZipReader] path the scanner uses, including entry
- * ordering. The entry order matters: the reader makes one forward pass per entry it wants, and a
- * package document sitting BEFORE container.xml is the case a single-pass reader gets wrong.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class EpubMetadataReaderTest {
-
-    // ── Archive construction ──────────────────────────────────────────────────
-
     private fun epub(vararg entries: Pair<String, ByteArray>): () -> InputStream {
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
@@ -70,8 +49,6 @@ class EpubMetadataReaderTest {
         </package>
     """.trimIndent().toByteArray()
 
-    // ── Title and author ──────────────────────────────────────────────────────
-
     @Test
     fun `title and author come from the dublin core elements`() {
         val book = epub(
@@ -88,8 +65,6 @@ class EpubMetadataReaderTest {
         assertEquals("Dune", meta?.title)
         assertEquals("Frank Herbert", meta?.author)
     }
-
-    // ── Series: the two conventions ───────────────────────────────────────────
 
     @Test
     fun `calibre series and index are read`() {
@@ -153,8 +128,6 @@ class EpubMetadataReaderTest {
         assertNull(meta?.seriesIndex)
     }
 
-    // ── Cover: the two conventions ────────────────────────────────────────────
-
     @Test
     fun `an epub 2 cover meta resolves through the manifest to an entry`() {
         val book = epub(
@@ -197,12 +170,10 @@ class EpubMetadataReaderTest {
         assertNull(EpubMetadataReader.read(book)?.coverEntry)
     }
 
-    // ── Path handling ─────────────────────────────────────────────────────────
-
     @Test
     fun `a percent-encoded href decodes, and a plus stays a plus`() {
         assertEquals("OEBPS/my cover.jpg", EpubMetadataReader.resolveAgainst("OEBPS/content.opf", "my%20cover.jpg"))
-        // URLDecoder would turn this into "C   Primer.jpg", which names no entry in the archive.
+
         assertEquals("OEBPS/C++ Primer.jpg", EpubMetadataReader.resolveAgainst("OEBPS/content.opf", "C++%20Primer.jpg"))
     }
 
@@ -218,8 +189,6 @@ class EpubMetadataReaderTest {
 
     @Test
     fun `the package document path is read from container xml, not assumed`() {
-        // A tool that writes the package document somewhere other than OEBPS/content.opf is the
-        // case a hardcoded path silently returns nothing for.
         val book = epub(
             "META-INF/container.xml" to container("EPUB/package.opf"),
             "EPUB/package.opf" to opf("<dc:title>Elsewhere</dc:title>"),
@@ -229,16 +198,12 @@ class EpubMetadataReaderTest {
 
     @Test
     fun `a package document stored before container xml is still found`() {
-        // Each entry costs its own forward pass precisely so archive order cannot matter. A
-        // single-pass reader would have resolved the path after already streaming past the file.
         val book = epub(
             "OEBPS/content.opf" to opf("<dc:title>Out Of Order</dc:title>"),
             "META-INF/container.xml" to container("OEBPS/content.opf"),
         )
         assertEquals("Out Of Order", EpubMetadataReader.read(book)?.title)
     }
-
-    // ── Refusals ──────────────────────────────────────────────────────────────
 
     @Test
     fun `a zip that is not an epub yields null rather than throwing`() {
@@ -259,11 +224,6 @@ class EpubMetadataReaderTest {
 
     @Test
     fun `an external entity is never resolved into the title`() {
-        // An EPUB comes off the user's disk but is still outside input. The claim asserted here is
-        // the one that matters and not how a given parser meets it: whatever comes back, it must
-        // not be the contents of a file on disk. The pull parser resolves no external entity, so
-        // this either fails the parse or yields the reference untouched; both are acceptable and
-        // an assertion pinned to only one of them would break on a parser swap for no reason.
         val hostile = """
             <?xml version="1.0"?>
             <!DOCTYPE package [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>

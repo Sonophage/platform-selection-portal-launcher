@@ -36,23 +36,18 @@ import javax.inject.Singleton
 
 data class MetadataFetchResult(
     val success: Boolean,
-    val source: String,   // "screenscraper" | "steamgriddb" | "igdb" | "none"
+    val source: String,
     val message: String,
     val scrapedTitle: String? = null,
 )
 
-/**
- * What the four providers said about one game, before anything is chosen or written (C16 task
- * 3.1, AD-7). [fetchForGame][MetadataRepository.fetchForGame] picks winners from this and persists
- * them; a preview can show it and write nothing.
- */
 data class MetadataCandidates(
     val gameEntity: GameEntity?,
-    /** The query the title-addressed providers were asked: user override → scraped → raw title. */
+
     val bestTitle: String,
     val ssInfo: SsGameInfo?,
     val romIdentity: RomIdentity?,
-    /** ScreenScraper was served from `ss_media_cache` rather than a live jeuInfos call. */
+
     val usedSsCache: Boolean,
     val cachedSsId: Long?,
     val igdbInfo: IgdbGameInfo?,
@@ -60,29 +55,15 @@ data class MetadataCandidates(
     val sgdbGridUrl: String?,
     val sgdbHeroUrl: String?,
     val sgdbLogoUrl: String?,
-    /** Steam's store record, for a row the PC importer tagged with a Steam app id. */
+
     val steamDetails: SteamAppDetails?,
-    /** Steam's three library assets, derived from that same app id. Present iff [steamDetails] is. */
+
     val steamArt: SteamAppArt?,
 ) {
-    /**
-     * No provider returned anything — the seam where [MetadataRepository.fetchForGame] stops.
-     *
-     * Steam counts. Without it here, a Windows game that Steam answered for and nobody else did
-     * would be declared "Not found on any source" and every asset it just fetched would be
-     * dropped on the floor — the one failure mode this whole provider exists to remove.
-     */
     val isEmpty: Boolean
         get() = ssInfo == null && igdbInfo == null && sgdbGridUrl == null && steamDetails == null
 }
 
-// Fetches metadata + artwork from multiple sources in priority order.
-//
-// Default source priority: ScreenScraper (hash-based) → IGDB → SteamGridDB (artwork)
-//
-// ScreenScraper matches by CRC32 + size + filename (never by cleaned-up title), so it is tried
-// first and the later sources only fill the gaps it leaves. Per-asset overrides:
-//   • preferSteamGridDbHeroes  → SGDB is tried first for hero art
 @Singleton
 class MetadataRepository @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -99,21 +80,9 @@ class MetadataRepository @Inject constructor(
     private val videoSnapTranscoder: VideoSnapTranscoder,
     private val ssMediaCacheDao: SsMediaCacheDao,
 ) {
-    // Batch guards, set from ScreenScraper's typed failures: 430 (daily quota) and credential
-    // failures stop SS for the rest of the run; 431 stops only hash-less lookups (each miss digs
-    // the account deeper into the unrecognized-ROM penalty). Reset at the start of each batch.
     @Volatile private var ssStopped = false
     @Volatile private var ssUnhashedStopped = false
 
-    /**
-     * Why ScreenScraper stopped, when it did.
-     *
-     * The flags above already knew this and threw it away: the reason arrived typed, turned into
-     * a boolean, and reached the user as one more entry in a bare failed count. "Ran out of your
-     * daily quota" and "your credentials were rejected" are different instructions to the person
-     * looking at the screen -- one means come back tomorrow, the other means the scrape will
-     * never work until something is fixed -- and both looked identical to "no match".
-     */
     @Volatile var ssStopReason: SsFailureReason? = null
         private set
 
@@ -122,16 +91,7 @@ class MetadataRepository @Inject constructor(
         ssUnhashedStopped = false
         ssStopReason = null
     }
-    /**
-     * The retrieval half of [fetchForGame] (C16 task 3.1, AD-12): asks the four providers in
-     * priority order and returns what they said.
-     *
-     * Writes no `games` column and saves no artwork file. It does keep two pieces of provider
-     * bookkeeping that were always part of asking: a live ScreenScraper response refreshes
-     * `ss_media_cache` (a response cache, never game state), and ScreenScraper's quota/credential
-     * failures still trip this run's batch guards. Moving either out would change what the batch
-     * scraper asks on the next game.
-     */
+
     suspend fun fetchCandidates(
         gameId: Long,
         title: String,
@@ -140,7 +100,6 @@ class MetadataRepository @Inject constructor(
         options: ScrapeOptions = ScrapeOptions(),
         onAssetProgress: ((source: String, asset: String) -> Unit)? = null,
     ): MetadataCandidates {
-        // Resolve best search title: user override → scraped title → caller-supplied title.
         val gameEntity = gameDao.getById(gameId)
         val bestTitle = gameEntity?.userTitleOverride?.takeIf { it.isNotBlank() }
             ?: gameEntity?.scrapedTitle?.takeIf { it.isNotBlank() }
@@ -150,11 +109,6 @@ class MetadataRepository @Inject constructor(
             Timber.d("MetadataRepository: using bestTitle='$bestTitle' instead of raw title='$title'")
         }
 
-        // ── 0. Steam's own store (id-addressed, no key) ───────────────────────
-        // First because it is the only step here that is not a guess: the PC importer recorded
-        // the app id, so this asks Steam about a game by the number Steam assigned it. Runs even
-        // on metadata-only scrapes, which the other artwork providers skip, because Steam is the
-        // one of them that supplies text.
         var steamDetails: SteamAppDetails? = null
         var steamArt: SteamAppArt? = null
         steamAppIdOf(gameEntity?.storefront, gameEntity?.storefrontGameId)?.let { appId ->
@@ -162,21 +116,15 @@ class MetadataRepository @Inject constructor(
             steamDetails = runCatching { steamStoreApi.appDetails(appId) }
                 .onFailure { Timber.w(it, "Steam store error for app $appId") }
                 .getOrNull()
-            // The art is derived from the id, not from the response, so it stands whether or not
-            // the store record came back — a delisted app still serves its library assets. A
-            // missing one 404s at download time and is treated as "no logo", never as a failure.
+
             steamArt = steamAppArt(appId)
         }
 
-        // ── 1. ScreenScraper (hash-based, primary) ────────────────────────────
         var ssInfo: SsGameInfo? = null
         var romIdentity: RomIdentity? = null
         var usedSsCache = false
         val cachedSsId = gameEntity?.ssId
         if (screenScraper.isEnabled() && !ssStopped) {
-            // Media-URL cache: a previously matched game whose text metadata is already stored
-            // needs no jeuInfos — the cached medias list serves every kind's URL (the response
-            // it came from carried URLs for ALL kinds, so coverage equals a live call).
             if (!options.bypassSsCache && cachedSsId != null && gameEntity.description != null) {
                 ssMediaCacheDao.get(cachedSsId)?.let { row ->
                     SsMediaSelection.decode(row.mediasJson)?.let { medias ->
@@ -195,17 +143,16 @@ class MetadataRepository @Inject constructor(
                 val ssResult = screenScraper.fetchGameInfo(
                     platformId = platformId,
                     rom        = romIdentity,
-                    ssGameId   = gameEntity?.ssId,   // known id → direct fetch, no matching
+                    ssGameId   = gameEntity?.ssId,
                 )
                 if (ssResult.isBatchStopper) {
                     ssStopped = true
-                    // First reason wins: it is the one that actually stopped the run, and every
-                    // later lookup is skipped rather than failing for its own reason.
+
                     if (ssStopReason == null) ssStopReason = ssResult.diagnostics.failureReason
                 }
                 if (ssResult.stopsUnhashedLookups) ssUnhashedStopped = true
                 ssInfo = ssResult.info
-                // Every successful live response refreshes the media-URL cache.
+
                 ssResult.info?.let { info ->
                     val id = info.ssId
                     if (id != null && info.medias.isNotEmpty()) {
@@ -218,7 +165,6 @@ class MetadataRepository @Inject constructor(
             }
         }
 
-        // ── 2. IGDB (secondary artwork; skipped on metadata-only runs) ────────
         var igdbInfo: IgdbGameInfo? = null
         if (igdbApi.hasCredentials() && !options.metadataOnly) {
             val needsBoxArt = ssInfo?.artworkUrl == null
@@ -231,7 +177,6 @@ class MetadataRepository @Inject constructor(
             }
         }
 
-        // ── 4. SteamGridDB (artwork) ──────────────────────────────────────────
         val sgdbKey = sgdbKeyProvider.getKey()
         var sgdbGridUrl: String? = null
         var sgdbHeroUrl: String? = null
@@ -278,7 +223,6 @@ class MetadataRepository @Inject constructor(
     ): MetadataFetchResult {
         val candidates = fetchCandidates(gameId, title, platformId, romPath, options, onAssetProgress)
 
-        // ── Nothing found ──────────────────────────────────────────────────────
         if (candidates.isEmpty) {
             Timber.i("No metadata found for '${candidates.bestTitle}'")
             return MetadataFetchResult(false, "none", "Not found on any source")
@@ -298,14 +242,6 @@ class MetadataRepository @Inject constructor(
         val steamDetails = candidates.steamDetails
         val steamArt    = candidates.steamArt
 
-        // ── Assemble per-asset winners ─────────────────────────────────────────
-        // Steam leads for a Steam game, ahead of ScreenScraper and IGDB, because those two had
-        // to work out WHICH game a Windows shortcut is from a title that came out of a filename,
-        // and this one was told. An exact id beats a good guess.
-        //
-        // It does not lead over SteamGridDB when the user has asked for SGDB heroes: that
-        // preference is about which picture they want, not about which game it is, and this
-        // provider has no opinion worth overriding it with.
         val finalBoxArtUrl = steamArt?.boxArtUrl ?: ssInfo?.artworkUrl ?: igdbInfo?.artworkUrl ?: sgdbGridUrl
         val finalHeroUrl   = if (options.preferSteamGridDbHeroes)
             sgdbHeroUrl ?: steamArt?.heroUrl ?: ssInfo?.heroUrl ?: igdbInfo?.heroUrl
@@ -315,11 +251,8 @@ class MetadataRepository @Inject constructor(
             steamArt?.logoUrl ?: ssInfo?.logoUrl ?: igdbInfo?.logoUrl ?: sgdbLogoUrl
         else null
 
-        // ── Download to disk ───────────────────────────────────────────────────
         val src = primarySource(ssInfo, igdbInfo, sgdbGridUrl, steamDetails)
 
-        // Dead-URL fallback bookkeeping: kinds whose CACHED ScreenScraper URL failed to
-        // download. Only meaningful on cache-hit runs; live-URL failures keep old behavior.
         val failedSsKinds = mutableSetOf<ArtworkKind>()
         suspend fun savedTracked(kind: ArtworkKind, url: String, fromSs: Boolean): String? {
             val path = artworkStore.saveFromUrl(gameId, kind, url)
@@ -333,16 +266,11 @@ class MetadataRepository @Inject constructor(
         var boxArtPath: String? = null
         var physicalMediaPath: String? = null
         var box3dPath: String? = null
-        // Metadata-only runs stop here: no asset is downloaded and no artwork column is written.
-        if (!options.metadataOnly) {
 
+        if (!options.metadataOnly) {
         if (options.downloadHeroes) onAssetProgress?.invoke(src, "Hero")
         heroPath = if (options.downloadHeroes) finalHeroUrl?.let { savedTracked(ArtworkKind.HERO, it, fromSs = it == ssInfo?.heroUrl) } else null
 
-        // Background (artworkUri) drives the full-screen XMB background, so it MUST be full
-        // resolution. The old path composited box art into a tiny fixed-size card (≈288px) which
-        // looked crunchy stretched to fullscreen. Download full-res instead, preferring a landscape
-        // hero (reuse the hero file if we already have it), else the box/grid art.
         onAssetProgress?.invoke(src, "Background")
         backgroundPath = heroPath
             ?: finalHeroUrl?.let { savedTracked(ArtworkKind.BACKGROUND, it, fromSs = it == ssInfo?.heroUrl) }
@@ -351,9 +279,6 @@ class MetadataRepository @Inject constructor(
         if (options.downloadClearLogos) onAssetProgress?.invoke(src, "Logo")
         logoPath = finalLogoUrl?.let { savedTracked(ArtworkKind.LOGO, it, fromSs = it == ssInfo?.logoUrl) }
 
-        // Icon-display-mode tiles — small images, always fetched (no toggles). Box art accepts
-        // IGDB covers as fallback; SGDB grids are stylized, not boxes, so they stay out.
-        // Physical media and 3D boxes are ScreenScraper-only.
         val boxArtSrcUrl = ssInfo?.boxArtUrl ?: igdbInfo?.artworkUrl
         if (boxArtSrcUrl != null) onAssetProgress?.invoke(src, "Box Art")
         boxArtPath = boxArtSrcUrl?.let { savedTracked(ArtworkKind.BOX_ART, it, fromSs = it == ssInfo?.boxArtUrl) }
@@ -365,37 +290,32 @@ class MetadataRepository @Inject constructor(
             onAssetProgress?.invoke("ScreenScraper", "3D Box")
             savedTracked(ArtworkKind.BOX_3D, it, fromSs = true)
         }
-        // In-game screenshot for Game Detail's SCREENSHOT panel (record-only kind, no column).
+
         ssInfo?.screenshotUrl?.let {
             onAssetProgress?.invoke("ScreenScraper", "Screenshot")
             savedTracked(ArtworkKind.SCREENSHOT, it, fromSs = true)
         }
 
-        // ScreenScraper-only extras — stored under fixed names, looked up via ArtworkStore.find
-        // (never referenced from game columns).
         if (options.downloadManuals) ssInfo?.manualUrl?.let {
             onAssetProgress?.invoke("ScreenScraper", "Manual")
             savedTracked(ArtworkKind.MANUAL, it, fromSs = true)
         }
         if (options.downloadVideoSnaps) {
-            val snapUrl = ssInfo?.videoUrl      // video-normalized — a ready-made snap
-            val rawUrl  = ssInfo?.videoRawUrl   // video — the full gameplay video
-            // VIDEO (full, untouched) feeds the Game Detail media strip; ICON1 (60 s muted
-            // snap) feeds the XMB icon animation. They are separate assets: the full video is
-            // ALWAYS kept as-is, and ICON1 is generated from it only when SS has no normalized
-            // snap of its own.
+            val snapUrl = ssInfo?.videoUrl
+            val rawUrl  = ssInfo?.videoRawUrl
+
             val rawFile = rawUrl?.let {
                 onAssetProgress?.invoke("ScreenScraper", "Video")
                 ArtworkTempIO.downloadToTemp(httpClient, context.cacheDir, ArtworkKind.VIDEO, it)
             }
-            // 1) Store the full video untouched as VIDEO (a copy — saveFromFile consumes it).
+
             if (rawFile != null) {
                 val vCopy = java.io.File.createTempFile("vid_", ".mp4", context.cacheDir)
                 runCatching { rawFile.copyTo(vCopy, overwrite = true) }
                     .onSuccess { artworkStore.saveFromFile(gameId, ArtworkKind.VIDEO, vCopy) }
                     .onFailure { vCopy.delete() }
             }
-            // 2) ICON1 snap: SS's normalized snap if it has one, else transcode from the full.
+
             when {
                 snapUrl != null -> {
                     onAssetProgress?.invoke("ScreenScraper", "Icon Video")
@@ -412,26 +332,20 @@ class MetadataRepository @Inject constructor(
             }
             rawFile?.delete()
         }
+        }
 
-        }   // end !options.metadataOnly
-
-        // Scraped title: ScreenScraper's canonical name. Deliberately NOT
-        // written through updateMetadata below — see the fill-only write after it.
         val newScrapedTitle = ssInfo?.title ?: steamDetails?.title
         val existingOverride = gameEntity?.userTitleOverride
 
-        // ── Persist metadata (COALESCE in SQL preserves existing non-null values) ─
         gameDao.updateMetadata(
             id           = gameId,
-            // Steam fills what ScreenScraper leaves rather than outranking it: SS is the
-            // specialist on the games it knows, and for the games it does not — every Windows
-            // shortcut — its side of each of these is null anyway, so the fallback is the value.
+
             description  = ssInfo?.description ?: steamDetails?.description,
             developer    = ssInfo?.developer ?: steamDetails?.developer,
             publisher    = ssInfo?.publisher ?: steamDetails?.publisher,
             releaseYear  = ssInfo?.releaseYear ?: steamDetails?.releaseYear,
             genre        = ssInfo?.genre ?: steamDetails?.genre,
-            // Metadata-only runs pass null artwork columns — COALESCE leaves them untouched.
+
             artworkUri   = if (options.metadataOnly) null else backgroundPath ?: finalHeroUrl ?: finalBoxArtUrl,
             heroUri      = if (options.metadataOnly) null else heroPath ?: finalHeroUrl,
             logoUri      = if (options.metadataOnly) null else logoPath ?: finalLogoUrl,
@@ -448,17 +362,10 @@ class MetadataRepository @Inject constructor(
             romCrc32     = romIdentity?.crc32,
         )
 
-        // The title is the one column a scrape may FILL but never OVERWRITE: naming a game the
-        // scan only knew as a filename is the whole point, but silently renaming one the library
-        // already shows under another name is not. Re-scrapes and Change Match therefore leave it
-        // alone, and the only ways a title changes are the ones the user drove — the metadata
-        // preview's chosen fields, or Edit Title (user_title_override, which outranks this column).
         if (newScrapedTitle != null && existingOverride == null) {
             gameDao.fillScrapedTitleIfMissing(gameId, newScrapedTitle)
         }
 
-        // Dead cached URL(s): SS occasionally moves media. Refresh the cache once from a live
-        // jeuInfos and retry exactly the failed kinds with fresh URLs — one extra call total.
         if (usedSsCache && failedSsKinds.isNotEmpty() && cachedSsId != null) {
             Timber.w("SS cached URLs failed for $failedSsKinds — refreshing cache, retrying once")
             ssMediaCacheDao.delete(cachedSsId)
@@ -479,7 +386,7 @@ class MetadataRepository @Inject constructor(
                         ArtworkKind.BOX_3D         -> fresh.box3dUrl
                         ArtworkKind.SCREENSHOT     -> fresh.screenshotUrl
                         ArtworkKind.MANUAL         -> fresh.manualUrl
-                        ArtworkKind.ICON1          -> fresh.videoUrl   // normalized snap
+                        ArtworkKind.ICON1          -> fresh.videoUrl
                         else                       -> null
                     } ?: continue
                     val path = artworkStore.saveFromUrl(gameId, kind, url) ?: continue
@@ -490,7 +397,7 @@ class MetadataRepository @Inject constructor(
                         ArtworkKind.BOX_ART        -> gameDao.updateMetadata(gameId, boxArtUri = path)
                         ArtworkKind.PHYSICAL_MEDIA -> gameDao.updateMetadata(gameId, physicalMediaUri = path)
                         ArtworkKind.BOX_3D         -> gameDao.updateMetadata(gameId, box3dUri = path)
-                        else                       -> Unit   // record-only kinds need no column
+                        else                       -> Unit
                     }
                 }
             }
@@ -518,8 +425,6 @@ class MetadataRepository @Inject constructor(
         }
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
-
     private fun primarySource(
         ss: SsGameInfo?,
         igdb: IgdbGameInfo?,
@@ -528,9 +433,7 @@ class MetadataRepository @Inject constructor(
     ): String =
         when {
             ss != null      -> "screenscraper"
-            // Below SS for the same reason SS keeps the text columns, and above the two that
-            // guess: this names what actually identified the game, and it is what the user reads
-            // on the scrape result.
+
             steam != null   -> "steam"
             igdb != null    -> "igdb"
             sgdbUrl != null -> "steamgriddb"

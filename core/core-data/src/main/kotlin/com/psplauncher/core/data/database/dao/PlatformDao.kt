@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PlatformDao {
-
     @Query("SELECT * FROM platforms ORDER BY name ASC")
     fun observeAll(): Flow<List<PlatformEntity>>
 
@@ -35,7 +34,6 @@ interface PlatformDao {
     @Query("UPDATE platforms SET preferred_emulator_package = :packageName WHERE id = :id")
     suspend fun setPreferredEmulator(id: String, packageName: String?)
 
-    // Returns distinct platform IDs that have at least one game
     @Query("SELECT DISTINCT platform_id FROM games")
     fun observeActivePlatformIds(): Flow<List<String>>
 }

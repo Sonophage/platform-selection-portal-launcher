@@ -7,22 +7,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Phase 2 — the inverse lookup that footers are built on.
- *
- * Behaviour reads keycode → action. Chrome needs the opposite: given an action,
- * which physical button currently performs it? Deriving prompts from the same
- * [GamepadMappings] the input handler consumes is what makes footer drift
- * structurally impossible, rather than a thing to remember.
- */
 class ControllerIconLookupTest {
-
     private fun mappings(confirmBack: ConfirmBackLayout, xy: XYLayout) =
         gamepadMappingsFor(confirmBack, xy)
 
     private val standard = mappings(ConfirmBackLayout.STANDARD, XYLayout.STANDARD)
-
-    // ── Keycode → physical position ─────────────────────────────────────────
 
     @Test
     fun `face keycodes map to face positions`() {
@@ -54,15 +43,11 @@ class ControllerIconLookupTest {
 
     @Test
     fun `keys that are not on a gamepad have no position`() {
-        // Enter, hardware Back and D-pad centre drive the UI but are not buttons
-        // a prompt can point at. They must never leak into a footer.
         assertNull(KeyEvent.KEYCODE_ENTER.toControllerIcon())
         assertNull(KeyEvent.KEYCODE_BACK.toControllerIcon())
         assertNull(KeyEvent.KEYCODE_DPAD_CENTER.toControllerIcon())
         assertNull(KeyEvent.KEYCODE_SPACE.toControllerIcon())
     }
-
-    // ── Action → position, per layout ───────────────────────────────────────
 
     @Test
     fun `confirm and back follow the Confirm-Back setting`() {
@@ -76,8 +61,6 @@ class ControllerIconLookupTest {
 
     @Test
     fun `the context menu prompt follows the X-Y setting`() {
-        // This is the ContextMenuHint bug: it hardcoded FACE_NORTH, which is
-        // wrong the moment the user swaps X and Y.
         assertEquals(ControllerIcon.FACE_NORTH, standard.iconFor(GamepadAction.OPEN_CONTEXT_MENU))
 
         val swapped = mappings(ConfirmBackLayout.STANDARD, XYLayout.SWAPPED)
@@ -112,13 +95,8 @@ class ControllerIconLookupTest {
         }
     }
 
-    // ── Alias handling: the subtle failure ──────────────────────────────────
-
     @Test
     fun `SELECT resolves to a face button, never to one of its keyboard aliases`() {
-        // SELECT is bound three times (BUTTON_A, ENTER, DPAD_CENTER). A naive
-        // firstOrNull over the binding list can hand the footer a D-pad glyph
-        // for "Launch" depending purely on list order.
         for (confirmBack in ConfirmBackLayout.entries) {
             for (xy in XYLayout.entries) {
                 val icon = mappings(confirmBack, xy).iconFor(GamepadAction.SELECT)
@@ -145,8 +123,6 @@ class ControllerIconLookupTest {
 
     @Test
     fun `a resolved icon is always reachable from the action it came from`() {
-        // Round-trip: whatever position we show, pressing it must dispatch the
-        // action the label promised.
         for (confirmBack in ConfirmBackLayout.entries) {
             for (xy in XYLayout.entries) {
                 val m = mappings(confirmBack, xy)
@@ -164,15 +140,13 @@ class ControllerIconLookupTest {
         }
     }
 
-    // ── Degradation ─────────────────────────────────────────────────────────
-
     @Test
     fun `an unbound action has no prompt rather than a wrong one`() {
         val stripped = GamepadMappings(
             standard.bindings.filterNot { it.action == GamepadAction.CHANGE_SORT },
         )
         assertNull(stripped.iconFor(GamepadAction.CHANGE_SORT))
-        // Everything else still resolves.
+
         assertNotNull(stripped.iconFor(GamepadAction.SELECT))
     }
 
@@ -184,11 +158,8 @@ class ControllerIconLookupTest {
         assertNull(keyboardOnly.iconFor(GamepadAction.SELECT))
     }
 
-    // ── Multi-input prompts ─────────────────────────────────────────────────
-
     @Test
     fun `a multi-input prompt keeps the order it was asked for`() {
-        // "◀▶ Seek" must not come out as "▶◀".
         assertEquals(
             listOf(ControllerIcon.DPAD_LEFT, ControllerIcon.DPAD_RIGHT),
             standard.iconsFor(listOf(GamepadAction.NAVIGATE_LEFT, GamepadAction.NAVIGATE_RIGHT)),
@@ -212,7 +183,6 @@ class ControllerIconLookupTest {
 
     @Test
     fun `a prompt whose every member is unbound resolves to nothing`() {
-        // The caller renders nothing at all rather than a label with no glyph.
         val keyboardOnly = GamepadMappings(
             listOf(GamepadBinding(KeyEvent.KEYCODE_ENTER, GamepadAction.SELECT)),
         )
@@ -221,8 +191,6 @@ class ControllerIconLookupTest {
 
     @Test
     fun `two actions on one button draw that button once`() {
-        // A remap can land both members of a pair on the same physical button.
-        // The same glyph twice reads as a broken prompt, not as a pair.
         val collapsed = GamepadMappings(
             listOf(
                 GamepadBinding(KeyEvent.KEYCODE_BUTTON_A, GamepadAction.SELECT),
@@ -249,12 +217,8 @@ class ControllerIconLookupTest {
         }
     }
 
-    // ── The media footers, end to end ───────────────────────────────────────
-
     @Test
     fun `the video transport bar resolves under every layout combination`() {
-        // The Music/Video/Photo footers were hardcoded Xbox letters; they are
-        // now action-driven, so every entry must resolve under every layout.
         val transport = listOf(
             listOf(GamepadAction.SELECT),
             listOf(GamepadAction.NAVIGATE_LEFT, GamepadAction.NAVIGATE_RIGHT),
@@ -277,8 +241,6 @@ class ControllerIconLookupTest {
 
     @Test
     fun `the track picker Add prompt sits on Start under every layout`() {
-        // HOME is the picker's confirm ("Start to add"); the layout settings
-        // touch only the face buttons and must never move it.
         for (confirmBack in ConfirmBackLayout.entries) {
             for (xy in XYLayout.entries) {
                 assertEquals(
@@ -288,8 +250,6 @@ class ControllerIconLookupTest {
             }
         }
     }
-
-    // ── The App Drawer footer, end to end ───────────────────────────────────
 
     @Test
     fun `the drawer command bar resolves under every layout combination`() {

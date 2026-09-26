@@ -5,28 +5,11 @@ import android.graphics.BitmapFactory
 import java.io.InputStream
 import java.io.OutputStream
 
-/**
- * Bounded reads/decodes for untrusted theme media (SAF picks, extracted bundle entries).
- * theme-kit's parsers cap what they decode; this caps what we hold in memory at all, and
- * keeps BitmapFactory from allocating pixel buffers for crafted headers claiming absurd
- * dimensions.
- */
 object SafeMedia {
-
-    /** Theme files/bundles are a few MB; 64 MB is generous headroom, not a target. */
     const val MAX_THEME_FILE_BYTES = 64L * 1024 * 1024
 
-    /** Matches theme-kit Bmp.kt's dimension cap. */
     const val MAX_IMAGE_DIMENSION = 8192
 
-    /**
-     * Streams [this] to [out], or returns null once more than [cap] bytes arrive.
-     *
-     * The counterpart to [readCapped] for content that has no business being on the heap. A
-     * theme bundle carrying a motion wallpaper is routinely 50 MB; [readCapped] would hold that
-     * plus the doubling buffer that inflated it, against a 256 MB heap shared with a live UI.
-     * Callers that only need the bytes to land somewhere should land them here instead.
-     */
     fun InputStream.copyCappedTo(out: OutputStream, cap: Long = MAX_THEME_FILE_BYTES): Long? {
         val buffer = ByteArray(64 * 1024)
         var total = 0L
@@ -40,7 +23,6 @@ object SafeMedia {
         return total
     }
 
-    /** Reads [this] fully, or null once more than [cap] bytes arrive. */
     fun InputStream.readCapped(cap: Long = MAX_THEME_FILE_BYTES): ByteArray? {
         val out = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(64 * 1024)
@@ -55,11 +37,6 @@ object SafeMedia {
         return out.toByteArray()
     }
 
-    /**
-     * Decodes an image byte array with an `inJustDecodeBounds` pre-pass: headers claiming
-     * dimensions past [maxDimension] never reach a pixel allocation; anything above
-     * [targetDimension] decodes sampled down near it.
-     */
     fun decodeBitmapCapped(
         bytes: ByteArray,
         maxDimension: Int = MAX_IMAGE_DIMENSION,
@@ -77,7 +54,6 @@ object SafeMedia {
         return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) }.getOrNull()
     }
 
-    /** [decodeBitmapCapped] for a file path (extracted theme icons and the like). */
     fun decodeFileCapped(path: String, maxDimension: Int, targetDimension: Int = maxDimension): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, bounds)

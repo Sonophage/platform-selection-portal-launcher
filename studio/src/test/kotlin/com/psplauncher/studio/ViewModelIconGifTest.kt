@@ -16,15 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
-/**
- * The end-to-end animation contract: an animated GIF imported in the Studio must reach the
- * theme bundle AS A GIF — the handheld classifies `icons/<key>.gif` via the frame probe and
- * animates it with Coil's AnimatedImageDecoder. Regression test for the Studio flattening
- * every GIF to frame 1 as a png ("the animated icons added in the theme studio do not
- * animate").
- */
 class ViewModelIconGifTest {
-
     private suspend fun StudioViewModel.awaitIdle() {
         withTimeout(30_000) {
             delay(50)
@@ -55,7 +47,6 @@ class ViewModelIconGifTest {
             assertTrue(gifBytes.contentEquals(staged.iconOverrides["catbar_games"]), "gif bytes must be preserved, not re-encoded")
             assertEquals("gif", staged.iconExtensions["catbar_games"])
 
-            // Export → reopen → re-export: the gif entry survives both hops.
             val bundleFile = File(dir, "out.pfptheme")
             vm.exportTo(bundleFile) { null }
             vm.awaitIdle()
@@ -115,7 +106,7 @@ class ViewModelIconGifTest {
         val dir = createTempDirectory("studio-gif-long").toFile()
         try {
             val gifFile = File(dir, "long.gif")
-            // 110 frames x 100cs = 11s > the 10s cap, all other caps respected.
+
             gifFile.writeBytes(IconGifTestMedia.animatedGif(frames = 110, delayCs = 100))
             vm.setIconOverride("catbar_games", gifFile)
             vm.awaitIdle()

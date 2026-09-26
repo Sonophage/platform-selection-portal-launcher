@@ -51,7 +51,7 @@ fun LibraryManagerScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onAddAndroidApps: () -> Unit = {},
-    // Open straight into Import PC Games (the games context menu's "Import PC Games" action).
+
     startInImportPc: Boolean = false,
     viewModel: LibraryManagerViewModel = hiltViewModel(),
 ) {
@@ -61,8 +61,6 @@ fun LibraryManagerScreen(
         if (startInImportPc) viewModel.openImportPcGames()
     }
 
-    // Picker for ES-DE folder setup: creates the system-folder structure under the
-    // chosen folder (which also becomes the ROM Root).
     val setupPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> viewModel.onRomFolderSetupPicked(uri) }
@@ -173,7 +171,6 @@ private fun LibraryManagerContent(
         LibraryStep.IMPORT_PC     -> ImportPcGamesContent(state, onBack = handleBack, onRefreshHomeStatus = onRefreshHomeStatus, onScanPcGamesFolder = onScanPcGamesFolder, onExportManualPcGames = onExportManualPcGames, onImportPcGame = onImportPcGame, onImportAllPcGames = onImportAllPcGames, onTestLaunchPcGame = onTestLaunchPcGame, onAddPcGameById = onAddPcGameById, onDismissMessage = onDismissMessage, homeRoleIntentProvider = homeRoleIntentProvider, modifier = modifier)
     }
 
-    // ── Rename dialog ─────────────────────────────────────────────────────────
     state.renameTargetPlatformId?.let { targetId ->
         val current = state.cards.firstOrNull { it.platformId == targetId }?.displayName ?: ""
         var text by remember(targetId) { mutableStateOf(current) }
@@ -186,8 +183,6 @@ private fun LibraryManagerContent(
         )
     }
 }
-
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun LibraryListContent(
@@ -207,7 +202,7 @@ private fun LibraryListContent(
     val addRootPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> onAddRomRoot(uri) }
-    
+
     var relinkTarget by remember { mutableStateOf<RootFolderRow?>(null) }
     val relinkRootPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -222,32 +217,21 @@ private fun LibraryListContent(
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
-
-            // ── ROM Root Access ─────────────────────────────────────────────────
             RootAccessSection(
                 groupTitle  = "ROM Root Access",
                 roots       = state.romRoots,
                 addLabel    = "Add ROM Root",
                 addSublabel = "Grant a root folder (e.g. /Roms) — or a second location like an SD card",
                 onAddRoot    = { addRootPicker.launch(null) },
-                onRelinkRoot = { 
+                onRelinkRoot = {
                     relinkTarget = it
-                    relinkRootPicker.launch(onBeginRelink(it)) 
+                    relinkRootPicker.launch(onBeginRelink(it))
                 },
                 onRemoveRoot = { onRemoveRomRoot(it) },
             )
 
             SettingsGroup("Consoles")
 
-            // WINDOWS IS IN THIS LIST. It used to be filtered out, and its own Settings row was
-            // the only way to reach its card detail — then that row was removed in a426a2dc, on
-            // the reasoning that "Windows Games is a card in Library Manager, not a row beside
-            // it". The list had never shown it, so that left a fully built screen with no door:
-            // no rename, no Show In Games, no pin, no Import PC Games.
-            //
-            // The detail screen already handles it — a Windows-specific Library and Actions block
-            // instead of ROM extensions and a console scan, and no Remove, because the PC import
-            // system owns the card. Only the way in was missing.
             val consoleCards = state.cards
             if (consoleCards.isEmpty()) {
                 Hint("No consoles configured. Add a console to create a Memory Card that appears inside Games.")
@@ -314,8 +298,6 @@ private fun LibraryListContent(
     }
 }
 
-// ── PICK PLATFORM ───────────────────────────────────────────────────────────────
-
 @Composable
 private fun PickPlatformContent(
     state: LibraryManagerUiState,
@@ -324,9 +306,6 @@ private fun PickPlatformContent(
     modifier: Modifier,
 ) {
     SettingsPageScaffold(heading = "Add Console", subtitle = "Choose Platform", onBack = onBack, modifier = modifier) {
-        // Registered like the list screens: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
-        // the body itself is unchanged.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -342,8 +321,6 @@ private fun PickPlatformContent(
     }
 }
 
-// ── PICK EMULATOR ───────────────────────────────────────────────────────────────
-
 @Composable
 private fun PickEmulatorContent(
     state: LibraryManagerUiState,
@@ -352,9 +329,6 @@ private fun PickEmulatorContent(
     modifier: Modifier,
 ) {
     SettingsPageScaffold(heading = "Add Console", subtitle = "Assign Emulator", onBack = onBack, modifier = modifier) {
-        // Registered like the list screens: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
-        // the body itself is unchanged.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -369,8 +343,6 @@ private fun PickEmulatorContent(
     }
 }
 
-// ── SCAN PROMPT ─────────────────────────────────────────────────────────────────
-
 @Composable
 private fun ScanPromptContent(
     state: LibraryManagerUiState,
@@ -379,9 +351,6 @@ private fun ScanPromptContent(
     modifier: Modifier,
 ) {
     SettingsPageScaffold(heading = "Add Console", subtitle = "Scan Now?", onBack = onBack, modifier = modifier) {
-        // Registered like the list screens: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
-        // the body itself is unchanged.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -405,8 +374,6 @@ private fun ScanPromptContent(
     }
 }
 
-// ── CARD DETAIL ─────────────────────────────────────────────────────────────────
-
 @Composable
 private fun CardDetailContent(
     state: LibraryManagerUiState,
@@ -429,10 +396,6 @@ private fun CardDetailContent(
     onRemoveApp: (Long) -> Unit,
     modifier: Modifier,
 ) {
-    // No card for this platform. It happens for real: the Windows card only exists once a PC game
-    // has been imported, so a deep link to it can arrive before there is one. It used to
-    // `return` here, which drew NOTHING -- no header, no rail, no Back, just the wallpaper, with
-    // no way to tell a missing console from a broken screen.
     val card = state.detailCard
     if (card == null) {
         SettingsPageScaffold(
@@ -443,10 +406,6 @@ private fun CardDetailContent(
             val scrollState = rememberScrollState()
             LocalSettingsScrollStateRegistrar.current(scrollState)
             Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
-                // The explanation is a row's LABEL, not its sublabel: a sublabel feeds the
-                // focused-row help band at the bottom, which is empty until something takes
-                // focus -- and on a screen whose entire point is that it has nothing, that is
-                // exactly when the user needs to be told why.
                 SettingsGroup("Nothing here yet")
                 SettingsValueRow(label = "No console to show", value = "")
                 SettingsValueRow(
@@ -474,13 +433,9 @@ private fun CardDetailContent(
     ) { uri -> uri?.let { onSetVita3KFolder(it) } }
 
     SettingsPageScaffold(subtitle = card.displayName, onBack = onBack, modifier = modifier) {
-        // Registered like the list screens: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
-        // the body itself is unchanged.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
-
             if (isWindows) {
                 SettingsGroup("Library")
                 SettingsValueRow(
@@ -591,14 +546,7 @@ private fun CardDetailContent(
             }
 
             if (isAndroid) SettingsGroup("Actions")
-            // Every card, not only the consoles. It fills the gaps for THIS card's games and
-            // leaves valid artwork alone, so it is safe to press on a card that is already
-            // complete — it finds nothing and says so.
-            //
-            // The same action has been on the XMB's card context menu all along, and the
-            // repository function behind it is even commented "the per-card menu action". It was
-            // simply never offered in Settings, which is where you go when you are looking at a
-            // card rather than standing on it.
+
             SettingsRow(
                 label    = "Scrape Missing Artwork",
                 sublabel = "Fetch box art, logos and backgrounds for this card's games that have none",
@@ -619,7 +567,6 @@ private fun CardDetailContent(
             SettingsRow(label = "Move Up",   onClick = { onMoveCard(card.platformId, true) })
             SettingsRow(label = "Move Down", onClick = { onMoveCard(card.platformId, false) })
 
-            // The Windows Memory Card is managed by the PC import system and cannot be removed.
             if (!isWindows) {
                 SettingsGroup("Danger Zone")
                 SettingsRow(
@@ -661,15 +608,12 @@ private fun EmulatorPickerDialog(
     SettingsChoiceOverlay(
         title = "Set Emulator",
         options = options.map { it.name },
-        // Nothing is pre-chosen here: the row that opens this already shows the current
-        // emulator, and marking one as selected would claim a choice the caller has not made.
+
         selectedIndex = -1,
         onPick = { onSelect(options[it]) },
         onCancel = onDismiss,
     )
 }
-
-// ── IMPORT PC GAMES ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun ImportPcGamesContent(
@@ -688,7 +632,6 @@ private fun ImportPcGamesContent(
 ) {
     var addTarget by remember { mutableStateOf<PcLauncherRow?>(null) }
 
-    // Picking a folder IS the scan trigger: on pick, scan that folder for exports one-shot.
     val importPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> uri?.let { onScanPcGamesFolder(it) } }
@@ -698,13 +641,9 @@ private fun ImportPcGamesContent(
     ) { onRefreshHomeStatus() }
 
     SettingsPageScaffold(subtitle = "Import PC Games", onBack = onBack, modifier = modifier) {
-        // Registered like the list screens: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
-        // the body itself is unchanged.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
-
             state.message?.let { MessageRow(it) { onDismissMessage() } }
 
             SettingsGroup("Add To Home Capture")
@@ -794,9 +733,6 @@ private fun AddPcGameDialog(
     var title by remember { mutableStateOf("") }
     var source by remember { mutableStateOf(adapter?.sources?.firstOrNull()) }
 
-    // Two fields and a source row: not one of the shared shapes, so it uses the card directly.
-    // A and B are wired the way every other settings prompt is; the fields themselves are typed
-    // into with the keyboard, as they were.
     SettingsOverlayInput { action ->
         when (action) {
             GamepadAction.SELECT -> if (id.isNotBlank() && title.isNotBlank()) onAdd(id, title, source)
@@ -836,8 +772,6 @@ private fun AddPcGameDialog(
     }
 }
 
-// ── Shared bits ─────────────────────────────────────────────────────────────────
-
 private fun cardSublabel(card: LibraryCardRow): String = buildString {
     append(card.romDirectory ?: "No ROM directory")
     append("  ·  ${card.gameCount} game${if (card.gameCount == 1) "" else "s"}")
@@ -857,8 +791,6 @@ private fun MessageRow(message: String, onDismiss: () -> Unit) {
         onClick  = onDismiss,
     )
 }
-
-// ── Previews ──────────────────────────────────────────────────────────────────
 
 @CombinedPreviews
 @Composable

@@ -22,9 +22,6 @@ import javax.inject.Inject
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
-// Injected rather than hardcoded so the dispatcher is part of this repository's contract and a
-// test can pin that its file reads really do leave the caller's thread. Mirrors the pattern
-// LibraryScanner already uses for @ScannerIoDispatcher.
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class ProfileIoDispatcher
@@ -37,20 +34,6 @@ object EmulatorProfileModule {
     fun provideProfileIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
 }
 
-/**
- * Owns the emulator profile set: bundled defaults merged with whatever the user has saved.
- *
- * Both of this class's contracts are deliberate and were previously implicit.
- *
- * **It declares its dispatcher.** Every accessor that touches disk is `suspend` and hops to [io].
- * The reads used to sit behind plain functions called from `viewModelScope`, so a game launch
- * parsed JSON off the UI thread; the suspend siblings were safe only because the one caller
- * happened to use an IO scope.
- *
- * **It does not trust what it loads.** A persisted profile chooses the `ComponentName` a launch
- * intent targets and its package receives `grantUriPermission(...)` for the ROM, and the file can
- * arrive from a restored backup. Everything read off disk goes through [EmulatorProfileAdmission].
- */
 @Singleton
 class EmulatorProfileRepository @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -69,12 +52,8 @@ class EmulatorProfileRepository @Inject constructor(
         Timber.i("Emulator profiles loaded: ${bundled.size} bundled, ${persisted.size} persisted")
     }
 
-    // Returns every profile saved to local storage (custom + auto-generated).
-    // Used by EmulatorAutoConfigService to check existing entries.
     suspend fun getAllPersistedProfiles(): List<EmulatorProfile> = withContext(io) { loadPersistedProfiles() }
 
-    // Reads the in-memory set only; the package-manager queries are cheap and involve no disk of
-    // ours, so this one stays non-suspend.
     fun getInstalledProfiles(): List<EmulatorProfile> {
         val pm = context.packageManager
         return _profiles.value.filter { profile ->
@@ -83,16 +62,6 @@ class EmulatorProfileRepository @Inject constructor(
         }
     }
 
-    // Ordered so the automatic pick (first entry) is a standalone emulator when one is installed,
-    // with RetroArch cores after it (see EmulatorLaunchPreference). Unavailable profiles — e.g. a
-    // RetroArch core detected as NOT installed via the SAF link — are excluded so they can never be
-    // launched into a black screen.
-    // The console's remembered RetroArch core (AutoCoreMemory) is lifted to the front of the core
-    // tier, so every consumer of this list — the XMB's direct-launch path included — agrees on the
-    // same stable core for the console.
-    // Suspend even though the current implementation reads memory: the profile set is loaded from
-    // disk, and callers reach this during a game launch. Declaring it here keeps a future change
-    // that re-reads the file from silently reintroducing a main-thread parse.
     suspend fun getProfilesForPlatform(platformId: String): List<EmulatorProfile> = withContext(io) {
         getInstalledProfiles()
             .filter { it.isAvailable && it.supportsPlatform(platformId) }
@@ -102,17 +71,13 @@ class EmulatorProfileRepository @Inject constructor(
 
     fun getInstalledVersionCode(packageName: String): Long {
         return try {
-            // longVersionCode arrived in P and minSdk is Q; the deprecated branch was unreachable.
             context.packageManager.getPackageInfo(packageName, 0).longVersionCode
         } catch (_: Exception) { -1L }
     }
 
-    // Saves a user-created profile.
     suspend fun saveCustomProfile(profile: EmulatorProfile) =
         savePersistedProfile(profile.copy(isCustom = true))
 
-    // Saves any profile that should be persisted locally (custom or auto-generated).
-    // Marks auto-generated edits with userModified when the caller is the settings editor.
     suspend fun savePersistedProfile(profile: EmulatorProfile) = withContext(io) {
         val current = loadPersistedProfiles().toMutableList()
         val idx = current.indexOfFirst { it.id == profile.id }
@@ -127,10 +92,6 @@ class EmulatorProfileRepository @Inject constructor(
         persistProfiles(current)
     }
 
-    /**
-     * Clears all persisted (auto-generated + custom) emulator profiles and reloads bundled
-     * defaults. Does not touch the game library, ROM paths, artwork, saves, or metadata.
-     */
     suspend fun resetPersistedProfiles() = withContext(io) {
         try {
             val file = java.io.File(context.filesDir, "emulator_profiles/custom_profiles.json")
@@ -142,7 +103,6 @@ class EmulatorProfileRepository @Inject constructor(
         Timber.i("Emulator profiles reset to bundled defaults")
     }
 
-    // Merges bundled (read-only) with persisted, deduping by id (persisted wins).
     private fun mergeProfiles(
         bundled: List<EmulatorProfile>,
         persisted: List<EmulatorProfile>,
@@ -164,7 +124,6 @@ class EmulatorProfileRepository @Inject constructor(
         }
     }
 
-    // Blocking by design; every caller reaches it through a withContext(io) hop above.
     private fun loadPersistedProfiles(): List<EmulatorProfile> {
         val parsed = try {
             val file = java.io.File(context.filesDir, "emulator_profiles/custom_profiles.json")
@@ -174,9 +133,7 @@ class EmulatorProfileRepository @Inject constructor(
             Timber.e(e, "Failed to load persisted emulator profiles")
             return emptyList()
         }
-        // This file can arrive from a restored backup, and a profile decides an intent target that
-        // then receives a URI grant. RestoreArchive already filters it, but the check belongs here
-        // too: this is where the bytes actually become a launchable profile.
+
         val admitted = EmulatorProfileAdmission.admit(parsed, selfPackage = context.packageName)
         admitted.refused.forEach {
             Timber.w("Ignoring inadmissible persisted emulator profile %s: %s", it.id, it.reason)
@@ -194,7 +151,4 @@ class EmulatorProfileRepository @Inject constructor(
             Timber.e(e, "Failed to persist emulator profiles")
         }
     }
-
-    // supportsPlatform / platformAliases live in EmulatorPlatformMapping.kt (shared with the
-    // intent resolver and the launch ladder) so no copy can drift.
 }

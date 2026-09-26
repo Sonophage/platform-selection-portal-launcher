@@ -22,13 +22,11 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** One `.pfpgame` file to write: its name in the import folder, and its content. */
 data class PcGameExportFile(
     val fileName: String,
     val export: PcGameExport,
 )
 
-/** The outcome of an export, with a ready-made message for settings or a game's menu. */
 data class PcGameExportReport(
     val written: Int,
     val skipped: Int,
@@ -36,22 +34,7 @@ data class PcGameExportReport(
     val message: String,
 )
 
-/**
- * Turns games into `.pfpgame` files (C18 tasks X.3 and X.7). Pure, so file naming, content and
- * ownership are testable without storage.
- */
 object PcGameExportBuilder {
-
-    /**
-     * One file per game, in [games]' order. A file is named after the game's display title, with
-     * `" (2)"`, `" (3)"`, … when two games share a name (compared ignoring case, as FAT does), or
-     * when the name is already taken by another game's file in [existing] (keyed the same way as
-     * [fileNameFor]). A game [exportFor] cannot export gets no file.
-     *
-     * Names this pass hands out are folded into the ownership check as it goes (as an unreadable
-     * entry, so two games in the same batch never share a name even if they happen to look like the
-     * same game to [isSameGame]) — batch-internal uniqueness holds alongside folder ownership.
-     */
     fun build(
         games: List<Game>,
         artworkByGame: Map<Long, List<ArtworkRecordEntity>>,
@@ -66,10 +49,6 @@ object PcGameExportBuilder {
         }
     }
 
-    /**
-     * [game]'s entry with its [artwork], or null when the import would reject it: no launcher package,
-     * or neither a launch intent nor a shortcut.
-     */
     fun exportFor(game: Game, artwork: List<ArtworkRecordEntity>): PcGameExport? {
         val launcherPackage = game.packageName?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         val isPin = game.shortcutId != null
@@ -79,7 +58,7 @@ object PcGameExportBuilder {
             scrapedTitle = game.scrapedTitle,
             userTitleOverride = game.userTitleOverride,
             launcherPackage = launcherPackage,
-            // A pin is matched on import, never launched from the file.
+
             launchIntentUri = if (isPin) null else game.launchIntentUri,
             shortcutId = game.shortcutId,
             storefront = game.storefront,
@@ -89,20 +68,12 @@ object PcGameExportBuilder {
             steamGridDbId = game.steamGridDbId,
             artwork = artwork
                 .sortedWith(compareBy({ it.artworkType }, { it.sortOrder }))
-                // The codec refuses more than this; no real game comes near it.
+
                 .take(PcGameExportCodec.MAX_ARTWORK_ITEMS)
                 .map { PcGameExportArtwork(kind = it.artworkType, sortOrder = it.sortOrder, portableName = it.portableName) },
         )
     }
 
-    /**
-     * Whether [existing] is [game]'s own export file, so exporting the game again may overwrite it.
-     *
-     * The same launcher package, and then the same pin, or the same launch intent. After an import
-     * the game stores its *sanitized* intent, whose text can differ from the file's (launch flags are
-     * stripped), so two intents also count as the same when their typed extras are equal and
-     * non-empty: `localGameId`, `app_id`, `shortcut_path` and the like are what name the game.
-     */
     fun isSameGame(existing: PcGameExport, game: Game): Boolean {
         if (existing.launcherPackage != game.packageName) return false
         val shortcutId = game.shortcutId
@@ -115,14 +86,6 @@ object PcGameExportBuilder {
         return myExtras.isNotEmpty() && myExtras == IntentUriExtras.parse(theirs)
     }
 
-    /**
-     * The file name to export [game] under, when the import folder already holds the `.pfpgame` files
-     * in [existing] (keyed by lowercased file name; null for one that could not be read).
-     *
-     * The display title's name is used when it is free or already holds this game's file. A name
-     * holding another game's file, or a file that could not be read, is never overwritten: the name
-     * moves on to `" (2)"`, `" (3)"`, … instead.
-     */
     fun fileNameFor(game: Game, existing: Map<String, PcGameExport?>): String {
         val base = PortableNameResolver.fromTitle(game.displayTitle)
         var name = base
@@ -138,14 +101,6 @@ object PcGameExportBuilder {
     }
 }
 
-/**
- * Writes `.pfpgame` files into `<ROM Root>/windows/import`, which the scan reads with the rest of the
- * launcher exports.
- *
- * - [export] (Export Manual Games, C18 task X.3): every Windows game a fresh install could not bring
- *   back on its own, and every pin with artwork.
- * - [exportGame] (Export Game, C18 task X.7): one Windows game the user picked, whatever it is.
- */
 @Singleton
 class PcGameExporter @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -154,7 +109,6 @@ class PcGameExporter @Inject constructor(
     private val artworkRecordDao: ArtworkRecordDao,
     private val pcGameScanner: PcGameScanner,
 ) {
-
     suspend fun export(): PcGameExportReport = withContext(Dispatchers.IO) {
         val folder = when (val found = importFolder()) {
             is ImportFolder.Missing -> return@withContext refusal(found.message)
@@ -189,12 +143,6 @@ class PcGameExporter @Inject constructor(
         PcGameExportReport(written, skipped, failed, bulkMessage(written, skipped, failed))
     }
 
-    /**
-     * Exports the one game [gameId], the user's explicit choice, so it skips the bulk selection: a game
-     * from a launcher export file is exported too, and its import then matches it and restores its
-     * artwork names. A same-named file is overwritten only when it is this game's own
-     * ([PcGameExportBuilder.fileNameFor]).
-     */
     suspend fun exportGame(gameId: Long): PcGameExportReport = withContext(Dispatchers.IO) {
         val game = gameRepository.getById(gameId)
             ?: return@withContext refusal("That game is no longer in the library.")
@@ -225,7 +173,6 @@ class PcGameExporter @Inject constructor(
         data class Missing(val message: String) : ImportFolder
     }
 
-    /** The first `<ROM Root>/windows/import`, after the same setup self-heal the scan runs. */
     private suspend fun importFolder(): ImportFolder {
         val setup = runCatching { windowsLibrarySetup.ensure() }.getOrNull()
         if (setup is WindowsSetupState.NoRomRoot) {
@@ -236,19 +183,12 @@ class PcGameExporter @Inject constructor(
         return ImportFolder.Found(Uri.parse(treeUri), docId)
     }
 
-    /** An existing `.pfpgame` file's entry, or null when it is too large or does not decode. */
     private fun readExport(file: SafChild): PcGameExport? {
-        // sizeBytes is only an early-out (skip opening a stream the provider already told us is too
-        // big); readBoundedText below is the real guard, since a provider can misreport or omit it.
         if ((file.sizeBytes ?: 0L) > PcGameExportCodec.MAX_CHARS) return null
         val text = readBoundedText(file.uri, PcGameExportCodec.MAX_CHARS.toLong()) ?: return null
         return (PcGameExportCodec.decode(text) as? PcGameExportDecode.Valid)?.export
     }
 
-    // Reads [uri]'s content up to [maxBytes], decoding as UTF-8, or null if the stream can't be
-    // opened/read or holds more than [maxBytes]. minSdk (29) predates InputStream.readNBytes(int)
-    // (API 33), so this bounds the read with a manual loop instead of buffering the whole stream
-    // before its size is known.
     private fun readBoundedText(uri: Uri, maxBytes: Long): String? = runCatching {
         context.contentResolver.openInputStream(uri)?.use { stream ->
             val cap = maxBytes.toInt()
@@ -266,11 +206,6 @@ class PcGameExporter @Inject constructor(
         }
     }.getOrNull()
 
-    /**
-     * Writes [file] over [existing] when the folder already has one by that name, so a re-export
-     * replaces it instead of SAF adding "(1)". Created as octet-stream: a provider appends the
-     * canonical extension of a typed mime, which would make `Portal 2.pfpgame.json`.
-     */
     private fun write(tree: Uri, parentDocId: String, existing: Uri?, file: PcGameExportFile): Boolean {
         return runCatching {
             val target = existing ?: DocumentsContract.createDocument(

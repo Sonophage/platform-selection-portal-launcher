@@ -5,16 +5,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Frozen normalization rules (NORMALIZATION_VERSION 1) — these expectations must never change
-// without a version bump; existing portable libraries stop matching if slugs drift.
 class ArtworkNamingTest {
-
     @Test
     fun `file stem strips only the final extension`() {
         assertEquals("Ratchet & Clank (USA)", ArtworkNaming.fileStem("Ratchet & Clank (USA).chd"))
         assertEquals("game.v1.2", ArtworkNaming.fileStem("game.v1.2.iso"))
         assertEquals("no-extension", ArtworkNaming.fileStem("no-extension"))
-        assertEquals(".hidden", ArtworkNaming.fileStem(".hidden")) // leading dot is not an extension
+        assertEquals(".hidden", ArtworkNaming.fileStem(".hidden"))
     }
 
     @Test
@@ -27,7 +24,7 @@ class ArtworkNamingTest {
             ArtworkNaming.normalizeForMatch("Tony Hawk's Pro Skater"),
             ArtworkNaming.normalizeForMatch("Tony Hawk’s Pro Skater"),
         )
-        // Tags are preserved at this pass — releases stay distinguishable.
+
         assertFalse(
             ArtworkNaming.normalizeForMatch("Game (USA)") == ArtworkNaming.normalizeForMatch("Game (Europe)"),
         )

@@ -12,20 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Moving Last Played to its home on a database that already has it somewhere else.
- *
- * Last Played shipped appended to the end of the bar and was given its place left of Game hours
- * later. Reconciliation deliberately never touches a category's position -- position is
- * user-editable and rewriting it every launch would undo a reorder -- so a one-shot does it
- * instead, and the caller guards it with a DataStore flag.
- *
- * The thing worth testing is that it SHIFTS rather than assigning numbers: a user who has already
- * rearranged their bar must keep that arrangement, with Last Played inserted into it, not a
- * canonical order imposed on top of it.
- */
 class LastPlayedPlacementTest {
-
     private class FakeCategories(seed: List<CategoryEntity>) {
         val rows = seed.associateBy { it.id }.toMutableMap()
         val dao: CategoryDao = mockk(relaxed = true)
@@ -40,7 +27,6 @@ class LastPlayedPlacementTest {
             }
         }
 
-        /** The bar as the user sees it: ids in position order. */
         fun order(): List<String> = rows.values.sortedBy { it.position }.map { it.id }
     }
 
@@ -72,15 +58,13 @@ class LastPlayedPlacementTest {
             ),
             fake.order(),
         )
-        // Every row still holds a position of its own; a shift that produced a tie would leave
-        // the bar's order down to whatever the query happened to return.
+
         val positions = fake.rows.values.map { it.position }
         assertEquals(positions.size, positions.toSet().size, "two rows ended up sharing a position")
     }
 
     @Test
     fun `a bar the user has rearranged keeps its order, with Last Played slotted into it`() = runTest {
-        // Game dragged to the front, Settings pushed to the back. The fix must respect that.
         val fake = FakeCategories(
             listOf(
                 category(BuiltInCategory.GAMES, 0),
@@ -100,8 +84,6 @@ class LastPlayedPlacementTest {
 
     @Test
     fun `it does nothing when Last Played is already left of Game`() = runTest {
-        // The control, and the reason this is safe to call before the flag is written: a fresh
-        // install is seeded with Last Played already in place, and must not be shuffled.
         val fake = FakeCategories(
             listOf(
                 category(BuiltInCategory.RECENTLY_PLAYED, 4),
@@ -118,8 +100,6 @@ class LastPlayedPlacementTest {
 
     @Test
     fun `it does nothing when there is no Game column to sit beside`() = runTest {
-        // Game is protected from deletion, but a restored archive can carry anything, and a
-        // position computed from a missing row would be a silent guess.
         val fake = FakeCategories(listOf(category(BuiltInCategory.RECENTLY_PLAYED, 10)))
 
         assertFalse(CategoryRepositoryImpl(fake.dao).placeLastPlayedBeforeGames())

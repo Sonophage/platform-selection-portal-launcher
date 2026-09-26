@@ -62,12 +62,6 @@ import com.psplauncher.core.data.database.entity.VideoLibraryEntity
 import com.psplauncher.core.data.database.entity.VideoPlaylistEntity
 import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
 
-/**
- * The schema version, named once.
- *
- * The `@Database` annotation and `PFPDatabaseMigrationsTest`'s chain check both read this, so a
- * version bump cannot leave the test still asserting against the old number.
- */
 const val PFP_DATABASE_VERSION = 53
 
 @Database(
@@ -103,11 +97,10 @@ const val PFP_DATABASE_VERSION = 53
         BookEntity::class,
     ],
     version = PFP_DATABASE_VERSION,
-    exportSchema = true,        // schema JSON exported to /schemas/ for migration auditing
+    exportSchema = true,
 )
 @TypeConverters(PFPTypeConverters::class)
 abstract class PFPDatabase : RoomDatabase() {
-
     abstract fun gameDao(): GameDao
     abstract fun launchOutcomeDao(): LaunchOutcomeDao
     abstract fun platformDao(): PlatformDao
@@ -138,8 +131,6 @@ abstract class PFPDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "pfp_database"
 
-        // Migration stubs — add real SQL here as schema evolves
-        // Never use fallbackToDestructiveMigration() in production — users lose their library
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE themes ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0")
@@ -148,17 +139,10 @@ abstract class PFPDatabase : RoomDatabase() {
 
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // platform_id ties a scan folder to a specific platform —
-                // all ROMs found there are assigned to that platform regardless of extension
                 db.execSQL("ALTER TABLE library_sources ADD COLUMN platform_id TEXT")
             }
         }
 
-        // v4 — manual Memory Card library system. Adds the memory_cards table that drives
-        // the Games category. The legacy auto-detected library is retired: existing scanned
-        // games and library_sources are cleared so the user starts from a clean slate and
-        // configures each console manually. Platform definitions (the pick-list catalog) are
-        // left intact.
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -178,15 +162,12 @@ abstract class PFPDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
-                // Clean slate: retire the legacy auto-scanned library.
+
                 db.execSQL("DELETE FROM games")
                 db.execSQL("DELETE FROM library_sources")
             }
         }
 
-        // v5 — application categories & user customization. Adds per-app overrides, a pinned
-        // flag for category items, the App Store category, and aligns built-in category names
-        // with the PSP-style spec. User customizations to existing categories are preserved.
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE category_items ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
@@ -200,7 +181,7 @@ abstract class PFPDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
-                // Add the App Store category (idempotent) and align built-in display names.
+
                 db.execSQL(
                     """
                     INSERT OR IGNORE INTO categories (id, name, icon_key, type, position, is_visible)
@@ -213,15 +194,12 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v6 — landscape game icon art (SteamGridDB horizontal grid) used for the 144:80 tile.
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN icon_uri TEXT")
             }
         }
 
-        // v7 — display title fields: scraped_title (from metadata) and user_title_override
-        // (user-set). displayTitle = userTitleOverride ?: scrapedTitle ?: title.
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN scraped_title TEXT")
@@ -229,16 +207,10 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v8 — user collections + game content typing.
-        //  • content_type classifies each game so "All Games" can aggregate real games only.
-        //    Backfill reclassifies existing app-style entries (package-based) as ANDROID_APP so
-        //    they drop out of All Games but stay in their own card/category. No rows are deleted.
-        //  • collections / collection_games implement user-created folders (many-to-many).
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN content_type TEXT NOT NULL DEFAULT 'GAME'")
-                // Existing package-based (Android app) entries are not real games — reclassify
-                // so they no longer appear in All Games automatically. Their rows are preserved.
+
                 db.execSQL("UPDATE games SET content_type = 'ANDROID_APP' WHERE package_name IS NOT NULL")
 
                 db.execSQL(
@@ -270,42 +242,30 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v9 — launcher-shortcut entries: per-game shortcuts harvested from other apps
-        // (GameHub PCs, etc.) store the host app's shortcut id so they can be launched via
-        // LauncherApps.startShortcut. Nullable; existing rows are unaffected.
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN launch_shortcut_id TEXT")
             }
         }
 
-        // v10 — legacy INSTALL_SHORTCUT capture: stores the broadcast's launch intent so PFP can
-        // launch shortcuts from apps that still use the old broadcast (BannerHub, old Winlator).
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN launch_intent_uri TEXT")
             }
         }
 
-        // v11 — collections belong to exactly one gaming category. category_id is the single
-        // source of truth for a collection's placement; existing collections default to the
-        // built-in Game category ('games').
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE collections ADD COLUMN category_id TEXT NOT NULL DEFAULT 'games'")
             }
         }
 
-        // v12 — collections can be pinned to the top of their category.
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE collections ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0")
             }
         }
 
-        // v13 — Xbox 360 platform (X360 Mobile emulator). Adds the built-in platform definition
-        // to databases seeded by older builds. Idempotent; user customizations are preserved.
-        // accent_color 0xFF107C10 (Xbox green) = 4279270416.
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -321,9 +281,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v14 — Music library. Adds music_folders (user-added SAF sources) and music_tracks
-        // (scanned audio, cascade-deleted with their folder). Additive only; no existing data
-        // is touched.
         val MIGRATION_13_14 = object : Migration(13, 14) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -366,9 +323,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v15 — album art on tracks + user playlists. Adds music_tracks.art_uri (cached embedded
-        // art), and the playlists / playlist_tracks tables (an ordered, cross-folder track list).
-        // Additive only; no existing data is touched.
         val MIGRATION_14_15 = object : Migration(14, 15) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE music_tracks ADD COLUMN art_uri TEXT")
@@ -404,9 +358,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v16 — Video Experience (Phase 1). Adds video_libraries (SAF video sources, mirroring
-        // music_folders + memory cards) and videos (scanned files with metadata, thumbnails and
-        // resume position). No existing data is touched.
         val MIGRATION_15_16 = object : Migration(15, 16) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -456,8 +407,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v17 — Video Experience (Phase 2). Adds a favorite flag on videos and the video-playlist
-        // tables (mirroring the music playlist tables). Additive only — no existing data touched.
         val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE videos ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
@@ -489,9 +438,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v18 — per-location hiding. Adds hidden_placements ("this item is hidden from this
-        // location"). The legacy global app hide (app_overrides.is_hidden) is left untouched and
-        // treated as a GLOBAL placement by the manager. Additive only.
         val MIGRATION_17_18 = object : Migration(17, 18) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -511,9 +457,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v19 — Photo section. Adds photo_libraries (SAF photo sources / Albums, mirroring
-        // video_libraries) and photos (scanned files with resolution, EXIF date and a cached
-        // thumbnail). Additive only; no existing data is touched.
         val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -556,10 +499,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v20 — SAF ROM libraries. Adds memory_cards.tree_uri (the persisted SAF document-tree URI
-        // a card scans, when the user picked it via the folder picker) and games.rom_uri (the SAF
-        // content:// URI for a scanned ROM). Both nullable and additive: existing raw-path cards and
-        // games are untouched (tree_uri / rom_uri stay NULL and the legacy raw-path launch path runs).
         val MIGRATION_19_20 = object : Migration(19, 20) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE memory_cards ADD COLUMN tree_uri TEXT")
@@ -567,24 +506,12 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v21 — per-collection icon. Adds collections.icon_key: a user-picked key from the shared
-        // category icon catalog. Nullable; NULL keeps the default memory-card art. Additive only.
         val MIGRATION_20_21 = object : Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE collections ADD COLUMN icon_key TEXT")
             }
         }
 
-        // v22 — library restructure: Windows Games card + gaming/standard app split.
-        //  • scan_tombstones records user-removed scanned games so re-scans don't resurrect them.
-        //  • PC-launcher entries (harvested shortcuts / exported PC games) consolidate under the
-        //    "windows" platform as real games. Only the unambiguous launcher packages are re-homed
-        //    here; spoof-named variants (AnTuTu/PUBG/Genshin/CrossFire package names shared with
-        //    genuine apps) are resolved by LibraryConsolidation with an app-label check.
-        //  • Android-library entries become contentType GAME (they now count in All Games); the
-        //    app_shortcut sentinel rows (per-app decoration/favorites shortcuts) stay ANDROID_APP.
-        //  No rows are deleted. Dedupe, Windows card creation, and launcher-collection cleanup run
-        //  in LibraryConsolidation (Kotlin one-shot) — they need logic SQL can't express safely.
         val MIGRATION_21_22 = object : Migration(21, 22) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -598,14 +525,10 @@ abstract class PFPDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
 
-                // Rename only if the user hasn't customized the platform name.
                 db.execSQL(
                     "UPDATE platforms SET name = 'Windows Games' WHERE id = 'windows' AND name = 'Windows (Winlator)'"
                 )
 
-                // Re-home PC-launcher game entries to the Windows platform as real games. The
-                // launch-handle requirement keeps a decorated launcher app itself (a plain
-                // package shortcut row with no shortcut id / intent) out of the Windows card.
                 db.execSQL(
                     """
                     UPDATE games SET platform_id = 'windows', content_type = 'GAME'
@@ -616,21 +539,12 @@ abstract class PFPDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
 
-                // Android-library entries are user-curated games — promote them so they aggregate
-                // into All Games and become eligible for gaming categories. The user can demote
-                // individual apps via "Unmark as Game".
                 db.execSQL(
                     "UPDATE games SET content_type = 'GAME' WHERE platform_id = 'android' AND content_type = 'ANDROID_APP'"
                 )
             }
         }
 
-        // v23 — zipped-ROM support for cartridge platforms. The dominant Android emulators for
-        // these systems (RetroArch cores, Snes9x EX+, M64Plus FZ, My Boy!/mGBA, DraStic, MD.emu,
-        // Stella/Handy/Beetle cores, VICE) all load .zip directly, so it joins the default
-        // extension lists. Disc-based systems are excluded — their compressed formats are
-        // CHD/RVZ/CSO and their emulators don't read zip. Existing Memory Cards get the new
-        // extension too (idempotent, additive; a card the user already gave zip is untouched).
         val MIGRATION_22_23 = object : Migration(22, 23) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 val zipPlatforms = listOf(
@@ -656,9 +570,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // Scraper identity columns: persisted database ids let re-scrapes fetch by id instead of
-        // re-matching by name, and rom_crc32 (streamed hash computed during ScreenScraper lookups)
-        // is the portable-artwork matcher's strongest reconnect evidence. All nullable/additive.
         val MIGRATION_23_24 = object : Migration(23, 24) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN ss_id INTEGER")
@@ -668,10 +579,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v25 — portable artwork library + ES-DE import. games.artwork_key is the stable portable
-        // identity (rom/{platform}/{slug}, minted lazily). artwork_index is the fast lookup cache
-        // over the user's artwork folder (rebuildable — never source of truth). artwork_import_reports
-        // stores past import runs for the Import Report screen. All additive.
         val MIGRATION_24_25 = object : Migration(24, 25) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN artwork_key TEXT")
@@ -703,12 +610,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v26 — portable media library layout v2. artwork_records replaces artwork_index: the
-        // same fast map over the user's artwork folder, plus provenance (source, user_assigned,
-        // locked) and lazily-filled dimensions/checksum. Existing index rows migrate by joining
-        // games on artwork_key (multi-row disc games correctly fan out to one record per row);
-        // relative_path/portable_name backfill on the next Relink — the folder, not this table,
-        // is the source of truth.
         val MIGRATION_25_26 = object : Migration(25, 26) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -755,18 +656,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v27 — icon display modes + richer scrape metadata.
-        //  • box_art_uri / physical_media_uri / box3d_uri: column-backed alternative XMB tiles
-        //    (BOX_ART / PHYSICAL_MEDIA / BOX_3D kinds); icon_display_mode is the per-game
-        //    override (null = follow the global setting).
-        //  • players / age_rating / franchise / community_rating / release_date: ScreenScraper
-        //    metadata already present in scrape responses, now persisted for Game Detail.
-        //  • ICON records that actually hold ES-DE box art (source import-esde/relink) become
-        //    BOX_ART in place — the file already sits in covers/, which BOX_ART now owns; the
-        //    box_art_uri column is seeded from them and icon_uri cleared where it pointed at the
-        //    reclassified file. Scrape/user/internal-migration ICON records are true 144:80
-        //    icons; their FILES still live in covers/ and are relocated to pfp/icon0/ by the
-        //    Kotlin one-shot (SAF moves can't run in SQL) — see IconCoversReclassifyWorker.
         val MIGRATION_26_27 = object : Migration(26, 27) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN box_art_uri TEXT")
@@ -779,9 +668,6 @@ abstract class PFPDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE games ADD COLUMN community_rating REAL")
                 db.execSQL("ALTER TABLE games ADD COLUMN release_date TEXT")
 
-                // Imported ES-DE "covers" were stored as ICON before BOX_ART existed — they are
-                // true box art. Reclassify in place (unique (game_id, artwork_type) can't clash:
-                // BOX_ART rows can't exist before this migration).
                 db.execSQL(
                     """
                     UPDATE artwork_records SET artwork_type = 'BOX_ART'
@@ -803,7 +689,7 @@ abstract class PFPDatabase : RoomDatabase() {
                     WHERE icon_uri IS NOT NULL AND icon_uri = box_art_uri
                     """.trimIndent()
                 )
-                // Seed physical_media_uri from records imported before it was column-backed.
+
                 db.execSQL(
                     """
                     UPDATE games SET physical_media_uri = (
@@ -816,10 +702,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v28 — ScreenScraper media-URL cache. One jeuInfos response carries URLs for EVERY
-        // artwork kind; caching the list (keyed by SS game id) lets later scrapes of
-        // newly-enabled kinds and the Artwork Studio's browse grid skip the metadata call.
-        // Pure cache — rebuildable, losing it costs one API call per game, never data.
         val MIGRATION_27_28 = object : Migration(27, 28) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -834,11 +716,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v29 — Artwork Studio pass 2. Adds provenance + one-previous-version + baked-crop
-        // columns to artwork_records: origin_url (re-download for "Reset to Scraped Default"),
-        // provider (file-info panel), prev_* (single "Restore Previous" backup under
-        // pfp/versions/), crop_rect + has_original (lossless re-crop from pfp/originals/).
-        // All additive and nullable/defaulted — existing rows keep working untouched.
         val MIGRATION_28_29 = object : Migration(28, 29) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE artwork_records ADD COLUMN origin_url TEXT")
@@ -851,11 +728,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v30 — Shiba Coins achievement system. Adds achievement_sets (one denormalized coin
-        // summary + sync metadata per game/provider, for O(1) glance + wallet reads) and
-        // achievements (one row per individual coin with tier, rarity and earned state). Both
-        // cascade-delete with their game. Additive only; no existing data is touched.
-        // See docs/shiba-coins-achievements-plan.md.
         val MIGRATION_29_30 = object : Migration(29, 30) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -899,9 +771,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v31 — provider-game links. Maps a library game to its identifier on an achievement
-        // provider (RA game id / Steam appid) so a sync knows what to fetch, set automatically
-        // (Steam title match) or by hand. Additive; cascade-deletes with the game.
         val MIGRATION_30_31 = object : Migration(30, 31) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -936,14 +805,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v33 — account-keyed achievement storage. Library-keyed achievement_sets/achievements
-        // become account_achievement_sets/account_achievements, keyed by (provider,
-        // provider_game_id) so account-imported games without a library copy are first-class rows.
-        // Library games reach their rows through provider_game_links, whose key widens to
-        // (game_id, provider) so a STEAM and a LOCAL_STEAM link coexist on one game. Existing rows
-        // copy across (titles joined from games; duplicates on the same provider identity merge by
-        // construction). Account rows have no FK to games: they survive library deletion and
-        // provider disconnect. See docs/account-achievements-plan.md.
         val MIGRATION_32_33 = object : Migration(32, 33) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -1034,11 +895,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v34 — Steam library import support. steam_owned_games caches the account's GetOwnedGames
-        // list (the shared owned-appid component for the account import and the local-steam
-        // four-state model); steam_no_achievements remembers appids probed once with no achievement
-        // schema so the import never pays for them again. Additive only; no existing data touched.
-        // See docs/account-achievements-plan.md Phase 3.
         val MIGRATION_33_34 = object : Migration(33, 34) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -1063,22 +919,18 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // LOCAL_STEAM ownership classification on the provider link (OWNED / NOT_IN_LIBRARY,
-        // null = unknown) — derived from the owned-games cache at scan time, never guessed.
         val MIGRATION_34_35 = object : Migration(34, 35) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE provider_game_links ADD COLUMN ownership TEXT")
             }
         }
 
-        // launch_token: per-game launch token for ID-launch emulators (Vita3K Title ID).
         val MIGRATION_35_36 = object : Migration(35, 36) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN launch_token TEXT")
             }
         }
 
-        // v37 - Adding the ability to mark missing files and see when they were last present in the library.
         val MIGRATION_36_37 = object : Migration(36, 37) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN is_missing INTEGER NOT NULL DEFAULT 0")
@@ -1086,12 +938,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v38 — multi-disc set identity (docs/plans/README.md (C1)). Adds the
-        // disc-set columns to games: disc_set_key (platform + containing folder + disc-stripped,
-        // region/revision-stripped title), disc_number (position within the set; NULL for an .m3u
-        // primary), is_disc_primary (the row a set projects to — the .m3u when present, else disc
-        // 1). All nullable/additive: existing rows migrate with NULL keys and behave exactly as
-        // before until a rescan populates them (the plan's reversibility guarantee).
         val MIGRATION_37_38 = object : Migration(37, 38) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN disc_set_key TEXT")
@@ -1100,12 +946,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v39 — enforce the one-primary-per-disc-set invariant. Existing databases may contain
-        // duplicate primaries from incremental scans, so repair them deterministically first:
-        // an m3u-style NULL disc number wins, then the lowest disc number, then the lowest id.
-        // (No index here: the invariant is enforced by DiscSetBuilder/DiscSetReconciler at scan
-        // time, and Room cannot express the partial unique index that would enforce it in SQL —
-        // a raw-SQL partial index fails Room's post-migration validation, see MIGRATION_39_40.)
         val MIGRATION_38_39 = object : Migration(38, 39) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -1145,23 +985,11 @@ abstract class PFPDatabase : RoomDatabase() {
                       )
                     """.trimIndent()
                 )
-                // Defensive: an earlier build's 38→39 migration created a partial unique index
-                // that Room's validation cannot accept; drop it in case this path is ever rerun
-                // on a database that still carries it.
+
                 db.execSQL("DROP INDEX IF EXISTS index_games_one_disc_primary")
             }
         }
 
-        // v40 — detected disc region. games.region holds the TV format detected from the disc image
-        // content (GameRegion enum name; null = not detected). Additive; existing rows keep NULL
-        // and get their region on the next scan that touches them.
-        //
-        // Also drops index_games_one_disc_primary: the v39-era build created that partial unique
-        // index via raw SQL, but Room cannot express partial indexes in its schema export, so the
-        // post-migration validation saw an unexpected index and refused to open the database
-        // ("Migration didn't properly handle: games"). Databases stuck on that build carry the
-        // index; the one-primary-per-set invariant is enforced by DiscSetBuilder/DiscSetReconciler
-        // at scan time, so the index can be dropped safely.
         val MIGRATION_39_40 = object : Migration(39, 40) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP INDEX IF EXISTS index_games_one_disc_primary")
@@ -1169,11 +997,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v41 — launch-outcome history (B1 — launch reliability). One row per settled game launch:
-        // SUCCEEDED / NEVER_FOREGROUNDED / INTENT_FAILED with the emulator/core/source snapshot that
-        // WAS launched and the failure reason. Purely additive; the recovery sheet reads it to say
-        // "this failed N of the last M times with core X" and to offer the alternate emulator.
-        // No FK to games: outcomes are a diagnostic log that outlives a deleted game row.
         val MIGRATION_40_41 = object : Migration(40, 41) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -1204,20 +1027,12 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v42 — artwork multi-media (C16 phase 0). A game may now hold several screenshots and
-        // videos at once, so artwork_records gains a position and the one-row-per-(game,type)
-        // unique index is rebuilt to include it. Purely additive: every existing row keeps its
-        // asset at sort_order 0, which is exactly the slot the single-art code path still uses.
-        //
-        // provider_asset_id and crop_profile_key land in the same migration so the later phases
-        // (duplicate detection, crop profiles) are data-only changes rather than more upgrades.
         val MIGRATION_41_42 = object : Migration(41, 42) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE artwork_records ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE artwork_records ADD COLUMN provider_asset_id TEXT")
                 db.execSQL("ALTER TABLE artwork_records ADD COLUMN crop_profile_key TEXT")
-                // (game_id, artwork_type) → (game_id, artwork_type, sort_order). Existing rows are
-                // all at 0, so the new index is satisfied by the data already present.
+
                 db.execSQL("DROP INDEX IF EXISTS index_artwork_records_game_id_artwork_type")
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS " +
@@ -1227,15 +1042,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        // v43 — Windows storefront identity (C16 phase 0). PcGameScanner computed the store and
-        // app id for every imported PC game and discarded both, leaving a Steam or GOG title
-        // matchable only by title. games.storefront / games.storefront_game_id keep that
-        // evidence, and the pair is indexed together — an app id is unique within a store, never
-        // across stores, so ("STEAM","620") and ("GOG","620") must not collide.
-        //
-        // Backfilled in place from launch_intent_uri, so existing libraries gain the identity
-        // without a re-scan or any user action. Rows whose intent carries no trustworthy store
-        // id (Winlator .desktop launches, GameHub localGameId) are left null rather than guessed.
         val MIGRATION_42_43 = object : Migration(42, 43) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN storefront TEXT")
@@ -1265,11 +1071,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * v44 — the Library section's two tables. Purely additive: nothing existing is read,
-         * altered or dropped, so an install that never opens the section carries two empty tables
-         * and behaves exactly as it did on v43.
-         */
         val MIGRATION_43_44 = object : Migration(43, 44) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -1313,14 +1114,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * v45 — series and cover art on `books`.
-         *
-         * Three nullable columns, no backfill. Every existing row keeps a null series and a null
-         * cover until the scan that reads them runs, which is what makes this safe to apply to a
-         * library of any size: the migration does no file I/O, and a book whose EPUB carries no
-         * series metadata stays null forever rather than being guessed at from its file name.
-         */
         val MIGRATION_44_45 = object : Migration(44, 45) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE books ADD COLUMN series TEXT")
@@ -1329,18 +1122,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * v46 — achievement tracking is gone, and so are its tables.
-         *
-         * Six tables, dropped outright: the feature was removed at the user's request and the rows
-         * are dead weight that every later migration and every backup would otherwise carry
-         * forever. This is the one destructive migration in the project, so it names each table
-         * explicitly rather than looping over a pattern, and it touches nothing else. `games`,
-         * `platforms` and the rest of the library are not referenced here at all.
-         *
-         * `IF EXISTS` on each: a database seeded before the tables existed is upgraded by the same
-         * path, and it must not fail on a table it never had.
-         */
         val MIGRATION_45_46 = object : Migration(45, 46) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP TABLE IF EXISTS account_achievements")
@@ -1352,91 +1133,30 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * An index on `disc_set_key`.
-         *
-         * It is the one column the display queries correlate on and the only one they correlate
-         * on without an index: All Games, Favorites, the platform lists and Missing each carry a
-         * `WHERE member.disc_set_key = games.disc_set_key` subquery that runs once per row. With
-         * no index that is a full scan per row, so the cost is quadratic in the library rather
-         * than linear, and it is invisible until the library is large enough to feel it.
-         *
-         * Not unique: a disc set has several rows by definition, which is the entire point of the
-         * column. IF NOT EXISTS because Room creates the index itself on a fresh install, and
-         * this migration must be safe to meet a database that already has it.
-         */
         val MIGRATION_46_47 = object : Migration(46, 47) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_games_disc_set_key ON games(disc_set_key)")
             }
         }
 
-        /**
-         * Drops `unmatched_roms`.
-         *
-         * The table, its entity and its DAO were declared and then never used: nothing wrote a
-         * row and nothing read one, and the Settings screen its comment promised ("Settings →
-         * Library → Unmatched ROMs") does not exist. The scanner's own `UnmatchedRom` is a
-         * different, live type — a result it hands back in memory — and is untouched by this.
-         *
-         * A real DROP rather than the retire-in-place that ScanTombstoneEntity got. That one is
-         * kept to hold the schema version steady; there is no such reason here, the rows were
-         * worthless where they existed at all, and DROP TABLE is the one destructive schema verb
-         * that minSdk 29's SQLite does support — unlike ALTER TABLE DROP COLUMN, which is why
-         * games.tgdb_id is still a documented-retired column rather than a removed one.
-         */
         val MIGRATION_47_48 = object : Migration(47, 48) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP TABLE IF EXISTS unmatched_roms")
             }
         }
 
-        /**
-         * A poster slot for videos, filled from TMDB.
-         *
-         * Separate from thumbnail_uri, which the scanner owns and rewrites: a poster stored there
-         * would be wiped by the next rescan, taking the frame grab with it. Two columns means both
-         * survive and Video.effectiveThumbnailUri decides which is shown.
-         */
         val MIGRATION_49_50 = object : Migration(49, 50) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE videos ADD COLUMN poster_uri TEXT")
             }
         }
 
-        /**
-         * The album artist, so the Artists view lists artists.
-         *
-         * `artist` holds whatever the file was tagged with, which for most of a real library is
-         * the whole credit line -- "Ab-Soul, Anderson .Paak, James Blake" is one value from this
-         * device. Grouping on it produced a list of credit COMBINATIONS, with one performer
-         * appearing in a dozen rows and no row for the performer alone.
-         *
-         * Added as NULL rather than backfilled from `artist`: a copy of the credit line under a
-         * new name would look populated and group exactly as badly, and there would be no way
-         * afterwards to tell a real album artist from the copy. Null means "this file has not
-         * been re-read yet", which is true, and MusicTrack.primaryArtist falls back to `artist`
-         * so nothing looks broken in the meantime. The next scan of a folder fills it.
-         */
         val MIGRATION_50_51 = object : Migration(50, 51) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE music_tracks ADD COLUMN album_artist TEXT")
             }
         }
 
-        /**
-         * When a game entered the library, so "recently added" can mean it.
-         *
-         * Photos, books and videos have carried `date_added` since their tables were written;
-         * games never did, and the cover fan has been standing in with "highest id first" —
-         * a fair proxy until a platform is deleted and re-added, which drops and re-inserts every
-         * row of it and is exactly when someone looks at a recently-added list.
-         *
-         * **Existing rows are set to 0, not to now.** 0 reads as "was already here, and unknown",
-         * and every query that means recency excludes it. Stamping the migration's own timestamp
-         * would have made the entire library "added today" — one wrong answer for every row,
-         * permanently, since they would all share the instant.
-         */
         val MIGRATION_51_52 = object : Migration(51, 52) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN date_added INTEGER")
@@ -1444,33 +1164,12 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * Playing / Completed / Backlog, marked by hand.
-         *
-         * No backfill, and that is the decision rather than an omission: every existing row stays
-         * NULL, which means unmarked. The obvious alternative — call the whole library BACKLOG —
-         * would put a badge on 152 games at once and make it say nothing on the day it arrived.
-         */
         val MIGRATION_52_53 = object : Migration(52, 53) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE games ADD COLUMN play_state TEXT")
             }
         }
 
-        /**
-         * Recency for music and books, so the Last Played shelf can hold all four media.
-         *
-         * Games and videos already carried their own stamp (`last_played_at`, `last_watched_at`).
-         * Tracks and books carried only `last_modified` — the file's mtime — and `date_added`,
-         * which is when the scan first saw the file. Both answer "when did this arrive", so a
-         * library copied across in one go would have every item claim the same recency and the
-         * shelf would rank by copy order while looking perfectly plausible. That is why these are
-         * new columns and not a reused proxy.
-         *
-         * NULL for every existing row on purpose: nothing has been played through the launcher
-         * yet as far as these columns know, so the shelf shows music and books only once they
-         * have actually been opened. Backfilling from mtime would be the same lie in one step.
-         */
         val MIGRATION_48_49 = object : Migration(48, 49) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE music_tracks ADD COLUMN last_played_at INTEGER")
@@ -1486,17 +1185,6 @@ abstract class PFPDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * Every migration, in order, as ONE list.
-         *
-         * DatabaseModule used to hand-type all of these into `addMigrations(...)`, which made the
-         * registration a mirror of the declarations with nothing keeping them level. Forgetting one
-         * line there produces `IllegalStateException: A migration from N to N+1 was required but not
-         * found` on every existing user's next launch -- and, because each migration's own test
-         * invokes the object directly, the whole suite stays green. The list lives here now, beside
-         * the objects it names, and `PFPDatabaseMigrationsTest` enumerates the declarations by
-         * reflection and checks none is missing from it.
-         */
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -1551,6 +1239,5 @@ abstract class PFPDatabase : RoomDatabase() {
             MIGRATION_51_52,
             MIGRATION_52_53,
         )
-
     }
 }

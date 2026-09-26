@@ -17,11 +17,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Builds the import preview: detects launcher folders under `import/`, enumerates their artwork,
- * matches each file to a game, and filters to what actually needs importing. Read-only — nothing
- * is copied, moved, or written until the user approves the plan.
- */
 @Singleton
 class ArtworkImportPlanner @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -30,17 +25,14 @@ class ArtworkImportPlanner @Inject constructor(
     private val artworkStore: ArtworkStore,
     private val esDeSource: EsDeImportSource,
 ) {
-    // Extensible registry: future launchers (Daijisho, Pegasus, …) are added here only.
     private val sources: List<ArtworkImportSource> get() = listOf(esDeSource)
 
-    /** Recognized launcher folders under `import/`, tried against every registered source. */
     suspend fun detectSources(treeUri: Uri): List<DetectedImportSource> = withContext(Dispatchers.IO) {
         library.listImportSources(treeUri).mapNotNull { folder ->
             sources.firstNotNullOfOrNull { it.detect(treeUri, folder) }
         }
     }
 
-    /** Names of `import/` children no source recognized (shown as "unrecognized layout"). */
     suspend fun unrecognizedFolders(treeUri: Uri, detected: List<DetectedImportSource>): List<String> =
         withContext(Dispatchers.IO) {
             val known = detected.map { it.folderDocId }.toSet()
@@ -69,8 +61,6 @@ class ArtworkImportPlanner @Inject constructor(
             }
             when (val result = index.match(candidate.displayName)) {
                 is ArtworkImportMatcher.Result.Matched -> {
-                    // Several ids = duplicate rows of one physical game (.cue + .bin) — the
-                    // artwork applies to every row so each stays consistent in the XMB.
                     for (gameId in result.gameIds) {
                         val game = gameById.getValue(gameId)
                         when (val need = needFor(game, candidate.kind)) {
@@ -85,8 +75,7 @@ class ArtworkImportPlanner @Inject constructor(
                                     confidence = result.confidence,
                                     replacesStale = need == Need.STALE,
                                 )
-                                // One file per kind per game — the strongest match wins (an
-                                // exact-filename hit replaces an index-prefixed duplicate).
+
                                 val existing = items.firstOrNull { it.kind == candidate.kind }
                                 when {
                                     existing == null -> items += item
@@ -109,9 +98,6 @@ class ArtworkImportPlanner @Inject constructor(
             }
         }
 
-        // ── gamelist.xml metadata pass ────────────────────────────────────────
-        // Entries match through the same per-platform index: <path> filename first (pass 1),
-        // then <name> through the title passes. Fill-missing-only, applied by the executor.
         val metadataUpdates = mutableListOf<MetadataUpdate>()
         val metadataSeen = mutableSetOf<Long>()
         for ((platformId, gamelistDocId) in detected.gamelistDocIds) {
@@ -159,7 +145,7 @@ class ArtworkImportPlanner @Inject constructor(
                     ?: PortableNameResolver.fromTitle(game.displayTitleOrNull() ?: game.title),
                 title = game.displayTitleOrNull() ?: game.title,
                 romFileName = romFileName,
-                // Kind priority: visible slots first so the XMB fills fastest.
+
                 items = items.sortedBy { KIND_PRIORITY.indexOf(it.kind).let { i -> if (i < 0) 99 else i } },
             )
         }
@@ -187,10 +173,6 @@ class ArtworkImportPlanner @Inject constructor(
         }
     }
 
-    /**
-     * Review resolution: moves an ambiguous candidate into the plan as a confirmed item for
-     * [gameId]. Returns the updated plan (the ambiguous entry removed either way).
-     */
     suspend fun assignAmbiguous(plan: ImportPlan, ambiguousIndex: Int, gameId: Long): ImportPlan =
         withContext(Dispatchers.IO) {
             val entry = plan.ambiguous.getOrNull(ambiguousIndex) ?: return@withContext plan
@@ -207,7 +189,7 @@ class ArtworkImportPlanner @Inject constructor(
             )
             val existing = plan.games.firstOrNull { it.gameId == gameId }
             val games = if (existing != null) {
-                if (existing.items.any { it.kind == item.kind }) plan.games   // kind already planned
+                if (existing.items.any { it.kind == item.kind }) plan.games
                 else plan.games.map { if (it.gameId == gameId) it.copy(items = it.items + item) else it }
             } else {
                 val key = game.artworkKey ?: ArtworkKeyFactory.keyFor(gameEntityToDomainLite(game))
@@ -227,17 +209,11 @@ class ArtworkImportPlanner @Inject constructor(
             plan.copy(games = games, ambiguous = remaining)
         }
 
-    /** Review resolution: drops an ambiguous candidate without importing it. */
     fun skipAmbiguous(plan: ImportPlan, ambiguousIndex: Int): ImportPlan =
         plan.copy(ambiguous = plan.ambiguous.filterIndexed { i, _ -> i != ambiguousIndex })
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private enum class Need { MISSING, STALE, SATISFIED }
 
-    // For column-backed kinds, need is judged from the game row (valid ref = satisfied; dead
-    // ref = stale → overwrite). Extra kinds (SCREENSHOT, …) have no column — the executor skips
-    // them if the entry file already exists, so they always plan as MISSING here.
     private fun needFor(game: GameEntity, kindName: String): Need {
         val ref = when (kindName) {
             ArtworkKind.ICON.name -> game.iconUri
@@ -266,7 +242,6 @@ class ArtworkImportPlanner @Inject constructor(
             ?: scrapedTitle?.takeIf { it.isNotBlank() }
             ?: title.takeIf { it.isNotBlank() }
 
-    // ArtworkKeyFactory takes the domain model; build the minimal fields it reads.
     private fun gameEntityToDomainLite(game: GameEntity) =
         com.psplauncher.core.domain.model.Game(
             id = game.id,

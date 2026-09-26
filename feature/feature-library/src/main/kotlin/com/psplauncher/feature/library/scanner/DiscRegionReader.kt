@@ -14,24 +14,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import timber.log.Timber
 
-/**
- * Detects the TV format / region of a disc-based game by reading the disc image content — never
- * the filename. Shared by [RomScanner] (fresh-scan enrichment) and [DiscSetReconciler]
- * (reconciliation over existing rows) so every scan path detects region identically.
- *
- * Raw-path games read from disk; SAF games from their document URI. For .cue / .gdi sheets the
- * first data-track file (the .bin) is resolved and read instead of the sheet itself. A read or
- * detection failure is a soft failure — the game keeps region null (Unknown), which only ever
- * falls back to merging, never mis-splits a set.
- *
- * Supported: psx, ps2, psp, gc, wii, saturn, dreamcast, segacd, x360, ps3. PC Engine and
- * cartridge platforms return null (no reliable embedded region marker / no multi-disc).
- */
 @Singleton
 class DiscRegionReader @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-
     fun read(game: Game): GameRegion? = when (game.platformId) {
         "psx" -> headDetect(game, 256 * 1024, DiscRegionDetectors::detectPsx)
         "ps2" -> headDetect(game, 256 * 1024, DiscRegionDetectors::detectPs2)
@@ -53,8 +39,6 @@ class DiscRegionReader @Inject constructor(
     }
 
     private fun detectPs3(game: Game): GameRegion? {
-        // PS3 games are folder-based (PS3_GAME/) or ISOs. Folder: read PARAM.SFO straight from
-        // disk. SAF folder trees are out of scope here — region stays null (safe fallback).
         val path = game.romPath ?: return null
         if (!game.romUri.isNullOrBlank()) return null
         val dir = File(path)
@@ -71,8 +55,6 @@ class DiscRegionReader @Inject constructor(
         }
         return null
     }
-
-    // ── image head reading ───────────────────────────────────────────────────
 
     private fun readImageHead(game: Game, maxBytes: Int): ByteArray? {
         return try {
@@ -91,7 +73,6 @@ class DiscRegionReader @Inject constructor(
         }
     }
 
-    /** Reads at most [maxBytes] (a disc image can be gigabytes — never read it whole). */
     private fun readAtMost(input: InputStream, maxBytes: Int): ByteArray {
         val buffer = ByteArray(maxBytes)
         var total = 0
@@ -103,7 +84,6 @@ class DiscRegionReader @Inject constructor(
         return buffer.copyOf(total)
     }
 
-    /** Resolves a raw-path game to the file whose bytes hold the disc's boot data. */
     private fun resolveRawImageFile(file: File): File? {
         return when (file.extension.lowercase()) {
             "cue" -> {
@@ -118,12 +98,11 @@ class DiscRegionReader @Inject constructor(
                     ?.takeIf(::isSafeSiblingName)
                     ?.let { File(file.parentFile, it) }
             }
-            "m3u" -> null  // playlist — the discs themselves carry the region
+            "m3u" -> null
             else -> file
         }
     }
 
-    /** Resolves a SAF game to the document URI whose bytes hold the disc's boot data. */
     private fun resolveSafImageUri(game: Game): Uri? {
         val sheetUri = runCatching { Uri.parse(game.romUri) }.getOrNull() ?: return null
         val name = sheetUri.lastPathSegment?.substringAfterLast('/') ?: return null
@@ -143,12 +122,6 @@ class DiscRegionReader @Inject constructor(
         }
     }
 
-    /**
-     * Builds the document URI for a sibling file next to a sheet, tree-scoped to the sheet's own
-     * URI so it inherits the ROM root's persisted grant — a bare document URI carries no grant and
-     * the provider throws SecurityException. The sibling's document id is the sheet's parent plus
-     * the sibling name; null for a name that is not a bare sibling or an id with no parent.
-     */
     private fun siblingDocumentUri(sheetUri: Uri, siblingName: String): Uri? {
         if (!isSafeSiblingName(siblingName)) return null
         val docId = runCatching { DocumentsContract.getDocumentId(sheetUri) }.getOrNull() ?: return null

@@ -12,7 +12,6 @@ import kotlin.test.assertNull
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration38To39Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
@@ -33,21 +32,18 @@ class Migration38To39Test {
         }
 
         helper.runMigrationsAndValidate(39, listOf(PFPDatabase.MIGRATION_38_39)).use { db ->
-            // The m3u playlist wins the primary slot for set-a, and it is the only primary there.
+
             val setA = db.rows("SELECT disc_number FROM games WHERE disc_set_key = 'set-a' AND is_disc_primary = 1") {
                 if (it.isNull(0)) null else it.getLong(0).toInt()
             }
             assertEquals(1, setA.size)
             assertNull(setA.single())
 
-            // set-b has no playlist, so the lowest disc number keeps the primary slot.
             val setB = db.rows("SELECT disc_number FROM games WHERE disc_set_key = 'set-b' AND is_disc_primary = 1") {
                 it.getLong(0).toInt()
             }
             assertEquals(listOf(1), setB)
 
-            // Multiple non-primary rows may share a set key (no DB-level uniqueness on it — the
-            // one-primary invariant is enforced at scan time by DiscSetBuilder/DiscSetReconciler).
             db.execSQL("INSERT INTO games (title, platform_id, rom_path, disc_set_key, disc_number, is_disc_primary, is_favorite, favorite_sort_order, total_play_time_millis, content_type, is_missing, is_manual_entry, created_at) VALUES ('Disc 3', 'psx', '/roms/disc3.cue', 'set-a', 3, 0, 0, 0, 0, 'GAME', 0, 0, 6)")
         }
     }

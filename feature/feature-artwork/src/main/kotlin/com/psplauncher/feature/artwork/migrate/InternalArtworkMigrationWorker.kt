@@ -25,22 +25,6 @@ import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 import java.util.UUID
 
-/**
- * M-F2 — moves artwork stranded in internal storage (`filesDir/artwork/{gameId}/`, scraped or
- * picked before a folder was linked) into the user's portable library.
- *
- * Discipline, per the plan's §22/§16 rules:
- *  • Conflict gate first: an existing valid portable asset outranks the internal file — the
- *    redundant internal copy is deleted, nothing is written. A locked/user-assigned record
- *    whose file is dead is left alone (the internal file stays as its manual-recovery source).
- *  • Writes ride the exact scrape path ([RoutingArtworkStore.saveTempPortable]): payload
- *    sniffing + size caps, portable naming, record upsert, Coil cache-bust — versioned user
- *    picks migrate as `user_assigned + locked`, scraper files as `internal-migration`.
- *  • The internal file is deleted only AFTER a verified portable write; game columns that
- *    referenced it are repointed to the new content URI in the same step.
- *  • Resumable by construction: migrated slots hold valid portable records, so a re-run
- *    conflict-gates straight past them. Cancellation keeps everything migrated so far.
- */
 @HiltWorker
 class InternalArtworkMigrationWorker @AssistedInject constructor(
     @Assisted appContext: Context,
@@ -52,7 +36,6 @@ class InternalArtworkMigrationWorker @AssistedInject constructor(
     private val artworkRecordDao: ArtworkRecordDao,
     private val reportDao: ArtworkImportReportDao,
 ) : CoroutineWorker(appContext, params) {
-
     override suspend fun doWork(): Result {
         val notifier = BackgroundTaskNotifier(applicationContext)
         if (folderRepository.getTreeUri() == null || !folderRepository.hasLiveGrant()) {
@@ -75,13 +58,12 @@ class InternalArtworkMigrationWorker @AssistedInject constructor(
             assets.forEachIndexed { index, asset ->
                 if (isStopped) throw CancellationException()
                 val game = games[asset.gameId]
-                if (game == null) { skipped++; return@forEachIndexed }   // orphan dir — untouched
+                if (game == null) { skipped++; return@forEachIndexed }
 
                 val record = artworkRecordDao.get(asset.gameId, asset.kind.name)
                 val portableValid = record != null && routing.isValidRef(record.documentUri)
                 when {
                     portableValid -> {
-                        // Library already has this slot — the internal copy is redundant.
                         internal.deleteKind(asset.gameId, asset.kind)
                         skipped++
                     }
@@ -141,7 +123,6 @@ class InternalArtworkMigrationWorker @AssistedInject constructor(
         return Result.success(workDataOf(KEY_MIGRATED to migrated, KEY_FAILED to failed))
     }
 
-    /** Repoints a column-backed kind at the new URI when it referenced the migrated file or is dead. */
     private suspend fun repointColumn(gameId: Long, kind: ArtworkKind, oldPath: String, uri: String) {
         val game = gameDao.getById(gameId) ?: return
         when (kind) {
@@ -159,7 +140,7 @@ class InternalArtworkMigrationWorker @AssistedInject constructor(
                 if (game.physicalMediaUri == oldPath || !routing.isValidRef(game.physicalMediaUri)) gameDao.updatePhysicalMedia(gameId, uri)
             ArtworkKind.BOX_3D ->
                 if (game.box3dUri == oldPath || !routing.isValidRef(game.box3dUri)) gameDao.updateBox3d(gameId, uri)
-            else -> Unit   // record-only kinds (manuals, videos, extras)
+            else -> Unit
         }
     }
 

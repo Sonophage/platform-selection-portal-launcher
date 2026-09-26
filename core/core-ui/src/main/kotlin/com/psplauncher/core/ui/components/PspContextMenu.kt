@@ -37,31 +37,17 @@ import com.psplauncher.core.ui.preview.PfpPreview
 import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 
-// ── PSP-style context menu panel ──────────────────────────────────────────────
-//
-// The canonical XMB sub-menu look: a translucent column anchored to the right
-// edge over a light scrim, a plain title underlined by a thin rule, and the
-// selected item marked by a soft horizontal glow band that bleeds to the screen
-// edge (no boxed panel). Shared by the XMB's Y/Triangle menu and any settings
-// screen that opens a per-item options menu — one source, no style drift.
-//
-// Controller navigation is the caller's job (selectedIndex in, activation out);
-// this composable handles touch/click interaction.
-
-/** One row of a [PspContextMenuOverlay]. */
 data class PspMenuRow(
     val label: String,
     val isDestructive: Boolean = false,
-    // Marks a current membership/selection (e.g. collections the item already belongs to).
+
     val checked: Boolean = false,
-    // Group heading drawn above this row. Not a row itself: the cursor never lands on it, and
-    // the index the caller gets back is still the index into this list.
+
     val heading: String? = null,
 )
 
 private val PanelWidth = 300.dp
 
-// Black drop shadow on the menu text so it stays legible over the wave/backdrop.
 private val TextDropShadow = Shadow(
     color = Color.Black.copy(alpha = 0.75f),
     offset = Offset(0f, 2f),
@@ -76,10 +62,7 @@ fun PspContextMenuOverlay(
     onRowActivated: (index: Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    // Dims what is behind the menu. This was 0x40 — 25% black — which is a fine scrim over a
-    // plain gradient and far too little over artwork: on a game's options menu the hero art and
-    // the metadata line stayed at near-full brightness right up to the panel's edge. The hardware
-    // dims the whole cross hard behind its options menu, and the menu is modal here too.
+
     scrim: Color = Color(0x99000000),
 ) {
     val colors = LocalPFPColors.current
@@ -97,30 +80,16 @@ fun PspContextMenuOverlay(
             .background(scrim)
             .clickable(onClick = onDismiss),
     ) {
-        // Right-edge column: the theme's HUE at a surface's darkness, not the theme's colour.
-        //
-        // Two failures got fixed here and the second was only visible after the first. At alpha
-        // 0.75 the panel was a wash, so on a game's flyout the PIC0 logo and the metadata line
-        // read straight THROUGH it — "Change Emulator" sat on the word "FANTASY". Making it
-        // opaque stopped that and revealed why the wash had been hiding it: on a game flyout the
-        // wave colour is tinted by the ARTWORK, so an opaque panel came out as a full-strength
-        // slab of whatever the box art happened to be — scarlet for one game, gold for another —
-        // and the destructive row went red on red.
-        //
-        // So the hue is kept, because the menu should belong to the theme and to the game, and
-        // the value is taken down to where a list of white labels and one red one both read. The
-        // wave showing through is the scrim's job, never the panel's.
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(PanelWidth)
                 .background(lerp(colors.waveColor, Color.Black, 0.62f).copy(alpha = 0.96f))
-                .clickable(onClick = {}) // consume clicks so the scrim isn't triggered inside
+                .clickable(onClick = {})
                 .padding(start = 28.dp, end = 40.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            // ── Title ─────────────────────────────────────────────────────
             Text(
                 text = title,
                 fontSize = 19.sp,
@@ -130,7 +99,7 @@ fun PspContextMenuOverlay(
                 maxLines = 2,
                 modifier = Modifier.padding(bottom = 10.dp),
             )
-            // Thin underline rule beneath the title.
+
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -139,18 +108,13 @@ fun PspContextMenuOverlay(
                     .background(Color.White.copy(alpha = 0.30f)),
             )
 
-            // ── Items ──────────────────────────────────────────────────────
             LazyColumn(
                 state = listState,
-                // Bottom padding, not just top. A list longer than the panel used to end flush
-                // with the screen edge, so the last row — Remove, on a game — was cut in half
-                // even while it was the selected one. contentPadding rather than a Modifier so
-                // the gap scrolls away with the content instead of masking the last row.
+
                 contentPadding = PaddingValues(top = 10.dp, bottom = 32.dp),
             ) {
                 itemsIndexed(rows) { index, row ->
-                    // The heading is drawn INSIDE the row's item, above it: it belongs to this
-                    // row, and a separate list item would be one the cursor index has to skip.
+
                     row.heading?.let { heading ->
                         Text(
                             text = heading,
@@ -184,14 +148,11 @@ private fun PspContextMenuRow(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    // Accent-tinted glow so the cursor follows the chosen color scheme; blended toward white in
-    // menuCursorEdge so a dark theme accent still reads clearly on the scrim.
     val glow = menuCursorEdge()
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            // Horizontal glow band for the active item — brighter toward the
-            // screen edge, fading out to the left. No border or rounded box.
+
             .background(
                 if (isSelected) {
                     Brush.horizontalGradient(
@@ -226,8 +187,6 @@ private fun PspContextMenuRow(
         }
     }
 }
-
-// ── Previews ──────────────────────────────────────────────────────────────────
 
 @CombinedPreviews
 @Composable

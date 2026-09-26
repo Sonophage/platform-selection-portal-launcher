@@ -8,9 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** C18 task X.3 — the pure half of Export Manual Games: file names and content. */
 class PcGameExportBuilderTest {
-
     private val gameHubIntent = "intent:#Intent;action=banner.hub.LAUNCH_GAME;S.localGameId=local_1f2e;end"
 
     private fun game(
@@ -99,8 +97,6 @@ class PcGameExportBuilderTest {
         assertTrue(decoded is PcGameExportDecode.Valid && decoded.export.isPin)
     }
 
-    // ── One game at a time (task X.7) ─────────────────────────────────────────
-
     private fun exportOf(game: Game) = checkNotNull(PcGameExportBuilder.exportFor(game, emptyList()))
 
     @Test
@@ -108,7 +104,7 @@ class PcGameExportBuilderTest {
         val game = game(1)
 
         assertTrue(PcGameExportBuilder.isSameGame(exportOf(game), game))
-        // Flags stripped by the sanitizer; the extras that name the game are unchanged.
+
         val sanitized = game.copy(launchIntentUri = "intent:#Intent;component=banner.hub/x.Y;S.localGameId=local_1f2e;end")
         assertTrue(PcGameExportBuilder.isSameGame(exportOf(game), sanitized))
     }

@@ -1,36 +1,17 @@
 package com.psplauncher.themekit
 
-/**
- * The themeable XMB icon surface — every UI glyph a theme may replace, keyed stably.
- *
- * This registry is the single source of truth shared by the launcher (which resolves an
- * applied theme's `icons/<key>.png` overrides at render time) and the desktop Theme Studio
- * (which edits the slots and exports the editable template pack). Platform/console icons
- * (`sysicon_*`) and physical-media art are deliberately NOT slots: those identify content,
- * not UI, and stay uniform across themes.
- *
- * Keys are also the bundle entry names (`icons/<key>.png` inside a `.pfptheme`), so they are
- * forever-stable: never rename one, only add.
- */
 data class IconSlot(
     val key: String,
     val group: Group,
-    /** Human label for editors ("Games", "Video folder"...). */
+
     val displayName: String,
-    /** Square canvas size (px) for exported editable templates. */
+
     val templateSizePx: Int,
 ) {
-    /**
-     * Bucket a slot renders in. CONSOLE is not an `IconSlots` bucket in the bundle contract
-     * (`icons/` entries stay gated by [IconSlots.isValidKey]) — it exists for the app-side
-     * superset registry [CustomizableIcons], whose console slots travel under the separate
-     * `sysicons/` bundle directory (schema v3).
-     */
     enum class Group { CATEGORY_BAR, ITEMS, STATUS, CONSOLE }
 }
 
 object IconSlots {
-
     private const val CATBAR_TEMPLATE_PX = 256
     private const val ITEM_TEMPLATE_PX = 256
     private const val STATUS_TEMPLATE_PX = 128
@@ -45,7 +26,7 @@ object IconSlots {
         IconSlot(key, IconSlot.Group.STATUS, name, STATUS_TEMPLATE_PX)
 
     val ALL: List<IconSlot> = listOf(
-        // ── Category bar (crossbar column glyphs) ────────────────────────────
+
         catbar("catbar_games", "Games"),
         catbar("catbar_music", "Music"),
         catbar("catbar_video", "Video"),
@@ -56,13 +37,9 @@ object IconSlots {
         catbar("catbar_favorites", "Favorites"),
         catbar("catbar_library", "Library"),
 
-        // ── First-level item glyphs (one key per semantic slot, not per shape:
-        //    the video folder and photo folder may diverge in a custom theme) ──
         item("item_add", "Add / create action"),
         item("item_missing", "Missing games bucket"),
-        // Default memory-card art: the "Music"/"Videos"/"Photos" library cards and the
-        // Games-side default (collections without a picked icon). Per-console cards keep
-        // their console identity and stay non-themeable.
+
         item("item_memcard_games", "Memory card (Games)"),
         item("item_memcard_music", "Memory card (Music)"),
         item("item_memcard_video", "Memory card (Video)"),
@@ -89,8 +66,6 @@ object IconSlots {
         item("item_music_albums", "Albums"),
         item("item_playlist", "Playlist"),
 
-
-        // ── Status strip ─────────────────────────────────────────────────────
         status("status_battery_full", "Battery (full)"),
         status("status_battery_high", "Battery (high)"),
         status("status_battery_medium", "Battery (medium)"),

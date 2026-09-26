@@ -29,19 +29,6 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Executes an approved [ImportPlan]: brings each planned file into `games/{platform}/{slug}/`,
- * writes per-entry provenance (`metadata.json`), updates the game rows and the artwork index.
- *
- * Discipline:
- *  • Resumable — an entry file that already exists (from an interrupted run) is reused, not
- *    re-copied; re-running a plan converges instead of duplicating work.
- *  • One child-listing cursor, one metadata write, one batched index upsert per game.
- *  • Bounded concurrency (SAF providers largely serialize; more workers just queue on binder).
- *  • Locked assets (user-pinned in metadata.json) are never overwritten.
- *  • Per-game error isolation — one unreadable file never aborts the run.
- *  • Cooperative cancellation; a partial run still persists an honest report.
- */
 @Singleton
 class ArtworkImportExecutor @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
@@ -71,8 +58,6 @@ class ArtworkImportExecutor @Inject constructor(
         val errors = java.util.Collections.synchronizedList(mutableListOf<String>())
         var cancelled = false
 
-        // Text metadata first — cheap DB writes, and titles/details are correct in the XMB
-        // while the (much slower) file transfers run. Fill-missing-only by construction.
         var metadataApplied = 0
         for (update in plan.metadataUpdates) {
             runCatching {
@@ -89,8 +74,6 @@ class ArtworkImportExecutor @Inject constructor(
             }.onFailure { Timber.w(it, "Metadata update failed for game ${update.gameId}") }
         }
 
-        // Media-dir listings shared across all games in this run — one cursor per directory,
-        // used for resume detection ("is this asset already there?").
         val dirListings = java.util.concurrent.ConcurrentHashMap<String, Map<String, SafChild>>()
 
         try {
@@ -145,14 +128,12 @@ class ArtworkImportExecutor @Inject constructor(
             errors = errors.take(ImportSummary.MAX_ERRORS),
             cancelled = cancelled,
         )
-        // Durable identity is buffered per file and written here, at the operation boundary (task
-        // D.2). NonCancellable for the same reason the report below is: a cancelled import still
-        // wrote files, and those files should still be identifiable.
+
         withContext(kotlinx.coroutines.NonCancellable) {
             runCatching { identityRecorder.flush(treeUri) }
                 .onFailure { Timber.w(it, "Could not write the artwork identity index") }
         }
-        // The report must persist even for a cancelled run — write it outside the cancelled scope.
+
         withContext(kotlinx.coroutines.NonCancellable) {
             runCatching {
                 reportDao.insert(
@@ -170,8 +151,6 @@ class ArtworkImportExecutor @Inject constructor(
         summary
     }
 
-    // ── Per-game work ─────────────────────────────────────────────────────────
-
     private enum class ItemOutcome { IMPORTED, SKIPPED, FAILED }
 
     private suspend fun importGame(
@@ -182,9 +161,6 @@ class ArtworkImportExecutor @Inject constructor(
         dirListings: java.util.concurrent.ConcurrentHashMap<String, Map<String, SafChild>>,
         onItem: (PlannedItem, ItemOutcome) -> Unit,
     ) {
-        // Provenance guard: user-picked or locked assets are never overwritten by an import.
-        // An import always writes the PRIMARY of a slot, so the guard reads position 0 — a
-        // multi-asset kind's later positions must not decide whether the primary is protected.
         val existingRecords = artworkRecordDao.getForGame(game.gameId)
             .filter { it.sortOrder == 0 }
             .associateBy { it.artworkType }
@@ -202,14 +178,9 @@ class ArtworkImportExecutor @Inject constructor(
                 continue
             }
 
-            // ES-DE videos become TWO assets: the full video is imported untouched as VIDEO
-            // (Game Detail media strip) via the normal move/copy path, and a 60 s muted snap is
-            // transcoded from a temp copy into ICON1 (XMB icon animation). The source is only
-            // moved/deleted by the VIDEO import itself (Move mode); the transcode never touches
-            // the original. Locked/user-assigned slots of either kind are preserved.
             if (kind == ArtworkKind.VIDEO) {
                 val src = sourceChildFor(treeUri, item)
-                // A temp copy lets us transcode ICON1 even after Move relocates the original.
+
                 val raw = runCatching {
                     context.contentResolver.openInputStream(src.uri)?.use {
                         com.psplauncher.feature.artwork.store.ArtworkTempIO
@@ -218,7 +189,6 @@ class ArtworkImportExecutor @Inject constructor(
                 }.getOrNull()
                 var anyImported = false
 
-                // 1) Full video → VIDEO (untouched).
                 val priorVideo = existingRecords["VIDEO"]
                 if (priorVideo == null || !(priorVideo.locked || priorVideo.userAssigned)) {
                     var pn = basePortableName
@@ -248,7 +218,6 @@ class ArtworkImportExecutor @Inject constructor(
                     }
                 }
 
-                // 2) ICON1 snap from the temp copy.
                 val priorIcon1 = existingRecords["ICON1"]
                 if (raw != null && (priorIcon1 == null || !(priorIcon1.locked || priorIcon1.userAssigned))) {
                     val snap = java.io.File.createTempFile("snap_", ".mp4", context.cacheDir)
@@ -272,7 +241,6 @@ class ArtworkImportExecutor @Inject constructor(
                 continue
             }
 
-            // Case-insensitive cross-game collision (FAT volumes): keep tags, then suffix.
             var portableName = basePortableName
             if (artworkRecordDao.findNameCollisions(game.platformId, item.kind, portableName, game.gameId).isNotEmpty()) {
                 portableName = "$portableName (2)"
@@ -284,7 +252,6 @@ class ArtworkImportExecutor @Inject constructor(
                 .associateBy { it.name.lowercase(Locale.ROOT) }
                 .also { dirListings[dirId] = it }
 
-            // Resume path: an asset already stored under this portable name is reused as-is.
             val already = listing.values.firstOrNull {
                 !it.isDirectory && (it.sizeBytes ?: 0L) > 0L &&
                     it.name.substringBeforeLast('.').equals(portableName, ignoreCase = true)
@@ -321,7 +288,6 @@ class ArtworkImportExecutor @Inject constructor(
         gameDao.mintArtworkKey(game.gameId, game.artworkKey)
     }
 
-    // Candidates carry document ids; rebuild the tree-scoped uri (grant-bounded by construction).
     private fun sourceChildFor(treeUri: Uri, item: PlannedItem): SafChild = SafChild(
         documentId = item.documentId,
         uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, item.documentId),
@@ -340,7 +306,7 @@ class ArtworkImportExecutor @Inject constructor(
         ArtworkKind.BOX_ART -> gameDao.updateBoxArt(gameId, uri)
         ArtworkKind.PHYSICAL_MEDIA -> gameDao.updatePhysicalMedia(gameId, uri)
         ArtworkKind.BOX_3D -> gameDao.updateBox3d(gameId, uri)
-        else -> Unit    // record-only kinds (manuals, videos, screenshots, titlescreens)
+        else -> Unit
     }
 
     private fun sourceTag(sourceId: String): String = when (sourceId) {

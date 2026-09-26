@@ -51,7 +51,7 @@ data class ProfileEditorState(
     val packageName: String = "",
     val activityClass: String = "",
     val intentType: IntentType = IntentType.ACTION_VIEW,
-    val supportedPlatformIds: String = "",  // comma-separated
+    val supportedPlatformIds: String = "",
     val mimeType: String = "",
     val useFileUri: Boolean = true,
     val useSafUri: Boolean = false,
@@ -59,20 +59,19 @@ data class ProfileEditorState(
     val notes: String = "",
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
-    // Wizard banner explaining detection confidence (null = plain edit).
+
     val detectionNote: String? = null,
-    // ── Advanced launch fields (editable as text; parsed back to typed on save) ──
+
     val intentActionText: String = "",
-    val intentExtrasText: String = "",      // one "key=value" per line; true/false → bool extras
-    val intentFlagsText: String = "",       // comma-separated (CLEAR_TASK, CLEAR_TOP, NEW_TASK)
+    val intentExtrasText: String = "",
+    val intentFlagsText: String = "",
     val intentCategoryText: String = "",
-    val coreText: String = "",              // single RetroArch core path applied to all platforms
-    val extensionsText: String = "",        // comma-separated file extensions
+    val coreText: String = "",
+    val extensionsText: String = "",
 )
 
 const val ADD_CUSTOM_EMULATOR_FOCUS_KEY = "add_custom_emulator"
 
-// Recommended launch-shape presets offered when auto-detection can't infer the settings.
 enum class EmulatorTemplate(val label: String, val description: String) {
     VIEW_CONTENT("ACTION_VIEW + content:// URI", "Most modern emulators (Eden, Azahar, PPSSPP)"),
     VIEW_FILE("ACTION_VIEW + file:// path", "Older emulators that read a raw file path"),
@@ -80,15 +79,12 @@ enum class EmulatorTemplate(val label: String, val description: String) {
     RETROARCH_CORE("RetroArch core (ROM + LIBRETRO)", "Set the core path in LIBRETRO"),
 }
 
-// ── Test launch (wizard step) ──────────────────────────────────────────────────
-
 data class TestRom(
     val gameId: Long,
     val title: String,
     val platformId: String,
 )
 
-// Safe, user-readable summary of the intent the draft profile would fire.
 data class IntentPreview(
     val packageName: String,
     val activity: String?,
@@ -114,32 +110,22 @@ data class EmulatorsSettingsUiState(
     val availableProfiles: List<ProfileListItem> = emptyList(),
     val customProfiles: List<ProfileListItem> = emptyList(),
     val editorState: ProfileEditorState? = null,
-    // Non-null while the "Add Custom Emulator" wizard is on its Pick-App step.
+
     val wizardApps: List<DetectableApp>? = null,
     val isInspecting: Boolean = false,
-    // Non-null while testing a draft profile against a ROM.
+
     val testLaunch: TestLaunchState? = null,
     val returnFocusKey: String? = null,
     val showResetConfirm: Boolean = false,
     val isResetting: Boolean = false,
-    // RetroArch core detection: null count = not linked (offering unverified curated cores);
-    // a count = linked and this many installed cores were detected.
+
     val retroArchLinked: Boolean = false,
     val retroArchCoreCount: Int? = null,
-    /**
-     * The grant is live and the folder holds no cores — nearly always the visible `/RetroArch`
-     * folder rather than RetroArch's own storage.
-     *
-     * Carried separately because the count cannot say it: zero cores under a correctly picked
-     * tree and zero cores because the tree was wrong read identically as "0 core(s) detected",
-     * and only one of those is the user's problem to fix by installing cores.
-     */
+
     val retroArchTreeHasNoCores: Boolean = false,
     val retroArchCores: List<String> = emptyList(),
     val isDetectingCores: Boolean = false,
-    // Installed Windows/PC runtimes, by display name. They take no ROM and have no profile to
-    // edit — the screen lists them so "PFP doesn't know about GameNative" stops being the
-    // reasonable conclusion from an Emulators screen that never mentions it.
+
     val pcRuntimes: List<String> = emptyList(),
 )
 
@@ -153,12 +139,11 @@ class EmulatorsSettingsViewModel @Inject constructor(
     private val autoConfig: EmulatorAutoConfigService,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(EmulatorsSettingsUiState())
     val uiState: StateFlow<EmulatorsSettingsUiState> = _uiState.asStateFlow()
 
     private var allProfiles: List<EmulatorProfile> = emptyList()
-    // Holds the built, launchable test intent (kept out of UI state — Intents aren't UI data).
+
     private var testIntent: Intent? = null
 
     init {
@@ -167,23 +152,13 @@ class EmulatorsSettingsViewModel @Inject constructor(
         refreshRetroArchStatus()
     }
 
-    // ── RetroArch core detection (SAF link) ────────────────────────────────────
-
     private fun refreshRetroArchStatus() {
         viewModelScope.launch { readRetroArchState() }
     }
 
-    /**
-     * Publishes what PFP actually knows about the installed cores. `retroArchLinked` tracks a live
-     * grant specifically, so a [CoreInventory.Remembered] read still lists the user's cores while
-     * reporting unlinked — which is what prompts the re-link without wiping the list first.
-     */
     private suspend fun readRetroArchState() {
         val inventory = retroArchLink.inventory()
-        // The package is arbitrary HERE and only here: it builds each core's absolutePath, and
-        // this call throws every path away on the next line. The list is names for a settings
-        // screen. Anything that needs a path asks EmulatorDetector, which knows which RetroArch
-        // build is actually installed — do not copy this literal to a call whose result launches.
+
         val cores = RetroArchCoreScanner.coresFor("com.retroarch", inventory.coreFiles).map { it.name }
         _uiState.update {
             it.copy(
@@ -196,8 +171,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
         }
     }
 
-    /** User picked RetroArch's folder in the SAF tree picker: persist it and re-run detection so
-     *  only installed cores are offered. */
     fun linkRetroArch(treeUri: Uri) {
         _uiState.update { it.copy(isDetectingCores = true) }
         viewModelScope.launch {
@@ -207,7 +180,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Re-scan the already-linked RetroArch folder (after the user downloads more cores). */
     fun redetectRetroArchCores() {
         if (!_uiState.value.retroArchLinked) return
         _uiState.update { it.copy(isDetectingCores = true) }
@@ -232,16 +204,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Which Windows/PC runtimes are actually installed.
-     *
-     * Read once, not observed: the set of installed apps does not change while a settings screen
-     * is open, and the alternative is a PackageManager query per recomposition.
-     *
-     * Winlator is matched by prefix because every fork renames itself (com.winlator.cmod and
-     * friends); the rest are exact. Both rules come from [PcRuntimes], which is also what tags
-     * these packages as emulators for the app drawer — one list, two readers.
-     */
     private fun detectPcRuntimes() {
         viewModelScope.launch {
             val installed = withContext(Dispatchers.IO) {
@@ -286,24 +248,10 @@ class EmulatorsSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * One row per installed app.
-     *
-     * An app with a curated recipe AND an auto-detected profile produced two rows -- "PPSSPP" and
-     * "PPSSPP  Auto", "Dolphin Emulator" and "Dolphin", "NetherSX2 / AetherSX2" twice -- which
-     * reads as two copies of the emulator being installed. Both profiles are real and both stay
-     * in the repository; this is only about what the list shows.
-     *
-     * The curated one wins. It is the verified launch recipe, it is what actually launches a
-     * game, and the auto-detected draft exists to cover apps that have no curated entry. Where
-     * only the draft exists it is shown, Auto badge and all, which is the case that badge is for.
-     */
     private fun List<EmulatorProfile>.dedupedByPackage(): List<EmulatorProfile> =
         groupBy { it.packageName }
             .map { (_, sharing) -> sharing.firstOrNull { !it.isAutoGenerated } ?: sharing.first() }
-            // groupBy keeps first-seen order; map over its values keeps it too, so the list stays
-            // in whatever order getInstalledProfiles returned rather than jumping about on a
-            // rescan.
+
             .toList()
 
     fun openEditor(profileId: String?) {
@@ -317,9 +265,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
         }
     }
 
-    // ── Add Custom Emulator wizard ─────────────────────────────────────────────
-
-    /** Step 1: present the controller-navigable list of installed apps to pick from. */
     fun startAddEmulatorWizard() {
         _uiState.update { it.copy(returnFocusKey = ADD_CUSTOM_EMULATOR_FOCUS_KEY, isInspecting = true) }
         viewModelScope.launch {
@@ -328,7 +273,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Step 2: inspect the chosen app and open the editor pre-filled with the best-guess draft. */
     fun selectWizardApp(packageName: String) {
         _uiState.update { it.copy(isInspecting = true) }
         viewModelScope.launch {
@@ -398,9 +342,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
     private fun parseCsv(text: String): List<String> =
         text.split(",", "\n").map { it.trim() }.filter { it.isNotEmpty() }
 
-    // ── Test launch ────────────────────────────────────────────────────────────
-
-    /** Loads the user's scanned ROMs to pick a test target (controller-navigable list). */
     fun startTestLaunch() {
         if (_uiState.value.editorState == null) return
         viewModelScope.launch {
@@ -414,8 +355,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Builds the intent from the current draft + chosen ROM, shows a preview, and reports whether
-     *  it resolves. Does NOT launch yet — the user confirms with [launchTest]. */
     fun selectTestRom(gameId: Long) {
         val editor = _uiState.value.editorState ?: return
         val test = _uiState.value.testLaunch ?: return
@@ -530,7 +469,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
         )
     }
 
-    // Maps resolver failures and startActivity exceptions to the spec's actionable error cases.
     private fun mapLaunchError(e: Throwable): String {
         val msg = e.message.orEmpty()
         return when {
@@ -541,7 +479,7 @@ class EmulatorsSettingsViewModel @Inject constructor(
             msg.contains("not installed", ignoreCase = true)      -> msg
             msg.contains("ROM file not found", ignoreCase = true)  -> msg
             msg.contains("ROM path is required", ignoreCase = true) -> msg
-            msg.contains("core", ignoreCase = true)                -> msg   // missing RetroArch core
+            msg.contains("core", ignoreCase = true)                -> msg
             msg.contains("cannot open this ROM", ignoreCase = true) ->
                 "$msg The app didn't accept this MIME type / URI mode — try the other URI mode."
             msg.isNotBlank()                                       -> msg
@@ -570,8 +508,6 @@ class EmulatorsSettingsViewModel @Inject constructor(
     fun updateEditorCore(value: String)           = updateEditor { copy(coreText = value) }
     fun updateEditorExtensions(value: String)     = updateEditor { copy(extensionsText = value) }
 
-    // Recommended templates — quick presets for undetected apps. Each fills the launch shape;
-    // the user then sets package/activity/platforms.
     fun applyTemplate(template: EmulatorTemplate) = updateEditor {
         when (template) {
             EmulatorTemplate.VIEW_CONTENT -> copy(
@@ -618,7 +554,7 @@ class EmulatorsSettingsViewModel @Inject constructor(
                 id                   = editor.originalId ?: UUID.randomUUID().toString(),
                 name                 = editor.name.trim(),
                 notes                = editor.notes.trimToNull(),
-                // Preserve auto-gen metadata; mark as user-modified so auto-config skips it.
+
                 isAutoGenerated      = existing?.isAutoGenerated ?: false,
                 autoSource           = existing?.autoSource,
                 lastDetectedAt       = existing?.lastDetectedAt,

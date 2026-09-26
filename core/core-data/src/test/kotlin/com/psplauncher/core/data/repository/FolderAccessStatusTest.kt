@@ -3,9 +3,7 @@ package com.psplauncher.core.data.repository
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-// The pure link-status rule that drives every Root Access section (SafGrants).
 class FolderAccessStatusTest {
-
     private val romRoot = "content://com.android.externalstorage.documents/tree/primary%3ARoms"
     private val music   = "content://com.android.externalstorage.documents/tree/primary%3AMusic"
 

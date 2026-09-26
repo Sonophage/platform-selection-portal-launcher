@@ -23,22 +23,9 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.ui.image.rememberArtworkModel
 
-// ── Media preview tiles ───────────────────────────────────────────────────────
-//
-// The storefront-style preview strip: videos first, then screenshots. One tile is one controller
-// node, so the whole strip is a horizontal row the cursor can enter and leave without the page
-// reflowing.
-
 val DetailMediaTileWidth: Dp = 214.dp
 val DetailMediaTileHeight: Dp = 120.dp
 
-/**
- * A single preview tile.
- *
- * [posterFallbackUri] is what a video tile shows when it has no poster frame of its own — the hero
- * art or a screenshot, exactly like a store trailer card. A missing image leaves the dark plate, so
- * the strip's geometry never depends on whether art resolved.
- */
 @Composable
 fun PfpDetailMediaTile(
     uri: String?,
@@ -76,11 +63,9 @@ fun PfpDetailMediaTile(
             )
         }
         if (isVideo) {
-            // Scrim + drawn play mark: the poster must stay recognisable, so the mark sits over a
-            // translucent wash rather than a solid plate.
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.42f)))
             PfpPlayMark(color = Color.White.copy(alpha = if (focused) 1f else 0.9f), size = 40.dp)
-            // A named plate, so "this is playable" never rests on the play glyph's colour alone.
+
             Text(
                 text = "VIDEO",
                 color = Color.White,

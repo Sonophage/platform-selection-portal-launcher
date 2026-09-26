@@ -24,7 +24,6 @@ class ArtworkScrapePreferences @Inject constructor(
     val downloadHeroesFlow: Flow<Boolean> =
         context.pfpDataStore.data.map { it[KEY_DOWNLOAD_HEROES] ?: true }
 
-    // Manuals default ON (small PDFs relative to the cap; surfaced on Game Detail later).
     val downloadManualsFlow: Flow<Boolean> =
         context.pfpDataStore.data.map { it[KEY_DOWNLOAD_MANUALS] ?: true }
 

@@ -7,7 +7,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GimTest {
-
     private val red = 0xFFE01030.toInt()
     private val translucent = 0x8020FF40.toInt()
 
@@ -22,7 +21,6 @@ class GimTest {
         assertEquals(translucent, image[0, 1])
     }
 
-    // Position-dependent color that stays within an index8 palette (251 distinct values).
     private fun swatch(x: Int, y: Int, width: Int): Int {
         val v = (x + y * width) % 251
         return (0xFF shl 24) or (v shl 16) or ((v * 7) and 0xFF shl 8) or ((v * 13) and 0xFF)
@@ -30,8 +28,6 @@ class GimTest {
 
     @Test
     fun `decodes a swizzled index8 gim`() {
-        // Wider than one 16-byte block and taller than one 8-row block, so real
-        // block reshuffling happens — position-dependent colors catch any misplacement.
         val gim = TestFixtures.buildGim(48, 24, swizzle = true) { x, y -> swatch(x, y, 48) }
         val image = assertNotNull(Gim.decode(gim))
         for (y in 0 until 24) for (x in 0 until 48 step 5) {
@@ -61,18 +57,18 @@ class GimTest {
         assertNull(Gim.decode(ByteArray(64) { 3 }))
         val valid = TestFixtures.buildGim(20, 10) { _, _ -> red }
         assertNull(Gim.decode(valid.copyOf(valid.size / 2)), "truncated mid-image")
-        // Image block claiming absurd dimensions must be rejected before allocation.
+
         val hostile = TestFixtures.buildGim(20, 10) { _, _ -> red }
         val imageChunk = findChunk(hostile, 0x04)
-        hostile[imageChunk + 16 + 8] = 0xFF.toByte() // width low byte
-        hostile[imageChunk + 16 + 9] = 0xFF.toByte() // width high byte -> 65535
+        hostile[imageChunk + 16 + 8] = 0xFF.toByte()
+        hostile[imageChunk + 16 + 9] = 0xFF.toByte()
         assertNull(Gim.decode(hostile))
     }
 
     @Test
     fun `indexed image without a palette is rejected`() {
         val gim = TestFixtures.buildGim(20, 10) { _, _ -> red }
-        // Corrupt the palette chunk id so only the image block remains readable.
+
         val palette = findChunk(gim, 0x05)
         gim[palette] = 0x77
         assertNull(Gim.decode(gim))

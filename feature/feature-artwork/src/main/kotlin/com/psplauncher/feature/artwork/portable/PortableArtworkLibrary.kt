@@ -19,45 +19,19 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * The SAF layer of the user-owned artwork library — all reads/writes of the picked tree go
- * through here, always via `DocumentsContract` against document ids resolved *inside* the
- * granted tree (nothing outside the user's grant is ever reachable), never raw paths.
- *
- * Layout under the user-picked root (v3):
- *   pfp-artwork-library.json                          ← manifest
- *   Artwork/{platformId}/{mediaDir}/{Name}.{ext}      ← the portable library
- *   Import/{Launcher}/…                               ← user-managed drop zone (read, never indexed)
- *
- * Performance discipline (large imports): directory document-ids are cached so a path is
- * resolved at most once per run; existence checks ride one child-listing cursor per directory;
- * byte copies use [FileUtils.copy] (in-kernel); same-tree moves use `moveDocument` (metadata
- * only, no bytes) with a copy+delete fallback for providers that refuse it.
- *
- * Write discipline (security + integrity): every incoming file's first bytes are sniffed and
- * must be a real image for the kind before anything lands under a final name; destination
- * names are fixed per-kind names (never attacker-controlled); a failed write deletes its
- * partial destination.
- */
 @Singleton
 class PortableArtworkLibrary @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     private val resolver get() = context.contentResolver
 
-    // path-under-root ("games/psx/slug") → directory document id, per tree. Rebuilt per process.
     private val dirCache = ConcurrentHashMap<String, String>()
 
-    // Serializes find-or-create of directories. Without it, two games imported concurrently on
-    // the same platform both miss the cache, both createDocument("gba"), and SAF silently
-    // auto-suffixes the loser to "gba (1)" — a duplicate platform folder.
     private val dirCreateLock = Any()
 
     data class SavedAsset(val kind: ArtworkKind, val uriString: String, val fileName: String, val sizeBytes: Long)
 
     enum class Transfer { COPY, MOVE }
-
-    // ── Manifest ──────────────────────────────────────────────────────────────
 
     suspend fun readManifest(treeUri: Uri): ArtworkLibraryManifest? = withContext(Dispatchers.IO) {
         val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
@@ -65,15 +39,10 @@ class PortableArtworkLibrary @Inject constructor(
         readTextCapped(manifest.uri, ArtworkLibraryManifest.MAX_BYTES)?.let { ArtworkLibraryManifest.parse(it) }
     }
 
-    /**
-     * Reads the manifest, creating it (plus `games/` and `import/`) when the folder isn't a
-     * library yet. Returns null only when the tree is unwritable (dead grant, read-only provider).
-     */
     suspend fun ensureLibrary(treeUri: Uri, appVersion: String): ArtworkLibraryManifest? = withContext(Dispatchers.IO) {
         readManifest(treeUri)?.let { return@withContext it }
         val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
-        // Layout v3 shows its shape up front: Import/ (drop zone) + Artwork/ (the library);
-        // platform/media dirs under Artwork/ appear on demand.
+
         ensureDir(treeUri, rootDocId, ArtworkLibraryManifest.DIR_IMPORT, ArtworkLibraryManifest.DIR_IMPORT)
             ?: return@withContext null
         ensureDir(treeUri, rootDocId, ArtworkLibraryManifest.DIR_ARTWORK, ArtworkLibraryManifest.DIR_ARTWORK)
@@ -87,7 +56,6 @@ class PortableArtworkLibrary @Inject constructor(
         if (ok) manifest else null
     }
 
-    /** Rewrites the root manifest (once per operation — never per file). */
     suspend fun writeManifest(treeUri: Uri, manifest: ArtworkLibraryManifest): Boolean =
         withContext(Dispatchers.IO) {
             val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
@@ -97,15 +65,6 @@ class PortableArtworkLibrary @Inject constructor(
             )
         }
 
-    // ── Durable-identity index (task D.1) ─────────────────────────────────────
-
-    /**
-     * Tri-state read of `pfp-artwork-identity.json` (task 1.3 / D3). Absent and Unreadable used to
-     * collapse to the same `null`, which let a writer treat "the app can't read this" as "there's
-     * nothing here yet" and overwrite it. They are now distinct: only [Absent] is safe to create
-     * fresh; [Unreadable] (IO error, oversized, a newer `format_version`, or not an index at all)
-     * must never be overwritten — the caller falls back to name matching for this run instead.
-     */
     sealed interface IdentityIndexRead {
         data object Absent : IdentityIndexRead
         data class Loaded(val index: ArtworkIdentityIndex) : IdentityIndexRead
@@ -123,7 +82,6 @@ class PortableArtworkLibrary @Inject constructor(
         IdentityIndexRead.Loaded(index)
     }
 
-    /** Rewrites the identity index (once per operation — never per file, as with the manifest). */
     suspend fun writeIdentityIndex(treeUri: Uri, index: ArtworkIdentityIndex): Boolean =
         withContext(Dispatchers.IO) {
             val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
@@ -133,9 +91,6 @@ class PortableArtworkLibrary @Inject constructor(
             )
         }
 
-    // ── Import drop zone ──────────────────────────────────────────────────────
-
-    /** The children of `import/` — each directory is a candidate import source. */
     suspend fun listImportSources(treeUri: Uri): List<SafChild> = withContext(Dispatchers.IO) {
         val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
         val importDir = findChild(treeUri, rootDocId, ArtworkLibraryManifest.DIR_IMPORT)
@@ -146,12 +101,6 @@ class PortableArtworkLibrary @Inject constructor(
     fun listChildren(treeUri: Uri, dirDocId: String): List<SafChild> =
         resolver.querySafChildren(treeUri, dirDocId)
 
-    // ── Layout v3 writes: Artwork/{platform}/{mediaDir}/{PortableName}.{ext} ──
-
-    /**
-     * Resolves (creating as needed) `Artwork/{platformId}/{mediaDir}` for [kind], cached per
-     * run. A kind's media dir may be nested ("pfp/icon0") — each segment is ensured in turn.
-     */
     suspend fun mediaDirDocId(treeUri: Uri, platformId: String, kind: ArtworkKind): String? =
         withContext(Dispatchers.IO) {
             val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
@@ -168,12 +117,6 @@ class PortableArtworkLibrary @Inject constructor(
             parentId
         }
 
-    /**
-     * Every platform directory of the library: the children of `Artwork/`, plus any legacy
-     * v2 platform dirs still at the root (recognized structurally — a directory holding at
-     * least one known media-type folder). The legacy pass keeps scan/export working even when
-     * a provider refused the v2→v3 migration moves.
-     */
     suspend fun platformDirs(treeUri: Uri): List<SafChild> = withContext(Dispatchers.IO) {
         val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
         val out = mutableListOf<SafChild>()
@@ -184,11 +127,6 @@ class PortableArtworkLibrary @Inject constructor(
         out
     }
 
-    /**
-     * v2 → v3: moves platform dirs from the root into `Artwork/` — same-tree directory moves,
-     * zero bytes copied. Dirs a provider refuses to move stay where they are (still found via
-     * [platformDirs]). Returns how many dirs were relocated.
-     */
     suspend fun migrateRootPlatformsToArtwork(treeUri: Uri): Int = withContext(Dispatchers.IO) {
         val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
         val legacy = legacyRootPlatformDirs(treeUri, rootDocId)
@@ -210,8 +148,6 @@ class PortableArtworkLibrary @Inject constructor(
         moved
     }
 
-    // A root child is a legacy platform dir when it's none of the reserved names and holds at
-    // least one known media-type folder — the same structural test the importer uses.
     private fun legacyRootPlatformDirs(treeUri: Uri, rootDocId: String): List<SafChild> =
         listChildren(treeUri, rootDocId).filter { child ->
             child.isDirectory &&
@@ -222,12 +158,6 @@ class PortableArtworkLibrary @Inject constructor(
                     .any { it.isDirectory && ArtworkPathResolver.isMediaDirName(it.name) }
         }
 
-    /**
-     * Brings [source] (a file inside this same tree's import zone) into
-     * `{platformId}/{mediaDir}/` as `{portableName}.{ext}`. Validates the payload header first;
-     * rejects wrong types. A same-stem file already in the directory is pre-deleted so
-     * create/rename can never silently suffix the name ("Game (1).png" would be invisible).
-     */
     suspend fun saveAsset(
         treeUri: Uri,
         platformId: String,
@@ -257,12 +187,6 @@ class PortableArtworkLibrary @Inject constructor(
         movedOrCopied?.let { SavedAsset(kind, it.toString(), destName, source.sizeBytes ?: 0L) }
     }
 
-    /**
-     * Writes a validated local temp file (scraper download, user pick copied to cache) into
-     * `{platformId}/{mediaDir}/` as `{portableName}.{ext}`. Same discipline as [saveAsset]:
-     * header sniffed, same-stem predecessors pre-deleted, kernel copy, failed writes cleaned up.
-     * The temp file is always deleted.
-     */
     suspend fun saveFromFile(
         treeUri: Uri,
         platformId: String,
@@ -306,12 +230,6 @@ class PortableArtworkLibrary @Inject constructor(
         }
     }
 
-    /**
-     * Same-tree move of one asset between two kinds' media dirs (metadata-only where the
-     * provider allows; copy+delete fallback otherwise). Any same-stem occupant of the
-     * destination is pre-deleted so the name can never silently suffix. Null when the source
-     * file doesn't exist or the destination dir can't be created.
-     */
     suspend fun relocateAsset(
         treeUri: Uri,
         platformId: String,
@@ -334,16 +252,8 @@ class PortableArtworkLibrary @Inject constructor(
 
     fun clearDirCache() = dirCache.clear()
 
-    // ── PFP private namespaces (versions/, originals/) — Studio pass 2 ──────────
-
     data class NamespaceFile(val uriString: String, val fileName: String, val sizeBytes: Long)
 
-    /**
-     * Writes [tempFile] into an arbitrary namespace dir (e.g. `pfp/versions/icon`) under
-     * [fileName], replacing any same-stem occupant so create/rename can never silently suffix.
-     * No payload sniff — these bytes are the app's own already-validated files. Consumes
-     * [tempFile] when [deleteTemp]. Returns the stored document, or null.
-     */
     suspend fun saveTempIntoPath(
         treeUri: Uri,
         segments: List<String>,
@@ -379,7 +289,6 @@ class PortableArtworkLibrary @Inject constructor(
         }
     }
 
-    /** The `{portableName}.*` file in a namespace dir, or null if the dir/file is absent. */
     suspend fun findInPath(treeUri: Uri, segments: List<String>, portableName: String): SafChild? =
         withContext(Dispatchers.IO) {
             val dirDocId = resolveExistingPath(treeUri, segments) ?: return@withContext null
@@ -388,7 +297,6 @@ class PortableArtworkLibrary @Inject constructor(
             }
         }
 
-    /** Copies any readable document to a fresh cache temp file (no validation). Caller deletes it. */
     suspend fun copyUriToTemp(sourceUri: Uri, cacheDir: java.io.File, suffix: String): java.io.File? =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -405,7 +313,6 @@ class PortableArtworkLibrary @Inject constructor(
         runCatching { DocumentsContract.deleteDocument(resolver, uri) }.getOrDefault(false)
     }
 
-    // Resolve an existing dir path WITHOUT creating segments (read-only lookups).
     private fun resolveExistingPath(treeUri: Uri, segments: List<String>): String? {
         var parent = DocumentsContract.getTreeDocumentId(treeUri)
         for (segment in segments) {
@@ -414,11 +321,6 @@ class PortableArtworkLibrary @Inject constructor(
         return parent
     }
 
-    /**
-     * Resolves (creating as needed) a directory path under ANY granted tree — used by the
-     * exporter to build `{esDeName}/{mediaDir}/` in the user-picked destination. Same cached,
-     * serialized find-or-create as library writes.
-     */
     suspend fun ensureDirPath(treeUri: Uri, segments: List<String>): String? = withContext(Dispatchers.IO) {
         var parent = DocumentsContract.getTreeDocumentId(treeUri)
         var path = ""
@@ -429,7 +331,6 @@ class PortableArtworkLibrary @Inject constructor(
         parent
     }
 
-    /** Kernel copy of one document into [destDirDocId] under [destName]; skips nothing itself. */
     suspend fun copyDocument(
         sourceUri: Uri,
         destTreeUri: Uri,
@@ -452,10 +353,8 @@ class PortableArtworkLibrary @Inject constructor(
         ok
     }
 
-    // ── v1 → v2 migration ─────────────────────────────────────────────────────
-
     data class MigratedAsset(
-        val key: String,             // v1 artwork key from the entry's metadata.json
+        val key: String,
         val platformId: String,
         val kind: ArtworkKind,
         val portableName: String,
@@ -466,13 +365,6 @@ class PortableArtworkLibrary @Inject constructor(
 
     data class MigrationResult(val assets: List<MigratedAsset>, val entriesSkipped: Int)
 
-    /**
-     * Relocates a v1 library (games/{platform}/{slug}/{kind}.{ext} + metadata.json) into the
-     * v2 layout. Same-tree moves — no bytes copied. Each entry's metadata.json supplies the
-     * platform and ROM filename (so entries under misnamed folders like "gba (1)" migrate
-     * correctly), then the sidecar and emptied directories are removed. Idempotent: a re-run
-     * finds no games/ folder and returns empty.
-     */
     suspend fun migrateV1Library(treeUri: Uri): MigrationResult = withContext(Dispatchers.IO) {
         val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
         val gamesDir = findChild(treeUri, rootDocId, ArtworkLibraryManifest.DIR_GAMES)
@@ -496,7 +388,7 @@ class PortableArtworkLibrary @Inject constructor(
                     val kind = ArtworkKind.entries.firstOrNull {
                         ArtworkFileNaming.baseName(it).lowercase(Locale.US) == base
                     }
-                    if (kind == null) { movedAll = false; continue }   // foreign file — leave it
+                    if (kind == null) { movedAll = false; continue }
                     val ext = child.name.substringAfterLast('.', "").ifBlank { "jpg" }
                     val destDirId = mediaDirDocId(treeUri, meta.platformId, kind)
                     if (destDirId == null) { movedAll = false; continue }
@@ -532,18 +424,12 @@ class PortableArtworkLibrary @Inject constructor(
         return readTextCapped(child.uri, ArtworkEntryMetadata.MAX_BYTES)?.let { ArtworkEntryMetadata.parse(it) }
     }
 
-    // Only ever deletes a directory verified empty by a fresh listing — SAF deleteDocument is
-    // recursive, so this guard is what makes cleanup safe.
     private fun deleteIfEmpty(treeUri: Uri, dir: SafChild) {
         if (listChildren(treeUri, dir.documentId).isEmpty()) {
             runCatching { DocumentsContract.deleteDocument(resolver, dir.uri) }
         }
     }
 
-    // ── Transfer internals ────────────────────────────────────────────────────
-
-    // Same-provider move: metadata-only on the platform ExternalStorageProvider (no bytes),
-    // then a rename to the fixed kind name. Falls back to copy + delete-source.
     private fun moveInto(treeUri: Uri, source: SafChild, targetParentUri: Uri, destName: String): Uri? {
         val sourceParentUri = sourceParentUri(treeUri, source)
         if (sourceParentUri != null) {
@@ -554,7 +440,7 @@ class PortableArtworkLibrary @Inject constructor(
                 val renamed = if (source.name.equals(destName, ignoreCase = true)) moved
                 else runCatching { DocumentsContract.renameDocument(resolver, moved, destName) }.getOrNull()
                 if (renamed != null) return renamed
-                // Rename refused: keep the moved file rather than lose it — record its real name.
+
                 return moved
             }
         }
@@ -572,7 +458,7 @@ class PortableArtworkLibrary @Inject constructor(
         val ok = runCatching {
             resolver.openFileDescriptor(source.uri, "r")?.use { input ->
                 resolver.openFileDescriptor(dest, "w")?.use { output ->
-                    // In-kernel copy (sendfile/copy_file_range) — bytes never enter user space.
+
                     FileUtils.copy(input.fileDescriptor, output.fileDescriptor)
                     true
                 }
@@ -585,8 +471,6 @@ class PortableArtworkLibrary @Inject constructor(
         return dest
     }
 
-    // The parent document uri moveDocument requires. Derivable by string math on tree doc ids
-    // ("primary:X/Y/file" → "primary:X/Y"); null for providers with opaque ids → copy fallback.
     private fun sourceParentUri(treeUri: Uri, source: SafChild): Uri? {
         val slash = source.documentId.lastIndexOf('/')
         if (slash <= 0) return null
@@ -602,8 +486,6 @@ class PortableArtworkLibrary @Inject constructor(
         "webm" -> "video/webm"
         else   -> "image/jpeg"
     }
-
-    // ── Document helpers ──────────────────────────────────────────────────────
 
     private fun findChild(treeUri: Uri, parentDocId: String, name: String): SafChild? =
         resolver.querySafChildren(treeUri, parentDocId).firstOrNull { it.name.equals(name, ignoreCase = true) }
@@ -637,8 +519,6 @@ class PortableArtworkLibrary @Inject constructor(
         }
     }.getOrNull()
 
-    // A manual loop, not InputStream.readNBytes: that is API 33 and minSdk is 29, where it threw
-    // NoSuchMethodError into runCatching and every manifest and identity read came back null.
     private fun readTextCapped(uri: Uri, maxBytes: Int): String? = runCatching {
         resolver.openInputStream(uri)?.use { stream ->
             val out = java.io.ByteArrayOutputStream()
@@ -663,7 +543,6 @@ class PortableArtworkLibrary @Inject constructor(
             DocumentsContract.createDocument(resolver, parentUri, mime, name)
         }.getOrNull() ?: return false
         return runCatching {
-            // "wt" truncates — a shorter rewrite must not leave trailing bytes of the old JSON.
             resolver.openOutputStream(target, "wt")?.use { it.write(text.toByteArray(Charsets.UTF_8)); true } ?: false
         }.onFailure { Timber.w(it, "Could not write $name") }.getOrDefault(false)
     }

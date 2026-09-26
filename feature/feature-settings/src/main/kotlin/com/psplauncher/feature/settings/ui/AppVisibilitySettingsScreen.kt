@@ -94,7 +94,6 @@ private fun HiddenItemCard(
     onUnhideAll: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
-        // Item header: icon + label (informational — the actions below are the focus targets).
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -116,9 +115,7 @@ private fun HiddenItemCard(
                 modifier = Modifier.weight(1f),
             )
         }
-        // One focusable settings row per hidden location, so the controller can walk and
-        // activate them like any other settings screen (raw clickable Texts are invisible
-        // to the scaffold's focus navigation).
+
         group.entries.forEach { entry ->
             SettingsValueRow(
                 label   = entry.locationLabel,

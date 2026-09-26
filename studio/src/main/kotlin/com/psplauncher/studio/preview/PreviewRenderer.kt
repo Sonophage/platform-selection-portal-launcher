@@ -20,39 +20,26 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.swing.Swing
 import org.jetbrains.skia.EncodedImageFormat
 
-/**
- * Offscreen Compose renders (no window needed): the bundle's embedded `preview.png` — the
- * same PSP idea of seeing a theme before applying it — and the editable icon templates.
- */
 @OptIn(ExperimentalComposeUiApi::class)
 object PreviewRenderer {
-
     private const val DESIGN_WIDTH_DP = 960f
 
-    /**
-     * Scenes compose/render on the AWT thread even when callers are on IO: an offscreen
-     * composition running concurrently with the window's corrupts shared Compose runtime
-     * state (observed as NodeChain/SlotTable crashes). Renders are ~100 ms — blocking the
-     * event thread that briefly is fine.
-     */
     private fun <T> onAwtThread(block: () -> T): T =
         if (EventQueue.isDispatchThread()) block() else runBlocking(Dispatchers.Swing) { block() }
 
-    /** Renders the themed XMB frame for [state] and encodes it as PNG. */
     fun renderPreviewPng(state: StudioState, widthPx: Int = 1280, heightPx: Int = 720): ByteArray = onAwtThread {
         ImageComposeScene(
             width = widthPx,
             height = heightPx,
             density = Density(widthPx / DESIGN_WIDTH_DP),
         ).use { scene ->
-            // The embedded preview is always the Home frame, whatever the editor is showing.
+
             val model = state.copy(previewMode = com.psplauncher.studio.PreviewMode.HOME).toPreviewModel()
             scene.setContent { XmbFrame(model) }
             scene.render(nanoTime = 0L).encodeToData(EncodedImageFormat.PNG)!!.bytes
         }
     }
 
-    /** Preview for a just-converted bundle (batch mode) without a full editor state. */
     fun renderPreviewPng(bundle: PfpThemeBundle): ByteArray {
         val state = StudioState(
             name = bundle.manifest.name,
@@ -68,7 +55,6 @@ object PreviewRenderer {
         return renderPreviewPng(state)
     }
 
-    /** The built-in glyph for [key] as a white silhouette PNG — the editable template. */
     fun rasterizeDefaultIcon(key: String, sizePx: Int): ByteArray = onAwtThread {
         ImageComposeScene(width = sizePx, height = sizePx).use { scene ->
             scene.setContent {

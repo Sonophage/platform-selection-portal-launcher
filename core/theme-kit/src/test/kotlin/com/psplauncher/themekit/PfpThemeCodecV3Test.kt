@@ -9,22 +9,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Schema v3 of the `.pfptheme` bundle (additive on v2):
- *
- * - `icons/<key>.png` widens to `icons/<key>.{png,gif}` — animated icons round-trip.
- * - `sysicons/<platformId>.{png,gif}` — console art, gated by CustomizableIcons (NOT
- *   IconSlots, so the desktop Studio's slot list is unaffected until it opts in).
- * - `motion.<mp4|webm|gif>` — motion wallpaper travels in the bundle.
- *
- * The forward-compatibility contract is load-bearing: unknown entries are ignored, unknown
- * manifest keys ignored, and a bundle that trips a limit is "not a .pfptheme", not a crash.
- */
 class PfpThemeCodecV3Test {
-
     private val manifest = PfpThemeManifest(name = "V3 Pink", accentColor = "#FF72B1")
-
-    // ── write + read round-trips ──────────────────────────────────────────────
 
     @Test
     fun `v3 round-trips gif icons and sysicons and motion`() {
@@ -51,8 +37,7 @@ class PfpThemeCodecV3Test {
         assertTrue(decoded.icons["catbar_games"]!!.bytes.contentEquals(gifBytes()))
         assertEquals(setOf("psx", "nes"), decoded.sysicons.keys)
         assertEquals("mp4", decoded.motion?.extension)
-        // The motion entry is never held as bytes — it streams on demand, so the round-trip is
-        // asserted by draining it rather than by reading a `bytes` property that no longer exists.
+
         assertTrue(decoded.motion!!.drain().contentEquals(mp4Bytes()))
     }
 
@@ -70,7 +55,7 @@ class PfpThemeCodecV3Test {
 
         val a = build(linkedMapOf("status_bluetooth" to ThemeImage(gifBytes(), "gif"), "catbar_games" to ThemeImage(gifBytes(), "gif")))
         val b = build(linkedMapOf("catbar_games" to ThemeImage(gifBytes(), "gif"), "status_bluetooth" to ThemeImage(gifBytes(), "gif")))
-        // Identical themes built with different insertion orders must be byte-identical.
+
         assertTrue(a.contentEquals(b), "same entries in different insertion order must produce identical bytes")
     }
 
@@ -91,14 +76,12 @@ class PfpThemeCodecV3Test {
         assertEquals(setOf("catbar_games"), decoded.icons.keys)
     }
 
-    // ── entry-name gating ─────────────────────────────────────────────────────
-
     @Test
     fun `read rejects sysicon keys that are not registered console slots`() {
         val hostile = zip(
             "manifest.json" to jsonManifest(),
             "sysicons/../evil.png" to ByteArray(4),
-            "sysicon_default.png" to ByteArray(4), // fallback art, never a slot
+            "sysicon_default.png" to ByteArray(4),
             "sysicons/not_a_platform.png" to ByteArray(4),
             "sysicons/psx.png" to ByteArray(4),
         )
@@ -117,7 +100,6 @@ class PfpThemeCodecV3Test {
         assertEquals(setOf("psx"), decoded.sysicons.keys)
     }
 
-    /** Streams a [ThemeMotion] into memory so a test can assert its content. */
     private fun ThemeMotion.drain(): ByteArray =
         java.io.ByteArrayOutputStream().also { copyTo(it) }.toByteArray()
 
@@ -138,20 +120,15 @@ class PfpThemeCodecV3Test {
             "icons/catbar_games.gif" to gifBytes(),
             "icons/not_a_slot.png" to pngV3Bytes(),
             "icons/../../evil.gif" to gifBytes(),
-            "sysicon_snes.png" to pngV3Bytes(), // right key, wrong directory — not an icon entry
+            "sysicon_snes.png" to pngV3Bytes(),
         )
         val decoded = assertNotNull(PfpThemeCodec.read(hostile))
         assertEquals(setOf("catbar_games"), decoded.icons.keys)
         assertTrue(decoded.sysicons.isEmpty(), "sysicon keys live under sysicons/, not icons/")
     }
 
-    // ── limits ────────────────────────────────────────────────────────────────
-
     @Test
     fun `limits are raised for v3`() {
-        // A motion wallpaper is capped at 60 MB by MotionLimits, so the per-entry
-        // cap must clear it; 98 icons + sysicons + manifest + wallpaper + motion + preview
-        // clears 128 entries.
         assertEquals(256, PfpThemeCodec.BUNDLE_LIMITS.maxEntries)
         assertEquals(64L * 1024 * 1024, PfpThemeCodec.BUNDLE_LIMITS.maxEntryBytes)
         assertEquals(256L * 1024 * 1024, PfpThemeCodec.BUNDLE_LIMITS.maxTotalBytes)
@@ -170,11 +147,8 @@ class PfpThemeCodecV3Test {
         assertEquals(setOf("catbar_music"), decoded.icons.keys)
     }
 
-    // ── forward compatibility ─────────────────────────────────────────────────
-
     @Test
     fun `v2-shaped bundle still reads unchanged`() {
-        // Hand-built v2 zip: icons only under the .png-only naming, no sysicons/motion.
         val v2 = zip(
             "manifest.json" to """{"manifest":"pfptheme","schemaVersion":2,"name":"Legacy","accentColor":"#FF0000"}""".toByteArray(),
             "icons/catbar_games.png" to pngV3Bytes(),
@@ -199,9 +173,6 @@ class PfpThemeCodecV3Test {
 
     @Test
     fun `textColor round-trips and the schema version does not move`() {
-        // Additive by the same argument the v3 note makes: a reader that predates textColor
-        // ignores it and applies the rest, so bumping the version would only make older builds
-        // refuse bundles they can in fact render.
         assertEquals(3, PfpThemeManifest.SCHEMA_VERSION, "textColor is additive — v3 stands")
 
         val written = PfpThemeCodec.write(
@@ -237,17 +208,6 @@ class PfpThemeCodecV3Test {
         assertEquals("Ancient", decoded.manifest.name)
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
-
-    /**
-     * Proves the manifest read stops at the first entry rather than streaming the archive.
-     *
-     * The archive here carries more entries than [PfpThemeCodec.BUNDLE_LIMITS] allows, so a full
-     * read is refused outright. readManifest still succeeds — which it can only do by never
-     * looking past `manifest.json`. That early exit is the whole point: the library listing calls
-     * this once per saved theme, and reading to the end would mean streaming every motion
-     * wallpaper on disk to recover a name.
-     */
     @Test
     fun `readManifest stops at the manifest and ignores the rest of the archive`() {
         val entries = arrayOf("manifest.json" to jsonManifest()) +
@@ -275,7 +235,7 @@ class PfpThemeCodecV3Test {
 
         assertEquals("mp4", decoded.motion?.extension)
         assertTrue(decoded.motion!!.drain().contentEquals(mp4Bytes()), "streams from the file")
-        // Streaming is repeatable: apply() may extract the same bundle more than once.
+
         assertTrue(decoded.motion!!.drain().contentEquals(mp4Bytes()), "and can be streamed again")
     }
 
@@ -285,7 +245,6 @@ class PfpThemeCodecV3Test {
             PfpThemeBundle(manifest, null, null, motion = ThemeMotion.ofBytes(mp4Bytes(), "mp4")),
         )
 
-        // Documented one-pass limitation: nothing can stream the entry back, so it is not offered.
         assertNull(PfpThemeCodec.read(bytes.inputStream()).let { assertNotNull(it).motion })
     }
 
@@ -295,7 +254,6 @@ class PfpThemeCodecV3Test {
     private fun jsonManifest(): ByteArray =
         """{"manifest":"pfptheme","schemaVersion":3,"name":"V3 Pink","accentColor":"#FF72B1"}""".toByteArray()
 
-    /** A minimal but structurally valid GIF89a header — enough for the codec, which treats bytes as opaque. */
     private fun gifBytes(): ByteArray =
         "GIF89a".toByteArray() + ByteArray(16) { it.toByte() }
 

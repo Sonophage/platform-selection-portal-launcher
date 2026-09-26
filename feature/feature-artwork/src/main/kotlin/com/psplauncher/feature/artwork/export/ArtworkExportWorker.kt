@@ -24,16 +24,6 @@ import timber.log.Timber
 import java.util.Locale
 import java.util.UUID
 
-/**
- * ES-DE-compatible export: copies the library's standard media directories into a user-picked
- * destination as `{esDeFolderName}/{mediaDir}/{file}` — point it at an ES-DE install's
- * `downloaded_media` folder and the artwork is immediately usable there.
- *
- * Rules: copy only (the live library is never touched or moved); missing-only (existing
- * destination files are skipped, so re-exports are incremental); `pfp/`, `import/` and the
- * manifest are never exported; kernel copies; cancellable; the outcome lands in the same
- * report list as imports.
- */
 @HiltWorker
 class ArtworkExportWorker @AssistedInject constructor(
     @Assisted appContext: Context,
@@ -43,7 +33,6 @@ class ArtworkExportWorker @AssistedInject constructor(
     private val platformResolver: PlatformFolderHintResolver,
     private val reportDao: ArtworkImportReportDao,
 ) : CoroutineWorker(appContext, params) {
-
     override suspend fun doWork(): Result {
         val notifier = BackgroundTaskNotifier(applicationContext)
         val destUriString = inputData.getString(KEY_DEST_TREE_URI)
@@ -66,11 +55,9 @@ class ArtworkExportWorker @AssistedInject constructor(
         notifier.running(TASK_ID, LABEL, null)
 
         try {
-            // Artwork/{platform} children plus any legacy root-level platform dirs (v2 layout).
             for (platformDir in library.platformDirs(sourceTree)) {
                 val destPlatformName = platformResolver.esDeFolderName(platformDir.name)
                 for (mediaDir in library.listChildren(sourceTree, platformDir.documentId).filter { it.isDirectory }) {
-                    // Standard media types only — pfp/ and unknown dirs stay private.
                     if (ArtworkPathResolver.kindForMediaDir(mediaDir.name) == null) continue
                     val files = library.listChildren(sourceTree, mediaDir.documentId)
                         .filter { !it.isDirectory && (it.sizeBytes ?: 0L) > 0L }

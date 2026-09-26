@@ -23,8 +23,6 @@ fun CreditsSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Pure info screen — no interactive rows for the scaffold's focus navigation to walk, so
-    // Up/Down scroll the column directly instead.
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val stepPx = with(LocalDensity.current) { 120.dp.toPx() }
@@ -41,9 +39,6 @@ fun CreditsSettingsScreen(
             }
         },
     ) {
-        // Credits has no focusable rows — it scrolls as a whole — so this registration is purely
-        // what lets the scaffold's header and footer drag it. The screen keeps owning the state
-        // itself because onInterceptAction above animates the same one for UP/DOWN.
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(
             modifier = Modifier
@@ -157,7 +152,6 @@ fun CreditsSettingsScreen(
             CreditParagraph(
                 "This product uses the TMDB API but is not endorsed or certified by TMDB."
             )
-
 
             Spacer(Modifier.height(16.dp))
             SettingsGroup("Typeface")

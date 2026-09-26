@@ -155,8 +155,7 @@ private fun ColorSchemeRow(
                     color = if (isSelected) Color.White else Color.White.copy(alpha = 0.66f),
                     style = TextStyle(shadow = PickerTextShadow),
                 )
-                // Most presets are their name and their colour, and have nothing to add. A second
-                // line repeated down every row is noise that costs a row's worth of panel height.
+
                 option.sublabel?.let { sub ->
                     Text(
                         text = sub,
@@ -170,10 +169,6 @@ private fun ColorSchemeRow(
     }
 }
 
-/**
- * Thin adapter onto the shared [HsvColorPickerDialog]. This file used to carry its own copy of the
- * whole 440dp panel; only the state shape is XMB-specific now.
- */
 @Composable
 fun CustomColorPickerOverlay(
     state: CustomColorPickerState,

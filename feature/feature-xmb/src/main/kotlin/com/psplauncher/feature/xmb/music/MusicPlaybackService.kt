@@ -22,15 +22,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
-/**
- * Foreground service that keeps the in-app [MusicPlayerController] playing while the user is
- * outside PFP, surfacing a media-style notification (play/pause, prev, next, stop) backed by a
- * [MediaSession] for lockscreen/headset controls. It does not own the player — it observes the
- * shared singleton controller and mirrors its state.
- */
 @AndroidEntryPoint
 class MusicPlaybackService : Service() {
-
     @Inject lateinit var controller: MusicPlayerController
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -53,7 +46,7 @@ class MusicPlaybackService : Service() {
             })
             isActive = true
         }
-        // Mirror controller state into the notification + session; when nothing is loaded, end.
+
         controller.state.onEach { state ->
             if (state.track == null) stopPlayback() else if (started) update(state)
         }.launchIn(scope)
@@ -66,8 +59,7 @@ class MusicPlaybackService : Service() {
             ACTION_PREV       -> controller.prev()
             ACTION_STOP       -> { stopPlayback(); return START_NOT_STICKY }
         }
-        // Always promote to foreground first — startForegroundService requires startForeground
-        // within ~5s or the system kills us with a crash.
+
         val state = controller.state.value
         startForeground(NOTIF_ID, buildNotification(state))
         started = true
@@ -142,8 +134,7 @@ class MusicPlaybackService : Service() {
             Intent(this, MusicPlaybackService::class.java).setAction(intentAction),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        // The Icon overload, not the int one: the int-resource constructor is deprecated, and
-        // the replacement takes an Icon so an action can carry a bitmap. Same drawable either way.
+
         return Notification.Action.Builder(Icon.createWithResource(this, icon), title, pi).build()
     }
 
@@ -169,7 +160,6 @@ class MusicPlaybackService : Service() {
         const val ACTION_PREV = "com.psplauncher.music.PREV"
         const val ACTION_STOP = "com.psplauncher.music.STOP"
 
-        /** Promote the currently-playing controller to a foreground notification. */
         fun start(context: Context) {
             ContextCompat.startForegroundService(
                 context,

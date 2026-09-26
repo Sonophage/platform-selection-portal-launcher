@@ -4,13 +4,9 @@ import com.psplauncher.feature.artwork.store.ArtworkKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** C16 task L.1 — the grid capacity rules and their worked examples, pinned by slot size. */
 class StudioGridCapacityTest {
-
     private fun capacity(width: Float, height: Float, tileClass: StudioTileClass) =
         StudioGridCapacity.of(width, height, tileClass).let { it.columns to it.rows }
-
-    // ── Worked examples (plan table, landscape and portrait) ──────────────────
 
     @Test
     fun `AYN Thor, the reference canvas`() {
@@ -54,19 +50,15 @@ class StudioGridCapacityTest {
         assertEquals(4 to 3, capacity(635f, 259f, StudioTileClass.WIDE))
     }
 
-    // ── Rounding and clamps ───────────────────────────────────────────────────
-
     @Test
     fun `an exact fit is not floored one short`() {
-        // (592 + 8) ÷ (112 + 8) is exactly 5 columns.
         assertEquals(5, StudioGridCapacity.of(592f, 259f, StudioTileClass.LANDSCAPE).columns)
-        // 5 landscape tiles in 635 dp are 80.4 tall: 3 rows need exactly 3 × 88.4 − 8 = 257.2 dp.
+
         assertEquals(3, StudioGridCapacity.of(635f, 257.2f, StudioTileClass.LANDSCAPE).rows)
     }
 
     @Test
     fun `a near miss still rounds down`() {
-        // 1.998 rows: the epsilon must not promote it to 2.
         assertEquals(5 to 1, capacity(570f, 223f, StudioTileClass.SQUARE))
     }
 
@@ -85,8 +77,6 @@ class StudioGridCapacityTest {
     fun `the unmeasured default is the old 4 by 5 page`() {
         assertEquals(20, StudioGridCapacity.UNMEASURED.pageSize)
     }
-
-    // ── Tab → tile class ──────────────────────────────────────────────────────
 
     @Test
     fun `every tab carries the tile class from the plan table`() {

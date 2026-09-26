@@ -27,13 +27,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.psplauncher.feature.settings.viewmodel.CredentialField
 import com.psplauncher.feature.settings.viewmodel.ArtworkSettingsViewModel
 
-/**
- * Which half of this screen to show. Artwork was 33 rows across eleven groups doing two unrelated
- * jobs: managing the art you have, and holding API credentials for four scraping services that are
- * entered once and then never touched. Splitting the entry points keeps both short.
- *
- * Null renders the whole screen, as with [DisplaySection].
- */
 enum class ArtworkSection { ARTWORK, SOURCES }
 
 @Composable
@@ -45,26 +38,18 @@ fun ArtworkSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Artwork Folder & Import lives on its own sub-screen (same pattern as Library Manager's
-    // internal sections) — BACK returns here.
     var showImport by remember { mutableStateOf(false) }
     if (showImport) {
         ArtworkImportScreen(onBack = { showImport = false }, modifier = modifier)
         return
     }
 
-    // Read from the ViewModel, not remembered here: the keyboard covers the field below the one
-    // you are filling on this screen's height, so a two-part credential means dismissing it and
-    // scrolling, and a back press that left the pane used to take the half-typed pair with it.
-    // Three of these were also keyed on the stored value, so a store emission could blank the box
-    // you were typing in.
     val sgdbKeyDraft = state.drafts.sgdbKey
     val igdbClientIdDraft = state.drafts.igdbClientId
     val igdbClientSecretDraft = state.drafts.igdbClientSecret
     val ssUsernameDraft = state.drafts.ssUsername
     val ssPasswordDraft = state.drafts.ssPassword
 
-    // Debug builds only. Any MIME type: pickers often report .properties files as octet-stream.
     val credentialsFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.loadDebugCredentials(it) }
     }
@@ -84,10 +69,6 @@ fun ArtworkSettingsScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState),
         ) {
-
-            // ── Debug: credentials file ───────────────────────────────────────
-            // Never in release: BuildConfig.DEBUG is a compile-time false there, so the row is
-            // stripped and the ViewModel refuses the load as well.
             if (com.psplauncher.feature.settings.BuildConfig.DEBUG && state.debugCredentialsAvailable) {
                 SettingsGroup("Debug")
 
@@ -107,7 +88,6 @@ fun ArtworkSettingsScreen(
                 }
             }
 
-            // ── Artwork library / import ──────────────────────────────────────
             if (section == null || section == ArtworkSection.ARTWORK) {
                 SettingsGroup("Artwork Library")
 
@@ -119,7 +99,6 @@ fun ArtworkSettingsScreen(
                     onClick  = { showImport = true },
                 )
 
-                // ── Artwork status ────────────────────────────────────────────────
                 SettingsGroup("Library Artwork Status")
 
                 SettingsValueRow(label = "Total Games",      value = state.status.total.toString())
@@ -139,7 +118,6 @@ fun ArtworkSettingsScreen(
                     onClick  = if (state.isRepairingLinks) null else ({ viewModel.repairArtworkLinks() }),
                 )
 
-                // ── Scraping ──────────────────────────────────────────────────────
                 SettingsGroup("Scrape Artwork")
 
                 if (state.isScraping) {
@@ -200,8 +178,6 @@ fun ArtworkSettingsScreen(
                         onClick  = { viewModel.dismissSummary() },
                     )
                 }
-
-                // ── Source priority ───────────────────────────────────────────────
             }
             if (section == null || section == ArtworkSection.SOURCES) {
                 SettingsGroup("Source Priority")
@@ -214,8 +190,6 @@ fun ArtworkSettingsScreen(
                     SettingsValueRow(label = "Primary",    value = "IGDB")
                     SettingsValueRow(label = "Fallback 1", value = "SteamGridDB (artwork)")
                 }
-
-                // ── Art preferences ───────────────────────────────────────────────
             }
             if (section == null || section == ArtworkSection.ARTWORK) {
                 SettingsGroup("Art Preferences")
@@ -323,8 +297,6 @@ fun ArtworkSettingsScreen(
                         onToggle = { viewModel.setDownloadVideoSnaps(it) },
                     )
                 }
-
-                // ── SteamGridDB API key ───────────────────────────────────────────
             }
             if (section == null || section == ArtworkSection.SOURCES) {
                 SettingsGroup("SteamGridDB API")
@@ -397,10 +369,6 @@ fun ArtworkSettingsScreen(
                     )
                 }
 
-                // ── ScreenScraper provider status ────────────────────────────────
-                // The WebAPI rejects every call without a devid/devpassword pair. This build ships an
-                // obfuscated built-in pair (there is no user-entered override), so the provider works
-                // out of the box; the optional user account below only raises the rate limit/quota.
                 SettingsGroup("ScreenScraper")
 
                 SettingsValueRow(
@@ -421,14 +389,8 @@ fun ArtworkSettingsScreen(
                     )
                 }
 
-                // ── ScreenScraper user account (optional) ─────────────────────────
-                // Only raises the rate limit and daily quota; scraping works without it.
                 SettingsGroup("ScreenScraper Account (Optional)")
 
-                // A stored username is shown whether or not the account is complete, and the
-                // two are now separate questions: a restore from another device keeps the
-                // username and drops the password, so "a username is saved" and "the account
-                // works" stopped being the same thing.
                 val ssUsernameStored = state.ssUsername.isNotBlank()
                 SettingsTextFieldRow(
                     label         = if (ssUsernameStored) "Username (saved: ${state.ssUsername})" else "Username",
@@ -446,10 +408,6 @@ fun ArtworkSettingsScreen(
                         "Stored encrypted on this device (Android Keystore).",
                 )
 
-                // The re-prompt the restore path's log line already promises. BackupManager logs
-                // "Dropped un-decryptable credential on restore ... (re-prompt)" and nothing was
-                // ever prompting, so the account sat half-saved and the scrape quietly ran at
-                // anonymous limits.
                 if (ssUsernameStored && !state.hasSsCredentials) {
                     SettingsRow(
                         label    = "Password needed to use this account",
@@ -477,8 +435,6 @@ fun ArtworkSettingsScreen(
                     )
                 }
 
-                // Offered whenever ANYTHING is stored, so a half-restored account can be cleared
-                // rather than stranded.
                 if (ssUsernameStored || state.hasSsCredentials) {
                     SettingsRow(
                         label    = "Clear ScreenScraper Account",
@@ -486,8 +442,6 @@ fun ArtworkSettingsScreen(
                         onClick  = { viewModel.clearSsCredentials() },
                     )
                 }
-
-                // ── Cache ─────────────────────────────────────────────────────────
             }
             if (section == null || section == ArtworkSection.ARTWORK) {
                 SettingsGroup("Cache")

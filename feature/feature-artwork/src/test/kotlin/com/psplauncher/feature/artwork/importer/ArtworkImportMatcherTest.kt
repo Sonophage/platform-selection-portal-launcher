@@ -8,7 +8,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ArtworkImportMatcherTest {
-
     private val index = PlatformIndex(
         listOf(
             GameRef(1, "Ratchet & Clank (USA)", "Ratchet & Clank", null),
@@ -33,7 +32,6 @@ class ArtworkImportMatcherTest {
 
     @Test
     fun `pass 3 matches simplified title only when unique`() {
-        // "Crash Bandicoot (USA)" ≠ stored "(Europe)" stem, but simplifies uniquely.
         val result = index.match("Crash Bandicoot (USA).png")
         assertEquals(Result.Matched(5, MatchConfidence.SIMPLIFIED_TITLE), result)
     }
@@ -60,8 +58,8 @@ class ArtworkImportMatcherTest {
     fun `same-stem duplicate rows (cue plus bin) match all rows, not ambiguous`() {
         val dupIndex = PlatformIndex(
             listOf(
-                GameRef(10, "Parasite Eve II (USA) (Disc 1)", "Parasite Eve II", null),   // .cue row
-                GameRef(11, "Parasite Eve II (USA) (Disc 1)", "Parasite Eve II", null),   // .bin row
+                GameRef(10, "Parasite Eve II (USA) (Disc 1)", "Parasite Eve II", null),
+                GameRef(11, "Parasite Eve II (USA) (Disc 1)", "Parasite Eve II", null),
             )
         )
         val result = dupIndex.match("Parasite Eve II (USA) (Disc 1).png")
@@ -82,8 +80,7 @@ class ArtworkImportMatcherTest {
         val numIndex = PlatformIndex(
             listOf(GameRef(20, "1942 (Japan, USA)", "1942", null))
         )
-        // Exact match works; and a genuine "1942 - something" title isn't destroyed because
-        // pass 4 only runs when earlier passes found nothing.
+
         assertEquals(
             Result.Matched(listOf(20L), MatchConfidence.EXACT_FILENAME),
             numIndex.match("1942 (Japan, USA).png"),

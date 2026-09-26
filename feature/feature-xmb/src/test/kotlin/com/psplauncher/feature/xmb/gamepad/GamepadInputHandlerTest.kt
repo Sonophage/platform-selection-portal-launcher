@@ -19,19 +19,15 @@ import org.junit.Before
 import org.junit.Test
 
 class GamepadInputHandlerTest {
-
     private lateinit var handler: GamepadInputHandler
     private val remapCoordinator = RemapCoordinator()
 
     @Before
     fun setUp() {
         handler = GamepadInputHandler(remapCoordinator, ControllerRegistry(mockk(relaxed = true)))
-        // SystemClock.uptimeMillis is an Android stub on the JVM; tests override with a stable clock
-        // (dedupe tests swap in a mutable one to control the duplicate window).
+
         handler.clock = { 0L }
     }
-
-    // ── Key events ───────────────────────────────────────────────────────
 
     @Test
     fun `onKeyEvent emits SELECT for BUTTON_A down`() = runTest {
@@ -96,7 +92,7 @@ class GamepadInputHandlerTest {
     fun `ACTION_UP does not emit an action`() = runTest {
         handler.actions.test {
             handler.onKeyEvent(keyEvent(KeyEvent.KEYCODE_BUTTON_A, KeyEvent.ACTION_DOWN))
-            awaitItem() // consume DOWN emission
+            awaitItem()
             handler.onKeyEvent(keyEvent(KeyEvent.KEYCODE_BUTTON_A, KeyEvent.ACTION_UP))
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -108,15 +104,13 @@ class GamepadInputHandlerTest {
         handler.actions.test {
             handler.onKeyEvent(keyEvent(KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.ACTION_DOWN))
             assertEquals(GamepadAction.NAVIGATE_DOWN, awaitItem())
-            // repeatCount > 0 is an OS-level repeat — the handler's own repeat loop owns repeats.
+
             val repeat = keyEvent(KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.ACTION_DOWN, repeatCount = 1)
             assertTrue(handler.onKeyEvent(repeat))
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    // ── Motion events (analog stick) ──────────────────────────────────────
 
     @Test
     fun `analog stick below dead zone does not emit`() = runTest {
@@ -174,14 +168,12 @@ class GamepadInputHandlerTest {
         }
     }
 
-    // ── Stick hysteresis ──────────────────────────────────────────────────
-
     @Test
     fun `stick stays engaged above the release threshold`() = runTest {
         handler.actions.test {
             assertTrue(handler.onMotionEvent(motionEvent(axisX = 0.6f, axisY = 0.0f)))
             assertEquals(GamepadAction.NAVIGATE_RIGHT, awaitItem())
-            // Below activation (0.5) but above release (0.3): still held — no release, no re-press.
+
             assertTrue(handler.onMotionEvent(motionEvent(axisX = 0.4f, axisY = 0.0f)))
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -204,14 +196,12 @@ class GamepadInputHandlerTest {
         handler.actions.test {
             handler.onMotionEvent(motionEvent(axisX = 0.6f, axisY = 0.0f))
             assertEquals(GamepadAction.NAVIGATE_RIGHT, awaitItem())
-            handler.onMotionEvent(motionEvent(axisX = 0.2f, axisY = 0.0f)) // release
-            handler.onMotionEvent(motionEvent(axisX = 0.4f, axisY = 0.0f)) // below activation
+            handler.onMotionEvent(motionEvent(axisX = 0.2f, axisY = 0.0f))
+            handler.onMotionEvent(motionEvent(axisX = 0.4f, axisY = 0.0f))
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    // ── HAT (D-pad) axes ──────────────────────────────────────────────────
 
     @Test
     fun `HAT right emits NAVIGATE_RIGHT`() = runTest {
@@ -242,8 +232,6 @@ class GamepadInputHandlerTest {
         }
     }
 
-    // ── Duplicate-direction mitigation ────────────────────────────────────
-
     @Test
     fun `DPAD press matching a held stick direction inside the window is suppressed`() = runTest {
         var now = 0L
@@ -252,7 +240,7 @@ class GamepadInputHandlerTest {
             handler.onMotionEvent(motionEvent(axisX = 0.8f, axisY = 0.0f))
             assertEquals(GamepadAction.NAVIGATE_RIGHT, awaitItem())
             now = 50
-            // Same physical direction reported by a second source: consumed, not emitted.
+
             assertTrue(handler.onKeyEvent(keyEvent(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.ACTION_DOWN)))
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -267,17 +255,15 @@ class GamepadInputHandlerTest {
             handler.onMotionEvent(motionEvent(axisX = 0.8f, axisY = 0.0f))
             assertEquals(GamepadAction.NAVIGATE_RIGHT, awaitItem())
             now = 200
-            handler.onMotionEvent(motionEvent(axisX = 0.0f, axisY = 0.0f)) // release stick
+            handler.onMotionEvent(motionEvent(axisX = 0.0f, axisY = 0.0f))
             expectNoEvents()
             now = 250
-            // Past the duplicate window: a genuine new press.
+
             assertTrue(handler.onKeyEvent(keyEvent(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.ACTION_DOWN)))
             assertEquals(GamepadAction.NAVIGATE_RIGHT, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    // ── Custom mappings ───────────────────────────────────────────────────
 
     @Test
     fun `remapped binding overrides default action`() = runTest {
@@ -291,8 +277,6 @@ class GamepadInputHandlerTest {
         }
     }
 
-    // ── Settings handoff ──────────────────────────────────────────────────
-
     @Test
     fun `bypassToComposeFocus lets non-BACK fall through but keeps BACK`() = runTest {
         handler.bypassToComposeFocus = true
@@ -303,8 +287,6 @@ class GamepadInputHandlerTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    // ── Capture mode ──────────────────────────────────────────────────────
 
     @Test
     fun `capture mode consumes the key without emitting its mapped action`() = runTest {
@@ -318,8 +300,6 @@ class GamepadInputHandlerTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private fun keyEvent(keyCode: Int, action: Int, repeatCount: Int = 0): KeyEvent {
         val event = mockk<KeyEvent>(relaxed = true)
@@ -336,8 +316,7 @@ class GamepadInputHandlerTest {
         hatY: Float = 0f,
     ): MotionEvent {
         val event = mockk<MotionEvent>(relaxed = true)
-        // onMotionEvent only processes ACTION_MOVE joystick events; a relaxed mock defaults action
-        // to 0 (ACTION_DOWN), which the handler ignores — stub it so the stick logic actually runs.
+
         every { event.action } returns MotionEvent.ACTION_MOVE
         every { event.getAxisValue(MotionEvent.AXIS_X) } returns axisX
         every { event.getAxisValue(MotionEvent.AXIS_Y) } returns axisY

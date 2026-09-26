@@ -6,9 +6,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.VideoLibrary
 
-// One row per user-added SAF video library. id is a generated UUID; tree_uri is the persisted
-// ACTION_OPEN_DOCUMENT_TREE uri. video_count / last_scanned_at mirror the MusicFolder/Memory Card
-// pattern so the library list stays reactive with counts without an extra join.
 @Serializable
 @Entity(tableName = "video_libraries")
 data class VideoLibraryEntity(

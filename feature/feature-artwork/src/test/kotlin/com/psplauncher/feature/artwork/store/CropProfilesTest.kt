@@ -8,7 +8,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CropProfilesTest {
-
     @Test
     fun `shipped kinds resolve to today's exact ratios`() {
         val registry = CropProfileRegistry.Default
@@ -21,7 +20,6 @@ class CropProfilesTest {
 
     @Test
     fun `the hero crop is the Game Detail banner's own shape`() {
-        // The banner at full size: the 920dp page body less its 28dp side margins, 220dp tall.
         val aspect = CropProfileRegistry.Default.resolve(ArtworkKind.HERO, null, null).aspect!!
         assertEquals(864f / 220f, aspect, 0.001f)
     }
@@ -128,8 +126,6 @@ class CropProfilesTest {
         }
     }
 
-    // ── Task 6.3: the per-game override ──────────────────────────────────────
-
     @Test
     fun `a stored override beats every tier, including a region row`() {
         val registry = CropProfileRegistry(
@@ -155,9 +151,6 @@ class CropProfilesTest {
 
     @Test
     fun `an unknown override is ignored rather than resolving to no target`() {
-        // A key written by a later version, or a platform row since removed. Falling through to the
-        // kind default keeps the crop frame sane; treating it as Original Image would silently drop
-        // a fixed crop target the artwork kind requires.
         val profile = CropProfileRegistry.Default.resolve(
             ArtworkKind.ICON, "psx", null, override = "ICON:nonesuch:PAL",
         )
@@ -182,7 +175,6 @@ class CropProfilesTest {
 
     @Test
     fun `an override never leaks across kinds`() {
-        // The stored key carries its own kind, so a HERO key must not satisfy an ICON resolve.
         val profile = CropProfileRegistry.Default.resolve(
             ArtworkKind.ICON, "psx", null, override = ArtworkKind.HERO.name,
         )

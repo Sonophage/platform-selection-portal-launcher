@@ -3,21 +3,13 @@ package com.psplauncher.feature.library.scanner
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Extension-to-platform mapping aligned with EmulationStation DE conventions.
-// Platform IDs match PlatformSeeder IDs (ES-DE canonical folder names where practical).
 @Singleton
 class PlatformExtensionMap @Inject constructor() {
-
-    // Unambiguous: one extension = exactly one platform.
-    // Compressed archives (.zip, .7z) are excluded here — they're multi-platform
-    // and resolved via folder hints only.
     private val definitiveExtensions = mapOf(
 
-        // ── PlayStation Portable ───────────────────────────────────────────
         "cso"   to "psp",
-        "pbp"   to "psp",       // PSP homebrew/PSN; also used for PS1-on-PSP but psp is safer default
+        "pbp"   to "psp",
 
-        // ── Nintendo ──────────────────────────────────────────────────────
         "nes"   to "nes",
         "fds"   to "nes",
         "unf"   to "nes",
@@ -39,7 +31,7 @@ class PlatformExtensionMap @Inject constructor() {
         "cia"   to "n3ds",
         "gcm"   to "gc",
         "gcz"   to "gc",
-        "rvz"   to "gc",        // Dolphin compressed
+        "rvz"   to "gc",
         "wbfs"  to "wii",
         "wad"   to "wii",
         "rpx"   to "wiiu",
@@ -52,7 +44,6 @@ class PlatformExtensionMap @Inject constructor() {
         "vb"    to "virtualboy",
         "vboy"  to "virtualboy",
 
-        // ── Sega — unambiguous ────────────────────────────────────────────
         "md"    to "megadrive",
         "gen"   to "megadrive",
         "smd"   to "megadrive",
@@ -61,10 +52,9 @@ class PlatformExtensionMap @Inject constructor() {
         "sms"   to "mastersystem",
         "sg"    to "mastersystem",
         "gg"    to "gamegear",
-        "gdi"   to "dreamcast",  // GDI dump — only Dreamcast
+        "gdi"   to "dreamcast",
         "cdi"   to "dreamcast",
 
-        // ── Atari ─────────────────────────────────────────────────────────
         "a26"   to "atari2600",
         "a52"   to "atari5200",
         "car"   to "atari5200",
@@ -72,25 +62,17 @@ class PlatformExtensionMap @Inject constructor() {
         "lnx"   to "atarilynx",
         "lyx"   to "atarilynx",
 
-        // ── NEC ───────────────────────────────────────────────────────────
         "pce"   to "pcengine",
         "sgx"   to "pcengine",
 
-        // ── SNK ───────────────────────────────────────────────────────────
-        "neo"   to "neogeo",    // Neo Geo arcade ROM
-        "ngp"   to "ngp",       // Neo Geo Pocket
-        "ngc"   to "ngp",       // Neo Geo Pocket Color
+        "neo"   to "neogeo",
+        "ngp"   to "ngp",
+        "ngc"   to "ngp",
         "npc"   to "ngp",
 
-        // ── Bandai ────────────────────────────────────────────────────────
         "ws"    to "wonderswan",
         "wsc"   to "wonderswancolor",
 
-        // Sony Vita has no ROM-file extension: Android Vita3K runs only INSTALLED titles from
-        // ux0/app/<TITLE_ID> (a loose .vpk can't be installed or launched), so the psvita platform
-        // is scanned by VitaGameScanner via the granted ux0 folder, not by file extension.
-
-        // ── Commodore ─────────────────────────────────────────────────────
         "d64"   to "c64",
         "g64"   to "c64",
         "t64"   to "c64",
@@ -100,18 +82,12 @@ class PlatformExtensionMap @Inject constructor() {
         "d81"   to "c64",
     )
 
-    // Extensions that are ambiguous across platforms — platform is determined by:
-    //   1. Folder name hint  (PlatformFolderHintResolver)
-    //   2. Disc resolver     (DiscImageResolver — for .cue/.bin groups)
-    //   3. Default fallback  (listed in folderSensitiveDefaults below)
     val contextDependentExtensions = setOf("bin", "cue", "img", "chd", "mds", "m3u", "ccd")
 
-    // These extensions are common enough to scan but need a folder hint to pick the right platform.
-    // Default is used when no folder hint is found.
     val folderSensitiveExtensions = mapOf(
-        "iso" to "ps2",   // default PS2; overridden by folder hints (psp, psx, gc, wii, saturn, etc.)
-        "zip" to "mame",  // default MAME/arcade; overridden by folder hints (nes, snes, gba, etc.)
-        "7z"  to "mame",  // same — compressed archives are used by almost every platform
+        "iso" to "ps2",
+        "zip" to "mame",
+        "7z"  to "mame",
     )
 
     fun detectPlatform(extension: String): String? =
@@ -129,8 +105,6 @@ class PlatformExtensionMap @Inject constructor() {
     fun isContextDependent(extension: String): Boolean =
         extension.lowercase() in contextDependentExtensions
 
-    // Playlists are context-dependent because their platform comes from the containing system
-    // folder, but unlike cue/bin/track companions they are launchable scan entries.
     fun isPlaylist(extension: String): Boolean = extension.equals("m3u", ignoreCase = true)
 
     fun isKnownExtension(extension: String): Boolean =

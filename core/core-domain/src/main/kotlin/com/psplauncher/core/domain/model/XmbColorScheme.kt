@@ -2,13 +2,6 @@ package com.psplauncher.core.domain.model
 
 import com.psplauncher.themekit.ColorCascade
 
-/**
- * Selectable XMB color schemes, in the spirit of the classic PSP.
- *
- * [ORIGINAL] reproduces the PSP "Original" theme whose background color changes with the
- * calendar month. All other entries are fixed presets. Resolve a scheme to a concrete
- * [XmbPalette] with [resolve], passing the current month (1-12) — only [ORIGINAL] uses it.
- */
 enum class XmbColorScheme {
     ORIGINAL,
     CLASSIC_BLUE,
@@ -25,7 +18,6 @@ enum class XmbColorScheme {
     BLACK,
 }
 
-/** A fully-resolved color palette for the XMB. Colors are ARGB longs (0xAARRGGBB). */
 data class XmbPalette(
     val waveColor: Long,
     val accentColor: Long,
@@ -50,10 +42,6 @@ fun XmbColorScheme.displayLabel(): String = when (this) {
     XmbColorScheme.BLACK         -> "Black"
 }
 
-/**
- * Resolve this scheme to a concrete palette. [month] is 1-12 and only affects [ORIGINAL];
- * out-of-range values are clamped.
- */
 fun XmbColorScheme.resolve(month: Int): XmbPalette {
     val wave = when (this) {
         XmbColorScheme.ORIGINAL      -> ORIGINAL_MONTH_WAVE[month.coerceIn(1, 12) - 1]
@@ -68,10 +56,7 @@ fun XmbColorScheme.resolve(month: Int): XmbPalette {
         XmbColorScheme.AQUA_TEAL     -> 0xFF2EC4B6L
         XmbColorScheme.MIDNIGHT_NAVY -> 0xFF23477EL
         XmbColorScheme.CHARCOAL      -> 0xFF4A505AL
-        // A true neutral black. Charcoal and Midnight Navy are both blue-leaning greys — 4A505A
-        // and 23477E — so the darkest thing on offer still read as blue. This one has no hue at
-        // all: lightBackgroundAnchors darkens it to pure black at the top and lifts it to a
-        // neutral grey at the wave, which is what makes the wave itself the only colour on screen.
+
         XmbColorScheme.BLACK         -> 0xFF000000L
     }
     return XmbPalette(
@@ -83,31 +68,20 @@ fun XmbColorScheme.resolve(month: Int): XmbPalette {
     )
 }
 
-/**
- * Vertical gradient anchors derived from the wave hue, in the classic PSP "Original" style: a DEEP,
- * saturated shade of the hue at the TOP (`first`) easing to a BRIGHTER shade near the wave (`second`).
- * Dark → bright, top → bottom — but both keep the hue's saturation (the real XMB gradient stays a
- * rich colour, it does not fade to navy/white). Used by [resolve] and re-applied when a category
- * tints the wave so the two always match.
- *
- * The math lives in theme-kit's [ColorCascade] so the desktop Theme Studio derives the exact
- * same gradient; this remains the launcher-side entry point.
- */
 fun lightBackgroundAnchors(waveArgb: Long): Pair<Long, Long> =
     ColorCascade.lightBackgroundAnchors(waveArgb)
 
-// PSP "Original" theme — approximate wave color for each month, Jan..Dec.
 private val ORIGINAL_MONTH_WAVE = longArrayOf(
-    0xFF1FA89CL, // Jan — teal
-    0xFFE56BA0L, // Feb — pink
-    0xFF6FBF3BL, // Mar — green
-    0xFFE99BC4L, // Apr — sakura
-    0xFF34B3A0L, // May — aqua-green
-    0xFF3A7BD5L, // Jun — blue
-    0xFF35B6D6L, // Jul — light aqua
-    0xFF2E54A8L, // Aug — deep blue
-    0xFFE08A2EL, // Sep — amber
-    0xFF8A5AC2L, // Oct — purple
-    0xFFB5642EL, // Nov — autumn brown
-    0xFFD23B4EL, // Dec — red
+    0xFF1FA89CL,
+    0xFFE56BA0L,
+    0xFF6FBF3BL,
+    0xFFE99BC4L,
+    0xFF34B3A0L,
+    0xFF3A7BD5L,
+    0xFF35B6D6L,
+    0xFF2E54A8L,
+    0xFFE08A2EL,
+    0xFF8A5AC2L,
+    0xFFB5642EL,
+    0xFFD23B4EL,
 )

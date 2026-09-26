@@ -16,22 +16,6 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * One-shot data normalization that runs once per app version at startup. It makes a dataset that
- * was carried over from an older build — an in-place upgrade, an adb data copy, or a restored
- * backup — safe to use on the current version.
- *
- * Two repairs, both idempotent:
- *  1. **Re-home internal-storage paths.** Game artwork (and the custom wallpaper) are stored as
- *     absolute `…/<package>/files/…` paths. If the data came from a different package/data-dir the
- *     package segment is wrong; every such path is repointed onto *this* install's filesDir.
- *  2. **Drop dead references.** If the repaired file still isn't there (art that was never bundled,
- *     e.g. a v1 backup), the reference is cleared so the item re-scrapes cleanly instead of showing
- *     a broken image.
- *
- * Room migrations remain the source of truth for schema; this only fixes file-path drift, which
- * migrations can't see.
- */
 @Singleton
 class StartupDataPrep @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -46,11 +30,7 @@ class StartupDataPrep @Inject constructor(
                 normalizeGameArtwork()
                 normalizeWallpaper()
             }
-            // Deliberately OUTSIDE the version gate. The wallpaper luminance survey is a derived
-            // cache, not a one-shot migration: a backup restore re-homes the wallpaper path
-            // (BackupManager.remapWallpaper) while data_prep_version is NOT restored, so the
-            // marker still matches this install and gating on it would skip the one event most
-            // likely to have invalidated the survey.
+
             healWallpaperSurvey()
         }.onFailure { Timber.e(it, "Startup data prep failed") }
 
@@ -91,17 +71,6 @@ class StartupDataPrep @Inject constructor(
         }
     }
 
-    /**
-     * Brings the wallpaper's luminance survey back in step with the wallpaper itself.
-     *
-     * Three ways it drifts, none of which a write site can catch: an OS update re-homes filesDir
-     * (so the map's embedded source path no longer matches), a backup restore repoints the
-     * wallpaper onto this install, and a restore can leave a survey behind with no wallpaper at
-     * all. All three surface as [WallpaperLuminanceProbe.describes] returning false.
-     *
-     * Runs on every cold start, so the happy path is deliberately cheap: a valid survey costs one
-     * parse to confirm and writes nothing. Only an actually-unusable one pays for a decode.
-     */
     private suspend fun healWallpaperSurvey() {
         val prefs = context.pfpDataStore.data.first()
         val wallpaper = prefs[KEY_CUSTOM_WALLPAPER]
@@ -114,10 +83,7 @@ class StartupDataPrep @Inject constructor(
             }
             return
         }
-        // BOTH facts, not just the luma. An install that had a wallpaper before the accent existed
-        // has a perfectly good luma map and no accent at all, and checking only the luma would
-        // return here and never derive one — the wave would go untinted forever on exactly the
-        // devices that already had a wallpaper.
+
         if (WallpaperLuminanceProbe.describes(storedLuma, wallpaper) && storedAccent != null) return
 
         val fresh = WallpaperLuminanceProbe.survey(wallpaper)
@@ -125,13 +91,10 @@ class StartupDataPrep @Inject constructor(
         context.pfpDataStore.edit { it.setWallpaperLuma(fresh) }
     }
 
-    // Returns the usable value for an internal-storage path: repointed onto filesDir, or null when
-    // the file is absent. Non-filesDir values (content URIs, shared-storage paths) pass through, and
-    // a value already pointing at an existing file is returned unchanged.
     private fun resolve(path: String?, filesDirPath: String): String? {
         if (path.isNullOrEmpty()) return path
         val idx = path.indexOf(FILES_MARKER)
-        if (idx < 0) return path   // not an internal-storage path — leave it alone
+        if (idx < 0) return path
         val remapped = filesDirPath.trimEnd('/') + "/" + path.substring(idx + FILES_MARKER.length)
         return if (File(remapped).exists()) remapped else null
     }

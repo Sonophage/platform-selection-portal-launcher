@@ -17,19 +17,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// One "hidden from <location>" row under an item.
 data class HiddenEntry(
     val itemKey: String,
     val locationType: HideLocationType,
     val locationId: String,
-    val locationLabel: String,   // "Everywhere" for a global hide
+    val locationLabel: String,
 )
 
-// An item (app or game/shortcut) with all the places it's hidden from.
 data class HiddenItemGroup(
     val itemKey: String,
     val label: String,
-    val icon: Drawable?,         // app icon when resolvable; null for games
+    val icon: Drawable?,
     val entries: List<HiddenEntry>,
 )
 
@@ -46,8 +44,6 @@ class AppVisibilityViewModel @Inject constructor(
     private val appOverrideDao: AppOverrideDao,
     private val hiddenPlacementDao: HiddenPlacementDao,
 ) : ViewModel() {
-
-    // packageName -> (label, icon) for resolving global-hidden apps; loaded once.
     private val installedInfo = MutableStateFlow<Map<String, Pair<String, Drawable>>>(emptyMap())
     private val loading = MutableStateFlow(true)
 
@@ -66,11 +62,10 @@ class AppVisibilityViewModel @Inject constructor(
         installedInfo,
         loading,
     ) { placements, overrides, info, isLoading ->
-        // entries keyed by itemKey
+
         val byItem = linkedMapOf<String, MutableList<HiddenEntry>>()
         val labels = hashMapOf<String, String>()
 
-        // Global hides (legacy app_overrides.is_hidden) → an "Everywhere" entry per app.
         overrides.filter { it.isHidden }.forEach { ov ->
             val itemKey = HiddenPlacement.appKey(ov.packageName)
             val label = info[ov.packageName]?.first ?: ov.customLabel ?: ov.packageName
@@ -80,7 +75,6 @@ class AppVisibilityViewModel @Inject constructor(
             )
         }
 
-        // Per-location placements.
         placements.forEach { p ->
             val type = runCatching { HideLocationType.valueOf(p.locationType) }.getOrDefault(HideLocationType.GLOBAL)
             labels.putIfAbsent(p.itemKey, p.itemLabel)

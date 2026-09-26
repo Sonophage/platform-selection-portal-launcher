@@ -31,33 +31,8 @@ import com.psplauncher.core.ui.detail.PfpDetailLaunchButton
 import com.psplauncher.core.ui.detail.PfpOverlayCard
 import com.psplauncher.core.ui.detail.PfpOverlayTitle
 
-// ── Settings prompts ──────────────────────────────────────────────────────────
-//
-// The settings screens' own family of in-window prompts. They exist for the reason every other
-// overlay in this app does -- a Material3 AlertDialog renders into its own platform Window, so
-// while it is up the Activity's dispatchKeyEvent never runs and no gamepad press reaches the app
-// -- plus one reason specific to here.
-//
-// A settings screen has a live cursor of its own underneath. A prompt drawn over it must take the
-// pad, or DOWN keeps walking the list behind the prompt and A fires whatever row it lands on.
-// Each of these calls SettingsOverlayInput, so the scaffold hands it every action first and the
-// list underneath goes still.
-//
-// The contract, the same in all of them: A performs the focused choice, B is the way out, and a
-// tap on the scrim cancels and never confirms.
-
 private val MESSAGE_COLOR = Color(0xCCFFFFFF)
 
-/**
- * A two-choice confirmation over a settings screen.
- *
- * UP/DOWN moves between the two buttons, which is why this owns a cursor at all rather than
- * hard-wiring A to confirm: a destructive prompt where A is "yes" and there is nothing to move to
- * is how a reflexive A-press deletes something.
- *
- * [destructive] tints the confirm button at rest and starts the cursor on Cancel, which is the
- * arrangement a prompt that removes something needs. A non-destructive one starts on Confirm.
- */
 @Composable
 fun SettingsConfirmOverlay(
     title: String,
@@ -68,7 +43,6 @@ fun SettingsConfirmOverlay(
     cancelLabel: String = "Cancel",
     destructive: Boolean = true,
 ) {
-    // 0 = cancel, 1 = confirm. Cancel leads on a destructive prompt.
     var cursor by remember(destructive) { mutableIntStateOf(if (destructive) 0 else 1) }
     SettingsOverlayInput { action ->
         when (action) {
@@ -105,10 +79,8 @@ fun SettingsConfirmOverlay(
     }
 }
 
-/** The resting fill of a non-destructive button, matching PfpDetailLaunchButton's own default. */
 private val DetailRestFill = Color(0x1FFFFFFF)
 
-/** A message with one way out. A or B closes it. */
 @Composable
 fun SettingsMessageOverlay(
     title: String,
@@ -117,8 +89,7 @@ fun SettingsMessageOverlay(
     dismissLabel: String = "OK",
 ) {
     SettingsOverlayInput { action ->
-        // Read-only: there is nothing to choose, so both buttons mean the same thing. Anything
-        // else is swallowed rather than passed down, or the list behind would move.
+
         if (action == GamepadAction.SELECT || action == GamepadAction.BACK) onDismiss()
     }
     PfpOverlayCard(onScrimTap = onDismiss) {
@@ -136,12 +107,6 @@ fun SettingsMessageOverlay(
     }
 }
 
-/**
- * A single-choice list over a settings screen: pick a default player, a sound, a category.
- *
- * The cursor starts on whatever is already chosen, so A with no movement is a no-op rather than a
- * change. [selectedIndex] of -1 means nothing is chosen yet and the cursor starts at the top.
- */
 @Composable
 fun SettingsChoiceOverlay(
     title: String,
@@ -165,8 +130,7 @@ fun SettingsChoiceOverlay(
     PfpOverlayCard(onScrimTap = onCancel) {
         PfpOverlayTitle(title)
         Spacer(Modifier.height(12.dp))
-        // Scrollable: a list of installed players or sound files has no fixed length, and a card
-        // taller than the screen would put its last rows where nothing can reach them.
+
         Column(
             modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -188,9 +152,7 @@ fun SettingsChoiceOverlay(
                         fontSize = 14.sp,
                         modifier = Modifier.weight(1f),
                     )
-                    // Drawn, not a font glyph: a check character's shape and baseline come from
-                    // whichever font the device falls back to. Same reasoning as PfpCheckMark's
-                    // other callers.
+
                     if (index == selectedIndex) {
                         PfpCheckMark(Color(0xFF7ED957), Modifier.padding(start = 8.dp))
                     }
@@ -200,13 +162,6 @@ fun SettingsChoiceOverlay(
     }
 }
 
-/**
- * A prompt with more than two ways out: "OK", "use my exact colour", "don't warn again".
- *
- * UP/DOWN walks the buttons, A takes the focused one, B takes [onCancel]. Two choices belong in
- * [SettingsConfirmOverlay], which says which of them is destructive; this one is for a set where
- * none of them is.
- */
 @Composable
 fun SettingsActionsOverlay(
     title: String,
@@ -245,13 +200,6 @@ fun SettingsActionsOverlay(
     }
 }
 
-/**
- * A name prompt over a settings screen.
- *
- * The card, the autofocused field and the keyboard's Done key all come from the shared
- * PfpTextPromptOverlay; what this adds is the settings pad contract, so A commits and B cancels
- * while the list underneath stays still.
- */
 @Composable
 fun SettingsTextPromptOverlay(
     title: String,
@@ -266,8 +214,7 @@ fun SettingsTextPromptOverlay(
         when (action) {
             GamepadAction.SELECT -> onConfirm()
             GamepadAction.BACK -> onCancel()
-            // Everything else is swallowed: the soft keyboard owns the rest of the pad, and
-            // letting a direction through would walk the list behind the prompt.
+
             else -> Unit
         }
     }

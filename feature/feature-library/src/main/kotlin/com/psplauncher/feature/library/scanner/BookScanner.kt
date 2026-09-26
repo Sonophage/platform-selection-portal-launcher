@@ -37,17 +37,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Longest edge of a cached cover, in px.
-//
-// Sized for the larger of the two things it feeds, not the smaller: the 40x56 list tile would be
-// happy with 400, but the same file is also the full-screen hover background behind the selected
-// row, where 400 is visibly soft on a 1080p panel. A jacket at this size is around 150 KB, so a
-// library of a few hundred books costs tens of megabytes of evictable cache.
 private const val COVER_MAX_DIM = 1200
 
-// Concurrent per-file EPUB reads. Each one opens the archive up to three times and decodes one
-// image, so this is I/O bound; four in flight keeps a folder of large books from monopolising the
-// device without leaving the disk idle between files.
 private const val SCAN_PARALLELISM = 4
 
 sealed interface BookScanResult {
@@ -56,22 +47,8 @@ sealed interface BookScanResult {
     data class Error(val libraryId: String, val message: String) : BookScanResult
 }
 
-/** One found file: the SAF row, and its path relative to the library root. */
 data class FoundBookFile(val child: SafChild, val relativePath: String)
 
-/**
- * Walks one library's folder and returns the book files in it.
- *
- * The walk is a plain function taking [listChildren] rather than a class reading a
- * `ContentResolver`, which is the whole reason the policy below is testable without a device. It
- * holds everything that can be got wrong: honouring `.nomedia`, pruning hidden directories,
- * refusing to recurse when the library says not to, and not looping when a provider surfaces a
- * directory under itself.
- *
- * Iterative rather than recursive so a deep tree cannot blow the stack, and both directories and
- * files are de-duplicated, because a provider that surfaces one document under two parents would
- * otherwise produce two rows for one book.
- */
 internal fun collectBookFiles(
     startDocId: String,
     scanRecursively: Boolean,
@@ -86,7 +63,7 @@ internal fun collectBookFiles(
     while (stack.isNotEmpty()) {
         val (dirDocId, relPath) = stack.removeLast()
         val children = listChildren(dirDocId)
-        // A .nomedia marker skips this folder's files AND its whole subtree.
+
         if (children.hasNoMediaMarker()) continue
         for (child in children) {
             if (child.isDirectory) {
@@ -98,9 +75,7 @@ internal fun collectBookFiles(
                 )
             } else {
                 if (!BookFileFilter.isBook(child.name, child.mime)) continue
-                // Keyed on the document id, not the uri: the id IS the provider's identity for a
-                // file, so this catches the same document surfaced under two parents even when the
-                // uris it builds differ.
+
                 if (seenFiles.add(child.documentId)) found.add(FoundBookFile(child, relPath))
             }
         }
@@ -108,23 +83,6 @@ internal fun collectBookFiles(
     return found
 }
 
-/**
- * True when [prior] can be carried forward without reopening the book.
- *
- * Top-level and pure so the quick-scan rule is unit-testable without a device, because it is the
- * one rule here whose failure is silent in both directions: too strict and every rescan reopens
- * the whole library, too loose and a book's metadata never updates.
- *
- * The rule has three parts:
- *  - the file has not changed on disk, by `lastModified`;
- *  - the row has actually been through the metadata pass. A row scanned before covers existed has
- *    every metadata field null and must be reparsed once, which is what [hasParsedMetadata]
- *    detects. A book that genuinely declares nothing is reparsed on every quick scan as a result:
- *    that is the safe direction of the error, and it costs one archive read for a file that has
- *    no metadata to find;
- *  - its cached cover is still on disk. Clearing the cover cache must make the next rescan
- *    regenerate covers rather than reporting "nothing changed".
- */
 internal fun canReuse(prior: Book?, lastModified: Long?, coverExists: (String) -> Boolean): Boolean {
     if (prior == null) return false
     if (prior.lastModified != lastModified) return false
@@ -133,32 +91,9 @@ internal fun canReuse(prior: Book?, lastModified: Long?, coverExists: (String) -
     return cover.isNullOrBlank() || coverExists(cover)
 }
 
-/**
- * Whether this row has been through the EPUB metadata pass.
- *
- * There is no "parsed" flag, so this infers it from the fields the pass fills. A book that
- * declares none of them is indistinguishable from one that was never parsed, which is why the
- * quick scan errs towards reparsing rather than towards leaving a book blank forever.
- */
 internal fun Book.hasParsedMetadata(): Boolean =
     title != null || author != null || series != null || coverUri != null
 
-/**
- * Finds the books in one [BookLibrary] and reads what each one says about itself.
- *
- * Two modes, mirroring [PhotoScanner] and [MusicScanner]:
- *  - **Quick** ([deep] = false): a file whose `lastModified` is unchanged, whose row has been
- *    parsed before and whose cover is still cached is carried forward untouched, so a rescan of a
- *    settled library opens no archives at all.
- *  - **Deep** ([deep] = true): every book is reopened and its cover regenerated. This is what the
- *    Library settings screen's Deep Rescan row runs, and it is the escape hatch for a library
- *    whose metadata was edited in place without the file's timestamp moving, which is exactly what
- *    a Calibre "polish books" pass does.
- *
- * The metadata read is the expensive half and the reason the quick/deep split exists at all: the
- * first pass of this section did a cursor-only walk with no per-file I/O, and adding covers and
- * series turns every new book into three archive passes and an image decode.
- */
 @Singleton
 class BookScanner @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -195,8 +130,7 @@ class BookScanner @Inject constructor(
                         val book = runCatching { toBook(child, library.id, relPath, deep, byUri) }
                             .getOrElse { e ->
                                 if (e is CancellationException) throw e
-                                // One unreadable book is a row without metadata, never a failed
-                                // scan: a single corrupt file must not cost the user the library.
+
                                 Timber.w(e, "Reading metadata failed for ${child.uri}")
                                 bareBook(child, library.id, relPath, byUri[child.uri.toString()])
                             }
@@ -232,8 +166,7 @@ class BookScanner @Inject constructor(
         }
 
         val meta = EpubMetadataReader.read { openStream(child.uri) }
-        // A deep scan regenerates the cover; a quick scan reuses one that is still on disk, so a
-        // changed file does not pay for an image decode it does not need.
+
         val cover = prior?.coverUri
             ?.takeIf { !deep && it.isNotBlank() && fileExistsForUri(it) }
             ?: cacheCover(child.uri, meta)
@@ -247,9 +180,8 @@ class BookScanner @Inject constructor(
         )
     }
 
-    /** The row every book gets, metadata or not: what the directory cursor already knew. */
     private fun bareBook(child: SafChild, libraryId: String, relPath: String, prior: Book?) = Book(
-        // The id is kept across rescans so anything holding one keeps pointing at the same book.
+
         id = prior?.id ?: UUID.randomUUID().toString(),
         libraryId = libraryId,
         uri = child.uri.toString(),
@@ -261,24 +193,12 @@ class BookScanner @Inject constructor(
         dateAdded = prior?.dateAdded ?: System.currentTimeMillis(),
     )
 
-    // ── Cover cache ───────────────────────────────────────────────────────────
-
-    /**
-     * Cover cache, next to the photo thumbnails: internal app cache, private to the app, never
-     * indexed by MediaStore and evictable by the OS. A separate directory so Clear Cover Cache and
-     * Clear Thumbnail Cache do not take each other's files.
-     */
     val coverCacheDir: File by lazy { File(context.cacheDir, "book_covers").apply { mkdirs() } }
 
-    /** Deletes every cached cover. Returns how many files went. */
     fun clearCoverCache(): Int = runCatching {
         coverCacheDir.listFiles()?.count { it.delete() } ?: 0
     }.getOrDefault(0)
 
-    /**
-     * Extracts, downsamples and caches [meta]'s cover. Returns a file:// uri, or null when the
-     * book names no cover or the image cannot be decoded.
-     */
     private fun cacheCover(bookUri: Uri, meta: EpubMetadata?): String? {
         val entry = meta?.coverEntry ?: return null
         val file = File(coverCacheDir, "${sha1(bookUri.toString())}.jpg")
@@ -286,8 +206,6 @@ class BookScanner @Inject constructor(
             val bytes = EpubMetadataReader.readEntry({ openStream(bookUri) }, entry)
                 ?: return@runCatching null
 
-            // Bounds first, so a large jacket is subsampled during decode rather than allocated
-            // full size and scaled afterwards.
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
@@ -303,8 +221,6 @@ class BookScanner @Inject constructor(
         }.getOrElse { Timber.w(it, "Cover extraction failed for $bookUri"); null }
     }
 
-    // Throws rather than returning an empty stream on a revoked grant, so the caller logs a lost
-    // permission instead of silently recording a book with no metadata.
     private fun openStream(uri: Uri): InputStream =
         context.contentResolver.openInputStream(uri) ?: throw IOException("cannot open $uri")
 
@@ -312,9 +228,6 @@ class BookScanner @Inject constructor(
         Uri.parse(uriString).path?.let { File(it).exists() } == true
     }.getOrDefault(false)
 
-    // Power-of-two subsample factor that leaves the longest edge at or ABOVE [maxDim] and under
-    // twice it: the loop halves only while the result would still clear [maxDim], so the decode
-    // is never downsampled past the size the caller asked for.
     private fun sampleSize(w: Int, h: Int, maxDim: Int): Int {
         var sample = 1
         var longest = maxOf(w, h)

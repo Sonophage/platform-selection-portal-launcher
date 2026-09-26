@@ -18,14 +18,9 @@ import kotlinx.serialization.Serializable
         Index("last_played_at"),
         Index("rom_path", unique = true),
         Index("artwork_key"),
-        // The display queries correlate a disc set against itself once per row
-        // (WHERE member.disc_set_key = games.disc_set_key). Without this the cost of All Games,
-        // Favorites, a platform list and Missing is quadratic in the library size.
+
         Index("disc_set_key"),
-        // Duplicate lookup for PC games, on the PAIR — an app id is unique within its store, so
-        // ("STEAM","620") and ("GOG","620") are different games. Not unique: two library entries
-        // can legitimately point at one installed title (a pin and a folder import) until they
-        // are reconciled.
+
         Index("storefront", "storefront_game_id"),
     ]
 )
@@ -41,14 +36,9 @@ data class GameEntity(
     @ColumnInfo(name = "rom_path")
     val romPath: String?,
 
-    // SAF content:// URI for the ROM; null for legacy raw-path games. Not unique-indexed — dedupe
-    // stays on rom_path (always populated, raw or SAF-derived).
     @ColumnInfo(name = "rom_uri")
     val romUri: String? = null,
 
-    // Multi-disc set identity (docs/plans/README.md (C1)). Null for single-ROM games;
-    // populated by DiscSetBuilder at scan time. Downstream projection (step 5) shows one row per
-    // set — the primary — while paths, play sessions and achievements stay per-disc.
     @ColumnInfo(name = "disc_set_key")
     val discSetKey: String? = null,
 
@@ -58,9 +48,6 @@ data class GameEntity(
     @ColumnInfo(name = "is_disc_primary")
     val isDiscPrimary: Boolean = false,
 
-    // TV format / region detected from the disc image content at scan time (GameRegion enum name,
-    // null when undetected). Drives multi-disc set membership: same-region discs unify, genuinely
-    // conflicting regions split.
     @ColumnInfo(name = "region")
     val region: String? = null,
 
@@ -82,7 +69,6 @@ data class GameEntity(
     @ColumnInfo(name = "icon_uri")
     val iconUri: String? = null,
 
-    // Icon-display-mode artwork (BOX_ART / PHYSICAL_MEDIA / BOX_3D) — alternative XMB tiles.
     @ColumnInfo(name = "box_art_uri")
     val boxArtUri: String? = null,
 
@@ -92,7 +78,6 @@ data class GameEntity(
     @ColumnInfo(name = "box3d_uri")
     val box3dUri: String? = null,
 
-    // Per-game IconDisplayMode override (enum name); null follows the global setting.
     @ColumnInfo(name = "icon_display_mode")
     val iconDisplayMode: String? = null,
 
@@ -105,9 +90,6 @@ data class GameEntity(
 
     val genre: String?,
 
-    // ScreenScraper metadata captured for Game Detail / filters — never drawn on the XMB.
-    // players is SS's free-form count ("1-2"); age_rating is "PEGI 12" / "ESRB Teen" style;
-    // community_rating normalized to 0..1 (SS note is /20); release_date is ISO yyyy-MM-dd.
     val players: String? = null,
 
     @ColumnInfo(name = "age_rating")
@@ -124,38 +106,18 @@ data class GameEntity(
     @ColumnInfo(name = "steam_grid_db_id")
     val steamGridDbId: Long?,
 
-    // Scraper database ids, persisted so re-scrapes can fetch by id (no re-matching) and so a
-    // portable artwork library can reconnect by id after a device migration.
     @ColumnInfo(name = "ss_id")
     val ssId: Long? = null,
 
-    /**
-     * RETIRED. TheGamesDB was removed as a provider; nothing reads or writes this any more.
-     *
-     * The column stays because dropping one is not free here: minSdk is 29, whose SQLite has no
-     * `ALTER TABLE ... DROP COLUMN`, so the only portable way out is to rebuild the whole `games`
-     * table and its indices in a migration. That is real risk against no gain — the column is
-     * NULL on every one of the owner's 148 rows, and it was NULL on every row anywhere the moment
-     * the provider stopped writing it. Room needs the field declared to match the schema, so it
-     * is declared and documented rather than quietly left looking live.
-     *
-     * Delete it if the games table is ever rebuilt for another reason.
-     */
     @ColumnInfo(name = "tgdb_id")
     val tgdbId: Long? = null,
 
     @ColumnInfo(name = "igdb_id")
     val igdbId: Long? = null,
 
-    // Streamed CRC-32 of the ROM payload (zip-inner for zipped cartridge ROMs), uppercase hex.
-    // Computed opportunistically during ScreenScraper lookups; doubles as portable-identity
-    // evidence. Null when the ROM is missing, too large to hash, or hasn't been scraped yet.
     @ColumnInfo(name = "rom_crc32")
     val romCrc32: String? = null,
 
-    // Stable portable-artwork identity (rom/{platform}/{slug}, app/{pkg}, …), minted lazily by
-    // ArtworkKeyFactory on first artwork save/import. Joins the volatile Room id to the
-    // user-owned artwork folder so a fresh install can reconnect artwork by key.
     @ColumnInfo(name = "artwork_key")
     val artworkKey: String? = null,
 
@@ -171,31 +133,9 @@ data class GameEntity(
     @ColumnInfo(name = "last_played_at")
     val lastPlayedAt: Long? = null,
 
-    /**
-     * When this entry first entered the library, as a wall-clock instant.
-     *
-     * Three values with three meanings, and the difference matters because a "recently added"
-     * view is a lie if it cannot tell them apart:
-     *
-     *  - **null** — inserted and not yet stamped. Transient, inside one upsert.
-     *  - **0** — already here when the column arrived (migration 51 to 52). Unknowable, and
-     *    deliberately NOT recent. Every row of an existing library starts here.
-     *  - **> 0** — the instant the row was first written.
-     *
-     * NOT derived from the id. Rows are inserted in scan order and the upsert keys on the primary
-     * key, so id order is a fair proxy right up until a platform is deleted and re-added — which
-     * is exactly the moment someone would look at a recently-added list.
-     */
     @ColumnInfo(name = "date_added")
     val dateAdded: Long? = null,
 
-    /**
-     * Playing / Completed / Backlog, as the [com.psplauncher.core.domain.model.PlayState] name.
-     *
-     * Null is unmarked and is the default; it is NOT "backlog". Set by hand from the game's own
-     * menu, never inferred from play time — see the enum for why every inference is wrong
-     * somewhere obvious.
-     */
     @ColumnInfo(name = "play_state")
     val playState: String? = null,
 
@@ -208,37 +148,24 @@ data class GameEntity(
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
 
-    // Title resolved from a metadata scrape — updated by the scraper, never by ROM scanning.
     @ColumnInfo(name = "scraped_title")
     val scrapedTitle: String? = null,
 
-    // User-set display name override — preserved across re-scrapes unless explicitly cleared.
     @ColumnInfo(name = "user_title_override")
     val userTitleOverride: String? = null,
 
-    // Content classification (GAME / ANDROID_APP / VIDEO_APP / …). Only GAME rows aggregate
-    // into "All Games". Stored as the enum name; defaults to GAME for legacy/console rows.
     @ColumnInfo(name = "content_type")
     val contentType: String = GameContentType.GAME.name,
 
-    // Host app's launcher-shortcut id for harvested per-game entries (GameHub PCs, etc.).
-    // Null for ordinary apps and ROM games. Launched via LauncherApps.startShortcut.
     @ColumnInfo(name = "launch_shortcut_id")
     val launchShortcutId: String? = null,
 
-    // Captured legacy INSTALL_SHORTCUT launch intent (Intent.toUri), for BannerHub / old Winlator.
     @ColumnInfo(name = "launch_intent_uri")
     val launchIntentUri: String? = null,
 
-    // Per-game launch token for ID-launch emulators (e.g. Vita3K installed Title ID). Resolves
-    // {title_id} in the emulator profile; null for ordinary ROM/app games.
     @ColumnInfo(name = "launch_token")
     val launchToken: String? = null,
 
-    // Windows storefront identity (C16 phase 0) — the store an imported PC game came from
-    // (STEAM/EPIC/GOG/AMAZON/CUSTOM_GAME) and its id on that store. Captured at import and
-    // backfilled from launch_intent_uri in v43. Always used as a PAIR: an app id is unique
-    // within its store, never across stores.
     val storefront: String? = null,
 
     @ColumnInfo(name = "storefront_game_id")

@@ -9,22 +9,13 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * What the bottom bar claims the buttons will do.
- *
- * The bar's whole job is to be true. A prompt naming an action the press does not perform is worse
- * than no prompt at all — it is the app teaching someone the wrong thing about their own
- * controller — and every branch here is one such claim.
- */
 class HintPromptsTest {
-
     private fun state(
         items: List<XMBItem> = listOf(XMBItem(id = "g", title = "All Games", type = XMBItemType.ALL_GAMES)),
         selected: Int = 0,
         directLaunch: Boolean = true,
         menu: XMBContextMenu? = null,
-        // Drilled in, expressed the way the state actually is: selectedPlatformId set is one of
-        // the rungs drillOutStep reads. isInSubItem is derived, not stored, so it cannot be set.
+
         drilled: String? = null,
     ) = XMBUiState(
         categories = listOf(
@@ -42,8 +33,6 @@ class HintPromptsTest {
 
     @Test
     fun `the primary names what it acts on`() {
-        // The design's own line: "The primary action names what it acts on". Losing the target is
-        // what makes a bar read as a legend rather than as a sentence about this row.
         val p = promptsFor(state()).primary
         assertEquals("Open", p?.verb)
         assertEquals("All Games", p?.target)
@@ -70,8 +59,6 @@ class HintPromptsTest {
 
     @Test
     fun `an empty column promises nothing`() {
-        // The placeholder every column falls back to when it has nothing in it. "Open Nothing here
-        // yet" is the bar naming a press that does nothing, which is the one thing it is for.
         val empty = listOf(XMBItem(id = "e", title = "Nothing here yet", type = XMBItemType.EMPTY))
         assertNull(promptsFor(state(items = empty)).primary)
     }
@@ -84,8 +71,6 @@ class HintPromptsTest {
 
     @Test
     fun `the rail owns the bar while it is open`() {
-        // Confirm runs the focused rail row and back closes the rail — and the right side is empty
-        // because everything it would offer is already IN the rail.
         val menu = XMBContextMenu(
             title = "Crisis Core",
             items = listOf(
@@ -109,8 +94,6 @@ class HintPromptsTest {
 
     @Test
     fun `Sort and Filter are one button and never both`() {
-        // They are the same press doing two jobs. Both at once would be the bar promising X does
-        // two different things to the same list.
         val right = promptsFor(state()).right.map { it.verb }
         assertTrue("Sort and Filter both offered: $right", right.count { it == "Sort" || it == "Filter" } <= 1)
     }

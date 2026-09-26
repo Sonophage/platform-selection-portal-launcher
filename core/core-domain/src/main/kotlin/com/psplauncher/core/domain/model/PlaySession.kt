@@ -4,8 +4,8 @@ data class PlaySession(
     val id: Long = 0,
     val gameId: Long,
     val platformId: String,
-    val launchedAt: Long,               // epoch millis
-    val durationMillis: Long = 0,       // 0 if not tracked
+    val launchedAt: Long,
+    val durationMillis: Long = 0,
 )
 
 data class RecentPlatform(

@@ -8,15 +8,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PlaySessionDao {
-
     @Insert
     suspend fun insert(session: PlaySessionEntity): Long
 
     @Query("SELECT * FROM play_sessions WHERE game_id = :gameId ORDER BY launched_at DESC")
     fun observeForGame(gameId: Long): Flow<List<PlaySessionEntity>>
 
-    // Distinct platforms that have sessions, ordered by most recently played
-    // Used to drive Recently Played → per-platform list
     @Query("""
         SELECT platform_id
         FROM play_sessions
@@ -25,7 +22,6 @@ interface PlaySessionDao {
     """)
     fun observeRecentPlatformIds(): Flow<List<String>>
 
-    // Most recent session per platform — for the Recently Played platform row subtitle
     @Query("""
         SELECT MAX(launched_at)
         FROM play_sessions
@@ -33,7 +29,6 @@ interface PlaySessionDao {
     """)
     suspend fun getLastPlayedAt(platformId: String): Long?
 
-    // Games played on a platform, most recent first, capped for the drill-down view
     @Query("""
         SELECT DISTINCT game_id
         FROM play_sessions
@@ -55,7 +50,6 @@ interface PlaySessionDao {
     @Query("DELETE FROM play_sessions WHERE game_id = :gameId")
     suspend fun deleteForGame(gameId: Long)
 
-    // Prune oldest sessions when library exceeds the user's configured cap
     @Query("""
         DELETE FROM play_sessions
         WHERE id NOT IN (

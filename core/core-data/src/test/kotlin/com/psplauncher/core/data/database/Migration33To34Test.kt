@@ -8,11 +8,9 @@ import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Validates the additive v34 Steam-import tables against the exported schemas. */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration33To34Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 

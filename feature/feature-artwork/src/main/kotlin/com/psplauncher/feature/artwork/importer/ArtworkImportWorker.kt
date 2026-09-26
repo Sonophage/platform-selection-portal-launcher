@@ -17,21 +17,12 @@ import timber.log.Timber
 import java.io.File
 import java.util.UUID
 
-/**
- * Runs an approved import plan in the background — survives leaving the settings screen, shows
- * progress as a system notification, and remains cancellable via WorkManager.
- *
- * The plan rides as a JSON file in the app-private plans directory (WorkManager's Data payload
- * is ~10 KB; plans are megabytes). The worker only ever reads plans from that directory — a
- * hostile path in input data cannot make it read anything else.
- */
 @HiltWorker
 class ArtworkImportWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
     private val executor: ArtworkImportExecutor,
 ) : CoroutineWorker(appContext, params) {
-
     override suspend fun doWork(): Result {
         val notifier = BackgroundTaskNotifier(applicationContext)
         val planFile = resolvePlanFile(applicationContext, inputData.getString(KEY_PLAN_FILE_NAME))
@@ -48,7 +39,7 @@ class ArtworkImportWorker @AssistedInject constructor(
 
         return try {
             val summary = executor.execute(plan, transfer) { progress ->
-                // Throttle: a 50k-item run must not post 50k notifications/progress updates.
+
                 if (progress.done - lastShown >= PROGRESS_STRIDE || progress.done == progress.total) {
                     lastShown = progress.done
                     notifier.running(TASK_ID, label, progress.done.toFloat() / progress.total.coerceAtLeast(1))
@@ -94,7 +85,6 @@ class ArtworkImportWorker @AssistedInject constructor(
 
         private const val PLANS_DIR = "import_plans"
 
-        // File-NAME-only contract: the worker refuses anything that resolves outside plansDir.
         private fun resolvePlanFile(context: Context, name: String?): File? {
             if (name.isNullOrBlank()) return null
             val dir = File(context.filesDir, PLANS_DIR)
@@ -103,14 +93,13 @@ class ArtworkImportWorker @AssistedInject constructor(
             return if (safe && file.isFile) file else null
         }
 
-        /** Persists [plan] and enqueues the import. Replaces any not-yet-finished import run. */
         fun enqueue(
             context: Context,
             plan: ImportPlan,
             transfer: PortableArtworkLibrary.Transfer,
         ): UUID {
             val dir = File(context.filesDir, PLANS_DIR).apply { mkdirs() }
-            // Stale plan files from crashed runs are cleared on the next enqueue.
+
             dir.listFiles()?.forEach { it.delete() }
             val file = File(dir, "plan-${System.currentTimeMillis()}.json")
             file.writeText(ImportPlan.encode(plan))

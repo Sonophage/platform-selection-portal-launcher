@@ -26,7 +26,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ControllerSettingsViewModelTest {
-
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var mappingRepository: ControllerMappingRepository
     private lateinit var layoutRepository: ControllerLayoutRepository
@@ -45,8 +44,6 @@ class ControllerSettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    // uiState is a WhileSubscribed StateFlow and the cycle* methods read uiState.value, so it must be
-    // collected before it reflects the repository prefs — mirror the UI by keeping a live collector.
     private fun TestScope.buildActive(): ControllerSettingsViewModel {
         val vm = ControllerSettingsViewModel(mappingRepository, layoutRepository)
         backgroundScope.launch { vm.uiState.collect { } }
@@ -80,9 +77,6 @@ class ControllerSettingsViewModelTest {
 
     @Test
     fun `setConfirmBackLayout persists a value that is already current`() = runTest(testDispatcher) {
-        // Picking the ticked option is a normal thing to do in a picker, and it must reach the
-        // repository like any other pick rather than being quietly dropped as a no-op: these
-        // setters no longer read the current value at all, and this is what pins that.
         coEvery { layoutRepository.prefs } returns flowOf(
             ControllerLayoutPrefs(confirmBackLayout = ConfirmBackLayout.REVERSED)
         )
@@ -108,9 +102,6 @@ class ControllerSettingsViewModelTest {
 
     @Test
     fun `every controller type can be chosen directly`() = runTest(testDispatcher) {
-        // The picker indexes ControllerDisplayType.entries, so the list it offers and the values
-        // it can set are the same list. Cycling used to define that order; the enum defines it
-        // now, and every entry has to be reachable or a picker row would offer a dead option.
         viewModel = buildActive()
         advanceUntilIdle()
 

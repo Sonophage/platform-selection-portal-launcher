@@ -36,39 +36,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Behaviour of the user's per-slot UI-media storage: `filesDir/ui-media/<slotKey>.<ext>` is the
- * source of truth, staged import commits only on a passing gate, and a failing import leaves the
- * previous assignment intact (the design doc's "failed replacement rule").
- *
- * MediaMetadataRetriever is mocked (Robolectric's real one can't decode the synthetic bytes the
- * tests register), so each case pins exactly the probe values it wants the gate to see. A null
- * duration read no longer means rejection by itself: the gate falls back to
- * [MediaDurationFallback]'s container-header math, so the tests that exercise that path register
- * real WAV/MP3 bytes and assert the computed length is what the gate sees.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class UiMediaStoreTest {
-
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     private lateinit var store: UiMediaStore
 
     @Before
     fun setUp() {
-        // The prefs DataStore and the media dir persist within the test JVM; wipe both so each
-        // case starts empty.
         runBlocking { context.pfpDataStore.edit { it.clear() } }
         File(context.filesDir, UiMediaStore.UI_MEDIA_DIR).deleteRecursively()
         MediaDisplayNames.clearCache()
         mockkStatic(MediaMetadataRetriever::class)
-        // Robolectric's ShadowContentResolver.getType returns null for URIs with no registered
-        // provider, and its query() consults no cursor — the store's import path would reject
-        // every pick as "Unsupported format" and every display name would fall back to
-        // "Custom sound". Stub both to mimic a real SAF provider: MIME derived from the pick's
-        // extension, and a DISPLAY_NAME cursor for content://test picks (the fallback case uses
-        // a different authority precisely to see the null-query path).
+
         mockkObject(context.contentResolver)
         every { context.contentResolver.getType(any()) } answers {
             when (firstArg<Uri>().lastPathSegment?.substringAfterLast('.', missingDelimiterValue = "")) {
@@ -97,7 +78,6 @@ class UiMediaStoreTest {
         unmockkAll()
     }
 
-    /** Makes every MediaMetadataRetriever created in this test report [durationMs] and [mime]. */
     private fun probeReturns(durationMs: Long?, mime: String = "audio/mpeg") {
         val retriever = mockk<MediaMetadataRetriever>(relaxed = true)
         every { retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION) }
@@ -111,8 +91,6 @@ class UiMediaStoreTest {
         every { anyConstructed<MediaMetadataRetriever>().extractMetadata(any()) } answers { retriever.extractMetadata(firstArg()) }
         every { anyConstructed<MediaMetadataRetriever>().release() } returns Unit
     }
-
-    // ── import ────────────────────────────────────────────────────────────────
 
     @Test
     fun `import writes a slot-keyed file and bumps the stamp`() = runTest {
@@ -129,8 +107,6 @@ class UiMediaStoreTest {
         probeReturns(100L)
         assertTrue(store.import(UiMediaSlot.SOUND_SCROLL, register(wavBytes())).ok)
 
-        // Second pick is over the 0.5 s Navigation cap: it must be refused AND the first file
-        // must still be on disk, still resolvable through pathFor.
         probeReturns(900L)
         val result = store.import(UiMediaSlot.SOUND_SCROLL, register(wavBytes()))
 
@@ -142,8 +118,7 @@ class UiMediaStoreTest {
     @Test
     fun `an unreadable duration is rejected and leaves nothing behind`() = runTest {
         probeReturns(null)
-        // Bytes with no container headers at all: neither the extractor nor the fallback can
-        // time it, so the gate must refuse it.
+
         val garbage = ByteArray(256) { it.toByte() }
         val result = store.import(UiMediaSlot.SOUND_BACK, register(garbage, name = "junk.mp3"))
 
@@ -154,7 +129,6 @@ class UiMediaStoreTest {
 
     @Test
     fun `a null MMR duration falls back to the WAV header and passes`() = runTest {
-        // Some devices return no METADATA_KEY_DURATION for WAVs; the RIFF header still times it.
         probeReturns(null, mime = "audio/wav")
         val result = store.import(UiMediaSlot.SOUND_BACK, register(wavBytes()))
 
@@ -164,9 +138,6 @@ class UiMediaStoreTest {
 
     @Test
     fun `a null MMR duration falls back to the Xing table and passes for a tiny VBR clip`() = runTest {
-        // The on-device failure this fixes: a 3-frame ffmpeg-native VBR mp3 whose duration this
-        // device's extractor returns as null — the 78 ms clip must still pass the 0.5 s
-        // Navigation cap via the Xing frame count.
         probeReturns(null)
         val cursor = xingVbrMp3(frames = 3)
         val result = store.import(UiMediaSlot.SOUND_SCROLL, register(cursor, name = "snd_cursor.mp3"))
@@ -178,15 +149,7 @@ class UiMediaStoreTest {
     @Test
     fun `oversized pick is rejected off the descriptor without transferring a byte`() = runTest {
         probeReturns(100L)
-        // This case used to push 3 MB against a 2 MB sound cap. That cap is gone: the AUDIO
-        // policy (owner decision 2026-09-08, UiMediaLimits KDoc) is no user-facing byte limit,
-        // and every audio spec's maxBytes is now AUDIO_STAGE_MAX_BYTES — a 128 MB anti-DoS
-        // staging ceiling. A few spare megabytes are simply a legal pick now, so "oversized"
-        // has to be provoked at the gate that still enforces it.
-        //
-        // That gate is the SAF descriptor pre-check, and faking the length is the honest way to
-        // test it: its whole contract is that an oversized pick costs zero transferred bytes, so
-        // a test that actually allocated 128 MB would be testing the opposite of the claim.
+
         every { context.contentResolver.openAssetFileDescriptor(any(), any()) } returns
             mockk<AssetFileDescriptor>(relaxed = true) {
                 every { length } returns UiMediaLimits.AUDIO_STAGE_MAX_BYTES + 1
@@ -202,8 +165,6 @@ class UiMediaStoreTest {
 
     @Test
     fun `unsupported mime is rejected before any copy`() = runTest {
-        // A video picked for a sound row: the resolver reports video/mp4 and the probed copy
-        // does too — the gate must refuse it for the SOUND slot before anything is committed.
         probeReturns(100L, mime = "video/mp4")
         val result = store.import(UiMediaSlot.SOUND_SCROLL, register(wavBytes(), name = "clip.mp4"))
 
@@ -216,15 +177,12 @@ class UiMediaStoreTest {
         probeReturns(100L)
         store.import(UiMediaSlot.SOUND_BACK, register(wavBytes()))
 
-        // A slot holds ONE file: a new pick under a different container must remove the old one.
         val result = store.import(UiMediaSlot.SOUND_BACK, register(wavBytes(), name = "sel.mp3"))
 
         assertTrue(result.ok, result.message ?: "import rejected")
         assertTrue(File(mediaDir(), "${UiMediaSlot.SOUND_BACK.key}.mp3").isFile)
         assertFalse(wavFile(UiMediaSlot.SOUND_BACK).isFile, "the old-extension file must be removed")
     }
-
-    // ── pathFor / assignments ─────────────────────────────────────────────────
 
     @Test
     fun `pathFor resolves the stored file and null when unset`() = runTest {
@@ -240,29 +198,18 @@ class UiMediaStoreTest {
     fun `assignments lists only assigned slots of stored extensions`() = runTest {
         probeReturns(100L)
         store.import(UiMediaSlot.SOUND_SCROLL, register(wavBytes()))
-        // A video pick must probe as a video — the retriever's MIME is the gate's authority.
+
         probeReturns(100L, mime = "video/mp4")
         store.import(UiMediaSlot.BOOT_VIDEO, register(wavBytes(), name = "boot.mp4"))
-        // Hostile/foreign files that could only arrive outside the store's own writes.
+
         File(mediaDir(), "not_a_slot.wav").writeBytes(wavBytes())
 
         val assignments = store.assignments()
         assertEquals(setOf(UiMediaSlot.SOUND_SCROLL, UiMediaSlot.BOOT_VIDEO), assignments.keys)
     }
 
-    // ── clear / clearAll ──────────────────────────────────────────────────────
-
     @Test
     fun `every bump moves the stamp, even when the clock has not`() = runTest {
-        // The contract on ui_media_stamp is that observers reload on every import and clear, and
-        // an observer only reloads when the VALUE changes. A bare System.currentTimeMillis() write
-        // does not deliver that: two writes inside one millisecond store the same number, the flow
-        // never emits, and the reload silently does not happen. It also made this class's own
-        // "clear bumps the stamp" test fail roughly one run in three.
-        //
-        // The clock is seeded a minute ahead so the collision is exercised on purpose rather than
-        // hoped for: real time cannot reach the seeded value during the test, so every bump below
-        // has to come from the previous-plus-one floor.
         val ahead = System.currentTimeMillis() + 60_000
         context.pfpDataStore.edit { it[longPreferencesKey("ui_media_stamp")] = ahead }
 
@@ -296,13 +243,6 @@ class UiMediaStoreTest {
         assertFalse(store.clear(UiMediaSlot.SOUND_BACK))
     }
 
-    /**
-     * clearAll(SOUND) clears the six menu-sound rows and nothing else. Boot Sound is the Sound
-     * screen's SEVENTH row and IS cleared by that screen's reset — but by the ViewModel, not by
-     * the store: BOOT_AUDIO is AUDIO_TRACK kind, so clearAll(SOUND) structurally cannot see it
-     * (see AudioSettingsViewModel.confirmReset and its test). Videos are never touched either —
-     * the Phase 2c rule from docs/plans/README.md (C10).
-     */
     @Test
     fun `clearAll of SOUND clears the six sound rows and never touches boot or gameboot media`() = runTest {
         probeReturns(100L)
@@ -322,24 +262,15 @@ class UiMediaStoreTest {
         assertNotNull(store.pathFor(UiMediaSlot.GAMEBOOT_VIDEO), "reset audio must never touch GameBoot media")
     }
 
-    // ── pruneOrphans ─────────────────────────────────────────────────────────
-
-    /**
-     * Slots removed from the enum leave files (and display-name prefs) behind on user installs,
-     * and a restored OLD backup re-creates them — pruneOrphans sweeps anything that is not a
-     * live slot key, including a crashed import's staging file.
-     */
     @Test
     fun `pruneOrphans removes files that are not slot keys and keeps the real ones`() = runTest {
         mediaDir().mkdirs()
-        // The pre-merge spelling, which is still not a slot — `sound_system_browse` is.
+
         File(mediaDir(), "sound_systembrowse.ogg").writeBytes(wavBytes())
         File(mediaDir(), "not_a_slot.wav").writeBytes(wavBytes())
         File(mediaDir(), "staging_1725700000000.wav").writeBytes(wavBytes())
         File(mediaDir(), "${UiMediaSlot.SOUND_SCROLL.key}.wav").writeBytes(wavBytes())
-        // Both halves of the sound split, which ARE live keys now. This fixture used to store
-        // sound_select as an example orphan; if the three movement events are ever merged back
-        // into one slot, these two lines fail and say so.
+
         File(mediaDir(), "${UiMediaSlot.SOUND_SELECT.key}.wav").writeBytes(wavBytes())
         File(mediaDir(), "${UiMediaSlot.SOUND_SYSTEM_BROWSE.key}.wav").writeBytes(wavBytes())
 
@@ -388,8 +319,6 @@ class UiMediaStoreTest {
         assertTrue(stampPref()!! > 0L, "observers must reload after a prune")
     }
 
-    // ── path-escape guard ─────────────────────────────────────────────────────
-
     @Test
     fun `isValidKey keeps crafted keys from escaping the directory`() {
         for (key in listOf("../evil", "boot_video/../../x", "", ".hidden")) {
@@ -402,8 +331,6 @@ class UiMediaStoreTest {
             assertTrue(UiMediaSlot.isValidKey(slot.key))
         }
     }
-
-    // ── display names ─────────────────────────────────────────────────────────
 
     @Test
     fun `recordDisplayName stores the provider name and falls back when it reports none`() = runTest {
@@ -426,12 +353,6 @@ class UiMediaStoreTest {
         )
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
-
-    /**
-     * Minimal well-formed PCM RIFF/WAVE (44.1 kHz mono 16-bit) + payload — the gate probes
-     * metadata only, but the header must be honest so the duration fallback can time it.
-     */
     private fun wavBytes(): ByteArray {
         val data = ByteArray(2048)
         val out = java.io.ByteArrayOutputStream()
@@ -440,36 +361,32 @@ class UiMediaStoreTest {
         out.write("WAVE".toByteArray())
         out.write("fmt ".toByteArray())
         writeIntLe(out, 16)
-        writeShortLe(out, 1) // PCM
-        writeShortLe(out, 1) // mono
+        writeShortLe(out, 1)
+        writeShortLe(out, 1)
         writeIntLe(out, 44_100)
-        writeIntLe(out, 88_200) // byte rate
-        writeShortLe(out, 2) // block align
-        writeShortLe(out, 16) // bits per sample
+        writeIntLe(out, 88_200)
+        writeShortLe(out, 2)
+        writeShortLe(out, 16)
         out.write("data".toByteArray())
         writeIntLe(out, data.size)
         out.write(data)
         return out.toByteArray()
     }
 
-    /**
-     * A 45-byte ID3v2.4 tag + one MPEG1 Layer III frame carrying a Xing table declaring
-     * [frames] — the shape of the device's tiny ffmpeg-native clips that MMR cannot time.
-     */
     private fun xingVbrMp3(frames: Int): ByteArray {
         val out = java.io.ByteArrayOutputStream()
         out.write(byteArrayOf('I'.code.toByte(), 'D'.code.toByte(), '3'.code.toByte(), 4, 0, 0, 0, 0, 0, 0x23))
         out.write(ByteArray(35))
         out.write(0xFF)
-        out.write(0xFB) // MPEG1, Layer III, no CRC
-        out.write(0x50) // bitrate idx 5, 44100 Hz
-        out.write(0x00) // stereo
-        out.write(ByteArray(32)) // MPEG1 stereo side info
+        out.write(0xFB)
+        out.write(0x50)
+        out.write(0x00)
+        out.write(ByteArray(32))
         out.write("Xing".toByteArray())
         out.write(byteArrayOf(0, 0, 0, 0x0F))
         out.write(byteArrayOf(0, 0, 0, frames.toByte()))
         out.write(ByteArray(8))
-        out.write(ByteArray(700)) // a few audio frames' worth of junk
+        out.write(ByteArray(700))
         return out.toByteArray()
     }
 

@@ -15,8 +15,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// ── Response models ───────────────────────────────────────────────────────────
-
 @Serializable
 data class SgdbSearchResponse(
     val success: Boolean,
@@ -47,15 +45,12 @@ data class SgdbArtItem(
     val style: String? = null,
 )
 
-// Art types the SteamGridDB API supports
 enum class SgdbArtType(val endpoint: String) {
-    GRID("grids"),      // 600×900 portrait grid — primary game card art
-    HERO("heroes"),     // wide banner art — game details hero
-    LOGO("logos"),      // transparent logo art
-    ICON("icons"),      // square icon
+    GRID("grids"),
+    HERO("heroes"),
+    LOGO("logos"),
+    ICON("icons"),
 }
-
-// ── API client ────────────────────────────────────────────────────────────────
 
 private const val BASE_URL = "https://www.steamgriddb.com/api/v2"
 
@@ -64,12 +59,6 @@ class SteamGridDbApi @Inject constructor(
     private val httpClient: HttpClient,
     private val apiKeyProvider: SgdbApiKeyProvider,
 ) {
-    /**
-     * The Steam App ID SteamGridDB has on file for one of its games, or null. Uses the
-     * `platformdata=steam` option on `/games/id/{id}` and reads `external_platform_data.steam[].id`.
-     * SGDB warns this data may be stale/inaccurate, so callers treat it as a hint. Parsed
-     * tolerantly (raw JSON navigation) so a shape change degrades to null rather than throwing.
-     */
     suspend fun getSteamAppId(gameId: Long): String? {
         val key = apiKeyProvider.getKey() ?: return null
         return runCatching {
@@ -87,14 +76,6 @@ class SteamGridDbApi @Inject constructor(
         }.getOrNull()
     }
 
-    /**
-     * The SteamGridDB game for a Steam App ID, or null when SGDB does not know it.
-     *
-     * The direct `/games/steam/{appid}` lookup — identity evidence rather than a title guess, and
-     * the reason a Windows game's captured storefront pair (C16 phase 0) can resolve a match at
-     * Tier 2 instead of falling through to a title search. Only ever called with the Steam half of
-     * a (storefront, id) pair: an app id means nothing outside its own store.
-     */
     suspend fun getGameBySteamAppId(appId: String): SgdbGame? {
         val key = apiKeyProvider.getKey() ?: return null
         if (appId.isBlank() || !appId.all(Char::isDigit)) return null
@@ -109,7 +90,6 @@ class SteamGridDbApi @Inject constructor(
         }.onFailure { Timber.d(it, "SGDB steam appid lookup failed for %s", appId) }.getOrNull()
     }
 
-    // Search for a game by name — returns best matches
     suspend fun searchGame(name: String): Result<List<SgdbGame>> = runCatching {
         val key = apiKeyProvider.getKey()
             ?: error("SteamGridDB API key not configured")
@@ -122,13 +102,12 @@ class SteamGridDbApi @Inject constructor(
         response.data.also { Timber.d("SGDB search '$name' → ${it.size} results") }
     }
 
-    // Fetch art of a given type for a known game ID
     suspend fun getArt(
         gameId: Long,
         type: SgdbArtType,
         styles: List<String> = emptyList(),
         dimensions: List<String> = emptyList(),
-        // SGDB filters adult-tagged art out by default; true includes it (web parity toggle).
+
         includeNsfw: Boolean = false,
     ): Result<List<SgdbArtItem>> = runCatching {
         val key = apiKeyProvider.getKey()
@@ -145,15 +124,12 @@ class SteamGridDbApi @Inject constructor(
         response.data.also { Timber.d("SGDB ${type.name} for $gameId → ${it.size} results") }
     }
 
-    // "Steam Horizontal" grids — landscape capsule art (460×215 / 920×430), ideal for the
-    // 144:80 game icon tile.
     suspend fun getBestHorizontalGridUrl(gameId: Long): String? =
         getArt(gameId, SgdbArtType.GRID, dimensions = listOf("920x430", "460x215"))
             .getOrNull()
             ?.firstOrNull()
             ?.url
 
-    // Convenience — fetch best grid art URL for a game
     suspend fun getBestGridUrl(gameId: Long): String? =
         getArt(gameId, SgdbArtType.GRID)
             .getOrNull()

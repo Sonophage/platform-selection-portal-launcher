@@ -48,11 +48,6 @@ private val Primary    = Color.White
 private val Secondary  = Color(0xFFC9C7E8)
 private val Accent      = Color(0xFF4A9EFF)
 
-/**
- * Full-screen "Now Playing" view. Stateless: it renders [state] and forwards control intents.
- * Controller input is handled in the ViewModel (this screen also accepts touch). Y opens the
- * options menu (Play in Background) via the standard context-menu overlay.
- */
 @Composable
 fun MusicPlayerScreen(
     state: MusicPlaybackState,
@@ -62,21 +57,7 @@ fun MusicPlayerScreen(
     onSeekTo: (Int) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    /**
-     * Runs a tapped prompt through the shell's [XMBViewModel.onPromptTapped], the same route the
-     * pad takes.
-     *
-     * This screen had no route at all: its prompt row named five things and answered none of
-     * them, and Options in particular had nowhere else to be reached from — no button on screen,
-     * no gesture. A finger could see the word and could not press it.
-     *
-     * The two range prompts stay legends whatever is passed here: a prompt naming LEFT and RIGHT
-     * together has no single action to fire, and PfpHintBar refuses to guess one.
-     *
-     * After [modifier], not before it: Compose's convention is that the modifier is the first
-     * optional parameter, and lint says so. Putting this above it was a new warning in a build
-     * that had none.
-     */
+
     onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     val track = state.track
@@ -84,7 +65,7 @@ fun MusicPlayerScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Backdrop)
-            // Tap the dim area outside the controls to go back.
+
             .clickable(onClick = onBack),
         contentAlignment = Alignment.Center,
     ) {
@@ -94,7 +75,6 @@ fun MusicPlayerScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Album art when the track had embedded artwork; otherwise a framed music glyph.
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.5f)
@@ -135,7 +115,6 @@ fun MusicPlayerScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // Seek bar + times.
             val duration = state.durationMs.coerceAtLeast(0)
             Slider(
                 value = state.positionMs.coerceIn(0, duration).toFloat(),
@@ -153,7 +132,6 @@ fun MusicPlayerScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Transport controls (touch); the prompt bar below names the controller equivalents.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                 TransportButton(Icons.Filled.SkipPrevious, "Previous", 40.dp, onPrev)
                 TransportButton(
@@ -165,8 +143,7 @@ fun MusicPlayerScreen(
             }
 
             Spacer(Modifier.height(20.dp))
-            // Every binding the player actually honours (XMBViewModel's musicPlayerVisible
-            // branch), not just the two the old hint listed.
+
             PfpHintBar(
                 items = listOf(
                     ControllerPromptItem(GamepadAction.SELECT, "Play / Pause"),
@@ -200,6 +177,3 @@ private fun TransportButton(icon: ImageVector, desc: String, size: androidx.comp
     }
 }
 
-// Deleted: a local formatTime with no hour branch, so a 72-minute track read "72:14" and an
-// audiobook chapter read "184:07". LibraryRowText.formatDuration already handles hours and is
-// what every library row uses, so the player now agrees with the list it was launched from.

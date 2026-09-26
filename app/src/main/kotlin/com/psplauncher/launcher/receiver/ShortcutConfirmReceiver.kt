@@ -20,14 +20,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-/**
- * Handles the user's decision on a captured shortcut (the Add / Ignore actions from
- * [InstallShortcutReceiver]'s notification). It is declared `exported="false"` and has no
- * intent-filter, so it can only be triggered by PFP's own PendingIntents — the sending app cannot
- * forge a confirmation. Only on [ACTION_CONFIRM] is the library entry actually created.
- */
 class ShortcutConfirmReceiver : BroadcastReceiver() {
-
     @EntryPoint
     @InstallIn(SingletonComponent::class)
     interface Deps {
@@ -42,7 +35,7 @@ class ShortcutConfirmReceiver : BroadcastReceiver() {
         val notifId = intent.getIntExtra(EXTRA_NOTIF_ID, 0)
         context.getSystemService(NotificationManager::class.java)?.cancel(notifId)
 
-        if (intent.action != ACTION_CONFIRM) return // ACTION_DISMISS: notification already cancelled
+        if (intent.action != ACTION_CONFIRM) return
 
         val name = intent.getStringExtra(EXTRA_NAME) ?: return
         val intentUri = intent.getStringExtra(EXTRA_INTENT_URI) ?: return
@@ -58,9 +51,6 @@ class ShortcutConfirmReceiver : BroadcastReceiver() {
         val pending = goAsync()
         scope.launch {
             try {
-                // A confirmed shortcut from a verified PC launcher is a Windows game
-                // (docs/windows-library-refactor-plan.md section 3); anything else keeps the
-                // app-style collection entry.
                 if (importer.isPcLauncher(hostPackage)) {
                     val result = importer.importLegacyShortcut(hostPackage!!, name, intentUri)
                     if (result.needsSetup) {

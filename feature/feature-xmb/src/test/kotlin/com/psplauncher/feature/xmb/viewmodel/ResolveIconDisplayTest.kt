@@ -8,7 +8,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ResolveIconDisplayTest {
-
     private val fullArt = XMBItem(
         id = "1", title = "Game",
         iconUri = "icon", boxArtUri = "box", physicalMediaUri = "cart", box3dUri = "box3d",
@@ -80,7 +79,6 @@ class ResolveIconDisplayTest {
         assertEquals(IconDisplayMode.BOX_ART, psx.mode)
         assertEquals("box", psx.uri)
 
-        // A game on a console with no override of its own keeps following the global setting.
         val snes = resolveIconDisplay(fullArt.copy(platformId = "snes"), IconDisplayMode.ICON0, platformModes)
         assertEquals(IconDisplayMode.ICON0, snes.mode)
         assertEquals("icon", snes.uri)

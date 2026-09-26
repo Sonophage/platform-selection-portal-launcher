@@ -7,25 +7,15 @@ import com.psplauncher.themekit.PfpThemeSource
 import com.psplauncher.themekit.PtfParser
 import java.time.LocalDate
 
-/** Result of converting one `.ptf` file. */
 sealed interface ConvertOutcome {
-    /** [warning] is set when the theme converted but lost something (e.g. its wallpaper). */
     data class Converted(val bundle: PfpThemeBundle, val warning: String? = null) : ConvertOutcome
 
-    /** CXMB flash0 replacement — same magic, different beast; rejected with an explanation. */
     data object Cxmb : ConvertOutcome
 
     data class Failed(val reason: String) : ConvertOutcome
 }
 
-/**
- * The PTF → `.pfptheme` pipeline shared by Open and Batch Convert: parse the official
- * theme, extract the wallpaper, derive the accent from its dominant hue (the PSP stores
- * no usable color of its own), and wrap it all in a bundle with provenance.
- */
 object PtfConversion {
-
-    /** Classic Blue — the launcher's default scheme; used when a wallpaper has no dominant hue. */
     const val DEFAULT_ACCENT = 0xFF0055AA.toInt()
 
     fun convert(
@@ -71,10 +61,8 @@ object PtfConversion {
         )
     }
 
-    /** Packed ARGB → the manifest's `#RRGGBB` (alpha is always opaque in the cascade). */
     fun toHexRgb(argb: Int): String = "#%06X".format(argb and 0xFFFFFF)
 
-    /** `#RRGGBB` (or `#AARRGGBB`) → packed opaque ARGB int, or null when malformed. */
     fun parseHexRgb(hex: String): Int? {
         val digits = hex.removePrefix("#")
         if (digits.length != 6 && digits.length != 8) return null

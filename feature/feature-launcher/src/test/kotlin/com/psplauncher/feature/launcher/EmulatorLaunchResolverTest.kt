@@ -8,14 +8,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Pins the emulator resolution ladder — the load-bearing precedence every game launch and the
- * Game Detail attribution line walk. Do NOT reorder or extend the ladder without re-pinning these:
- *
- *   1. per-game override → 2. memory-card emulator → 3. platform default → 4. first valid.
- */
 class EmulatorLaunchResolverTest {
-
     private fun profile(
         id: String,
         packageName: String = id,
@@ -36,15 +29,12 @@ class EmulatorLaunchResolverTest {
     )
 
     private val duckstation = profile("duckstation", packageName = "com.github.stenzek.duckstation")
-    // A RetroArch entry listed FIRST on purpose: the automatic fallback must never pick it over a
-    // standalone, and platform-default resolution must still honor the configured id.
+
     private val retroarch = profile(
         id = "retroarch",
         packageName = "com.retroarch.aarch64",
         intentType = IntentType.COMPONENT,
     )
-
-    // ── Precedence ─────────────────────────────────────────────────────────
 
     @Test
     fun `per-game override wins over memory card and platform default and reports its source`() {
@@ -78,8 +68,6 @@ class EmulatorLaunchResolverTest {
 
     @Test
     fun `platform default wins even when it is not the first valid emulator`() {
-        // The automatic pick WOULD be retroarch (listed first), but an explicit platform default
-        // must win over the catalog fallback — including when the default is a later entry.
         val resolved = EmulatorLaunchResolver.resolve(
             platformId = "psx",
             installedProfiles = listOf(retroarch, duckstation),
@@ -95,8 +83,6 @@ class EmulatorLaunchResolverTest {
 
     @Test
     fun `clearing an override falls back to the platform default not the catalog pick`() {
-        // A game whose override was just cleared resolves exactly like a game that never had one:
-        // platform default first, and only then the first-valid catalog candidate.
         val resolved = EmulatorLaunchResolver.resolve(
             platformId = "psx",
             installedProfiles = listOf(retroarch, duckstation),
@@ -125,8 +111,6 @@ class EmulatorLaunchResolverTest {
 
     @Test
     fun `catalog fallback prefers a standalone over retroarch through profile order`() {
-        // Mirrors the real caller: platformProfiles come pre-ordered by byLaunchPreference, so a
-        // standalone wins the automatic pick even when RetroArch was detected first.
         val installed = listOf(retroarch, duckstation)
         val resolved = EmulatorLaunchResolver.resolve(
             platformId = "psx",
@@ -144,14 +128,12 @@ class EmulatorLaunchResolverTest {
         val resolved = EmulatorLaunchResolver.resolve(
             platformId = "psx",
             installedProfiles = listOf(uninstalled),
-            platformProfiles = emptyList(),   // caller excludes unavailable profiles up front
+            platformProfiles = emptyList(),
         ).exceptionOrNull()
 
         assertTrue(resolved != null, "An unavailable-only platform must not resolve")
         assertTrue(resolved.message!!.contains("No emulator configured for PSX"))
     }
-
-    // ── Failures ───────────────────────────────────────────────────────────
 
     @Test
     fun `configured emulator that is not installed fails with a usable message`() {
@@ -166,10 +148,6 @@ class EmulatorLaunchResolverTest {
         assertTrue(failure.message!!.contains("per-game override emulator is not installed or available: ghost_emulator"))
     }
 
-    // Regression: availability was filtered only into [platformProfiles], the automatic fallback
-    // pool. A platform default or memory card pointing at an unavailable RetroArch core walked
-    // straight past that filter and launched anyway — the exact black screen the filter existed to
-    // prevent, on the rung that decides most launches.
     @Test
     fun `a configured emulator that is unavailable is refused with an actionable message`() {
         val deadCore = profile(
@@ -196,8 +174,6 @@ class EmulatorLaunchResolverTest {
         )
     }
 
-    // The filter must narrow the pool, not break package-level resolution: a stored package name
-    // should still find a live profile for that package rather than failing on a dead sibling.
     @Test
     fun `a configured package resolves past an unavailable profile to an available one`() {
         val dead = profile(
@@ -248,15 +224,13 @@ class EmulatorLaunchResolverTest {
         assertTrue(failure.message!!.contains("No emulator configured for PSX"))
     }
 
-    // ── Core visibility ────────────────────────────────────────────────────
-
     @Test
     fun `retroarch core path is normalized to the profile package and given a curated label`() {
         val ra = profile(
             id = "retroarch",
             packageName = "com.retroarch",
             intentType = IntentType.COMPONENT,
-            // Core stored under the alias "ps1" while the game's canonical id is "psx".
+
             coreMap = mapOf("ps1" to "/data/data/com.retroarch.aarch64/cores/mednafen_psx_hw_libretro_android.so"),
         )
         val resolved = EmulatorLaunchResolver.resolve(
@@ -293,7 +267,7 @@ class EmulatorLaunchResolverTest {
             id = "retroarch",
             packageName = "com.retroarch.aarch64",
             intentType = IntentType.COMPONENT,
-            // Cores mapped for another system — none for psx.
+
             coreMap = mapOf("snes" to "/data/data/com.retroarch.aarch64/cores/snes9x_libretro_android.so"),
         )
         val resolved = EmulatorLaunchResolver.resolve(
@@ -315,8 +289,6 @@ class EmulatorLaunchResolverTest {
             perGameOverride = "duckstation",
         ).getOrThrow()
 
-        // Reference identity — callers (Game Detail) log and launch the SAME profile the ladder
-        // resolved, so a resolver copy could never silently launch a stale config.
         assertTrue(resolved.profile === duckstation, "Resolver must return the pool instance")
     }
 }

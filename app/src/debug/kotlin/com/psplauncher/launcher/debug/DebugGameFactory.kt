@@ -2,11 +2,7 @@ package com.psplauncher.launcher.debug
 
 import com.psplauncher.core.domain.model.Game
 
-// Generates realistic fake game entries for debug scenarios.
-// These are inserted into the real Room DB on debug launch
-// so the full production code path is exercised.
 object DebugGameFactory {
-
     fun ps2Games(): List<Game> = listOf(
         fakeGame(title = "Shadow of the Colossus",   platformId = "ps2", romPath = "/storage/emulated/0/ROMs/PS2/sotc.iso",   playTimeH = 12),
         fakeGame(title = "God of War",               platformId = "ps2", romPath = "/storage/emulated/0/ROMs/PS2/gow.iso",    playTimeH = 8),
@@ -43,7 +39,7 @@ object DebugGameFactory {
     }
 
     fun missingRomGames(): List<Game> = listOf(
-        // ROM path doesn't exist on disk — tests missing ROM detection
+
         fakeGame(title = "Missing Game 1", platformId = "ps2", romPath = "/storage/emulated/0/ROMs/PS2/nonexistent1.iso"),
         fakeGame(title = "Missing Game 2", platformId = "gba", romPath = "/storage/emulated/0/ROMs/GBA/nonexistent2.gba"),
     )

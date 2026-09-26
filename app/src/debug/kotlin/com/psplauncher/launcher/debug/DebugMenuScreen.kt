@@ -34,8 +34,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.foundation.layout.Box
 import kotlinx.coroutines.launch
 
-// Accessed by long-pressing the Settings category icon in debug builds.
-// Zero release footprint — entire file excluded from release APK.
 @Composable
 fun DebugMenuScreen(
     onDismiss: () -> Unit,
@@ -50,7 +48,6 @@ fun DebugMenuScreen(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.95f)),
     ) {
-        // ── Left panel — controls ─────────────────────────────────────────
         Column(
             modifier = Modifier
                 .width(480.dp)
@@ -62,7 +59,6 @@ fun DebugMenuScreen(
             DebugHeader(onDismiss = onDismiss)
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
-            // ── Data source ───────────────────────────────────────────────
             DebugSection("DATA SOURCE")
             DebugToggle(
                 label    = "Use fake data",
@@ -71,7 +67,6 @@ fun DebugMenuScreen(
                 onToggle = { viewModel.setUseFakeData(it) },
             )
 
-            // ── Scenarios ─────────────────────────────────────────────────
             DebugSection("SCENARIO")
             DebugScenario.values().forEach { scenario ->
                 DebugChip(
@@ -85,8 +80,6 @@ fun DebugMenuScreen(
 
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
-
-            // ── Wave control ──────────────────────────────────────────────
             DebugSection("WAVE RENDER MODE")
             ForceWaveMode.values().forEach { mode ->
                 DebugChip(
@@ -98,7 +91,6 @@ fun DebugMenuScreen(
 
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
-            // ── Thermal simulation ────────────────────────────────────────
             DebugSection("THERMAL SIMULATION")
             SimulatedThermal.values().forEach { thermal ->
                 DebugChip(
@@ -110,7 +102,6 @@ fun DebugMenuScreen(
 
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
-            // ── UI triggers ───────────────────────────────────────────────
             DebugSection("UI TRIGGERS")
             DebugToggle(
                 label    = "Show task tray",
@@ -124,7 +115,6 @@ fun DebugMenuScreen(
             )
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
-            // ── Reset ─────────────────────────────────────────────────────
             Button(
                 onClick = { viewModel.reset() },
                 colors  = ButtonDefaults.buttonColors(containerColor = Color(0xFF880000)),
@@ -136,7 +126,6 @@ fun DebugMenuScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
 
-        // ── Right panel — live XMB preview ────────────────────────────────
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -152,17 +141,13 @@ fun DebugMenuScreen(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
 
-            // Live XMB shell preview driven by current debug state
             com.psplauncher.feature.xmb.ui.XMBShell(
                 uiState = viewModel.previewState,
             )
         }
     }
-
     }
 }
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun DebugHeader(onDismiss: () -> Unit) {

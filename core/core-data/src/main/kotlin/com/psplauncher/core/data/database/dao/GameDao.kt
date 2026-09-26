@@ -10,9 +10,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GameDao {
-
-    // Projects one row per multi-disc set (the primary) so display counts never double-count a
-    // set's discs. Every consumer is display-side (card subtitles, pickers, Games root).
     @Query(
         """
         SELECT * FROM games
@@ -28,14 +25,9 @@ interface GameDao {
     )
     fun observeAll(): Flow<List<GameEntity>>
 
-    // "All Games" aggregate — real games only. App-style entries (content_type != 'GAME',
-    // e.g. ANDROID_APP / VIDEO_APP) are excluded so they never show up here automatically.
     @Query("SELECT * FROM games WHERE content_type = 'GAME'  AND is_missing = 0 ORDER BY title COLLATE NOCASE ASC")
     fun observeGamesOnly(): Flow<List<GameEntity>>
 
-    // Multi-disc projection (docs/plans/README.md (C1)): one row per disc set —
-    // the primary — for the All Games surface. The unprojected [observeGamesOnly] above stays
-    // untouched per disc.
     @Query(
         """
         SELECT * FROM games
@@ -57,7 +49,6 @@ interface GameDao {
     @Query("UPDATE games SET content_type = :contentType WHERE id = :id")
     suspend fun setContentType(id: Long, contentType: String)
 
-    // Projects one row per multi-disc set (the primary) — favorites count a set once. Display-only.
     @Query(
         """
         SELECT * FROM games
@@ -83,9 +74,6 @@ interface GameDao {
     @Query("SELECT * FROM games WHERE platform_id = :platformId AND is_missing = 0 ORDER BY title COLLATE NOCASE ASC")
     fun observeByPlatform(platformId: String): Flow<List<GameEntity>>
 
-    // Multi-disc projection (docs/plans/README.md (C1)): one row per disc set —
-    // the primary — for the Memory Card game list. The unprojected [observeByPlatform] above stays
-    // untouched for scan baselines (existing-path resolution must see every disc).
     @Query(
         """
         SELECT * FROM games
@@ -118,8 +106,6 @@ interface GameDao {
     )
     suspend fun getDiscSetMembers(discSetKey: String): List<GameEntity>
 
-    // The v39 partial index allows only one primary per set. Clear competing primaries before a
-    // replacement upsert, including when an incremental scan promotes a newly discovered disc.
     @Query("UPDATE games SET is_disc_primary = 0 WHERE disc_set_key = :discSetKey AND id != :gameId")
     suspend fun clearOtherDiscPrimaries(discSetKey: String, gameId: Long)
 
@@ -132,23 +118,18 @@ interface GameDao {
     @Query("SELECT * FROM games WHERE package_name = :packageName LIMIT 1")
     suspend fun getByPackageName(packageName: String): GameEntity?
 
-    // The plain app-launch row (no launcher shortcut). Distinguishes the "open the app" entry
-    // from per-game launcher-shortcut rows that share the same package_name.
     @Query("SELECT * FROM games WHERE package_name = :packageName AND launch_shortcut_id IS NULL LIMIT 1")
     suspend fun getAppEntry(packageName: String): GameEntity?
 
-    // A specific harvested launcher-shortcut row (package + shortcut id) — used to dedupe imports.
     @Query("SELECT * FROM games WHERE package_name = :packageName AND launch_shortcut_id = :shortcutId LIMIT 1")
     suspend fun getLauncherShortcut(packageName: String, shortcutId: String): GameEntity?
 
-    // A legacy INSTALL_SHORTCUT row, deduped by its captured launch intent.
     @Query("SELECT * FROM games WHERE launch_intent_uri = :intentUri LIMIT 1")
     suspend fun getByIntentUri(intentUri: String): GameEntity?
 
     @Query("SELECT * FROM games WHERE last_played_at IS NOT NULL  AND is_missing = 0 ORDER BY last_played_at DESC LIMIT :limit")
     fun observeRecentlyPlayed(limit: Int): Flow<List<GameEntity>>
 
-    // Used by recently played per-platform drill-down
     @Query(
         """
         SELECT * FROM games
@@ -164,14 +145,6 @@ interface GameDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(game: GameEntity): Long
 
-    /**
-     * The row's existing added-date, or null when there is no such row.
-     *
-     * [upsert] is `@Insert(onConflict = REPLACE)`, which SQLite performs as DELETE-then-INSERT, so
-     * every column the caller does not carry is destroyed rather than left alone. A scanner builds
-     * its entity from the filesystem and cannot know when the row was first written, so without
-     * reading it back first every rescan would restamp the whole library as new.
-     */
     @Query("SELECT date_added FROM games WHERE id = :id")
     suspend fun dateAddedOf(id: Long): Long?
 
@@ -190,9 +163,6 @@ interface GameDao {
     @Query("SELECT COUNT(*) FROM games WHERE platform_id = :platformId AND is_missing = 0")
     suspend fun countByPlatform(platformId: String): Int
 
-    // Real games only — what a Memory Card actually displays (standard app rows are excluded).
-    // Counts one row per multi-disc set (the primary) — a Memory Card's game count never
-    // double-counts a set's discs.
     @Query(
         """
         SELECT COUNT(*) FROM games primary_game
@@ -214,17 +184,9 @@ interface GameDao {
     @Query("UPDATE games SET is_favorite = :isFavorite WHERE id = :id")
     suspend fun setFavorite(id: Long, isFavorite: Boolean)
 
-    /** How many games carry each mark, for the shelves that hide themselves when empty. */
     @Query("SELECT COUNT(*) FROM games WHERE play_state = :state AND is_missing = 0")
     fun observePlayStateCount(state: String): kotlinx.coroutines.flow.Flow<Int>
 
-    /**
-     * Games added since the column existed, newest first.
-     *
-     * `date_added > 0` is the whole filter and it is doing real work: migration 51 to 52 wrote 0
-     * for every row that predates the column, so an untouched library has nothing here rather than
-     * everything. The shelf fills as games arrive instead of claiming 152 of them arrived at once.
-     */
     @Query(
         """
         SELECT * FROM games
@@ -240,7 +202,6 @@ interface GameDao {
     @Query("SELECT * FROM games WHERE play_state = :state AND is_missing = 0 ORDER BY title COLLATE NOCASE")
     fun observeByPlayState(state: String): kotlinx.coroutines.flow.Flow<List<GameEntity>>
 
-    /** Marks the game, or clears the mark with null. Column-at-a-time, like every other flag. */
     @Query("UPDATE games SET play_state = :state WHERE id = :id")
     suspend fun setPlayState(id: Long, state: String?)
 
@@ -272,28 +233,9 @@ interface GameDao {
     )
     suspend fun addPlayTime(id: Long, durationMillis: Long, playedAt: Long)
 
-    /**
-     * Stamps a row as opened NOW, without touching the play counter.
-     *
-     * The mirror of [clearLastPlayed], and the app-shaped counterpart to [addPlayTime]. A game
-     * gets its stamp from [addPlayTime] once LaunchDispatcher has seen the emulator cover the
-     * launcher and the user come back, which also yields a duration. An Android app is started
-     * with a plain `startActivity` and there is no session to measure and no hand-off to verify,
-     * so the shelf gets the one fact there is: it was opened, at this time.
-     *
-     * Deliberately NOT [addPlayTime] with a zero duration. That reads as "played for no time",
-     * which is a claim about the counter this does not make.
-     */
     @Query("UPDATE games SET last_played_at = :playedAt WHERE id = :id")
     suspend fun markOpened(id: Long, playedAt: Long)
 
-    /**
-     * Drops the game off the Last Played shelf without forgetting it was played.
-     *
-     * total_play_time_millis is deliberately untouched: the shelf asks "when", the counter asks
-     * "how long", and a user taking a game off the shelf has not asked to lose their hours. The
-     * next launch writes a fresh stamp through addPlayTime and the game comes back.
-     */
     @Query("UPDATE games SET last_played_at = NULL WHERE id = :id")
     suspend fun clearLastPlayed(id: Long)
 
@@ -304,34 +246,21 @@ interface GameDao {
     )
     suspend fun setPreferredEmulator(id: Long, emulatorPackage: String?)
 
-    // B4 per-platform assignment screen: bulk-clears every per-game emulator override on a
-    // platform so those games fall back to the platform default. Scoped to real game rows
-    // (content_type = 'GAME') — app-shortcut rows can never carry or receive a ROM emulator.
     @Query(
         "UPDATE games SET emulator_package = NULL " +
             "WHERE platform_id = :platformId AND content_type = 'GAME' AND emulator_package IS NOT NULL"
     )
     suspend fun clearPreferredEmulatorForPlatform(platformId: String)
 
-    // For missing ROM check — returns all games that have a rom_path
     @Query("SELECT id, rom_path FROM games WHERE rom_path IS NOT NULL")
     suspend fun getAllRomPaths(): List<RomPathProjection>
 
-    // ── Missing-ROM tracking ──────────────────────────────────────────────────
-    // A missing game keeps all its state (favorite, play stats, artwork) and is only hidden
-    // from the normal views; it reappears everywhere once its file is seen again.
-
-    // Marks the given paths present: clears the missing flag and stamps the last-seen time.
     @Query("UPDATE games SET is_missing = 0, last_seen_at = :seenAt WHERE rom_path IN (:romPaths)")
     suspend fun markSeen(romPaths: List<String>, seenAt: Long)
 
-    // Flags the given paths missing. last_seen_at is left untouched — it holds the last time the
-    // file WAS present. The reconciler passes an explicit, already-diffed list (never a NOT IN over
-    // the whole table) so an empty or partial scan can never mass-flag the library.
     @Query("UPDATE games SET is_missing = 1 WHERE rom_path IN (:romPaths)")
     suspend fun markMissing(romPaths: List<String>)
 
-    // The Missing bucket — one primary per fully missing set, plus ordinary missing games.
     @Query(
         """
         SELECT * FROM games
@@ -356,9 +285,6 @@ interface GameDao {
     @Query("SELECT * FROM games WHERE artwork_uri IS NULL AND rom_path IS NOT NULL")
     suspend fun getGamesWithoutArtwork(): List<GameEntity>
 
-    // Updates only non-null fields — COALESCE keeps existing value when new value is null.
-    // scraped_title is updated when a metadata source returns a title.
-    // user_title_override is NEVER touched here — only explicit user action changes it.
     @Query(
         """
         UPDATE games SET
@@ -416,23 +342,9 @@ interface GameDao {
     @Query("UPDATE games SET scraped_title = :scrapedTitle WHERE id = :id")
     suspend fun updateScrapedTitle(id: Long, scrapedTitle: String?)
 
-    /**
-     * Names a game the scrape has never named, and nothing else: the write is skipped outright when
-     * `scraped_title` already holds something.
-     *
-     * An automatic scrape may NAME an unnamed game but must never RENAME one. [updateMetadata]
-     * takes the opposite side for every other column (`COALESCE(:new, old)` — the incoming value
-     * wins), which is right for a description or a release year and wrong for the title: it made a
-     * Change Match, or any later re-scrape, silently rewrite what the library calls a game. A title
-     * now only ever CHANGES through a path the user drove — the metadata preview's chosen fields,
-     * or Edit Title, which writes `user_title_override` and outranks this column entirely.
-     */
     @Query("UPDATE games SET scraped_title = :scrapedTitle WHERE id = :id AND scraped_title IS NULL")
     suspend fun fillScrapedTitleIfMissing(id: Long, scrapedTitle: String)
 
-    // ── Windows storefront identity (C16 phase 0) ─────────────────────────────
-    // Fill-only: a null argument keeps whatever is already stored, so a re-import that could not
-    // determine the store never erases an identity an earlier one captured.
     @Query(
         """
         UPDATE games SET
@@ -443,16 +355,6 @@ interface GameDao {
     )
     suspend fun updateStorefrontIdentity(id: Long, storefront: String?, storefrontGameId: String?)
 
-    /**
-     * Attaches a launcher handle to an existing row, one column pair at a time.
-     *
-     * Emphatically NOT [upsert]. That is `@Insert(onConflict = REPLACE)`, which SQLite performs as
-     * DELETE-then-INSERT, so every `ON DELETE CASCADE` child of this row goes with it --
-     * `play_sessions` and `collection_games` both do. `GameUpsertCascadeTest` proves exactly that,
-     * on a windows fixture, and `PcGameScanner.applyFill` already writes column-at-a-time for the
-     * same reason. Pin reconcile runs at every app start, so a row merge here was silently
-     * deleting a game's playtime and its collection membership.
-     */
     @Query(
         """
         UPDATE games SET
@@ -469,12 +371,6 @@ interface GameDao {
         launchIntentUri: String?,
     )
 
-    // ── Confirmed provider match (C16 task 2.3) ──────────────────────────────
-    // Sets EXACTLY ONE provider id and leaves the other three untouched, so a match confirmed on
-    // SteamGridDB can never be read back as an IGDB id. Unlike updateMetadata this is not
-    // COALESCE-guarded: a null :providerGameId is Forget Match and must actually clear the column.
-    // It touches no artwork column and no metadata column — forgetting a match never costs the
-    // user a downloaded asset or a scraped description.
     @Query(
         """
         UPDATE games SET
@@ -486,14 +382,9 @@ interface GameDao {
     )
     suspend fun updateProviderMatch(id: Long, provider: String, providerGameId: Long?)
 
-    /** Games claiming one storefront id. Matched as a PAIR — an app id is unique per store only. */
     @Query("SELECT * FROM games WHERE storefront = :storefront AND storefront_game_id = :storefrontGameId")
     suspend fun getByStorefront(storefront: String, storefrontGameId: String): List<GameEntity>
 
-    // Fill-missing-only metadata write (reversed COALESCE — the EXISTING value always wins).
-    // Used by the artwork importer's gamelist.xml pass (imported metadata never overwrites anything
-    // a scraper or the user already set) and by C16 task 3.2's Fill Missing Only policy, which is
-    // why it covers every field a metadata preset can carry. A null argument is a no-op per column.
     @Query(
         """
         UPDATE games SET
@@ -524,7 +415,6 @@ interface GameDao {
         releaseDate: String? = null,
     )
 
-    // Stores the user-chosen display name. Pass null to clear and fall back to scrapedTitle/title.
     @Query("UPDATE games SET user_title_override = :override WHERE id = :id")
     suspend fun updateUserTitleOverride(id: Long, override: String?)
 
@@ -540,12 +430,9 @@ interface GameDao {
     @Query("UPDATE games SET box3d_uri = :box3dUri WHERE id = :id")
     suspend fun updateBox3d(id: Long, box3dUri: String?)
 
-    // Per-game icon display mode override (IconDisplayMode name); null follows the global setting.
     @Query("UPDATE games SET icon_display_mode = :mode WHERE id = :id")
     suspend fun updateIconDisplayMode(id: Long, mode: String?)
 
-    // Full artwork reset (Clear Cache): every artwork reference on every game. Titles,
-    // metadata, scraper ids and play stats are untouched — only the art pointers go.
     @Query(
         """
         UPDATE games SET artwork_uri = NULL, hero_uri = NULL, logo_uri = NULL, icon_uri = NULL,
@@ -554,12 +441,9 @@ interface GameDao {
     )
     suspend fun clearAllArtworkRefs()
 
-    // Mints the portable artwork key once — an already-set key is never rewritten (slug rules
-    // may evolve; the key recorded at first save is the one the folder was created under).
     @Query("UPDATE games SET artwork_key = COALESCE(artwork_key, :artworkKey) WHERE id = :id")
     suspend fun mintArtworkKey(id: Long, artworkKey: String)
 
-    // Clears all artwork references so a re-scrape starts from a clean slate.
     @Query("UPDATE games SET artwork_uri = NULL, hero_uri = NULL, logo_uri = NULL, icon_uri = NULL")
     suspend fun clearAllArtwork()
 

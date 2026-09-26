@@ -10,10 +10,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Represents a game assigned to a gaming category. Collections are NOT tracked here — a
-// collection belongs to exactly one category via CollectionEntity.categoryId (its single
-// source of truth). The junction table is games-only (echo/copy model: a game may appear
-// in several gaming categories).
 sealed class GameCategoryItem {
     abstract val id: String
     abstract val title: String
@@ -30,18 +26,14 @@ sealed class GameCategoryItem {
 
 private const val ITEM_TYPE_GAME = "game"
 
-// Manages assignment of games to gaming categories via the CategoryItemEntity junction table.
 @Singleton
 class GameCategoryRepository @Inject constructor(
     private val gameRepository: GameRepository,
     private val categoryDao: CategoryDao,
 ) {
-    // Emits whenever category item assignments change (games in any category)
-    // We watch all app items as a proxy since item_type differentiates; items are stored together
     fun changes(): Flow<Unit> =
         categoryDao.observeAppItems().map { }
 
-    // Resolves all games assigned to a gaming category, sorted with pinned first.
     suspend fun itemsForCategory(categoryId: String): List<GameCategoryItem> {
         val rows = categoryDao.getItemsForCategory(categoryId)
             .filter { it.itemType == ITEM_TYPE_GAME }
@@ -51,9 +43,6 @@ class GameCategoryRepository @Inject constructor(
             }
         }
 
-        // A category membership belongs to a logical game, not to a physical disc. If any disc in
-        // a set is assigned, project the set's primary (or the first available member) once. The
-        // pinned state follows the set when a non-primary member was the one pinned.
         val projected = mutableListOf<GameCategoryItem>()
         val seenSets = mutableSetOf<String>()
         for ((row, game) in games) {

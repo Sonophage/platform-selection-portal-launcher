@@ -1,10 +1,5 @@
 package com.psplauncher.themekit
 
-/**
- * Decoded bitmap pixels, row-major top-down, one packed ARGB int per pixel (alpha always 0xFF
- * for BMP sources; [Gim] sources carry real transparency). Kept platform-neutral so both
- * Android and desktop frontends can wrap it in their own image types.
- */
 class BmpImage(val width: Int, val height: Int, val argb: IntArray) {
     init {
         require(argb.size == width * height) { "pixel buffer ${argb.size} != ${width}x$height" }
@@ -13,23 +8,12 @@ class BmpImage(val width: Int, val height: Int, val argb: IntArray) {
     operator fun get(x: Int, y: Int): Int = argb[y * width + x]
 }
 
-/**
- * Minimal decoder for the exact BMP variant official PSP themes embed as wallpaper:
- * uncompressed 24-bit BI_RGB (verified: every sampled `.ptf` wallpaper, including Sony's
- * own examples, is this variant — see docs/official-ptf-template.md). Pure Kotlin so the
- * shared module needs neither android.graphics nor java.awt.
- */
 object Bmp {
-
     private const val FILE_HEADER_SIZE = 14
     private const val MIN_INFO_HEADER_SIZE = 40
 
-    // Sanity cap on dimensions from untrusted files. Beyond OOM protection, this keeps the
-    // Int arithmetic below (width * 3, width * height) safely inside 32 bits — absurd widths
-    // would otherwise overflow the row stride BEFORE the bounds checks run.
     private const val MAX_DIMENSION = 8192
 
-    /** Returns null when [bytes] is not an uncompressed 24-bit BMP. */
     fun decode(bytes: ByteArray): BmpImage? {
         if (bytes.size < FILE_HEADER_SIZE + MIN_INFO_HEADER_SIZE) return null
         if (bytes[0] != 'B'.code.toByte() || bytes[1] != 'M'.code.toByte()) return null
@@ -46,12 +30,11 @@ object Bmp {
 
         val bottomUp = rawHeight > 0
         val height = if (bottomUp) rawHeight else -rawHeight
-        val rowStride = (width * 3 + 3) and 0x3.inv() // rows padded to 4-byte boundaries
+        val rowStride = (width * 3 + 3) and 0x3.inv()
         if (pixelOffset < 0 || pixelOffset.toLong() + rowStride.toLong() * height > bytes.size) return null
 
         val argb = IntArray(width * height)
         for (row in 0 until height) {
-            // BMP stores bottom row first unless height is negative.
             val srcRow = if (bottomUp) height - 1 - row else row
             var src = pixelOffset + srcRow * rowStride
             var dst = row * width

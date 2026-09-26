@@ -8,10 +8,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.Book
 
-// One row per scanned book file. uri is a SAF document uri string. Cascade-deletes with its
-// library so removing a library removes its books; indexed by library_id for per-library queries.
-// title, author, series and cover_uri are all filled by the scanner's EPUB metadata pass and stay
-// null for a book whose package document does not declare them.
 @Serializable
 @Entity(
     tableName = "books",
@@ -23,8 +19,7 @@ import com.psplauncher.core.domain.model.Book
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    // last_opened_at is indexed because the recents query orders by it over a column that
-    // is null for every book not yet read.
+
     indices = [Index("library_id"), Index("uri"), Index("last_opened_at")],
 )
 data class BookEntity(
@@ -42,17 +37,11 @@ data class BookEntity(
     val title: String? = null,
     val author: String? = null,
 
-    /** Series name from the EPUB's package document; null when it declares none. */
     val series: String? = null,
 
-    /**
-     * Position within [series]. REAL rather than INTEGER because a novella between books 2 and 3
-     * is conventionally numbered 2.5, and Calibre stores it that way.
-     */
     @ColumnInfo(name = "series_index")
     val seriesIndex: Double? = null,
 
-    /** file:// uri of the cached cover thumbnail, or null when the book has no usable cover. */
     @ColumnInfo(name = "cover_uri")
     val coverUri: String? = null,
 
@@ -71,13 +60,6 @@ data class BookEntity(
     @ColumnInfo(name = "date_added")
     val dateAdded: Long? = null,
 
-    /**
-     * When this book was last opened in the reader, or null if it never has been.
-     *
-     * NOT [lastModified] (the file's mtime) and NOT [dateAdded] (when the scan first saw it):
-     * both answer "when did this file appear", and a shelf built on either would rank a library
-     * copied in one go by nothing more useful than copy order.
-     */
     @ColumnInfo(name = "last_opened_at")
     val lastOpenedAt: Long? = null,
 )

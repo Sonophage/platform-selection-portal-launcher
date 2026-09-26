@@ -20,8 +20,6 @@ class DebugSeeder @Inject constructor(
     private val gameDao: GameDao,
     private val debugController: DebugController,
 ) {
-    // Populates the real Room DB with fake games on first debug launch.
-    // Safe to call multiple times — guarded by DataStore flag.
     suspend fun seedIfNeeded() {
         val prefs = context.pfpDataStore.data.first()
         if (prefs[KEY_DEBUG_SEEDED] == true) {
@@ -36,16 +34,12 @@ class DebugSeeder @Inject constructor(
         Timber.i("Debug seeder: inserted ${games.size} fake games into Room DB")
     }
 
-    // Called from the debug menu — wipes and re-seeds with a chosen scenario
     suspend fun reseed(scenario: DebugScenario) {
         Timber.i("Debug reseed: clearing games, seeding scenario=${scenario.name}")
 
-        // Clear existing debug games (manual entries only — won't touch real scanned ROMs)
-        // In a full implementation we'd track debug-seeded IDs separately
         val games = DebugGameFactory.gamesForScenario(scenario)
         gameDao.insertAll(games.map { it.toEntity() })
 
-        // Reset the seeded flag so next launch re-seeds if needed
         context.pfpDataStore.edit { it[KEY_DEBUG_SEEDED] = true }
         debugController.setScenario(scenario)
 

@@ -6,16 +6,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
-/**
- * Drilled into a sub-item the XMB collapses focus onto the active column, hiding every category to
- * its right. These must be DROPPED from the row rather than rendered empty: an emptied item still
- * takes a slot, and the trailing phantoms left the caticon bar's LazyRow with no scroll headroom —
- * a re-measure (every resume re-measures, because the layout adjustment resolves asynchronously)
- * clamped the scroll short and parked the selected caticon a whole slot right, on top of the game
- * column.
- */
 class XmbCategoryBarVisibilityTest {
-
     private fun category(id: String, position: Int) = Category(
         id = id,
         name = id,
@@ -24,7 +15,6 @@ class XmbCategoryBarVisibilityTest {
         position = position,
     )
 
-    // The PSP order: the drill in the bug report was Game, with Video immediately to its left.
     private val categories = listOf("settings", "photo", "music", "video", "game", "network")
         .mapIndexed { i, id -> category(id, i) }
 
@@ -51,7 +41,6 @@ class XmbCategoryBarVisibilityTest {
     fun `surviving indices still line up with the source list`() {
         val visible = visibleCategories(categories, selectedIndex = 3, drilledIn = true)
 
-        // isSelected and the click callbacks index into this list with the ORIGINAL selectedIndex.
         visible.forEachIndexed { i, c -> assertEquals(categories[i].id, c.id) }
         assertEquals("video", visible[3].id)
     }
@@ -72,7 +61,6 @@ class XmbCategoryBarVisibilityTest {
 
     @Test
     fun `a selection that is not a real index hides nothing`() {
-        // An empty bar is worse than an unfiltered one: before the fix, -1 hid every category.
         assertSame(categories, visibleCategories(categories, selectedIndex = -1, drilledIn = true))
         assertSame(categories, visibleCategories(categories, selectedIndex = 99, drilledIn = true))
     }

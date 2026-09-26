@@ -6,11 +6,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CrossBandDetectorTest {
+    private val bright = 0xFFB4B4B4.toInt()
+    private val dark = 0xFF1A1A1A.toInt()
 
-    private val bright = 0xFFB4B4B4.toInt() // luma ~0.70
-    private val dark = 0xFF1A1A1A.toInt()   // luma ~0.10
-
-    /** width x height image, [dark] where rows fall inside bandRows, else [bright]. */
     private fun bandImage(
         width: Int = 480,
         height: Int = 272,
@@ -32,7 +30,6 @@ class CrossBandDetectorTest {
 
     @Test
     fun `dark band at quarter height is detected near its top edge`() {
-        // Band from 0.25h to 0.40h on a 272-tall image: rows 68..108.
         val fraction = assertNotNull(
             CrossBandDetector.detectBarTopFraction(bandImage(bandRows = 68..108)),
         )
@@ -41,7 +38,6 @@ class CrossBandDetectorTest {
 
     @Test
     fun `band in the lower half is ignored`() {
-        // 0.60h..0.75h — below the search region.
         assertNull(CrossBandDetector.detectBarTopFraction(bandImage(bandRows = 163..204)))
     }
 
@@ -52,7 +48,7 @@ class CrossBandDetectorTest {
 
     @Test
     fun `low-contrast band is rejected`() {
-        val slightlyDark = 0xFF9E9E9E.toInt() // luma ~0.62 vs 0.70 background
+        val slightlyDark = 0xFF9E9E9E.toInt()
         assertNull(
             CrossBandDetector.detectBarTopFraction(
                 bandImage(bandRows = 68..108, bandColor = slightlyDark),
@@ -62,7 +58,6 @@ class CrossBandDetectorTest {
 
     @Test
     fun `dark-from-the-top image has no top edge and is rejected`() {
-        // Dark from row 0 down to 40% — a night sky, not a band.
         assertNull(CrossBandDetector.detectBarTopFraction(bandImage(bandRows = 0..108)))
     }
 

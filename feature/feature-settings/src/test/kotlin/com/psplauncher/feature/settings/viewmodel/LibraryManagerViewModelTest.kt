@@ -39,7 +39,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryManagerViewModelTest {
-
     private val dispatcher = StandardTestDispatcher()
 
     private val context = mockk<Context>(relaxed = true)
@@ -90,7 +89,6 @@ class LibraryManagerViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    // uiState is WhileSubscribed — tests that assert on it need an active collector.
     private fun TestScope.collectState() = launch { vm.uiState.collect {} }
 
     @Test
@@ -101,18 +99,18 @@ class LibraryManagerViewModelTest {
         advanceUntilIdle()
         assertEquals(LibraryStep.IMPORT_PC, vm.uiState.value.step)
         assertTrue(vm.uiState.value.returnFocusKey != null)
-        // The standalone route is expected to unwind directly to its owning card.
+
         vm.openCardDetail("windows")
         vm.openImportPcGames()
         assertTrue(vm.onBack())
-        // uiState is stateIn(WhileSubscribed) — the sharing coroutine must run before reads.
+
         advanceUntilIdle()
         assertEquals(LibraryStep.CARD_DETAIL, vm.uiState.value.step)
         assertEquals("windows", vm.uiState.value.detailPlatformId)
         assertTrue(vm.onBack())
         advanceUntilIdle()
         assertEquals(LibraryStep.LIST, vm.uiState.value.step)
-        // Focus returns to the Windows row it was opened from.
+
         assertEquals("windows", vm.uiState.value.returnFocusKey)
 
         job.cancel()
@@ -122,22 +120,16 @@ class LibraryManagerViewModelTest {
     fun `backing out of the Windows card returns to the list and leaves nothing behind`() = runTest(dispatcher) {
         val job = collectState()
 
-        // Windows is a card in the list like any other now — Settings used to carry a second,
-        // separate "Windows Games" row that opened this same detail directly, and it showed an
-        // empty screen until a PC game had been imported.
         vm.openCardDetail("windows")
         advanceUntilIdle()
         assertEquals(LibraryStep.CARD_DETAIL, vm.uiState.value.step)
         assertEquals("windows", vm.uiState.value.detailPlatformId)
 
-        // Back is consumed by the screen (true) rather than closing Settings, and clears the
-        // detail: this ViewModel is activity-scoped, so a leaked detailPlatformId would pop the
-        // Windows card up again on the next Library Manager open.
         assertTrue(vm.onBack())
         advanceUntilIdle()
         assertEquals(LibraryStep.LIST, vm.uiState.value.step)
         assertNull(vm.uiState.value.detailPlatformId)
-        // ...but the row keeps focus, so returning lands on the card you just left.
+
         assertEquals("windows", vm.uiState.value.returnFocusKey)
 
         job.cancel()
@@ -157,8 +149,6 @@ class LibraryManagerViewModelTest {
         assertTrue("psx" !in vm.uiState.value.scanningPlatformIds)
         job.cancel()
     }
-
-    // ── scanOutcomeMessage mapping ────────────────────────────────────────────────
 
     @Test
     fun `SKIPPED_NO_SOURCE without an error uses the configured-folder message`() {

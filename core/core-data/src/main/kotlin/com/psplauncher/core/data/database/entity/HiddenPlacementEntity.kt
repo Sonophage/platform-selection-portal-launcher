@@ -7,8 +7,6 @@ import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.HiddenPlacement
 import com.psplauncher.core.domain.model.HideLocationType
 
-// One "item hidden from location" record. Composite PK so re-hiding the same spot is idempotent.
-// Indexed by item_key so the manager can group an item's placements cheaply.
 @Serializable
 @Entity(
     tableName = "hidden_placements",

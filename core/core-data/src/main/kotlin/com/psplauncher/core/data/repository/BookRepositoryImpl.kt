@@ -20,10 +20,6 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Backed up by name in `BackupManager.BACKED_UP_STRING_KEYS`. A preference that misses that list
- * reverts to its default on a restored device without anything failing.
- */
 private val KEY_BOOK_DEFAULT_READER = stringPreferencesKey("books_default_reader")
 
 @Singleton
@@ -32,7 +28,6 @@ class BookRepositoryImpl @Inject constructor(
     private val libraryDao: BookLibraryDao,
     private val bookDao: BookDao,
 ) : BookRepository {
-
     override fun observeLibraries(): Flow<List<BookLibrary>> =
         libraryDao.observeAll().map { list -> list.map { it.toDomain() } }
 
@@ -70,7 +65,6 @@ class BookRepositoryImpl @Inject constructor(
     override suspend fun setLibraryTreeUri(id: String, treeUri: String) =
         libraryDao.setTreeUri(id, treeUri, System.currentTimeMillis())
 
-    /** The books go with it through the foreign key, not through a second delete here. */
     override suspend fun removeLibrary(id: String) = libraryDao.delete(id)
 
     override fun observeAllBooks(): Flow<List<Book>> =

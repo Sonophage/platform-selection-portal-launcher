@@ -10,7 +10,6 @@ import com.psplauncher.core.data.database.entity.PlaylistEntity
 import com.psplauncher.core.data.database.entity.PlaylistTrackEntity
 import kotlinx.coroutines.flow.Flow
 
-// Playlist + its current track count, so the playlist list renders without N queries.
 data class PlaylistWithCount(
     @Embedded val playlist: PlaylistEntity,
     val track_count: Int,
@@ -18,7 +17,6 @@ data class PlaylistWithCount(
 
 @Dao
 interface PlaylistDao {
-
     @Query(
         """
         SELECT p.*, (
@@ -33,8 +31,6 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlists WHERE id = :id")
     suspend fun getById(id: Long): PlaylistEntity?
 
-    // A playlist's tracks, in the user's manual order. Joining drops orphaned rows (a track that
-    // a re-scan removed) automatically since the INNER JOIN finds no matching music_tracks row.
     @Query(
         """
         SELECT t.* FROM music_tracks t
@@ -66,7 +62,6 @@ interface PlaylistDao {
     @Query("DELETE FROM playlists WHERE id = :id")
     suspend fun delete(id: Long)
 
-    // Re-adding an existing membership is a no-op (composite PK + IGNORE).
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addTrack(join: PlaylistTrackEntity)
 

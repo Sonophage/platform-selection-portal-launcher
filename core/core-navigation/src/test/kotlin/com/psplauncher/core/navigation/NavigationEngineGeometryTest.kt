@@ -3,18 +3,13 @@ package com.psplauncher.core.navigation
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Spec §7/§8: visual (geometry) order wins over registration order; removal recovers to the
- * nearest focusable neighbor by visual position; order fallback when geometry is unavailable.
- */
 class NavigationEngineGeometryTest {
-
     private fun node(key: String, onSelect: (() -> Unit)? = null) = NavigationNode(key = key, onSelect = onSelect)
 
     @Test
     fun `visual order wins over registration order`() {
         val engine = NavigationEngine()
-        // Registered out of visual order (async insertion, spec §8).
+
         engine.replaceNodesWithGeometry(
             listOf(node("late"), node("first"), node("middle")),
             geometry = mapOf("first" to 100f, "middle" to 200f, "late" to 300f),
@@ -57,8 +52,6 @@ class NavigationEngineGeometryTest {
         engine.markReady()
         engine.setFocused("c")
 
-        // Remove 'c'; its visual neighbours are 'b' (200) and 'd' (400) — both 100 away, so
-        // the stable tie-break (registration order) picks the earlier node.
         engine.replaceNodesWithGeometry(
             listOf(node("a"), node("b"), node("d")),
             geometry = mapOf("a" to 100f, "b" to 200f, "d" to 400f),

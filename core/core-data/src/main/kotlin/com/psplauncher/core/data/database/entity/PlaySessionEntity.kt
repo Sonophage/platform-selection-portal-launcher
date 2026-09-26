@@ -16,13 +16,13 @@ import kotlinx.serialization.Serializable
             entity        = GameEntity::class,
             parentColumns = ["id"],
             childColumns  = ["game_id"],
-            onDelete      = ForeignKey.CASCADE,     // sessions removed when game deleted
+            onDelete      = ForeignKey.CASCADE,
         )
     ],
     indices = [
         Index("game_id"),
         Index("platform_id"),
-        Index("launched_at"),                       // for recently played queries
+        Index("launched_at"),
     ]
 )
 data class PlaySessionEntity(

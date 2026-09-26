@@ -20,29 +20,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 
-/**
- * ICON1.PMF revival — plays a game's video snap at whatever bounds the caller gives it.
- *
- * Two callers, one at a time, chosen by the user's Video Snap Placement:
- *  • GameIconView draws it inside the 144:80 tile over the static ICON0, which stays composed
- *    underneath as the poster frame. This is the PSP's own behaviour.
- *  • XMBShell draws it full-bleed behind the crossbar over the still background art. This is
- *    the PS3's.
- *
- * Nothing here is tile-specific: the centre-crop matrix below fits the frame to the view it is
- * laid out in, so the same composable serves both.
- *
- * Battery discipline (the linger gate, battery/thermal/saver checks, and the "one focused game
- * only" rule live in XMBViewModel — by the time this composes, playback has been approved):
- *  • ONE player per overlay, and only one overlay ever exists (the focused game's).
- *  • Audio is disabled at the track level — the audio track is never selected, never decoded.
- *  • A hard clip at [MAX_PLAY_MS] stops the decoder itself; when it ends we fade back to the
- *    static ICON0 and do NOT loop (a PMF that ran its course).
- *  • Released (not paused) the moment focus moves — DisposableEffect onDispose.
- *
- * Rendering: TextureView (not SurfaceView) so the fade-in/out alpha actually composites, with
- * a center-crop matrix so the (usually 4:3) snap fills its bounds like ICON1 did.
- */
 @Composable
 fun Icon1VideoOverlay(
     videoUri: String,
@@ -90,7 +67,6 @@ fun Icon1VideoOverlay(
         }
     }
 
-    // Static ICON0 shows until the first frame lands (no flicker); fade back when the clip ends.
     val alpha by animateFloatAsState(
         targetValue = if (firstFrameRendered && !ended) 1f else 0f,
         animationSpec = tween(durationMillis = 400),
@@ -111,8 +87,6 @@ fun Icon1VideoOverlay(
     )
 }
 
-// TextureView stretches the frame to its bounds by default; this rescales so the snap fills
-// the view at its own aspect, centered — overflow is clipped by the caller's shape, if any.
 private fun applyCenterCrop(view: TextureView, size: VideoSize?) {
     val vw = size?.width?.toFloat() ?: return
     val vh = size.height.toFloat()
@@ -126,5 +100,4 @@ private fun applyCenterCrop(view: TextureView, size: VideoSize?) {
     view.setTransform(matrix)
 }
 
-// 60 s hard cap — "only play the first 60 seconds", enforced in the media pipeline itself.
 private const val MAX_PLAY_MS = 60_000L

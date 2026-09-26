@@ -17,9 +17,6 @@ import javax.inject.Inject
 
 enum class CategoryStep { LIST, PICK_ICON, PICK_TYPE, DETAIL }
 
-// Hidden holder categories some older builds created to store Music/Video/Photo "Apps" picks. The
-// app sections now use the real built-in media categories, but a legacy row may still exist; it must
-// never be shown as an editable category.
 private val LEGACY_APP_PSEUDO_CATEGORY_IDS = setOf("music_apps", "video_apps", "photo_apps")
 
 data class CategoryRow(
@@ -29,15 +26,12 @@ data class CategoryRow(
     val visible: Boolean,
     val protected: Boolean,
     val isGamingCategory: Boolean = false,
-    // Settings is the only route back into category management, so it can never be hidden from the
-    // XMB bar — the "Show On Bar" toggle is suppressed for it.
+
     val canHide: Boolean = true,
 )
 
 data class IconOption(val key: String, val label: String)
 
-// Selectable category icons, sourced from the shared core-ui catalog (the 7 XMB glyphs plus every
-// bundled console icon). No sprite sheet — each entry renders from its own resource.
 val ICON_OPTIONS: List<IconOption> = CATEGORY_ICON_CATALOG.map { IconOption(it.key, it.label) }
 
 data class CategoryManagerUiState(
@@ -45,13 +39,13 @@ data class CategoryManagerUiState(
     val categories: List<CategoryRow> = emptyList(),
     val iconOptions: List<IconOption> = ICON_OPTIONS,
     val detailId: String? = null,
-    // Create flow scratch
+
     val pendingName: String? = null,
     val pendingIconKey: String? = null,
     val pickingIconForCreate: Boolean = false,
     val pendingIsGamingCategory: Boolean = false,
     val pickingTypeForCreate: Boolean = false,
-    // Dialogs
+
     val showCreateNameDialog: Boolean = false,
     val renameTargetId: String? = null,
     val returnFocusKey: String? = null,
@@ -66,7 +60,6 @@ const val CREATE_CATEGORY_FOCUS_KEY = "create_category"
 class CategoryManagerViewModel @Inject constructor(
     private val categoryRepository: CategoryRepositoryImpl,
 ) : ViewModel() {
-
     private val _scratch = MutableStateFlow(CategoryManagerUiState())
 
     val uiState: StateFlow<CategoryManagerUiState> = combine(
@@ -74,8 +67,7 @@ class CategoryManagerViewModel @Inject constructor(
         _scratch,
     ) { categories, scratch ->
         scratch.copy(
-            // Legacy hidden "*_apps" pseudo-categories (from older builds) are never user-editable —
-            // keep them out of the manager so they can't be renamed/deleted/toggled.
+
             categories = categories.filterNot { it.id in LEGACY_APP_PSEUDO_CATEGORY_IDS }.map {
                 CategoryRow(
                     id                 = it.id,
@@ -112,8 +104,6 @@ class CategoryManagerViewModel @Inject constructor(
         }
         return true
     }
-
-    // ── Create flow ───────────────────────────────────────────────────────────────
 
     fun startCreate() = _scratch.update { it.copy(showCreateNameDialog = true, returnFocusKey = CREATE_CATEGORY_FOCUS_KEY) }
     fun cancelCreateName() = _scratch.update { it.copy(showCreateNameDialog = false) }
@@ -170,8 +160,6 @@ class CategoryManagerViewModel @Inject constructor(
             }
         }
     }
-
-    // ── Detail / edit ───────────────────────────────────────────────────────────────
 
     fun openDetail(id: String) = _scratch.update { it.copy(step = CategoryStep.DETAIL, detailId = id, returnFocusKey = id) }
 

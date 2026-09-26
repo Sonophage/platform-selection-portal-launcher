@@ -24,15 +24,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * The GameBoot toggle's contract: it writes the live boolean, it retires the unreleased mode key
- * so a stale value cannot outrank the user's choice, and it reads through the same read-time
- * migration as the launch gate so the row and the gate can never disagree about what will play.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class DisplaySettingsViewModelGameBootTest {
-
     private val dispatcher = StandardTestDispatcher()
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var vm: DisplaySettingsViewModel
@@ -45,21 +39,16 @@ class DisplaySettingsViewModelGameBootTest {
             context,
             UiMediaStore(context),
             GameBootPreferences(context),
-            // Real, not a mock: it reads the same DataStore the assertions do, so a test about
-            // one toggle cannot pass because the other one was stubbed.
+
             com.psplauncher.core.data.launch.LaunchDiscPreferences(context),
             io.mockk.mockk(relaxed = true),
-            // The layout repo only feeds the media rows' face-button shortcuts. A relaxed mock
-            // would hand the combine a flow that never emits, so the state would never build.
+
             io.mockk.mockk(relaxed = true) {
                 io.mockk.every { prefs } returns kotlinx.coroutines.flow.flowOf(
                     com.psplauncher.core.domain.model.ControllerLayoutPrefs()
                 )
             },
-            // The disk work runs on the TEST scheduler, not a real pool — the same injection
-            // FontColorTest takes, and for the same reason. It does NOT make these tests
-            // deterministic on its own: DataStore keeps its own scope and threads, which is the
-            // race that still makes this class flaky under load. It removes the ViewModel's half.
+
             io = dispatcher,
         )
     }
@@ -81,8 +70,6 @@ class DisplaySettingsViewModelGameBootTest {
 
     @Test
     fun `toggling retires the unreleased mode key`() = runTest(dispatcher) {
-        // A device that ran the three-way build carries this. Without the removal it would keep
-        // outranking every later toggle, and the row would appear stuck.
         context.pfpDataStore.edit { it[KEY_GAMEBOOT_MODE] = "SOUND_ONLY" }
 
         eventually("the stale mode reads as on") { vm.uiState.first().gameBootEnabled }
@@ -90,9 +77,7 @@ class DisplaySettingsViewModelGameBootTest {
         vm.setGameBootEnabled(false)
 
         eventually("the toggle wins") { !vm.uiState.first().gameBootEnabled }
-        // JUnit's assertNull takes the MESSAGE first. Value-first compiles here — the value is a
-        // String? too — and silently asserts that the message literal is null, so this test could
-        // never pass and the retirement it guards was never actually verified.
+
         assertNull(
             "the retired mode key must not survive a toggle",
             context.pfpDataStore.data.first()[KEY_GAMEBOOT_MODE],
@@ -101,8 +86,6 @@ class DisplaySettingsViewModelGameBootTest {
 
     @Test
     fun `an established install with the old boolean surfaces off in the row`() = runTest(dispatcher) {
-        // The pre-toggle era: boolean off + first-run marker. The row must show off, the same
-        // value the gate will honour at launch.
         context.pfpDataStore.edit {
             it[KEY_GAMEBOOT_ENABLED] = false
             it[KEY_SETUP_SEEN] = true
@@ -111,14 +94,7 @@ class DisplaySettingsViewModelGameBootTest {
         eventually("boolean false surfaces as off in the row") { !vm.uiState.first().gameBootEnabled }
     }
 
-    /**
-     * Waits until [condition] holds. Drives the test scheduler (the VM's coroutines) and, in
-     * the same loop, sleeps on a REAL IO thread (never the scheduler thread) so wall-clock
-     * work — DataStore writes — gets time to land. Same pattern as the Legibility test.
-     */
-
     private companion object {
-        // Mirror the (private) preference keys by their string contract.
         val KEY_GAMEBOOT_ENABLED = booleanPreferencesKey("display_gameboot_enabled")
         val KEY_GAMEBOOT_MODE = stringPreferencesKey("display_gameboot_mode")
         val KEY_SETUP_SEEN = booleanPreferencesKey("initial_setup_seen")

@@ -7,14 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Pins the pure app-picker logic ([visibleApps], [AppPickerState.toggle], [AppPickerState.move],
- * [clampFocus], [pendingAdds], [pendingRemovals]) — the rules the
- * redesign demands: selection survives search, focus never strands, moves never wrap, and Apply
- * diffs against the membership the picker opened with.
- */
 class AppPickerLogicTest {
-
     private fun app(pkg: String, label: String = pkg) = AppPickerEntry(packageName = pkg, label = label)
 
     private fun state(
@@ -34,8 +27,6 @@ class AppPickerLogicTest {
         query = query,
         columns = columns,
     )
-
-    // ── visibleApps / search ──────────────────────────────────────────────────────
 
     @Test
     fun `no query shows every app`() {
@@ -62,8 +53,6 @@ class AppPickerLogicTest {
         assertEquals(setOf("a", "b"), s.selected)
     }
 
-    // ── toggle ────────────────────────────────────────────────────────────────────
-
     @Test
     fun `toggle adds then removes the same package`() {
         val afterAdd = state().toggle("a")
@@ -86,8 +75,6 @@ class AppPickerLogicTest {
         assertEquals(setOf("a"), toggled.selected)
     }
 
-    // ── pending diffs ─────────────────────────────────────────────────────────────
-
     @Test
     fun `pendingAdds is selected minus initialSelected`() {
         val s = state(selected = setOf("a", "b"), initialSelected = setOf("b", "c"))
@@ -105,16 +92,13 @@ class AppPickerLogicTest {
 
     @Test
     fun `selection surviving a search round-trip diffs clean against membership`() {
-        // Open with membership, filter away a checked app, clear: nothing pending.
         val opened = state(selected = setOf("a", "d"), initialSelected = setOf("a", "d"))
-        val filtered = opened.copy(query = "d")           // "a" hidden, still selected
+        val filtered = opened.copy(query = "d")
         assertEquals(setOf("a", "d"), filtered.selected)
         val cleared = filtered.copy(query = "")
         assertTrue(cleared.pendingAdds().isEmpty())
         assertTrue(cleared.pendingRemovals().isEmpty())
     }
-
-    // ── clampFocus ────────────────────────────────────────────────────────────────
 
     @Test
     fun `clampFocus on an empty visible list returns zero`() {
@@ -140,12 +124,10 @@ class AppPickerLogicTest {
         assertEquals(4, s.clampFocus().focusedIndex)
     }
 
-    // ── move (grid navigation, no wrap) ───────────────────────────────────────────
-
     private val sevenColumns = listOf(
         listOf("a", "b", "c", "d", "e", "f", "g"),
         listOf("h", "i", "j"),
-    )   // 10 apps, 7 per row
+    )
 
     private fun gridState(focusedIndex: Int) = state(
         packages = sevenColumns.flatten(),
@@ -186,7 +168,6 @@ class AppPickerLogicTest {
 
     @Test
     fun `move down into the short last row stops at the last item`() {
-        // From index 2 (row 0, col 2), down lands on index 9 — the last item of the 3-item row.
         assertEquals(9, gridState(2).move(GamepadAction.NAVIGATE_DOWN).focusedIndex)
     }
 
@@ -195,8 +176,6 @@ class AppPickerLogicTest {
         val s = state(packages = emptyList())
         assertEquals(0, s.move(GamepadAction.NAVIGATE_DOWN).focusedIndex)
     }
-
-    // ── confirm-modal option focus ────────────────────────────────────────────────
 
     @Test
     fun `confirm modal starts focused on cancel`() {
@@ -246,12 +225,6 @@ class AppPickerLogicTest {
         assertEquals(AppPickerState.CONFIRM_CANCEL, cancelled.confirmFocusedOption)
     }
 
-    // ── categoryShowsApps ─────────────────────────────────────────────────────
-    //
-    // "Add to Cross Bar" puts an app in whichever column the drawer was opened over, and three
-    // columns never read their assigned apps. Getting this wrong writes a row that nothing draws:
-    // the toast says it worked, the database agrees, and the app is nowhere.
-
     private fun builtIn(id: String) = BUILT_IN_CATEGORIES.first { it.id == id }
 
     @Test
@@ -264,7 +237,7 @@ class AppPickerLogicTest {
     @Test
     fun `Last Played refuses apps although it is not a gaming category`() {
         val recents = builtIn(BuiltInCategory.RECENTLY_PLAYED)
-        // The trap: the flag says "not gaming", so !isGamingCategory alone lets the write through.
+
         assertEquals(false, recents.isGamingCategory)
         assertEquals(false, categoryShowsApps(recents))
     }
@@ -275,20 +248,6 @@ class AppPickerLogicTest {
         assertEquals(false, categoryShowsApps(builtIn(BuiltInCategory.GAMES)))
     }
 
-    // ── The pair: the grid's column count and the cursor's must be the same number ────────
-
-    /**
-     * DOWN moves by exactly one drawn row, whatever the panel measured.
-     *
-     * This is why [AppPickerState.columns] exists instead of `move` reading the constant. The
-     * grid used to be a fixed seven on every screen; it is now the panel's width divided by a
-     * tile's, so a tablet draws nine and the Titan five. A cursor still stepping by seven through
-     * a nine-wide grid lands two tiles from the one under the eye — on the device with the most
-     * screen, silently.
-     *
-     * Asserted across a range rather than at one value: a hand-picked number is exactly how the
-     * old constant survived, by agreeing with the grid on the only device anyone ran.
-     */
     @Test
     fun `down steps one drawn row, whatever the panel measured`() {
         val packages = (1..40).map { "p$it" }
@@ -303,13 +262,6 @@ class AppPickerLogicTest {
         }
     }
 
-    /**
-     * RIGHT stops at the drawn row's edge, not at a remembered one.
-     *
-     * The failure this catches reads as "the cursor jumps a row": at a column count below the
-     * constant, a cursor that still believes in seven walks off the end of row one and reappears
-     * at the start of row two.
-     */
     @Test
     fun `right stops at the end of the drawn row`() {
         val packages = (1..40).map { "p$it" }
@@ -324,7 +276,6 @@ class AppPickerLogicTest {
         }
     }
 
-    /** A measurement arriving before layout must not divide by zero or strand the cursor. */
     @Test
     fun `a zero or negative column count is survived`() {
         for (cols in -3..0) {

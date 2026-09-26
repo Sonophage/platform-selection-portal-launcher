@@ -17,19 +17,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * What the redesigned page renders for two content shapes the design calls out explicitly: a
- * package-backed entry (no emulator controls anywhere, no emulator information field) and an entry
- * with nothing to preview (no media band, no information band).
- *
- * Rendering the real screen with a state-driving fake is the point: the rules live in the layout, so
- * nothing short of a composition can show that a band is absent rather than empty.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w480dp-h640dp")
 class GameDetailScreenContentTest {
-
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -51,7 +42,6 @@ class GameDetailScreenContentTest {
         composeRule.waitForIdle()
     }
 
-    /** Whether the composed page contains [text] anywhere (labels are not unique by design). */
     private fun exists(text: String): Boolean =
         composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
 
@@ -70,17 +60,15 @@ class GameDetailScreenContentTest {
                     id = 7L,
                     title = "Netflix",
                     platformId = "android",
-                    // Package-backed: launched through its package, so no emulator applies.
+
                     romPath = null,
                     packageName = "com.netflix.mediaclient",
                 ),
             ),
         )
 
-        // The emulator lives in the Options menu now, which is closed here. It was an inline
-        // field on the information band, and the band became a panel page.
         assertAbsent("Emulator", "a package-backed entry must not offer an emulator action")
-        // The footer is the page's whole cursor surface: heart, gear, Play.
+
         assertPresent("Play", "the primary action must survive an entry with no extra content")
         assertPresent("Favorite", "the footer's first button must survive a bare entry")
         assertPresent("Options", "the gear is where scrape and edit live, on every entry")
@@ -108,16 +96,12 @@ class GameDetailScreenContentTest {
             ),
         )
 
-        // The page opens on its logo page, which for a game with no logo is the title. The
-        // overview, the media strip and the information band are OTHER pages: one at a time, so
-        // what used to be five bands stacked down a scrolling column is now four tabs, and only
-        // the current one may be on screen.
         assertPresent("Crash Bandicoot", "the logo page falls back to the title when there is no logo")
         assertAbsent("Emulator", "the emulator field is an Options row now, not a page band")
         assertAbsent("Manual", "the manual row belongs to the closed Options menu")
         assertAbsent("VIDEO", "the media tiles belong to the media page, which is not the one showing")
         assertAbsent("Bandicoot jumps.", "the description belongs to the info page, not the logo page")
-        // The footer is present on every page.
+
         assertPresent("Play", "the footer carries Play on every page")
         assertPresent("Options", "the footer carries the gear on every page")
     }

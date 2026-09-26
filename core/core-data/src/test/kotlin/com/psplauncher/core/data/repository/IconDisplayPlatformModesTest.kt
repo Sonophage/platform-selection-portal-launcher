@@ -6,13 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The per-console icon display overrides are stored as ONE DataStore string (so the backup key
- * list can carry them by name). These cover the encode/decode round trip and the garbage cases
- * a hand-edited or partially-migrated value can produce.
- */
 class IconDisplayPlatformModesTest {
-
     @Test
     fun `round trips a map of platform overrides`() {
         val modes = mapOf("psx" to IconDisplayMode.BOX_ART, "snes" to IconDisplayMode.BOX_3D)

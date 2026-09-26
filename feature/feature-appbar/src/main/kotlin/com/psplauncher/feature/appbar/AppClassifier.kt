@@ -4,7 +4,6 @@ import android.content.pm.ApplicationInfo
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Category ids these match the seeded built-in categories in CategoryRepositoryImpl.
 object AppCategoryIds {
     const val PHOTO     = "photos"
     const val MUSIC     = "music"
@@ -12,24 +11,16 @@ object AppCategoryIds {
     const val NETWORK   = "network"
 }
 
-// Produces the DEFAULT category placement for an installed app. This is only a starting
-// point — once the user customizes an app's placement, AppCategoryRepository ignores this.
-//
-// Resolution order: curated package database → Android system category → label keywords.
 @Singleton
 class AppClassifier @Inject constructor() {
-
     fun defaultCategories(app: InstalledApp): Set<String> {
-        // 1) Curated database — exact or prefix match wins.
         curatedCategory(app.packageName)?.let { return setOf(it) }
 
-        // 2) Android-declared application category.
         systemCategory(app.systemCategory)?.let { return setOf(it) }
 
-        // 3) Label keyword fallback (e.g. generic "Browser").
         labelCategory(app.label)?.let { return setOf(it) }
 
-        return emptySet()   // unclassified — remains reachable via the App Drawer
+        return emptySet()
     }
 
     private fun curatedCategory(pkg: String): String? {
@@ -56,7 +47,6 @@ class AppClassifier @Inject constructor() {
     }
 
     private companion object {
-        // categoryId → known package-name prefixes
         val CURATED: Map<String, List<String>> = mapOf(
             AppCategoryIds.VIDEO to listOf(
                 "com.google.android.youtube", "com.google.android.apps.youtube",
@@ -73,23 +63,14 @@ class AppClassifier @Inject constructor() {
                 "com.duckduckgo.mobile.android", "com.sec.android.app.sbrowser",
                 "com.UCMobile.intl", "com.kiwibrowser.browser", "org.torproject.torbrowser",
                 "mark.via", "com.android.browser",
-                // ── Remote play ──────────────────────────────────────────────────────────
-                // Streaming clients belong in Network, not Game: they need a connection before
-                // they need a controller, and they run nothing on this device. A PSP owner looks
-                // under Network for "things that talk to something else".
-                //
-                // Verified installed on the test tablet: com.limelight (which by prefix also
-                // covers com.limelight.noir) and com.boosteroid.streaming. The rest are taken
-                // from each app's published id and have NOT been seen on a device here -- a wrong
-                // prefix classifies nothing and fails silently, so they are listed one per line
-                // with the app named, and AppClassifierTest pins each one.
-                "com.limelight",                    // Moonlight (and Moonlight Noir)
-                "com.boosteroid.streaming",         // Boosteroid
-                "com.metallic.chiaki",              // Chiaki (PS4/PS5 remote play)
-                "com.valvesoftware.steamlink",      // Steam Link
-                "com.nvidia.geforcenow",            // GeForce NOW
-                "com.microsoft.xcloud",             // Xbox Cloud Gaming
-                "com.parsecgaming.parsec",          // Parsec
+
+                "com.limelight",
+                "com.boosteroid.streaming",
+                "com.metallic.chiaki",
+                "com.valvesoftware.steamlink",
+                "com.nvidia.geforcenow",
+                "com.microsoft.xcloud",
+                "com.parsecgaming.parsec",
             ),
             AppCategoryIds.MUSIC to listOf(
                 "com.spotify.music", "com.google.android.apps.youtube.music",

@@ -11,15 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/**
- * C16 task D.2 — identity is buffered in memory and written once per operation, never per file.
- *
- * That rule is the whole reason this class exists: `RoutingArtworkStore.persistPortable` runs once
- * per artwork file, and a scrape that saves eight kinds would otherwise rewrite the whole index
- * eight times over SAF on an SD card.
- */
 class ArtworkIdentityRecorderTest {
-
     private val library = mockk<PortableArtworkLibrary>()
     private val tree = mockk<Uri>()
     private lateinit var recorder: ArtworkIdentityRecorder
@@ -39,8 +31,6 @@ class ArtworkIdentityRecorderTest {
         coEvery { library.writeIdentityIndex(any(), any()) } returns true
         recorder = ArtworkIdentityRecorder(library)
     }
-
-    // ── The buffering rule ────────────────────────────────────────────────────
 
     @Test fun `recording never writes`() = runTest {
         recorder.record(tree, entry())
@@ -75,10 +65,6 @@ class ArtworkIdentityRecorderTest {
         coVerify(exactly = 1) { library.writeIdentityIndex(any(), any()) }
     }
 
-    // ── Merging with what the folder already holds ────────────────────────────
-
-    // The folder is the source of truth: a recorder that started from an empty index would drop
-    // every row written by a previous session the first time it flushed.
     @Test fun `rows already in the folder survive a flush`() = runTest {
         val existing = ArtworkIdentityIndex(
             entries = listOf(
@@ -106,8 +92,6 @@ class ArtworkIdentityRecorderTest {
         coVerify(exactly = 1) { library.readIdentityIndex(any()) }
     }
 
-    // ── Re-recording one file ─────────────────────────────────────────────────
-
     @Test fun `re-recording the same file replaces its row rather than duplicating it`() = runTest {
         val written = slot<ArtworkIdentityIndex>()
         recorder.record(tree, entry(ssId = 1))
@@ -119,8 +103,6 @@ class ArtworkIdentityRecorderTest {
         assertEquals(2L, written.captured.find("snes", "ICON", "Final Fantasy VI")?.ssId)
     }
 
-    // A failed write must not clear the dirty flag, or the rows would be lost silently and the
-    // library would keep matching by name with no sign anything went wrong.
     @Test fun `a failed write stays dirty so the next flush retries`() = runTest {
         coEvery { library.writeIdentityIndex(any(), any()) } returns false
         recorder.record(tree, entry())
@@ -131,8 +113,6 @@ class ArtworkIdentityRecorderTest {
         assertTrue(recorder.flush(tree))
         coVerify(exactly = 2) { library.writeIdentityIndex(any(), any()) }
     }
-
-    // ── Tri-state read (task 1.3 / D3) ────────────────────────────────────────
 
     @Test fun `an absent folder index is created by flush`() = runTest {
         coEvery { library.readIdentityIndex(any()) } returns PortableArtworkLibrary.IdentityIndexRead.Absent
@@ -187,8 +167,6 @@ class ArtworkIdentityRecorderTest {
         coVerify(atLeast = 2) { library.readIdentityIndex(any()) }
     }
 
-    // ── Bulk upsert (task 1.4) ─────────────────────────────────────────────────
-
     @Test fun `recordAll buffers every row and flush writes them all at once`() = runTest {
         val written = slot<ArtworkIdentityIndex>()
 
@@ -208,12 +186,6 @@ class ArtworkIdentityRecorderTest {
         coVerify(exactly = 0) { library.writeIdentityIndex(any(), any()) }
     }
 
-    // ── Relink acceptance (task 1.4 / D2) ──────────────────────────────────────
-
-    // A relink reads through `current(tree)` before it walks the library, then writes back its
-    // whole backfill through `recordAll` + `flush` — this is what replaces the old direct
-    // read/writeIdentityIndex calls in ArtworkImportManager.relinkLibrary. A recorder that loaded
-    // the folder once, up front, must still keep the relink's rows once it flushes.
     @Test fun `a recorder loaded before a relink keeps the relink's rows after flush`() = runTest {
         val existing = ArtworkIdentityIndex(
             entries = listOf(
@@ -224,12 +196,9 @@ class ArtworkIdentityRecorderTest {
         )
         coEvery { library.readIdentityIndex(any()) } returns PortableArtworkLibrary.IdentityIndexRead.Loaded(existing)
 
-        // The relink's read, before its walk.
         val seen = recorder.current(tree)
         assertEquals(1, seen.entries.size)
 
-        // The relink's walk backfills identity for every file it linked, including a fresh row
-        // for the platform the folder already knew about.
         val relinkRows = listOf(
             entry(kind = "ICON"),
             ArtworkIdentityIndex.Entry(

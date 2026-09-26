@@ -4,13 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
-/**
- * IGDB's Apicalypse query bodies. Pure strings, so they are pinned without a network client: the
- * search must ask for a LIST with ids (Tier 3 and Change Match need more than `limit 1`), and a
- * confirmed match must be fetched by id rather than re-searched by title.
- */
 class IgdbApiTest {
-
     @Test
     fun `title search asks for a list with names and release dates`() {
         assertEquals(

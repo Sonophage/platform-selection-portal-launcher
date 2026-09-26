@@ -25,16 +25,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/*
- * PFP's checkmark, drawn as a path instead of typed as "✓".
- *
- * A glyph takes its shape, weight and vertical position from whichever font the device falls back
- * to and from the inherited line height, so it sat off-centre in every badge and box that used it.
- * A path looks the same on every device. Three shapes: the bare mark for list rows, [PfpCheckbox]
- * for toggles, and [PfpCheckBadge] for tiles.
- */
-
-/** The bare mark, [size] square. [shadow] draws a 1 dp drop copy first, for marks over wallpaper. */
 @Composable
 fun PfpCheckMark(
     color: Color,
@@ -54,7 +44,6 @@ fun PfpCheckMark(
     }
 }
 
-/** A square checkbox: filled with [color] and marked in [markColor] when checked, an outline when not. */
 @Composable
 fun PfpCheckbox(
     checked: Boolean,
@@ -78,7 +67,6 @@ fun PfpCheckbox(
     }
 }
 
-/** A round badge carrying the mark, for a picked tile's corner. */
 @Composable
 fun PfpCheckBadge(
     fill: Color,
@@ -96,7 +84,6 @@ fun PfpCheckBadge(
     }
 }
 
-// Proportions of the approved mockup (C19): a 24-unit box with the stroke through 5,12.5 → 9.5,17 → 19,7.5.
 private fun checkPath(size: Size) = Path().apply {
     moveTo(size.width * 0.21f, size.height * 0.52f)
     lineTo(size.width * 0.40f, size.height * 0.71f)

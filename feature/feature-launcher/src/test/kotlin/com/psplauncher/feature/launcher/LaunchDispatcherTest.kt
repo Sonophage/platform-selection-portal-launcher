@@ -23,16 +23,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Pins the B1 launch funnel: outcomes recorded per settled launch and the lifecycle-driven
- * foreground verification ([LaunchDispatcher.STOP_WINDOW_MS]). The verdict comes from whether the
- * emulator actually covered the launcher, never from a session-duration threshold. The clock is
- * injected and shares the runTest scheduler, so the watchdog window is driven by [advanceTimeBy]
- * — no real sleeps.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LaunchDispatcherTest {
-
     private val game = Game(
         id = 7L,
         title = "Crash Bandicoot",
@@ -56,13 +48,9 @@ class LaunchDispatcherTest {
         val recorder: LaunchOutcomeRecorder = mockk(relaxed = true)
         val intent: Intent = mockk(relaxed = true)
         var now = 0L
-        // Deliberately far apart and obviously different in kind: uptime is small, the wall clock
-        // is an epoch instant. A test that gave them the same value could not tell which one a
-        // write used, which is the entire bug this harness now has to be able to catch.
+
         var wallNow = 1_790_000_000_000L
 
-        // GameBoot switched off in every existing case: awaitPresentation returns immediately,
-        // so these tests keep pinning the dispatcher's own behaviour rather than the gate's.
         val gameBootPreferences: com.psplauncher.core.data.repository.GameBootPreferences =
             mockk(relaxed = true) {
                 every { gameBootEnabledFlow } returns kotlinx.coroutines.flow.flowOf(false)
@@ -89,16 +77,12 @@ class LaunchDispatcherTest {
 
     private fun TestScope.harness() = Harness(this)
 
-    // runTest auto-advances the virtual clock; keep every dispatcher job on that same scheduler so
-    // scope.launch work (verdict recording, watchdog) is driven by advanceUntilIdle/advanceTimeBy.
-
     private suspend fun Harness.launchAccepted() {
         coEvery { recorder.record(any()) } returns Unit
         val result = dispatcher.launch(game, resolved, intent)
         assertIs<LaunchDispatchResult.Accepted>(result)
     }
 
-    // A RetroArch core hand-off: the launch that must pin the console to its core.
     private val retroarchResolved = ResolvedLaunch(
         profile = EmulatorProfile(
             id = "auto_retroarch_gambatte_libretro_android",
@@ -118,21 +102,13 @@ class LaunchDispatcherTest {
 
         h.dispatcher.launch(game, retroarchResolved, h.intent)
 
-        // One write per successful core launch: Game Detail and the XMB direct-launch path both
-        // funnel here, so the record stays consistent for both entry points.
         coVerify(exactly = 1) {
             h.autoCoreMemory.remember("psx", "auto_retroarch_gambatte_libretro_android")
         }
     }
 
-    // ── The Last Played stamp ────────────────────────────────────────────────
-
     @Test
     fun `a dispatched launch stamps the shelf before the emulator has even opened`() = runTest {
-        // The stamp used to ride along with the play session, which needs `pending` and
-        // `hostStopped` to still be in memory when the user returns. A big game is exactly what
-        // evicts the launcher, so the return is a cold start and the whole hand-off is gone --
-        // and with it the one fact the Last Played shelf reads.
         val h = harness()
         coEvery { h.recorder.record(any()) } returns Unit
         h.now = 1_234L
@@ -141,18 +117,12 @@ class LaunchDispatcherTest {
         h.dispatcher.launch(game, resolved, h.intent)
         advanceUntilIdle()
 
-        // The WALL clock. Stamping the monotonic one put a few hours of uptime into a column the
-        // shelf sorts against epoch milliseconds, so the game just played sorted below every row
-        // in the library and landed at the BOTTOM of Last Played.
         coVerify(exactly = 1) { h.gameRepository.markOpened(7L, 1_790_000_001_000L) }
         coVerify(exactly = 0) { h.gameRepository.markOpened(7L, 1_234L) }
     }
 
     @Test
     fun `a launch the process never returns from is still on the shelf`() = runTest {
-        // The actual failure, played out: dispatched, the launcher is covered, and nothing ever
-        // reports back because the process died. No session is recorded, and that is correct --
-        // the duration is genuinely unknown. The stamp must survive it anyway.
         val h = harness()
         coEvery { h.recorder.record(any()) } returns Unit
         h.now = 5_000L
@@ -168,8 +138,6 @@ class LaunchDispatcherTest {
 
     @Test
     fun `a launch that never reached startActivity does not stamp`() = runTest {
-        // Same rule the core-memory write follows: after startActivity, so a launch that did not
-        // happen cannot claim the top of the shelf. Preflight refusals never get here at all.
         val h = harness()
         coEvery { h.recorder.record(any()) } returns Unit
         every { h.context.startActivity(any(), any()) } throws
@@ -232,7 +200,7 @@ class LaunchDispatcherTest {
         val h = harness()
         h.launchAccepted()
         assertNull(h.dispatcher.recoveryRequests.value)
-        // Nothing yet settled — the verdict comes from the lifecycle or the stop-window watchdog.
+
         coVerify(exactly = 0) { h.recorder.record(any()) }
     }
 
@@ -257,9 +225,6 @@ class LaunchDispatcherTest {
         val h = harness()
         h.launchAccepted()
 
-        // The emulator took the foreground and the user chose to close it right away. That is a
-        // deliberate decision, not a crash — an instant close must record success and never pop
-        // recovery UI, however short the session was.
         h.dispatcher.onHostStopped()
         h.now = 1_000
         h.dispatcher.onHostResumed()
@@ -276,8 +241,6 @@ class LaunchDispatcherTest {
         val h = harness()
         h.launchAccepted()
 
-        // startActivity succeeded, but the launcher was never covered and the user is back almost
-        // immediately (before the stop window): the emulator never demonstrably ran.
         h.now = 1_000
         h.dispatcher.onHostResumed()
         advanceUntilIdle()
@@ -310,8 +273,6 @@ class LaunchDispatcherTest {
         val h = harness()
         h.launchAccepted()
 
-        // The emulator covers the launcher well inside the stop window (the normal case), then the
-        // user plays on. The watchdog must not flag anything: the verdict waits for onHostResumed.
         h.now = 1_000
         h.dispatcher.onHostStopped()
         advanceTimeBy(LaunchDispatcher.STOP_WINDOW_MS + 1_000)
@@ -320,7 +281,6 @@ class LaunchDispatcherTest {
         coVerify(exactly = 0) { h.recorder.record(any()) }
         assertNull(h.dispatcher.recoveryRequests.value)
 
-        // And the eventual return (a real session) settles it as a success.
         h.now = 60_000
         h.dispatcher.onHostResumed()
         advanceUntilIdle()
@@ -399,18 +359,6 @@ class LaunchDispatcherTest {
         launchedAtMs = 1L,
     )
 
-    // ── Play sessions ──────────────────────────────────────────────────────────────
-    //
-    // Until these were written, `recordPlaySession` had exactly two references in the whole repository:
-    // its own interface declaration and its own implementation. Nothing called it. So `last_played_at`
-    // and `total_play_time_millis` were never written, the Recently Played sort ordered every game by
-    // zero, and Game Detail's "Last played" / "Play time" rows are null-guarded and never rendered.
-    //
-    // The rule these pin is WHEN a session counts: only when the emulator demonstrably covered the
-    // launcher and the user came back. A launch that never foregrounded is not play time, and neither
-    // is one that may still be running.
-
-
     @Test
     fun `a verified session records the real duration and stamps last played`() = runTest {
         val h = Harness(this)
@@ -418,7 +366,7 @@ class LaunchDispatcherTest {
         assertIs<LaunchDispatchResult.Accepted>(h.dispatcher.launch(game, null, h.intent))
 
         h.dispatcher.onHostStopped()
-        h.now = 1_800_000L                     // half an hour inside the emulator
+        h.now = 1_800_000L
         h.dispatcher.onHostResumed()
         advanceUntilIdle()
 
@@ -426,12 +374,7 @@ class LaunchDispatcherTest {
         coVerify(exactly = 1) { h.gameRepository.recordPlaySession(capture(session)) }
         assertEquals(7L, session.captured.gameId)
         assertEquals("psx", session.captured.platformId)
-        // launchedAt is when the game STARTED, not when the user came back — it is what
-        // `last_played_at` is set from, and a session must not be dated by its own end.
-        //
-        // And it is the WALL clock, not the monotonic one the duration is measured with. This
-        // asserted 0L before, which was uptime-at-dispatch and looked perfectly reasonable right
-        // up until you noticed it was going into a column compared against epoch milliseconds.
+
         assertEquals(1_790_000_000_000L, session.captured.launchedAt)
         assertEquals(1_800_000L, session.captured.durationMillis)
     }
@@ -442,7 +385,6 @@ class LaunchDispatcherTest {
         coEvery { h.recorder.record(any()) } returns Unit
         assertIs<LaunchDispatchResult.Accepted>(h.dispatcher.launch(game, null, h.intent))
 
-        // Back without the launcher ever being covered: the emulator never appeared.
         h.now = 900L
         h.dispatcher.onHostResumed()
         advanceUntilIdle()
@@ -464,8 +406,6 @@ class LaunchDispatcherTest {
 
     @Test
     fun `a repository failure never takes the launcher down with it`() = runTest {
-        // Recording is bookkeeping. It must not be able to turn a good session into a crash on the
-        // dispatcher's own scope, which has no supervisor above it.
         val h = Harness(this)
         coEvery { h.recorder.record(any()) } returns Unit
         coEvery { h.gameRepository.recordPlaySession(any()) } throws IllegalStateException("db closed")

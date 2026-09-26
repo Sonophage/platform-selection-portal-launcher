@@ -9,16 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Marking a game Playing / Completed / Backlog.
- *
- * The pair here is a menu id and an enum name. The submenu builds `pstate_${'$'}{state.name}` and the
- * handler reads it back with [PlayState.fromName], so a renamed constant does not break the build
- * and does not crash — the press simply stops doing anything, which is the failure nobody reports.
- * Same shape as the pill row's id pairing, one file over.
- */
 class PlayStateMenuTest {
-
     private fun state() = XMBUiState(
         categories = listOf(
             Category(
@@ -49,30 +40,17 @@ class PlayStateMenuTest {
         }
     }
 
-    /**
-     * The clear row. "Unmarked" is a real row rather than an absence, because the only other way
-     * out of a state would be picking a different one — and a flag you can set but not unset is
-     * the shape of every flag that ends up stuck on.
-     */
     @Test
     fun `the unmarked row clears rather than naming a state`() {
         assertNull(PlayState.fromName("none"))
     }
 
-    /**
-     * A value the enum does not have reads as unmarked, not as a crash. The column is TEXT and
-     * nothing stops an older or newer build writing a name this one has never heard of.
-     */
     @Test
     fun `an unknown stored value is unmarked`() {
         assertNull(PlayState.fromName("ABANDONED"))
         assertNull(PlayState.fromName(null))
     }
 
-    /**
-     * Three states, three distinct marks. They are drawn one glyph wide with no label beside them,
-     * so two states sharing a glyph would be two states nobody can tell apart on the row.
-     */
     @Test
     fun `the badges are distinguishable from each other`() {
         val marks = PlayState.entries.map { it.mark }

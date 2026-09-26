@@ -14,11 +14,6 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
 
-// Small marks drawn as paths rather than typed as characters. A glyph takes its shape, weight and
-// baseline from whichever font the device falls back to — the same reason PfpCheckMark exists — and
-// these three sit inside tight chrome where that drift is visible.
-
-/** The favorite star, for badges and rows. */
 @Composable
 fun PfpStarMark(
     color: Color,
@@ -32,7 +27,7 @@ fun PfpStarMark(
         val inner = outer * 0.44f
         val path = Path()
         repeat(10) { i ->
-            // Alternate outer/inner radius, starting straight up (-90°), for a five-pointed star.
+
             val radius = if (i % 2 == 0) outer else inner
             val angle = Math.toRadians((-90.0 + i * 36.0))
             val x = cx + (radius * cos(angle)).toFloat()
@@ -44,7 +39,6 @@ fun PfpStarMark(
     }
 }
 
-/** The disclosure chevron shown at a row's trailing edge — "Confirm opens more". */
 @Composable
 fun PfpChevronMark(
     color: Color,
@@ -67,7 +61,6 @@ fun PfpChevronMark(
     }
 }
 
-/** The media-tile play mark. */
 @Composable
 fun PfpPlayMark(
     color: Color,

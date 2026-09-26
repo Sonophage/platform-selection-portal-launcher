@@ -28,7 +28,7 @@ import javax.inject.Inject
 
 data class BackupSettingsUiState(
     val lastBackupDate: String? = null,
-    val backupFolder: String? = null,   // display name of the chosen SAF folder; null = not set
+    val backupFolder: String? = null,
     val backupFiles: List<String> = emptyList(),
     val isWorking: Boolean = false,
     val workingMessage: String = "",
@@ -43,7 +43,6 @@ class BackupSettingsViewModel @Inject constructor(
     private val backupManager: BackupManager,
     private val backupFolderRepository: BackupFolderRepository,
 ) : ViewModel() {
-
     private val workManager = WorkManager.getInstance(context)
     private val _uiState = MutableStateFlow(BackupSettingsUiState())
     val uiState: StateFlow<BackupSettingsUiState> = _uiState.asStateFlow()
@@ -52,7 +51,6 @@ class BackupSettingsViewModel @Inject constructor(
         refreshBackupList()
     }
 
-    /** Persists the chosen SAF backup folder (read+write) and refreshes the saved-backups list. */
     fun setBackupFolder(uri: android.net.Uri) {
         viewModelScope.launch {
             backupFolderRepository.persist(uri)
@@ -93,7 +91,7 @@ class BackupSettingsViewModel @Inject constructor(
                         _uiState.update { it.copy(isWorking = false, workingMessage = "") }
                         return@collect
                     }
-                    else -> { /* ENQUEUED / RUNNING — keep showing progress */ }
+                    else -> {  }
                 }
             }
         }
@@ -131,7 +129,6 @@ class BackupSettingsViewModel @Inject constructor(
         }
     }
 
-    // Kept for legacy composable call sites that haven't wired SAF yet
     fun restoreFromFile() {
         Timber.d("restoreFromFile — SAF picker launched by composable")
     }
@@ -153,7 +150,6 @@ class BackupSettingsViewModel @Inject constructor(
         }
     }
 
-    // A human-readable label for the chosen SAF tree (the last path segment of its document id).
     private fun backupFolderDisplayName(treeUri: String): String =
         runCatching {
             val docId = android.provider.DocumentsContract.getTreeDocumentId(android.net.Uri.parse(treeUri))

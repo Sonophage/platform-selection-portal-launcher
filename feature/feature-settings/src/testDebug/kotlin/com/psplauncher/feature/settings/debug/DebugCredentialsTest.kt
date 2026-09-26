@@ -13,16 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The debug-only credentials file: one `.properties` file that fills every artwork
- * credential at once, so a fresh debug install does not need each key typed in again.
- *
- * Debug source set only — the release build carries a stub loader and none of this code.
- */
 class DebugCredentialsTest {
-
-    // ── Parsing ───────────────────────────────────────────────────────────
-
     @Test
     fun `a full file fills every credential`() {
         val file = DebugCredentialsFile.parse(
@@ -73,8 +64,6 @@ class DebugCredentialsTest {
         val file = DebugCredentialsFile.parse("steamgriddb.apiKey =   spaced-key   ".reader())
         assertEquals("spaced-key", file.steamGridDbKey)
     }
-
-    // ── Applying ──────────────────────────────────────────────────────────
 
     private val sgdb = mockk<SgdbApiKeyProvider>(relaxed = true)
     private val metadata = mockk<MetadataApiKeyProvider>(relaxed = true)
@@ -139,8 +128,6 @@ class DebugCredentialsTest {
         assertEquals(listOf("SteamGridDB", "ScreenScraper"), report.loaded)
         assertEquals(listOf("IGDB"), report.failed)
     }
-
-    // ── One call from text to a status line ───────────────────────────────
 
     @Test
     fun `loading text says what was filled and what went wrong`() = runTest {

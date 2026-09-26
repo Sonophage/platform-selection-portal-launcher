@@ -39,19 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.theme.StorefrontColors
 
-// ── The search box ────────────────────────────────────────────────────────────
-//
-// Full width, pill-shaped, magnifier INSIDE it where a modern search box puts it, and the whole
-// row is the touch target. The App Drawer's header arrived at this shape first; it is here for
-// the same reason [PfpHintBar] is — the drawer is not the only screen that searches a grid, and
-// the installed-app picker cannot see feature-appbar to borrow it.
-//
-// It is the caret rule that makes this worth sharing rather than copying. A plain String value
-// leaves the selection at 0 while text arrives around it, so a query seeded from outside the
-// field — type-to-search hands the first character in before the box has focus — takes every
-// character after it at position zero: typing C then L produces "lc" on the device. The drawer
-// and SearchScreen each learned that separately. A third copy would have learned it a third time.
-
 private val FIELD_HEIGHT = 40.dp
 private val FIELD_CORNER = FIELD_HEIGHT / 2
 private val FIELD_BORDER = 1.dp
@@ -68,8 +55,6 @@ fun PfpSearchField(
     colors: StorefrontColors,
     modifier: Modifier = Modifier,
 ) {
-    // The edge brightens when the field is live rather than switching outright, so the box does
-    // not blink between two looks every time the keyboard comes and goes.
     val edge by animateColorAsState(
         targetValue = if (active) colors.searchBorder else colors.searchBorder.copy(alpha = 0.35f),
         animationSpec = tween(160),
@@ -83,8 +68,7 @@ fun PfpSearchField(
             .height(FIELD_HEIGHT)
             .background(colors.searchField, RoundedCornerShape(FIELD_CORNER))
             .border(FIELD_BORDER, edge, RoundedCornerShape(FIELD_CORNER))
-            // No ripple and no indication: this is a text box, and a box that flashes when you
-            // touch it reads as a button that did something other than take the caret.
+
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -94,8 +78,6 @@ fun PfpSearchField(
         SearchGlyph(colors)
         Spacer(Modifier.width(10.dp))
 
-        // A TextFieldValue, not a String, with the caret set explicitly to the end — see the
-        // note at the top of this file for what a plain String does to a seeded query.
         val field = remember(query) { TextFieldValue(query, selection = TextRange(query.length)) }
         BasicTextField(
             value = field,
@@ -122,7 +104,6 @@ fun PfpSearchField(
     }
 }
 
-/** The magnifier, hand-drawn rather than an icon font — this app has never shipped one. */
 @Composable
 private fun SearchGlyph(colors: StorefrontColors) {
     val tint = colors.textSecondary.copy(alpha = 0.75f)

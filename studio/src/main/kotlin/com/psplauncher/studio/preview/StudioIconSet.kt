@@ -28,22 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 
-/**
- * The Studio's copy of the launcher's default icon set, keyed by
- * [com.psplauncher.themekit.IconSlots] keys. Category-bar and status glyphs are the
- * same assets the launcher ships (copied under `resources/xmb/`); item glyphs are the same
- * Material vectors the launcher's item rows reference inline.
- */
 object StudioIconSet {
-
-    /**
-     * Classpath resources for the raster/XML-vector slots. StudioIconSetTest covers keys.
-     *
-     * The catbar_* glyphs are copies of the launcher's, and the Studio previews the same bar the
-     * launcher draws — so when that set is redrawn, these have to be replaced in the same commit
-     * or the Studio previews a bar the device does not have. They became vectors when the set was
-     * redrawn as one matched family; the PNGs they replaced are gone from both sides.
-     */
     internal val RESOURCE_SLOTS: Map<String, String> = mapOf(
         "catbar_games" to "xmb/catbar_games.xml",
         "catbar_music" to "xmb/catbar_music.xml",
@@ -54,13 +39,12 @@ object StudioIconSet {
         "catbar_appstore" to "xmb/catbar_appstore.png",
         "catbar_favorites" to "xmb/catbar_favorites.xml",
         "catbar_library" to "xmb/catbar_library.xml",
-        // Default memory-card art (launcher: systems/physical-media/_default.png) — one
-        // asset, four semantic slots so themes can diverge per category.
+
         "item_memcard_games" to "xmb/item_memcard.png",
         "item_memcard_music" to "xmb/item_memcard.png",
         "item_memcard_video" to "xmb/item_memcard.png",
         "item_memcard_photos" to "xmb/item_memcard.png",
-        // Settings rows' wrench badge (launcher: sysicon_settings).
+
         "item_settings" to "xmb/item_settings.png",
         "status_battery_full" to "xmb/ic_status_battery_full.xml",
         "status_battery_high" to "xmb/ic_status_battery_high.xml",
@@ -70,10 +54,6 @@ object StudioIconSet {
         "status_bluetooth" to "xmb/ic_status_bluetooth.xml",
     )
 
-    /**
-     * Material glyphs for the item slots — keep in lockstep with the launcher's
-     * XMBItemList leading icons (same vector per slot).
-     */
     val ITEM_VECTORS: Map<String, ImageVector> = mapOf(
         "item_add" to Icons.Filled.Add,
         "item_missing" to Icons.Filled.HelpOutline,
@@ -99,7 +79,6 @@ object StudioIconSet {
         "item_playlist" to Icons.Filled.QueueMusic,
     )
 
-    /** Default painter for a slot key, or a play-arrow stand-in for unknown keys. */
     @Composable
     fun defaultPainter(key: String): Painter {
         RESOURCE_SLOTS[key]?.let { return painterResource(it) }

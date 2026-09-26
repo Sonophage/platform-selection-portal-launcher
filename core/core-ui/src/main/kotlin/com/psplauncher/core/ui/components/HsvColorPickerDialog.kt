@@ -37,18 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.theme.contrastRatio
 
-/**
- * The app's one HSV colour picker.
- *
- * There used to be two: the XMB's `CustomColorPickerOverlay` and Themes' private
- * `IconColorCustomPicker`. They were the same 440dp panel, the same `0xFF15151F` surface, the same
- * three channel bars and the same gamepad hint, drifting apart one small edit at a time. Callers
- * differ only in the title, the accent/subtext colours, and whether they want the contrast strip.
- *
- * Channel indices are the caller's contract with its own state: 0 = hue, 1 = saturation,
- * 2 = brightness. The dialog is stateless — it renders the values it is given and reports
- * fractions back — because both call sites already drive channel selection from the D-pad.
- */
 @Composable
 fun HsvColorPickerDialog(
     title: String,
@@ -61,13 +49,9 @@ fun HsvColorPickerDialog(
     onCancel: () -> Unit,
     accent: Color = Color.White,
     subtext: Color = Color.White.copy(alpha = 0.7f),
-    /**
-     * Darkest and brightest backdrop the picked colour will actually sit on. When supplied, the
-     * dialog shows live contrast readings against both — which is what turns a later automatic
-     * adjustment from a surprise into something the user already saw coming.
-     */
+
     contrastAnchors: Pair<Color, Color>? = null,
-    /** Ratio below which a reading is called out. 3:1 by decision — see the legibility plan. */
+
     contrastWarnBelow: Float = 3f,
 ) {
     val preview = hsvColor(hue, saturation, brightness)
@@ -83,7 +67,7 @@ fun HsvColorPickerDialog(
                 .width(440.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFF15151F))
-                // Swallows taps so a click inside the panel does not reach the scrim's cancel.
+
                 .clickable(onClick = {})
                 .padding(24.dp),
         ) {
@@ -161,11 +145,6 @@ fun HsvColorPickerDialog(
     }
 }
 
-/**
- * Sample text in the picked colour over the darkest and brightest places it will land, with the
- * measured ratio under each. Neither of the old pickers had this; it costs ~20 lines because
- * `contrastRatio` already exists, and it makes the adjustment self-explanatory.
- */
 @Composable
 private fun ContrastStrip(
     color: Color,
@@ -241,9 +220,6 @@ private fun ChannelBar(
     }
 }
 
-// ── Preset swatches ───────────────────────────────────────────────────────────
-
-/** The shared preset list. `null` means "no override — inherit the theme's own colour". */
 val PfpColorChoices: List<Pair<String, Long?>> = listOf(
     "Default" to null,
     "Pink" to 0xFFFFD6E8L,
@@ -255,10 +231,6 @@ val PfpColorChoices: List<Pair<String, Long?>> = listOf(
     "Slate" to 0xFFAAB2BFL,
 )
 
-/**
- * Horizontal row of preset swatches plus a rainbow "Custom" entry, which is selected whenever the
- * stored colour is not one of the presets.
- */
 @Composable
 fun ColorSwatchRow(
     selectedArgb: Long?,
@@ -276,9 +248,7 @@ fun ColorSwatchRow(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            // 8dp, matching a settings row's inner padding: the row's own 40dp inset now comes
-            // from the focus plate around it, and 48dp here on top of that pushed the last
-            // swatch off the right edge.
+
             .padding(horizontal = 8.dp, vertical = 10.dp),
     ) {
         PfpColorChoices.forEachIndexed { index, (label, argb) ->
@@ -317,8 +287,6 @@ fun ColorSwatch(
     subtext: Color,
     onClick: () -> Unit,
 ) {
-    // The selection ring stays accent-coloured: a ring is a fill, not a text run, and the
-    // affordance was always carried by the ring rather than by the label's colour.
     val ringColor = if (focused || selected) accent else Color(0x66FFFFFF)
     val ringWidth = if (focused) 3.dp else if (selected) 2.dp else 1.dp
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -344,8 +312,6 @@ fun ColorSwatch(
         )
     }
 }
-
-// ── Shared colour helpers ─────────────────────────────────────────────────────
 
 fun rainbowBrush(): Brush = Brush.horizontalGradient(
     listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red),

@@ -5,13 +5,7 @@ import java.awt.Frame
 import java.io.File
 import javax.swing.JFileChooser
 
-/**
- * Native-feel file pickers. AWT [FileDialog] for files (real OS dialogs on all three
- * desktops); Swing [JFileChooser] for directories, which FileDialog can't pick on
- * Windows/Linux. All of these block and must be called from the UI/event thread.
- */
 object FileDialogs {
-
     fun openFile(parent: Frame?, title: String, extensions: Set<String>): File? {
         val dialog = FileDialog(parent, title, FileDialog.LOAD)
         dialog.setFilenameFilter { _, name -> name.substringAfterLast('.').lowercase() in extensions }
@@ -21,7 +15,6 @@ object FileDialogs {
         return File(dir, name)
     }
 
-    /** Save dialog that guarantees the returned path carries [extension]. */
     fun saveFile(parent: Frame?, title: String, suggestedName: String, extension: String): File? {
         val dialog = FileDialog(parent, title, FileDialog.SAVE)
         dialog.file = suggestedName

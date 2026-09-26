@@ -9,7 +9,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import timber.log.Timber
 
-/** Wall-clock seam so the resume-throttle boundary is drivable from tests (A3). */
 fun interface RescanClock {
     fun now(): Long
 }
@@ -47,10 +46,7 @@ class RescanTriggerBus @Inject constructor(
         if (!scanMutex.tryLock()) return
         try {
             if (source == "resume") lastResumeRunAt = clock.now()
-            // Discovery first: a ROM dropped into a folder for a console with no Memory Card yet
-            // (or a new subfolder under an existing root) is picked up here, so the incremental
-            // scan right after sees the new card too. A failure here is non-fatal — the
-            // incremental pass still runs against the cards that exist.
+
             runCatching { romRootDiscoveryScanner.discover() }
                 .onFailure { Timber.w(it, "Library Rescan — console discovery failed ($source)") }
             val outcomes = libraryScanner.scanAllEnabled(removeMissing = true)

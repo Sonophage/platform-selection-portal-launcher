@@ -56,15 +56,9 @@ sealed class BackupResult {
     data class Failure(val reason: String, val cause: Throwable? = null) : BackupResult()
 }
 
-// One backup file found in the SAF backup folder.
 data class BackupInfo(val name: String, val uri: Uri, val lastModified: Long)
 
 sealed class RestoreResult {
-    /**
-     * [refusals] lists anything the archive carried that was not admissible — an entry outside the
-     * restorable folders, or an emulator profile that failed admission. A restore can succeed and
-     * still have turned something away, and the user is entitled to know which.
-     */
     data class Success(val refusals: List<String> = emptyList()) : RestoreResult()
     data class Failure(val reason: String, val cause: Throwable? = null) : RestoreResult()
 }
@@ -79,14 +73,10 @@ open class BackupManager @Inject constructor(
     private val backupFolderRepository: BackupFolderRepository,
     private val uiMediaStore: UiMediaStore,
     private val categoryRepository: com.psplauncher.core.data.repository.CategoryRepositoryImpl,
-    // A finished backup/restore is a background task completing — the NOTIFICATION event.
-    // The event is currently parked at the player (it read as a random chime); this injection
-    // and both plays stay so lifting the park re-arms backup/restore automatically.
+
     private val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer,
 ) {
     private val json = Json { prettyPrint = false; ignoreUnknownKeys = true }
-
-    // ── Export ──────────────────────────────────────────────────────────
 
     suspend fun createBackup(
         appVersionCode: Int,
@@ -115,9 +105,6 @@ open class BackupManager @Inject constructor(
             categoryCount = categories.size,
         )
 
-        // Build the ZIP into app cache (no permission needed), then stream it into the SAF backup
-        // folder. This keeps the ZIP-building code identical while removing the raw public-folder
-        // write that used to require MANAGE_EXTERNAL_STORAGE.
         val fileName = "pfp_backup_${createdAt}${BACKUP_FILE_EXTENSION}"
         val tempFile = File(context.cacheDir, fileName)
 
@@ -129,7 +116,6 @@ open class BackupManager @Inject constructor(
             zip.writeJson(BackupEntry.PLAY_SESSIONS,  json.encodeToString(listSerializer<PlaySessionEntity>(), sessions))
             zip.writeJson(BackupEntry.SETTINGS,       json.encodeToString(SettingsSnapshot.serializer(), settings))
 
-            // v2 tables
             zip.writeJson(BackupEntry.PLATFORMS,            json.encodeToString(listSerializer<PlatformEntity>(),          backupDao.getPlatforms()))
             zip.writeJson(BackupEntry.MEMORY_CARDS,         json.encodeToString(listSerializer<MemoryCardEntity>(),        backupDao.getMemoryCards()))
             zip.writeJson(BackupEntry.APP_OVERRIDES,        json.encodeToString(listSerializer<AppOverrideEntity>(),       backupDao.getAppOverrides()))
@@ -150,9 +136,6 @@ open class BackupManager @Inject constructor(
             zip.writeJson(BackupEntry.BOOK_LIBRARIES,       json.encodeToString(listSerializer<BookLibraryEntity>(),       backupDao.getBookLibraries()))
             zip.writeJson(BackupEntry.BOOKS,                json.encodeToString(listSerializer<BookEntity>(),              backupDao.getBooks()))
 
-            // Bundled internal-storage assets. Absolute paths in the DB point into filesDir; storing
-            // them relative to filesDir lets restore relocate them into whatever package/data-dir the
-            // backup lands in.
             val filesDir = context.filesDir
             BUNDLED_FILE_ROOTS.forEach { root -> zip.bundleTree(filesDir, root) }
         }
@@ -172,15 +155,10 @@ open class BackupManager @Inject constructor(
     )
     }
 
-    // ── Import ──────────────────────────────────────────────────────────
-
     suspend fun restoreBackup(uri: Uri): RestoreResult = runCatching {
         val stream = context.contentResolver.openInputStream(uri)
             ?: return RestoreResult.Failure("Could not open backup file")
 
-        // Everything untrusted goes through RestoreArchive: it bounds the archive, confines staged
-        // files to the roots a backup owns, and drops inadmissible emulator profiles. Nothing is
-        // committed to the live filesDir until the manifest is validated below.
         val filesDir = context.filesDir
         val staging  = File(filesDir, RESTORE_STAGING_DIR)
 
@@ -189,8 +167,7 @@ open class BackupManager @Inject constructor(
                 source       = it,
                 staging      = staging,
                 bundledRoots = BUNDLED_FILE_ROOTS,
-                // Not the ZipLimits defaults: those are theme-sized and refuse a real library's
-                // own backup. See BACKUP_ZIP_LIMITS.
+
                 limits       = BACKUP_ZIP_LIMITS,
                 selfPackage  = context.packageName,
             )
@@ -211,7 +188,6 @@ open class BackupManager @Inject constructor(
             )
         }
 
-        // ── Decode all tables ───────────────────────────────────────────
         val games          = entries.decodeList<GameEntity>(BackupEntry.GAMES)
         val categories     = entries.decodeList<CategoryEntity>(BackupEntry.CATEGORIES)
         val catItems       = entries.decodeList<CategoryItemEntity>(BackupEntry.CATEGORY_ITEMS)
@@ -240,11 +216,9 @@ open class BackupManager @Inject constructor(
             json.decodeFromString(SettingsSnapshot.serializer(), it)
         }
 
-        // ── Commit bundled files (only when the backup actually carried some) ─
         val filesDirPath = filesDir.absolutePath
         bundle.commitFiles(filesDir)
 
-        // ── Rewrite internal-storage paths onto THIS package's filesDir ──
         val remappedGames = games.map { g ->
             g.copy(
                 artworkUri = rewriteFilesPath(g.artworkUri, filesDirPath),
@@ -254,12 +228,9 @@ open class BackupManager @Inject constructor(
             )
         }
 
-        // ── Apply to the database ────────────────────────────────────────
-        // Games / sessions: full replace.
         gameDao.deleteAll()
         playSessionDao.deleteAll()
 
-        // Child rows first so parents can be re-inserted cleanly.
         backupDao.clearCollectionGames()
         backupDao.clearCollections()
         backupDao.clearPlaylistTracks()
@@ -282,8 +253,6 @@ open class BackupManager @Inject constructor(
         if (remappedGames.isNotEmpty()) gameDao.insertAllReplace(remappedGames)
         if (sessions.isNotEmpty())      playSessionDao.insertAll(sessions)
 
-        // Categories: upsert (REPLACE) so backed-up name/position/visibility overwrite the seeded
-        // built-ins instead of being ignored; items were wiped above and are re-added fresh.
         categories.forEach { categoryDao.upsert(it) }
         catItems.forEach   { categoryDao.addItem(it) }
 
@@ -305,30 +274,22 @@ open class BackupManager @Inject constructor(
         backupDao.insertBooks(books)
         backupDao.insertPhotos(photos)
 
-        // Platforms: merge only the user-editable columns onto the existing seeded catalog so an
-        // older backup can never wipe platform definitions this build added.
         platforms.forEach { p ->
             backupDao.restorePlatformPrefs(p.id, p.preferredEmulatorPackage, p.isPinnedToBar, p.barPosition)
         }
 
-        // Themes: upsert user + built-in rows, then re-assert the single active one.
         backupDao.insertThemes(themes)
         themes.firstOrNull { it.isActive }?.let { backupDao.setActiveTheme(it.id) }
 
-        // Settings last, with the wallpaper path remapped onto this filesDir.
         if (settings != null) restoreSettingsSnapshot(settings.remapWallpaper(filesDirPath))
 
         bundle.refusals
     }.fold(
         onSuccess = { refusals ->
-            // An old archive can still CARRY files for slots the current build removed
-            // (sound_select, sound_systembrowse); restore wrote what it knew, so sweep the
-            // leftovers — same sweep every cold start runs, just brought forward.
+
             runCatching { uiMediaStore.pruneOrphans() }
                 .onFailure { Timber.w(it, "Post-restore UI-media prune failed") }
-            // Same story one table over: categories are upserted straight from the archive, so an
-            // archive written before a built-in was retired puts its column back. Sweep it here
-            // rather than waiting for the next cold start's reconcile.
+
             runCatching { categoryRepository.pruneRetiredCategories() }
                 .onFailure { Timber.w(it, "Post-restore retired-category prune failed") }
             menuSound.play(com.psplauncher.core.ui.sound.MenuSound.NOTIFICATION)
@@ -337,10 +298,6 @@ open class BackupManager @Inject constructor(
         onFailure = { RestoreResult.Failure(it.message ?: "Unknown error", it) },
     )
 
-    // ── Helpers ─────────────────────────────────────────────────────────
-
-    // Streams the built ZIP into the SAF backup folder, returning the new document URI (or null if
-    // the folder can't be written — e.g. the grant was lost). Open for test substitution.
     protected open suspend fun exportToBackupFolder(treeUri: String, source: File, name: String): Uri? {
         val tree = runCatching { Uri.parse(treeUri) }.getOrNull() ?: return null
         val rootDocId = runCatching { DocumentsContract.getTreeDocumentId(tree) }.getOrNull() ?: return null
@@ -356,8 +313,6 @@ open class BackupManager @Inject constructor(
         return if (ok) doc else null
     }
 
-    // Lists backup files in the SAF backup folder, newest first. Empty when no folder is set / the
-    // grant is gone. Open for test substitution.
     open suspend fun listBackups(): List<BackupInfo> {
         val treeUri = backupFolderRepository.get()?.let { runCatching { Uri.parse(it) }.getOrNull() }
             ?: return emptyList()
@@ -407,8 +362,6 @@ open class BackupManager @Inject constructor(
     private inline fun <reified T> Map<String, String>.decodeList(name: String): List<T> =
         this[name]?.let { json.decodeFromString(listSerializer<T>(), it) } ?: emptyList()
 
-    // Repoints a "…/files/<rel>" path onto this package's filesDir. Non-filesDir paths (SAF content
-    // URIs, shared-storage ROM/theme paths) are returned unchanged.
     private fun rewriteFilesPath(path: String?, filesDirPath: String): String? {
         if (path.isNullOrEmpty()) return path
         val idx = path.indexOf(FILES_MARKER)
@@ -418,7 +371,7 @@ open class BackupManager @Inject constructor(
 
     private fun SettingsSnapshot.remapWallpaper(filesDirPath: String): SettingsSnapshot {
         var entries = this.entries
-        // Repoint both members of the (poster, motion) pair onto this install's filesDir.
+
         for (key in listOf(KEY_CUSTOM_WALLPAPER, KEY_MOTION_WALLPAPER)) {
             val current = entries[key] ?: continue
             val remapped = rewriteFilesPath(current, filesDirPath) ?: continue
@@ -456,10 +409,7 @@ open class BackupManager @Inject constructor(
 
             BACKED_UP_STRING_KEYS.forEach { key ->
                 snapshot.entries[key.name]?.let { value ->
-                    // Encrypted scraper credentials are bound to the source device's Keystore. If this
-                    // backup was restored onto a different device (or after a reinstall lost the key),
-                    // the ciphertext can't be decrypted here — drop it so the user re-enters the key
-                    // rather than silently feeding garbage to the API.
+
                     if (key.name in ENCRYPTED_CREDENTIAL_KEYS &&
                         !KeystoreSecretCipher.isUsableOnThisDevice(value)
                     ) {
@@ -484,7 +434,6 @@ open class BackupManager @Inject constructor(
         }
     }
 
-    // Inline reified helper for list serializers — avoids allocating KType reflectively
     private inline fun <reified T> listSerializer() =
         kotlinx.serialization.builtins.ListSerializer(
             kotlinx.serialization.serializer<T>()
@@ -492,93 +441,74 @@ open class BackupManager @Inject constructor(
 
     companion object {
         private const val RESTORE_STAGING_DIR = ".pfp_restore_tmp"
-        // Generic binary so the SAF provider keeps our ".pfpbackup" name verbatim (no appended ext).
+
         private const val MIME_BACKUP = "application/octet-stream"
     private const val FILES_MARKER = "/files/"
     private const val KEY_CUSTOM_WALLPAPER = "display_custom_wallpaper"
-    // Motion wallpaper travels with the same "wallpaper" file bundle. Restored onto a device
-    // without its video file, the poster still renders (the freeze/failure fallback) and the
-    // motion path is simply dead weight — degraded, never broken.
+
     private const val KEY_MOTION_WALLPAPER = "display_motion_wallpaper"
 
-        // filesDir sub-trees bundled into the backup and replaced wholesale on restore.
         private val BUNDLED_FILE_ROOTS = listOf(
-            "artwork",            // game hero/logo/icon/box art
-            "wallpaper",          // custom XMB wallpaper
-            "emulator_profiles",  // user-defined / user-modified emulator profiles
-            "custom-icons",       // user's per-slot custom XMB icons (slot-keyed files)
-            "ui-media",           // user's menu sounds + boot/GameBoot media (slot-keyed files)
+            "artwork",
+            "wallpaper",
+            "emulator_profiles",
+            "custom-icons",
+            "ui-media",
         )
 
     private val BACKED_UP_STRING_KEYS = listOf(
-        // Display
+
         stringPreferencesKey("display_wave_style"),
-        // The retired GameBoot three-way mode key. GameBoot is a boolean again
-        // (display_gameboot_enabled, in the boolean list below), but this stays here so an
-        // archive written during the mode era restores and migrates through GameBootPreferences'
-        // read-time rule instead of silently reverting to the default.
+
         stringPreferencesKey("display_gameboot_mode"),
         stringPreferencesKey("display_color_scheme"),
         stringPreferencesKey("display_custom_wallpaper"),
         stringPreferencesKey("display_motion_wallpaper"),
-        // Font colour / text legibility. This list is explicit, so a key that is not named here
-        // silently fails to survive a restore — see BackupKeyCoverageTest.
+
         stringPreferencesKey("display_text_legibility"),
-        // Icon appearance + XMB geometry. These had been missing since they were added: all four
-        // are cosmetic settings the user chose, with no file or grant behind them, so they
-        // restore cleanly onto any device.
+
         stringPreferencesKey("display_icon_legibility"),
         stringPreferencesKey("display_xmb_layout_adjust"),
         stringPreferencesKey("pref_icon_display_mode"),
-        // Per-console icon display overrides, one encoded string for every Memory Card.
+
         stringPreferencesKey("pref_icon_display_mode_by_platform"),
-        // Where a video snap plays: the icon tile, or behind the whole crossbar.
+
         stringPreferencesKey("pref_video_snap_placement"),
-        // Theme cascade values. The applied theme's NAME and layout are plain data; the theme's
-        // extracted icon files are not bundled, so theme_icons_stamp is deliberately absent —
-        // restoring it would point observers at a directory that isn't there.
-        // Service account identifiers. Not credentials — the API keys are sealed separately by
-        // the Keystore — but they are things the user typed, and retyping them on a new device
-        // is exactly the kind of small re-setup a backup exists to avoid.
+
         stringPreferencesKey("ra_username"),
         stringPreferencesKey("steam_id64"),
         stringPreferencesKey("theme_applied_name"),
         stringPreferencesKey("theme_layout_spec"),
-            // Controller
+
             stringPreferencesKey("controller_scroll_speed"),
             stringPreferencesKey("controller_stick_sensitivity"),
-            // Controller
+
             stringPreferencesKey("controller_mappings_v1"),
             stringPreferencesKey("controller_confirm_back_layout"),
             stringPreferencesKey("controller_xy_layout"),
             stringPreferencesKey("controller_display_type"),
-            // Interface / touch
+
             stringPreferencesKey("interface_touch_nav_button"),
             stringPreferencesKey("interface_touch_sensitivity"),
-            // Default players
+
             stringPreferencesKey("music_default_player_package"),
             stringPreferencesKey("video_default_player"),
             stringPreferencesKey("books_default_reader"),
-            // Library
-            // SAF ROM root grants (newline-joined list; singular key kept for older backups).
-            // Inert without a live OS grant, so re-linked under Library ▸ ROM Root Access after a
-            // restore — carrying them lets that section pre-point the picker at each exact folder.
+
             stringPreferencesKey("library_rom_root_tree_uris"),
             stringPreferencesKey("library_rom_root_tree_uri"),
-            // Media root folders (Music/Video/Photo Root Access), same inert-URI semantics.
+
             stringPreferencesKey("music_root_tree_uris"),
             stringPreferencesKey("video_root_tree_uris"),
             stringPreferencesKey("photo_root_tree_uris"),
             stringPreferencesKey("book_root_tree_uris"),
-            // Where backups are saved (SAF folder). Inert without a live grant; carried so a
-            // restore can pre-point the Folder Access picker at it.
+
             stringPreferencesKey("backup_folder_tree_uri"),
-            // Portable artwork library (SAF folder + mode + library UUID). The tree URI is inert
-            // without a live grant; carrying it lets a restore pre-point the re-link picker.
+
             stringPreferencesKey("artwork_folder_tree_uri"),
             stringPreferencesKey("artwork_storage_mode"),
             stringPreferencesKey("artwork_library_uuid"),
-            // Scraper credentials
+
             stringPreferencesKey("sgdb_api_key"),
             stringPreferencesKey("tmdb_api_key"),
             stringPreferencesKey("igdb_client_id"),
@@ -586,48 +516,33 @@ open class BackupManager @Inject constructor(
             stringPreferencesKey("ss_username"),
             stringPreferencesKey("ss_password"),
         ) +
-            // Cosmetic names for the user's UI media, one per slot. Derived from the enum rather
-            // than listed, so a slot added later is backed up without a second edit here.
+
             UiMediaSlot.entries.map { UiMediaStore.displayNameKey(it) }
 
-        // Keystore-encrypted, device-bound credentials — dropped on restore if they can't be
-        // decrypted on this device (see restoreSettingsSnapshot). igdb_client_id is a public
-        // identifier stored in plaintext, so it restores normally and is intentionally absent here.
         private val ENCRYPTED_CREDENTIAL_KEYS = setOf(
             "sgdb_api_key",
-            // Sealed the same way and dropped on restore the same way: a key encrypted against the
-            // source device's Keystore is a dead string here, and the user re-pastes it.
+
             "tmdb_api_key",
             "igdb_client_secret",
-            "ss_password",   // ss_username is a public handle and restores normally
+            "ss_password",
         )
 
         private val BACKED_UP_BOOLEAN_KEYS = listOf(
-            // Whether the Android Memory Card has been seeded. Carried, unlike the other seed
-            // markers, because this one records a USER DECISION rather than schema progress: the
-            // archive's memory_cards table already says whether the card exists, and a restore
-            // that dropped this flag would seed a card the user had deliberately deleted.
+
             booleanPreferencesKey("android_card_seeded_v1"),
-            // Display
+
             booleanPreferencesKey("display_show_boot"),
             booleanPreferencesKey("display_boot_on_resume"),
             booleanPreferencesKey("display_thermal_aware"),
             booleanPreferencesKey("display_battery_saver"),
             booleanPreferencesKey("display_wave_over_wallpaper"),
-            // Whether the accent follows the wallpaper. The accent VALUE is carried in the long
-            // list; this is the rule that produced it, and without it a restore would keep the
-            // colour but stop tracking the picture.
+
             booleanPreferencesKey("theme_accent_from_wallpaper"),
             booleanPreferencesKey("interface_context_menu_hint"),
-            // Font colour opt-outs — see the string list above for why these are spelled out.
+
             booleanPreferencesKey("display_text_color_exact"),
             booleanPreferencesKey("display_text_contrast_notice_suppressed"),
-            // Icon + text appearance toggles, missing since they were introduced.
-            //
-            // display_solid_unfocused_icons is SUPERSEDED — nothing reads it any more, it was
-            // replaced by display_fade_by_distance when the setting changed from "dim at all?" to
-            // "dim flat or by distance?". It stays on this list so an archive written by an older
-            // build still round-trips unchanged; restoring it simply lands a value nobody asks for.
+
             booleanPreferencesKey("display_solid_unfocused_icons"),
             booleanPreferencesKey("display_fade_by_distance"),
             booleanPreferencesKey("display_card_art_grid"),
@@ -635,66 +550,47 @@ open class BackupManager @Inject constructor(
             booleanPreferencesKey("display_text_shadow"),
             booleanPreferencesKey("pref_animated_icons"),
             booleanPreferencesKey("pref_xmb_game_metadata"),
-        // "Backdrop & Tint" — whether the focused row's art and colour take over the shell.
+
         booleanPreferencesKey("pref_xmb_item_backdrop"),
-        // Artwork Studio's crop preview toggle — a plain preference with no file behind it.
+
         booleanPreferencesKey("artwork_crop_preview_enabled"),
-            // Launch behaviour
+
             booleanPreferencesKey("pref_direct_game_launch"),
-            // Artwork behaviour
+
             booleanPreferencesKey("artwork_import_move_files"),
             booleanPreferencesKey("pref_dl_manuals"),
             booleanPreferencesKey("pref_dl_video_snaps"),
-            // "Don't ask again" for the Windows library prompt — same reasoning as
-            // initial_setup_seen below: a restore must not re-open a prompt the user dismissed.
+
             booleanPreferencesKey("windows_library_setup_prompt"),
-            // GameBoot presentation (Display ▸ GameBoot) — the live key.
+
             booleanPreferencesKey("display_gameboot_enabled"),
-            // The launch disc for everything that is not a game (Display ▸ Launch Disc). Carried
-            // for the same reason GameBoot is: it is a taste setting about how launches feel, and
-            // a restore that silently turned it back on would undo a deliberate choice.
+
             booleanPreferencesKey("display_launch_disc"),
-            // Controller — D-pad LEFT as "back out" (Settings ▸ Controller).
+
             booleanPreferencesKey("controller_left_backs_out"),
-            // Sound
+
             booleanPreferencesKey("sound_menu_enabled"),
-            // The track itself is a ui-media file, and files under "ui-media" are bundled by
-            // BUNDLED_FILE_ROOTS — so the switch travelling with them is what makes a restore
-            // put the music back rather than leave a silent toggle on.
+
             booleanPreferencesKey("sound_menu_music"),
-            // Artwork download preferences
+
             booleanPreferencesKey("pref_dl_clear_logos"),
             booleanPreferencesKey("pref_dl_heroes"),
             booleanPreferencesKey("pref_sgdb_heroes"),
-            // Library
+
             booleanPreferencesKey("library_setup_complete"),
-            // First-run wizard shown/seeded — carried so restoring onto a new device doesn't
-            // re-open the wizard on top of the restored configuration.
+
             booleanPreferencesKey("initial_setup_seen"),
-            // db_seeded_v1 is deliberately NOT here — see deliberatelyNotBackedUp in
-            // BackupKeyDriftTest: restoring a seed marker onto a fresh device convinces it that
-            // seeding already ran.
+
         )
 
         private val BACKED_UP_FLOAT_KEYS = listOf(
             floatPreferencesKey("interface_context_menu_hint_delay_seconds"),
-            // XMB scale + crossbar position (Display ▸ Adjust XMB Layout).
+
             floatPreferencesKey("display_xmb_scale"),
             floatPreferencesKey("display_bar_top_fraction"),
             floatPreferencesKey("pref_icon1_linger_delay_seconds"),
         )
 
-        // Long-valued stamps whose PRESENCE (not value) tells observers to load. Without it the
-        // custom-icons files restore but nothing ever reloads them — and the same is true of the
-        // ui-media stamp: restored sounds must actually reload into the player.
-        /**
-         * Every preference name this manager carries, for the key-coverage test.
-         *
-         * The four lists are explicit by design, which means a new preference silently fails to
-         * survive a restore until someone remembers to add it here — a bug that is invisible
-         * right up until a user restores onto a new device and finds a setting missing. Exposing
-         * the names lets a test assert coverage instead of trusting memory.
-         */
         internal val BACKED_UP_KEY_NAMES: Set<String>
             get() = (
                 BACKED_UP_STRING_KEYS.map { it.name } +
@@ -704,24 +600,16 @@ open class BackupManager @Inject constructor(
                     BACKED_UP_INT_KEYS.map { it.name }
                 ).toSet()
 
-        // Int-valued settings. This list is new: there was no int tier at all, so every
-        // int-typed preference was unbackupable by construction rather than by omission.
-        // Empty today — the Discord voice tuning keys were the only Int preferences. The leg is
-        // kept so an Int preference added later rides backup like every other type; the snapshot
-        // format keeps its `ints` map either way.
         private val BACKED_UP_INT_KEYS = listOf<androidx.datastore.preferences.core.Preferences.Key<Int>>()
 
         private val BACKED_UP_LONG_KEYS = listOf(
-            // The user's picked font colour (absent = the theme's own).
+
             longPreferencesKey("display_text_color"),
-            // The one-colour cascade: accent override and unified icon tint. Pure values — no
-            // file behind either, unlike theme_icons_stamp.
+
             longPreferencesKey("theme_accent_override"),
             longPreferencesKey("theme_icon_color"),
             longPreferencesKey("custom_icons_stamp"),
             longPreferencesKey("ui_media_stamp"),
         )
-
-
     }
 }

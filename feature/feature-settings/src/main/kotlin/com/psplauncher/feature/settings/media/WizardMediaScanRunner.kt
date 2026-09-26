@@ -27,22 +27,6 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Runs the library (re)scan for a media section after a root change in the SETUP WIZARD (or any
- * other root list edit).
- *
- * The settings screens pair every root change with an immediate rescan, which is what creates the
- * library rows and stamps their lastScannedAt — the signal the XMB's "+ Add" getting-started rows
- * key off. This runner is the shared pass: it RECONCILES each section's library rows with the
- * configured roots (creating a row per root, removing rows whose root was removed) and then scans
- * every configured root incrementally. Roots may be MULTIPLE — a music library can span internal
- * storage plus an SD card, exactly like ROM roots.
- *
- * Each scan mirrors the corresponding settings flow (Music/Photo/VideoSettingsViewModel.rescan)
- * minus the per-screen UI state, and reports through the shared background-task notifications.
- * Runs on its own application-scoped supervisor so a scan survives the wizard (and its
- * ViewModel) closing; one scan per kind at a time.
- */
 @Singleton
 class WizardMediaScanRunner @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -58,7 +42,6 @@ class WizardMediaScanRunner @Inject constructor(
     private val notifier = BackgroundTaskNotifier(context)
     private val inFlight = ConcurrentHashMap<MediaRootKind, Job>()
 
-    /** Starts (or restarts after completion) the scan for [kind]'s current root. */
     fun kickoff(kind: MediaRootKind) {
         if (inFlight[kind]?.isActive == true) return
         inFlight[kind] = scope.launch {
@@ -79,16 +62,11 @@ class WizardMediaScanRunner @Inject constructor(
             MediaRootKind.VIDEO -> {
                 dropOrphanVideoLibraries(roots); roots.forEach { scanVideo(it) }
             }
-            // The Library section is not a step in the first-run wizard, so it has no root to
-            // scan here. Left as an explicit branch rather than an `else`, so adding that step
-            // later is a compile error in this file instead of a section that silently never
-            // scans.
+
             MediaRootKind.BOOK -> Unit
         }
     }
 
-    // Library rows are keyed by their root's tree URI; a root removed from the configured list
-    // (in the wizard or Settings) takes its library row with it on the next scan pass.
     private suspend fun dropOrphanMusicLibraries(roots: List<String>) {
         musicRepository.getFolders()
             .filter { it.treeUri !in roots }

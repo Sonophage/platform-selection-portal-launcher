@@ -39,13 +39,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
 
-// Longest edge of a generated list thumbnail, in px. Small enough to decode fast and cache cheap,
-// large enough for the 60×40 list tile and the flyout.
 private const val THUMB_MAX_DIM = 320
 
-// Concurrent per-file probes (decode bounds + EXIF + thumbnail). Bounded so a folder full of huge
-// images can't exhaust memory or starve the device — decodes are subsampled, so four in flight is
-// a few MB at worst.
 private const val SCAN_PARALLELISM = 4
 
 sealed interface PhotoScanResult {
@@ -54,25 +49,6 @@ sealed interface PhotoScanResult {
     data class Error(val libraryId: String, val message: String) : PhotoScanResult
 }
 
-/**
- * Walks a [PhotoLibrary]'s SAF document tree and emits the image files it finds. Always
- * user-initiated (never background/observer-driven). Runs on [Dispatchers.IO], skips
- * unreadable/corrupt files with a log rather than crashing, and is cancellable via
- * [coroutineContext.ensureActive].
- *
- * Directory listing goes through [DocumentsContract] directly — one child query per directory
- * returns name/MIME/mtime/size for every entry in a single cursor. (DocumentFile would issue a
- * separate ContentResolver query per property per file, which made scans of photo folders — many
- * small files — take ~6 IPC round-trips each before any image work.)
- *
- * Two modes (both add new files and drop files that no longer exist — stale entries are always
- * pruned):
- *  - **Quick** ([deep] = false): for files whose `lastModified` is unchanged, the existing row is
- *    reused verbatim (metadata + thumbnail) — no per-file decode cost. Only new/modified files are
- *    probed.
- *  - **Deep** ([deep] = true): every file's metadata is re-read and any missing thumbnail is
- *    regenerated; an existing valid thumbnail is preserved keyed by uri.
- */
 @Singleton
 class PhotoScanner @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -93,28 +69,24 @@ class PhotoScanner @Inject constructor(
         Timber.i("Photo scan started (${if (deep) "deep" else "quick"}): \"${library.displayName}\"")
         val byUri = existing.associateBy { it.uri }
 
-        // ── Phase 1: enumerate candidate files — cursor-only, one query per directory. ─────
-        // Iterative DFS over document IDs so deeply nested trees don't blow the stack; the
-        // visited-set stops a cyclic/self-referencing provider from looping the scan forever.
-        val files = mutableListOf<Pair<SafChild, String>>()   // child + its relative path
+        val files = mutableListOf<Pair<SafChild, String>>()
         val visitedDirs = HashSet<String>()
-        // Dedupe files by uri too: a provider surfacing one document under two parents would
-        // otherwise produce duplicate rows and two concurrent writers on one thumbnail file.
+
         val seenFiles = HashSet<String>()
         val rootDocId = safScanStartDocId(context, treeUri)
         visitedDirs.add(rootDocId)
-        val stack = ArrayDeque<Pair<String, String>>()   // documentId to relative path
+        val stack = ArrayDeque<Pair<String, String>>()
         stack.addLast(rootDocId to "")
         while (stack.isNotEmpty()) {
             coroutineContext.ensureActive()
             val (dirDocId, relPath) = stack.removeLast()
             val children = context.contentResolver.querySafChildren(treeUri, dirDocId)
-            // Respect a .nomedia marker: skip this folder's files and its whole subtree.
+
             if (children.hasNoMediaMarker()) continue
             for (child in children) {
                 if (child.isDirectory) {
                     if (!library.scanRecursively) continue
-                    if (child.isIgnoredDir()) continue   // hidden / thumbnail-cache / Android cache dirs
+                    if (child.isIgnoredDir()) continue
                     if (!visitedDirs.add(child.documentId)) continue
                     stack.addLast(child.documentId to if (relPath.isEmpty()) child.name else "$relPath/${child.name}")
                 } else {
@@ -124,9 +96,6 @@ class PhotoScanner @Inject constructor(
         }
         send(PhotoScanResult.Progress(library.displayName, files.size, 0))
 
-        // ── Phase 2: probe files with bounded parallelism. ─────────────────────────────────
-        // Quick-scan hits on unchanged files return without any I/O; new/changed files decode
-        // bounds + EXIF + thumbnail concurrently, capped at SCAN_PARALLELISM in-flight.
         val processed = AtomicInteger(0)
         val found = AtomicInteger(0)
         val semaphore = Semaphore(SCAN_PARALLELISM)
@@ -167,9 +136,6 @@ class PhotoScanner @Inject constructor(
         val uriStr = uri.toString()
         val prior = existingByUri[uriStr]
 
-        // Quick scan: reuse an unchanged file's row wholesale — no decode, no extra queries — but
-        // only while its thumbnail file is still present. If the thumbnail is gone (e.g. after
-        // Clear Thumbnail Cache), fall through so a Rescan actually regenerates it.
         val priorThumb = prior?.thumbnailUri
         if (!deep && prior != null && prior.lastModified == lastModified &&
             !priorThumb.isNullOrBlank() && fileExistsForUri(priorThumb)
@@ -178,8 +144,7 @@ class PhotoScanner @Inject constructor(
         }
 
         val meta = readMetadata(uri)
-        // Preserve an existing valid thumbnail; otherwise (or if it's gone) generate one, reusing
-        // the bounds we already decoded instead of probing the file again.
+
         val thumb = prior?.thumbnailUri
             ?.takeIf { it.isNotBlank() && fileExistsForUri(it) }
             ?: generateThumbnail(uri, meta?.rawWidth ?: 0, meta?.rawHeight ?: 0)
@@ -204,16 +169,13 @@ class PhotoScanner @Inject constructor(
     private data class PhotoMeta(
         val width: Int?,
         val height: Int?,
-        // Pre-rotation dimensions, kept for the thumbnail's subsample calculation.
+
         val rawWidth: Int,
         val rawHeight: Int,
         val dateTakenMs: Long?,
         val mimeType: String?,
     )
 
-    // Best-effort metadata: a bounds-only decode (no pixels allocated) for resolution and EXIF for
-    // capture time/orientation. Corrupt or exotic files never abort the scan — the photo is kept
-    // with just its file name. Orientation is applied so width/height reflect display orientation.
     private fun readMetadata(uri: Uri): PhotoMeta? = runCatching {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use {
@@ -224,7 +186,7 @@ class PhotoScanner @Inject constructor(
 
         var dateTaken: Long? = null
         var swap = false
-        // EXIF applies to JPEG/HEIF and is best-effort everywhere else (PNG/GIF just return null).
+
         runCatching {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 val exif = ExifInterface(input)
@@ -252,7 +214,6 @@ class PhotoScanner @Inject constructor(
         )
     }.getOrNull()
 
-    // EXIF datetimes are "yyyy:MM:dd HH:mm:ss" in local time; unparseable values become null.
     private fun exifDateMs(value: String?): Long? {
         if (value.isNullOrBlank()) return null
         return runCatching {
@@ -260,28 +221,20 @@ class PhotoScanner @Inject constructor(
         }.getOrNull()
     }
 
-    // Thumbnail cache lives in internal app cache (private to the app, never indexed by MediaStore,
-    // evictable by the OS under storage pressure). Files are named by a hash of the photo uri so
-    // re-scans reuse existing thumbs; missing ones are regenerated on the next scan. The source is
-    // decoded subsampled — the full-res bitmap is never loaded here.
     val thumbnailCacheDir: File by lazy {
         deleteLegacyExternalCache()
         File(context.cacheDir, "thumbnails").apply { mkdirs() }
     }
 
-    // Pre-migration builds kept thumbnails under app external-files (Android/data/<pkg>/files/
-    // cache/thumbnails), which other apps could read on Android 10. Remove any leftovers once;
-    // stale thumbnailUri rows fail the fileExistsForUri check and regenerate on the next scan.
     private fun deleteLegacyExternalCache() {
         runCatching {
             listOfNotNull(context.getExternalFilesDir(null), context.filesDir).forEach { base ->
                 File(base, "cache/thumbnails").deleteRecursively()
-                File(base, "cache").delete()   // only succeeds if now empty
+                File(base, "cache").delete()
             }
         }
     }
 
-    /** Deletes every generated thumbnail. */
     fun clearThumbnailCache(): Int {
         val dir = thumbnailCacheDir
         return runCatching {
@@ -289,8 +242,6 @@ class PhotoScanner @Inject constructor(
         }.getOrDefault(0)
     }
 
-    // [knownWidth]/[knownHeight] come from the metadata pass so the file isn't probed twice; when
-    // unknown (metadata failed) a bounds decode fills them in.
     private fun generateThumbnail(uri: Uri, knownWidth: Int, knownHeight: Int): String? {
         val file = File(thumbnailCacheDir, "${sha1(uri.toString())}.jpg")
         if (file.exists() && file.length() > 0) return Uri.fromFile(file).toString()
@@ -318,9 +269,6 @@ class PhotoScanner @Inject constructor(
         }.getOrElse { Timber.w(it, "Thumbnail generation failed for $uri"); null }
     }
 
-    // Power-of-two subsample factor that leaves the longest edge at or ABOVE [maxDim] and under
-    // twice it: the loop halves only while the result would still clear [maxDim], so the decode
-    // is never downsampled past the size the caller asked for.
     private fun sampleSize(w: Int, h: Int, maxDim: Int): Int {
         var sample = 1
         var longest = maxOf(w, h)

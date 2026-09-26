@@ -9,13 +9,7 @@ import timber.log.Timber
 import java.io.File
 import java.io.InputStream
 
-/**
- * Shared temp-file download/validation used by both artwork store backends: bytes stream into a
- * cache temp file and are magic-byte-checked for the kind before any backend commits them under
- * a real name — a CDN error page or truncated download is never visible at an artwork path.
- */
 object ArtworkTempIO {
-
     suspend fun downloadToTemp(httpClient: HttpClient, cacheDir: File, kind: ArtworkKind, url: String): File? =
         runCatching {
             val response = httpClient.get(url)
@@ -26,9 +20,6 @@ object ArtworkTempIO {
             response.bodyAsChannel().toInputStream().use { copyToTemp(it, cacheDir, kind) }
         }.onFailure { Timber.w(it, "Artwork download error for $url") }.getOrNull()
 
-    // Per-kind download ceilings. No legitimate scraper asset comes close (covers are a few MB,
-    // manuals tens of MB); the cap is what stops a hostile or broken server from streaming
-    // unbounded bytes into the cache partition.
     private const val MAX_IMAGE_BYTES = 50L * 1024 * 1024
     private const val MAX_MEDIA_BYTES = 200L * 1024 * 1024
 
@@ -37,10 +28,6 @@ object ArtworkTempIO {
         else -> MAX_IMAGE_BYTES
     }
 
-    /**
-     * Streams [input] into a cache temp file; null if empty, over the per-kind size cap, or the
-     * wrong payload type for [kind]. An over-cap stream is abandoned mid-copy, never fully drained.
-     */
     fun copyToTemp(input: InputStream, cacheDir: File, kind: ArtworkKind): File? {
         val tmp = File.createTempFile("artwork_", ".part", cacheDir)
         val maxBytes = maxBytesFor(kind)

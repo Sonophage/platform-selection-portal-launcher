@@ -45,20 +45,6 @@ import com.psplauncher.feature.xmb.viewmodel.CustomIconSession
 import com.psplauncher.themekit.CustomizableIcons
 import com.psplauncher.themekit.IconSlot
 
-/**
- * Live "Customize XMB Icons" editor, drawn OVER the real XMB (which keeps rendering — and
- * animating — behind it). Shape-for-shape the Adjust XMB Layout chrome: a light consuming
- * scrim, a bottom-anchored panel, D-pad control plus touch buttons.
- *
- * Edits apply IMMEDIATELY through the VM into CustomIconStore — there is deliberately no
- * Save/Cancel pair. Unlike layout adjust there is no coherent draft to discard (each pick is
- * independently complete), and Reset / Reset All are the undo. Don't "fix" this into a draft
- * model: the whole point of a live editor is that the XMB behind updates as each pick lands.
- *
- * The centre strip previews each slot THROUGH the real render pipeline — CustomIconSurface
- * with LocalIconAnimating provided for the focused slot — so what the user sees here (matte,
- * animation) is exactly what the XMB will draw.
- */
 @Composable
 fun CustomIconsOverlay(
     session: CustomIconSession,
@@ -76,15 +62,11 @@ fun CustomIconsOverlay(
     onActionConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // SAF pick for the focused slot. OpenDocument returns a content URI we copy from
-    // immediately — no persistence grant needed. Both control paths funnel here: the touch
-    // Pick button and the pad's SELECT (via [forwardedAction], forwarded by the VM).
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         session.focusedSlot?.let { slot -> uri?.let { onIconPicked(slot.key, it) } }
     }
     val launchPicker = { picker.launch(PICK_MIME) }
 
-    // Forwarded pad actions: SELECT = Pick, OPTIONS = Reset focused, BACK = Done.
     LaunchedEffect(forwardedAction) {
         when (forwardedAction) {
             GamepadAction.SELECT -> launchPicker()
@@ -104,8 +86,6 @@ fun CustomIconsOverlay(
     }
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-        // Consuming scrim: keeps the editor modal so taps above the panel never fall through
-        // to the XMB rows behind it (the columns stay fully visible, only faintly dimmed).
         Box(
             Modifier
                 .fillMaxSize()
@@ -113,7 +93,7 @@ fun CustomIconsOverlay(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) { /* swallow */ },
+                ) {  },
         )
         Column(
             modifier = Modifier
@@ -129,7 +109,7 @@ fun CustomIconsOverlay(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            // Group tabs (L/R on the pad).
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for ((index, group) in session.groups.withIndex()) {
                     val selected = index == session.groupIndex
@@ -152,7 +132,6 @@ fun CustomIconsOverlay(
                 }
             }
 
-            // The focused slot's current source, enlarged.
             val focused = slots.getOrNull(session.slotIndex)
             if (focused != null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -178,8 +157,6 @@ fun CustomIconsOverlay(
                 }
             }
 
-            // The group's slots, rendered through the real pipeline. The focused one animates
-            // (LocalIconAnimating=true) exactly as the XMB will draw it.
             LazyRow(
                 state = stripState,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -226,7 +203,6 @@ fun CustomIconsOverlay(
                 Text(text = message, color = Color(0xFFFFB4A2), fontSize = 12.sp)
             }
 
-            // Controller hints.
             PfpControllerHints(
                 items = listOf(
                     ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Move"),
@@ -241,8 +217,6 @@ fun CustomIconsOverlay(
                 style = ControllerHintStyle.OVERLAY,
             )
 
-            // Touch controls. Select launches the SAF picker for the focused slot; SELECT on
-            // the pad is forwarded by the VM to the overlay's action consumer, which calls it.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -251,25 +225,20 @@ fun CustomIconsOverlay(
                     onClick = launchPicker,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A82F6)),
                 ) { Text("Pick") }
-                // Reset clears the USER tier only, so it can act only on a slot the user has
-                // picked — greying it everywhere else is what stops "Reset" reading as broken
-                // on a slot whose icon comes from the theme (or from the built-in set). The
-                // pad's OPTIONS stays live and answers with a message instead, so the reason
-                // is available on controller too.
+
                 OutlinedButton(
                     onClick = { focused?.let { onResetSlot(it.key) } },
                     enabled = focused != null && customIcons.containsKey(focused.key),
                 ) { Text("Reset") }
                 OutlinedButton(onClick = onResetAll, enabled = customIcons.isNotEmpty()) { Text("Reset All") }
                 OutlinedButton(onClick = onSaveAsTheme) { Text("Save as Theme…") }
-                Box(Modifier.width(1.dp)) // spacer flex
+                Box(Modifier.width(1.dp))
                 OutlinedButton(onClick = onDone) { Text("Done") }
             }
         }
     }
 }
 
-/** The picker's accepted set — the plan's still formats plus GIF. */
 private val PICK_MIME = arrayOf(
     "image/png",
     "image/jpeg",
@@ -286,13 +255,6 @@ private fun groupLabel(group: IconSlot.Group): String = when (group) {
     IconSlot.Group.CONSOLE -> "Consoles"
 }
 
-/**
- * Draws a slot's current icon through the real pipeline: user pick > theme icon > the slot's
- * built-in glyph via [DefaultSlotGlyph]. Because the strip sits inside the shell's
- * CompositionLocalProvider tree, LocalIconLegibility and the theme's icon tint apply exactly
- * as on the XMB itself — so an untouched slot previews as the row it will replace, not as a
- * placeholder.
- */
 @Composable
 private fun SlotPreview(slot: IconSlot, icon: CustomIcon?, modifier: Modifier = Modifier) {
     if (icon != null) {
@@ -300,8 +262,7 @@ private fun SlotPreview(slot: IconSlot, icon: CustomIcon?, modifier: Modifier = 
         return
     }
     if (DefaultSlotGlyph(slot = slot, contentDescription = slot.displayName, modifier = modifier)) return
-    // Unreachable for a registered slot (DefaultSlotGlyphTest is the guard), but a slot added
-    // without built-in art still gets a readable plate rather than an empty cell.
+
     Box(
         modifier = modifier
             .border(1.dp, Color(0x66B9C6DC), RoundedCornerShape(6.dp))

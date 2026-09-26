@@ -29,28 +29,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 
-/**
- * Wallpaper pref contract for the Display settings importer — mirrors PfpThemeStoreTest's
- * cascade-pref contract tests.
- *
- * The motion-wallpaper invariant under test: `display_motion_wallpaper` is never set without
- * `display_custom_wallpaper`, and clearing the wallpaper clears BOTH keys — a leftover motion
- * path with a cleared poster is the unrenderable state the plan forbids.
- *
- * Concurrency note: the ViewModel launches on [dispatcher] (Dispatchers.setMain) while some of
- * its side effects complete on REAL threads (DataStore writes, Dispatchers.IO file deletes).
- * The wait helper therefore alternates `advanceUntilIdle()` (drives everything queued on the
- * test scheduler) with a real-thread sleep that never blocks the scheduler thread — blocking it
- * would deadlock the very coroutines we're waiting for.
- *
- * Coverage note: the video-probe success path (poster extraction through MediaMetadataRetriever)
- * is not exercised here — Robolectric can't decode a real MP4 on the JVM. Video import and the
- * decoder-release discipline are on-device checks.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class DisplaySettingsViewModelWallpaperTest {
-
     private val dispatcher = StandardTestDispatcher()
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var vm: DisplaySettingsViewModel
@@ -58,27 +39,23 @@ class DisplaySettingsViewModelWallpaperTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        // Synchronous clear — DataStore edits complete on real threads, no scheduler needed.
+
         runBlocking { context.pfpDataStore.edit { it.clear() } }
         File(context.filesDir, "wallpaper").deleteRecursively()
         vm = DisplaySettingsViewModel(
             context,
             UiMediaStore(context),
             GameBootPreferences(context),
-            // Real, not a mock: it reads the same DataStore the assertions do.
+
             com.psplauncher.core.data.launch.LaunchDiscPreferences(context),
             io.mockk.mockk(relaxed = true),
-            // The layout repo only feeds the media rows' face-button shortcuts. A relaxed mock
-            // would hand the combine a flow that never emits, so the state would never build.
+
             io.mockk.mockk(relaxed = true) {
                 io.mockk.every { prefs } returns kotlinx.coroutines.flow.flowOf(
                     com.psplauncher.core.domain.model.ControllerLayoutPrefs()
                 )
             },
-            // The disk work runs on the TEST scheduler, not a real pool — the same injection
-            // FontColorTest takes, and for the same reason. It does NOT make these tests
-            // deterministic on its own: DataStore keeps its own scope and threads, which is the
-            // race that still makes this class flaky under load. It removes the ViewModel's half.
+
             io = dispatcher,
         )
     }
@@ -91,7 +68,6 @@ class DisplaySettingsViewModelWallpaperTest {
 
     @Test
     fun `clearing the wallpaper clears both the poster and motion keys`() = runTest(dispatcher) {
-        // Stand in for a previously-applied motion wallpaper pair.
         context.pfpDataStore.edit {
             it[KEY_CUSTOM_WALLPAPER] = "/old/wallpaper.jpg"
             it[KEY_MOTION_WALLPAPER] = "/old/wallpaper.mp4"
@@ -137,7 +113,6 @@ class DisplaySettingsViewModelWallpaperTest {
 
     @Test
     fun `a still import replaces a motion wallpaper wholesale`() = runTest(dispatcher) {
-        // Previously-applied motion pair, files on disk.
         val dir = File(context.filesDir, "wallpaper").apply { mkdirs() }
         val oldPoster = File(dir, "wallpaper_1.jpg").apply { writeText("old") }
         val oldMotion = File(dir, "wallpaper_1.mp4").apply { writeText("old") }
@@ -161,21 +136,6 @@ class DisplaySettingsViewModelWallpaperTest {
         }
     }
 
-    /*
-     * Not unit-testable on the JVM (needs a device pass, like PfpThemeStoreTest's decode-failure
-     * note): the undecodable-still rejection — Robolectric's BitmapFactory shadow returns a
-     * placeholder bitmap for arbitrary bytes instead of failing, so the import always "succeeds".
-     */
-
-    // ── helpers ────────────────────────────────────────────────────────────────
-
-    /**
-     * Waits until [condition] holds. Drives the test scheduler (the VM's coroutines) and, in
-     * the same loop, sleeps on a REAL IO thread (never the scheduler thread) so wall-clock
-     * work — DataStore writes, file deletes — gets time to land.
-     */
-
-    /** Polls fresh prefs snapshots until [predicate] holds, returning the settled snapshot. */
     private suspend fun TestScope.eventuallyPrefs(
         reason: String,
         predicate: (Preferences) -> Boolean,
@@ -202,7 +162,6 @@ class DisplaySettingsViewModelWallpaperTest {
     }
 
     private companion object {
-        // Mirror the (internal) ViewModel keys by their string contract, like PfpThemeStoreTest does.
         val KEY_CUSTOM_WALLPAPER = stringPreferencesKey("display_custom_wallpaper")
         val KEY_MOTION_WALLPAPER = stringPreferencesKey("display_motion_wallpaper")
     }

@@ -27,7 +27,7 @@ data class CategoryEntity(
     @ColumnInfo(name = "accent_color")
     val accentColor: Long? = null,
 
-    val type: String,               // CategoryType.name()
+    val type: String,
 
     val position: Int,
 
@@ -37,7 +37,6 @@ data class CategoryEntity(
     @ColumnInfo(name = "is_gaming_category")
     val isGamingCategory: Boolean = false,
 
-    // JSON-serialized FilterRules — null for non-SMART categories
     @ColumnInfo(name = "filter_rules_json")
     val filterRulesJson: String? = null,
 )

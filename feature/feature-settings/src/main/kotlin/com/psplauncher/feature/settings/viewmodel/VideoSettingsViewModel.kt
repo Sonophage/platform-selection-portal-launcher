@@ -25,21 +25,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// Sentinel pref values for the default player (see VideoRepository).
-private const val PLAYER_BUILTIN = "builtin"   // PSPLauncher (built-in Media3)
-private const val PLAYER_ASK = "ask"           // System Default (OS chooser each time)
+private const val PLAYER_BUILTIN = "builtin"
+private const val PLAYER_ASK = "ask"
 
 data class VideoSettingsUiState(
-    // Every configured root, with its live SAF-grant status (same rows as Library Manager's
-    // ROM Root Access — a video library can span internal storage plus an SD card).
+
     val roots: List<RootFolderRow> = emptyList(),
     val scanning: Boolean = false,
     val scanMessage: String? = null,
-    // Default player: null/"builtin" = built-in, "ask" = system chooser, else a package name.
+
     val defaultPlayer: String? = null,
     val availablePlayers: List<VideoPlayerApp> = emptyList(),
     val showPlayerPicker: Boolean = false,
-    // ── TMDB posters ──────────────────────────────────────────────────────────
+
     val hasTmdbKey: Boolean = false,
     val tmdbKeyDraft: String = "",
     val matchingPosters: Boolean = false,
@@ -55,11 +53,6 @@ data class VideoSettingsUiState(
         }
 }
 
-/**
- * Multi-root Video settings, mirroring Library Manager's ROM Root Access: several root folders per
- * section (each a persisted SAF grant whose subfolders become libraries), a rescan that reconciles
- * the library rows with the configured roots and scans each root, and the default player.
- */
 @HiltViewModel
 class VideoSettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -70,7 +63,6 @@ class VideoSettingsViewModel @Inject constructor(
     private val tmdbKeyProvider: com.psplauncher.feature.artwork.api.TmdbApiKeyProvider,
     private val posterFetcher: com.psplauncher.feature.artwork.api.VideoPosterFetcher,
 ) : ViewModel() {
-
     private val notifier = BackgroundTaskNotifier(context)
     private val _ui = MutableStateFlow(VideoSettingsUiState())
     val uiState: StateFlow<VideoSettingsUiState> = _ui
@@ -83,8 +75,6 @@ class VideoSettingsViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            // distinctUntilChanged: the backing DataStore is app-wide; without it every unrelated
-            // preference write would re-run the persisted-grant snapshot below.
             mediaRootRepository.roots(MediaRootKind.VIDEO).distinctUntilChanged().collect { roots ->
                 val persisted = SafGrants.persistedReadUris(context.contentResolver)
                 _ui.value = _ui.value.copy(roots = roots.map { uri ->
@@ -103,7 +93,6 @@ class VideoSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Grants (and persists) a new root, adds it to the list, and rescans. */
     fun addRoot(treeUri: Uri) {
         viewModelScope.launch {
             mediaRootRepository.persist(treeUri)
@@ -112,7 +101,6 @@ class VideoSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Removes a root; its library row is dropped on the next rescan. */
     fun removeRoot(treeUri: String) {
         viewModelScope.launch {
             mediaRootRepository.remove(MediaRootKind.VIDEO, treeUri)
@@ -120,7 +108,6 @@ class VideoSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Replaces one root's URI (re-link after a lost grant, or picking a different folder). */
     fun relinkRoot(oldTreeUri: String, newUri: Uri) {
         viewModelScope.launch {
             mediaRootRepository.persist(newUri)
@@ -129,10 +116,6 @@ class VideoSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Reconciles the library rows with the configured roots (dropping rows whose root is gone)
-     * and scans every root incrementally.
-     */
     fun rescan() {
         viewModelScope.launch {
             val roots = mediaRootRepository.getAll(MediaRootKind.VIDEO)
@@ -142,7 +125,6 @@ class VideoSettingsViewModel @Inject constructor(
             }
             _ui.value = _ui.value.copy(scanning = true, scanMessage = "Scanning…")
 
-            // Roots removed in the wizard or here take their library rows with them.
             videoRepository.getLibraries()
                 .filter { it.treeUri !in roots }
                 .forEach { videoRepository.removeLibrary(it.id) }
@@ -174,15 +156,12 @@ class VideoSettingsViewModel @Inject constructor(
         }
     }
 
-    // ── Default player ──────────────────────────────────────────────────────────
-
     fun openPlayerPicker() {
         _ui.value = _ui.value.copy(showPlayerPicker = true, availablePlayers = intentResolver.availablePlayers())
     }
 
     fun dismissPlayerPicker() { _ui.value = _ui.value.copy(showPlayerPicker = false) }
 
-    /** [value] = null/"builtin" (PFP), "ask" (system default), or a package name. */
     fun chooseDefaultPlayer(value: String?) {
         _ui.value = _ui.value.copy(showPlayerPicker = false)
         viewModelScope.launch { videoRepository.setDefaultVideoPlayer(value) }
@@ -190,7 +169,6 @@ class VideoSettingsViewModel @Inject constructor(
 
     fun dismissMessage() { _ui.value = _ui.value.copy(scanMessage = null) }
 
-    // Ensures one VideoLibrary exists for [root] (recursive) — other roots keep their own rows.
     private suspend fun syncLibraryForRoot(root: String): VideoLibrary {
         val existing = videoRepository.getLibraries().firstOrNull { it.treeUri == root }
         val library = existing ?: videoRepository.addLibrary(displayName(root), root, scanRecursively = true)
@@ -203,8 +181,6 @@ class VideoSettingsViewModel @Inject constructor(
             ?: Uri.parse(treeUri).lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':')
             ?: "Videos"
 
-    // ── TMDB posters ──────────────────────────────────────────────────────────
-
     fun setTmdbKeyDraft(v: String) = _ui.update { it.copy(tmdbKeyDraft = v) }
 
     fun saveTmdbKey() {
@@ -215,9 +191,7 @@ class VideoSettingsViewModel @Inject constructor(
             _ui.update {
                 it.copy(
                     tmdbKeyDraft = "",
-                    // Says so when the Keystore could not seal it, rather than implying it was
-                    // stored encrypted when it was not — the same thing SecretProtection exists
-                    // to make visible for the other credentials.
+
                     posterMessage = if (protection == com.psplauncher.core.common.security.SecretProtection.PROTECTED) "Key saved"
                     else "Key saved, but it could not be encrypted on this device",
                 )
@@ -232,7 +206,6 @@ class VideoSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Matches every film that has no poster yet. [refresh] re-matches the ones that do. */
     fun fetchPosters(refresh: Boolean = false) {
         if (_ui.value.matchingPosters) return
         viewModelScope.launch {

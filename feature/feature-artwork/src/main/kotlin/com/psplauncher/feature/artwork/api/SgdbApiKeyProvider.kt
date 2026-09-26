@@ -19,8 +19,6 @@ private val KEY_SGDB_API_KEY = stringPreferencesKey("sgdb_api_key")
 class SgdbApiKeyProvider @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    // Keys are encrypted at rest (Keystore-backed); decryptOrLegacy keeps pre-encryption values
-    // working until they're next saved.
     val apiKeyFlow: Flow<String?> = context.pfpDataStore.data
         .map { prefs -> prefs[KEY_SGDB_API_KEY]?.let { KeystoreSecretCipher.decryptOrLegacy(it) } }
 

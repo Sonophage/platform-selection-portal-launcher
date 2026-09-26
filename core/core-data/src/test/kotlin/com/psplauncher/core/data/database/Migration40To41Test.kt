@@ -12,13 +12,11 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration40To41Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
     @Test
     fun `v41 creates the empty launch_outcomes table and preserves games`() {
-        // A v40 database with an existing game row — the migration must be purely additive.
         helper.createDatabase(40).use { db ->
             db.execSQL(
                 "INSERT INTO games (title, platform_id, rom_path, is_favorite, favorite_sort_order, " +
@@ -28,14 +26,13 @@ class Migration40To41Test {
         }
 
         helper.runMigrationsAndValidate(41, listOf(PFPDatabase.MIGRATION_40_41)).use { db ->
-            // The game survives the migration untouched.
+
             db.singleRow("SELECT title FROM games WHERE rom_path = '/roms/crash.bin'") {
                 assertEquals("Crash Bandicoot", it.getText(0))
             }
-            // The new log table exists and is empty.
+
             assertEquals(0, db.count("SELECT COUNT(*) FROM launch_outcomes"))
 
-            // A settled launch outcome round-trips through the schema.
             db.execSQL(
                 "INSERT INTO launch_outcomes (game_id, game_title, platform_id, emulator_id, " +
                     "emulator_name, core_path, core_name, source, outcome, failure_reason, " +

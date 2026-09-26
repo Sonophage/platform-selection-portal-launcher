@@ -30,13 +30,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-// Robolectric (not plain mockk): BackgroundTaskNotifier posts real Android notifications, whose
-// Notification.Builder throws "Stub!" on a bare JVM. Under Robolectric's shadow notification
-// manager it works against a real application context.
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class MusicSettingsViewModelTest {
-
     private val dispatcher = StandardTestDispatcher()
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val musicRepository = mockk<MusicRepository>(relaxed = true)
@@ -87,7 +83,7 @@ class MusicSettingsViewModelTest {
 
         coVerify { mediaRoots.persist(uri) }
         coVerify { mediaRoots.add(MediaRootKind.MUSIC, rootUri) }
-        // Rescan ran to completion and reported the empty result.
+
         assertFalse(vm.uiState.value.scanning)
         assertTrue(vm.uiState.value.scanMessage.orEmpty().contains("Found 0 tracks"))
     }

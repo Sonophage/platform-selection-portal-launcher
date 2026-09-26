@@ -4,9 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** C18 task X.5 — who a library file belongs to during Scan & Relink. */
 class RelinkOwnerLookupTest {
-
     private val asked = mutableListOf<String>()
 
     private fun fuzzy(answers: Map<String, List<Long>> = emptyMap()): (String) -> List<Long>? = { name ->
@@ -137,10 +135,6 @@ class RelinkOwnerLookupTest {
         assertNull(owners(fileName = "Unknown.png", fileStem = "Unknown"))
     }
 
-    // ── Durable identity (C16 task D.3) ───────────────────────────────────────
-
-    // The bug this tier exists for: the ROM was renamed, so the file's name matches nothing, but
-    // the identity index still knows which game's ids it was written for.
     @Test
     fun `identity reconnects a file whose name no longer matches anything`() {
         val ids = owners(
@@ -167,8 +161,6 @@ class RelinkOwnerLookupTest {
         assertEquals(listOf(7L), ids)
     }
 
-    // An index row naming a game that no longer exists must not swallow the file: relink hands back
-    // an empty owner list for it, and the name tiers below still get their turn.
     @Test
     fun `an identity row for a departed game falls through to the name tiers`() {
         val ids = owners(
@@ -181,7 +173,6 @@ class RelinkOwnerLookupTest {
         assertEquals(listOf(12L), ids)
     }
 
-    // A library written before D.2 has no rows at all; nothing about its matching may change.
     @Test
     fun `no identity at all behaves exactly as before`() {
         val ids = owners(
@@ -193,8 +184,6 @@ class RelinkOwnerLookupTest {
         assertEquals(listOf(34L), ids)
     }
 
-    // Multi-asset kinds store the ordinal in the name ("Name_02"), so the full stem is tried before
-    // the base — the same rule the name tiers follow, for the same reason.
     @Test
     fun `identity on the full stem wins over identity on the base`() {
         val ids = owners(

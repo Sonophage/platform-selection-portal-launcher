@@ -8,8 +8,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.MusicTrack
 
-// One row per scanned audio file. uri is a SAF document uri string. Cascade-deletes with its
-// folder so removing a folder removes its tracks; indexed by folder_id for per-folder queries.
 @Serializable
 @Entity(
     tableName = "music_tracks",
@@ -21,8 +19,7 @@ import com.psplauncher.core.domain.model.MusicTrack
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    // last_played_at is indexed for the same reason games.last_played_at is: the recents
-    // query is ORDER BY it DESC over a table that is mostly nulls.
+
     indices = [Index("folder_id"), Index("last_played_at")],
 )
 data class MusicTrackEntity(
@@ -41,7 +38,6 @@ data class MusicTrackEntity(
     val artist: String? = null,
     val album: String? = null,
 
-    /** The album's own artist, when the file carries one. See MusicTrack.albumArtist. */
     @ColumnInfo(name = "album_artist")
     val albumArtist: String? = null,
 
@@ -66,13 +62,6 @@ data class MusicTrackEntity(
     @ColumnInfo(name = "art_uri")
     val artUri: String? = null,
 
-    /**
-     * When this track was last played through the launcher, or null if it never has been.
-     *
-     * NOT [lastModified], which is the file's mtime — when the bytes were written, not when they
-     * were listened to. A library copied in one go would have every track claim the same recency,
-     * which is why the recents shelf needed a column of its own rather than a proxy.
-     */
     @ColumnInfo(name = "last_played_at")
     val lastPlayedAt: Long? = null,
 )

@@ -6,8 +6,6 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import kotlinx.serialization.Serializable
 
-// Junction table — links games/apps to MANUAL and SHORTCUT_GROUP categories
-// SMART and PLATFORM categories populate themselves dynamically, not stored here
 @Serializable
 @Entity(
     tableName = "category_items",
@@ -17,7 +15,7 @@ import kotlinx.serialization.Serializable
             entity        = CategoryEntity::class,
             parentColumns = ["id"],
             childColumns  = ["category_id"],
-            onDelete      = ForeignKey.CASCADE,     // items auto-removed when category deleted
+            onDelete      = ForeignKey.CASCADE,
         )
     ],
     indices = [Index("category_id"), Index("item_id")],
@@ -26,16 +24,14 @@ data class CategoryItemEntity(
     @ColumnInfo(name = "category_id")
     val categoryId: String,
 
-    // item_id is flexible — can reference a game ID, package name, or shortcut ID
     @ColumnInfo(name = "item_id")
     val itemId: String,
 
     @ColumnInfo(name = "item_type")
-    val itemType: String,               // "game" | "app" | "shortcut"
+    val itemType: String,
 
     @ColumnInfo(name = "sort_order")
     val sortOrder: Int = 0,
 
-    // Pinned items sort to the top of their category.
     val pinned: Boolean = false,
 )

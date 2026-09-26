@@ -54,9 +54,6 @@ class ControllerMappingRepository @Inject constructor(
     }
 
     suspend fun remap(action: GamepadAction, newKeyCode: Int) {
-        // Read the current persisted mappings once. DataStore.data is an infinite flow, so
-        // first() is required — collecting it would suspend forever and the write below would
-        // never run.
         val prefs = context.pfpDataStore.data.first()
         val current = prefs[KEY_MAPPINGS]?.let {
             runCatching { json.decodeFromString<GamepadMappings>(it) }.getOrNull()

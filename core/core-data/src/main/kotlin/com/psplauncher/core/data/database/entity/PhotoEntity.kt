@@ -8,8 +8,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.Photo
 
-// One row per scanned photo file. uri is a SAF document uri string. Cascade-deletes with its
-// library so removing an album removes its photos; indexed by library_id for per-album queries.
 @Serializable
 @Entity(
     tableName = "photos",

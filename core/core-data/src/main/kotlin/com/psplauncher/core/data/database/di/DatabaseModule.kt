@@ -49,7 +49,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-
     @Provides
     @Singleton
     fun providePFPDatabase(@ApplicationContext context: Context): PFPDatabase =
@@ -58,12 +57,7 @@ object DatabaseModule {
             PFPDatabase::class.java,
             PFPDatabase.DATABASE_NAME,
         )
-        // Never use fallbackToDestructiveMigration — users would lose their entire library
-        // (No partial unique index on games: Room cannot express it in the schema export, so any
-        // database carrying it — from a migration or this callback — fails Room's post-migration
-        // validation. The one-primary-per-disc-set invariant is enforced by DiscSetBuilder /
-        // DiscSetReconciler at scan time instead.)
-        // One list, declared beside the migrations themselves. See PFPDatabase.ALL_MIGRATIONS.
+
         .addMigrations(*PFPDatabase.ALL_MIGRATIONS)
         .build()
 
@@ -98,7 +92,6 @@ object DatabaseModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-
     @Binds
     @Singleton
     abstract fun bindGameRepository(impl: GameRepositoryImpl): GameRepository

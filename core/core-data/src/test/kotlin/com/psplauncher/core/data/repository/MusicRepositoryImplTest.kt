@@ -22,15 +22,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Repository behaviour over fake DAOs. The fake track DAO mirrors the real @Transaction
- * replaceForFolder contract (delete only the target folder's rows, then insert), so these tests
- * pin the "replace one folder doesn't touch others" and "remove folder removes its tracks"
- * guarantees the SQL provides.
- */
 class MusicRepositoryImplTest {
-
-    private val context = mockk<Context>(relaxed = true) // folder/track paths never touch context
+    private val context = mockk<Context>(relaxed = true)
     private val folderDao = FakeMusicFolderDao()
     private val trackDao = FakeMusicTrackDao()
     private val playlistDao = FakePlaylistDao(trackDao)
@@ -47,13 +40,12 @@ class MusicRepositoryImplTest {
         repo.replaceTracksForFolder(a.id, listOf(track("a1", a.id), track("a2", a.id)), 1L)
         repo.replaceTracksForFolder(b.id, listOf(track("b1", b.id), track("b2", b.id), track("b3", b.id)), 1L)
 
-        // Re-scan folder A with a single track — B must be unaffected.
         repo.replaceTracksForFolder(a.id, listOf(track("a3", a.id)), 2L)
 
         assertEquals(1, repo.observeTracksByFolder(a.id).first().size)
         assertEquals(3, repo.observeTracksByFolder(b.id).first().size)
         assertEquals(4, repo.observeAllTracks().first().size)
-        // Folder A's stored count reflects the latest scan.
+
         assertEquals(1, repo.getFolder(a.id)!!.trackCount)
     }
 
@@ -93,7 +85,6 @@ class MusicRepositoryImplTest {
         assertEquals(2, repo.observePlaylistTracks(playlistId).first().size)
         assertEquals(2, repo.observePlaylists().first().single().trackCount)
 
-        // Toggle removes the present track and reports the new state.
         assertFalse(repo.toggleTrackInPlaylist(playlistId, "t1"))
         assertEquals(listOf("t2"), repo.observePlaylistTracks(playlistId).first().map { it.id })
         assertEquals(listOf(playlistId), repo.getPlaylistIdsForTrack("t2"))
@@ -102,8 +93,6 @@ class MusicRepositoryImplTest {
         assertTrue(repo.observePlaylists().first().isEmpty())
     }
 }
-
-// ── Fakes ───────────────────────────────────────────────────────────────────────
 
 private class FakeMusicFolderDao : MusicFolderDao {
     private val map = linkedMapOf<String, MusicFolderEntity>()
@@ -125,11 +114,10 @@ private class FakeMusicFolderDao : MusicFolderDao {
 }
 
 private class FakeMusicTrackDao : MusicTrackDao {
-    // Keyed by folderId to mirror per-folder isolation in SQL.
     private val byFolder = linkedMapOf<String, MutableList<MusicTrackEntity>>()
     fun snapshot(): List<MusicTrackEntity> = byFolder.values.flatten()
     override fun observeAll(): Flow<List<MusicTrackEntity>> = flowOf(byFolder.values.flatten())
-    // Mirrors the SQL: newest id first, art-bearing rows only, capped at the limit.
+
     override fun observeNewestArtUris(limit: Int): Flow<List<String>> = flowOf(
         byFolder.values.flatten()
             .sortedByDescending { it.id }
@@ -144,8 +132,7 @@ private class FakeMusicTrackDao : MusicTrackDao {
         tracks.forEach { byFolder.getOrPut(it.folderId) { mutableListOf() }.add(it) }
     }
     override suspend fun deleteForFolder(folderId: String) { byFolder[folderId]?.clear() }
-    // The recency column this fake has to answer for. The real preservation-across-rescan
-    // behaviour is proven against a real database in RescanKeepsRecencyTest, not here.
+
     override suspend fun playStampsForFolder(folderId: String) =
         byFolder[folderId].orEmpty()
             .filter { it.lastPlayedAt != null }
@@ -164,7 +151,6 @@ private class FakeMusicTrackDao : MusicTrackDao {
             if (i >= 0) list[i] = f(list[i])
         }
     }
-    // replaceForFolder is a default interface method (stamps + deleteForFolder + insertAll) — inherited.
 }
 
 private class FakePlaylistDao(private val trackDao: FakeMusicTrackDao) : PlaylistDao {
@@ -180,7 +166,6 @@ private class FakePlaylistDao(private val trackDao: FakeMusicTrackDao) : Playlis
 
     override suspend fun getById(id: Long) = playlists[id]
 
-    // Mirrors the INNER JOIN: only members whose track still exists are returned, in position order.
     override fun observeTracks(playlistId: Long): Flow<List<MusicTrackEntity>> {
         val tracksById = trackDao.snapshot().associateBy { it.id }
         return flowOf(

@@ -39,22 +39,6 @@ import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.core.ui.components.XmbHeaderPill
 import com.psplauncher.feature.artwork.store.StudioArtworkSlot
 
-/**
- * The stored-assets manager (task 5.4): the active multi-asset slot's assets in order, with the
- * first one labelled the primary — what the rail and the Game Detail strip show.
- *
- * Reorder only. Removal stays the grid's checklist, so there is one way to delete an asset rather
- * than two that could disagree.
- *
- * Drawn as a full-screen overlay for the same reason the file-information panel is: the grid's
- * measured slot decides the page size (L.2), so a panel that took layout space would change how
- * many tiles a page holds.
- *
- * **The order lives in the records, not the filenames.** Files keep their ordinal names, because
- * Relink rebuilds position from those names and the Windows PC export claims records back by exact
- * name. A Relink therefore puts the slot back in file order — said plainly in the footer rather
- * than fought.
- */
 @Composable
 internal fun StudioAssetManagerPanel(
     kindLabel: String,
@@ -93,7 +77,6 @@ internal fun StudioAssetManagerPanel(
             Spacer(Modifier.height(12.dp))
 
             if (assets.isEmpty()) {
-                // Reachable if every record's file was lost between opening the menu and the panel.
                 Text(
                     "Nothing stored for this slot.",
                     color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp,
@@ -147,11 +130,6 @@ internal fun StudioAssetManagerPanel(
     }
 }
 
-/**
- * One row: its position, a thumbnail, and where it came from. The focused row frames itself with a
- * [BringIntoViewRequester] rather than scroll-offset arithmetic, which is this app's convention for
- * controller focus — it stays exact when a row is taller than its neighbours.
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StudioAssetRow(

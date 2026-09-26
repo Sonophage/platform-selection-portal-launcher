@@ -33,7 +33,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArtworkSettingsViewModelTest {
-
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var sgdbKeyProvider: SgdbApiKeyProvider
@@ -62,14 +61,10 @@ class ArtworkSettingsViewModelTest {
         every { sgdbKeyProvider.apiKeyFlow }             returns flowOf(null)
         every { metadataKeyProvider.igdbClientIdFlow }   returns flowOf(null)
         every { metadataKeyProvider.ssUsernameFlow }     returns flowOf(null)
-        // "Is it configured?" is the provider's answer now, not something this screen infers from
-        // the public half of the pair. Both are combine upstreams, so a relaxed mock's
-        // never-emitting Flow would stall uiState at its initial value.
+
         every { metadataKeyProvider.hasIgdbCredentialsFlow } returns flowOf(false)
         every { metadataKeyProvider.hasSsCredentialsFlow }   returns flowOf(false)
-        // ssEnabled comes from the credential source (bundled dev pair), not a build constant,
-        // so it is an extra combine upstream — a relaxed mock returns a Flow that never emits,
-        // which would stall uiState at its initial value.
+
         every { screenScraperApi.isEnabledFlow }         returns flowOf(false)
         every { scrapePreferences.preferSteamGridDbHeroesFlow } returns flowOf(false)
         cropPreviewPreferences = mockk(relaxed = true) {
@@ -92,8 +87,7 @@ class ArtworkSettingsViewModelTest {
     }
 
     private fun buildViewModel() = ArtworkSettingsViewModel(
-        // WorkManager.getInstance on a mock context throws → the VM's guarded scrape observer
-        // becomes a no-op, which is exactly what these tests want.
+
         context             = mockk(relaxed = true),
         sgdbKeyProvider     = sgdbKeyProvider,
         metadataKeyProvider = metadataKeyProvider,
@@ -102,7 +96,7 @@ class ArtworkSettingsViewModelTest {
         scrapePreferences   = scrapePreferences,
         igdbApi             = igdbApi,
         screenScraperApi    = screenScraperApi,
-        // No folder configured in tests → the grant-dead banner check is a no-op.
+
         artworkFolderRepository = mockk(relaxed = true) {
             coEvery { getTreeUri() } returns null
         },
@@ -111,16 +105,11 @@ class ArtworkSettingsViewModelTest {
         debugCredentialsLoader = debugCredentialsLoader,
     )
 
-    // uiState is a WhileSubscribed StateFlow, so it only reflects upstream (the credential flows +
-    // _extra) while something is collecting it. Build the VM with a background collector active so
-    // reads of uiState.value observe real updates, matching how the UI subscribes at runtime.
     private fun TestScope.activeViewModel(): ArtworkSettingsViewModel {
         val vm = buildViewModel()
         backgroundScope.launch { vm.uiState.collect { } }
         return vm
     }
-
-    // ── Credential state ──────────────────────────────────────────────────────
 
     @Test
     fun `hasApiKey is false when sgdb key flow emits null`() = runTest(testDispatcher) {
@@ -137,12 +126,6 @@ class ArtworkSettingsViewModelTest {
         assertTrue(viewModel.uiState.value.hasApiKey)
     }
 
-    // This pair replaces a test that asserted hasIgdbCredentials went true on a non-blank client
-    // id alone. That was the bug written down as the intent: the client id is the PUBLIC half and
-    // restores normally, while the secret is dropped on a cross-device restore, so a client id on
-    // its own describes a provider that cannot authenticate. The screen said "configured" and the
-    // scrape path -- which asked MetadataApiKeyProvider, and got the both-halves answer -- did not.
-
     @Test
     fun `hasIgdbCredentials follows the provider, not the client id on its own`() = runTest(testDispatcher) {
         every { metadataKeyProvider.igdbClientIdFlow } returns flowOf("my-client")
@@ -150,7 +133,7 @@ class ArtworkSettingsViewModelTest {
         viewModel = activeViewModel()
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.hasIgdbCredentials)
-        // The id itself is still surfaced, so the screen can show what is stored.
+
         assertEquals("my-client", viewModel.uiState.value.igdbClientId)
     }
 
@@ -172,13 +155,6 @@ class ArtworkSettingsViewModelTest {
         assertFalse(viewModel.uiState.value.hasSsCredentials)
         assertEquals("someone", viewModel.uiState.value.ssUsername)
     }
-
-    // TheGamesDB's key was stored and read by MetadataApiKeyProvider but never writable from the UI.
-
-    // ── Scrape modes ──────────────────────────────────────────────────────────
-    // Scrapes are WorkManager jobs now: the ViewModel enqueues MetadataScrapeWorker and mirrors
-    // its WorkInfo into uiState. These tests mock the worker's companion to verify the enqueue
-    // contract; progress/summary mirroring needs WorkManager test infra and is device-verified.
 
     @Test
     fun `scrapeMissingOnly enqueues the missing-mode worker`() = runTest(testDispatcher) {
@@ -250,8 +226,6 @@ class ArtworkSettingsViewModelTest {
         assertFalse(viewModel.uiState.value.confirmRescrapeAll)
     }
 
-    // ── Scrape preference toggles ─────────────────────────────────────────────
-
     @Test
     fun `setPreferSteamGridDbHeroes persists to scrapePreferences`() = runTest(testDispatcher) {
         viewModel = activeViewModel()
@@ -295,8 +269,6 @@ class ArtworkSettingsViewModelTest {
         coVerify { iconDisplayPreferences.setLingerDelaySeconds(3.5f) }
     }
 
-    // ── IGDB credential test ───────────────────────────────────────────────────
-
     @Test
     fun `testIgdbCredentials shows Valid on success`() = runTest(testDispatcher) {
         coEvery { igdbApi.testCredentials("id", "secret") } returns true
@@ -320,8 +292,6 @@ class ArtworkSettingsViewModelTest {
 
         assertTrue(viewModel.uiState.value.igdbCredentialStatus?.contains("Invalid") == true)
     }
-
-    // ── Dismiss helpers ───────────────────────────────────────────────────────
 
     @Test
     fun `dismissSummary clears summary`() = runTest(testDispatcher) {
@@ -348,18 +318,14 @@ class ArtworkSettingsViewModelTest {
         assertNull(viewModel.uiState.value.igdbCredentialStatus)
     }
 
-    // ── Debug credentials file (debug builds only) ────────────────────────────
-
     @Test
     fun `the credentials file row is offered in debug builds`() = runTest(testDispatcher) {
         viewModel = activeViewModel()
         advanceUntilIdle()
-        // Unit tests run the debug variant; the release variant compiles the row out.
+
         assertEquals(
             com.psplauncher.feature.settings.BuildConfig.DEBUG,
             viewModel.uiState.value.debugCredentialsAvailable,
         )
     }
-
-    // Loading itself is debug-source-set code: see ArtworkSettingsDebugCredentialsTest (testDebug).
 }

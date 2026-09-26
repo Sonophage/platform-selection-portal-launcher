@@ -52,18 +52,6 @@ import com.psplauncher.core.ui.wave.WaveStyle
 import com.psplauncher.feature.settings.ui.LocalSettingsActionConsumed
 import com.psplauncher.feature.settings.ui.LocalSettingsPendingAction
 
-/**
- * The wizard's front door: the mark on the wave, and one press to go in.
- *
- * Shown on a first run only — see [com.psplauncher.feature.settings.ui.InitialSetupScreen]. A
- * wizard re-opened from Settings ▸ System is a task, not an arrival, and a ceremony in front of it
- * every time would be something to sit through rather than something to see.
- *
- * Deliberately NOT a [WizardScaffold] page. Every page in that scaffold is a form — a header, a
- * heading, a column of rows and a prompt row — and this is a picture with one affordance. Building
- * it as a page would mean suppressing four pieces of chrome to arrive at a blank one, so it is its
- * own composable and reads the host's action directly.
- */
 @Composable
 fun WizardSplash(onBegin: () -> Unit) {
     val begin by rememberUpdatedState(onBegin)
@@ -71,8 +59,6 @@ fun WizardSplash(onBegin: () -> Unit) {
     val pendingAction = LocalSettingsPendingAction.current
     val onConsumed = LocalSettingsActionConsumed.current
 
-    // Latches: the press starts an animation that ends in navigation, so a second press (a mash,
-    // or a tap landing while the controller press is already running) must do nothing at all.
     var entering by remember { mutableStateOf(false) }
     val press = remember { Animatable(0f) }
 
@@ -83,8 +69,6 @@ fun WizardSplash(onBegin: () -> Unit) {
         }
     }
 
-    // BACK is not handled: on a first run there is nowhere behind this. The host's own back
-    // handling still applies, which is what keeps the launcher's Home key working.
     LaunchedEffect(pendingAction) {
         if (pendingAction == GamepadAction.SELECT) {
             onConsumed()
@@ -98,8 +82,6 @@ fun WizardSplash(onBegin: () -> Unit) {
         begin()
     }
 
-    // The idle shimmer: a band travelling through the mark, slowly, before anything is pressed.
-    // It is what makes the screen read as waiting for you rather than as stopped.
     val idle = rememberInfiniteTransition(label = "splash-shimmer")
     val idleSweep by idle.animateFloat(
         initialValue = -0.4f,
@@ -112,8 +94,7 @@ fun WizardSplash(onBegin: () -> Unit) {
     )
 
     val t = press.value
-    // The press: the mark brightens and swells a little, then the whole screen goes to it. The
-    // sweep is driven fast through the mark once, over the top of the idle one.
+
     val glow = FastOutSlowInEasing.transform((t / GlowPeak).coerceIn(0f, 1f))
     val exit = ((t - ExitStart) / (1f - ExitStart)).coerceIn(0f, 1f)
     val sweep = if (entering) -0.4f + t * 1.8f else idleSweep
@@ -122,8 +103,7 @@ fun WizardSplash(onBegin: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            // Tap anywhere. No ripple and no indication: this is a picture, not a button, and the
-            // response to the press is the animation itself.
+
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -133,10 +113,6 @@ fun WizardSplash(onBegin: () -> Unit) {
     ) {
         WaveLayers(WaveStyle.ANIMATED)
 
-        // A plain Box. This was BoxWithConstraints and never read maxWidth or maxHeight —
-        // BoxWithConstraints subcomposes its content to hand it the constraints, so an unused
-        // scope buys a second composition pass for nothing, on the first screen a new install
-        // ever draws.
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -146,8 +122,6 @@ fun WizardSplash(onBegin: () -> Unit) {
                     modifier = Modifier
                         .fillMaxSize(LogoFraction)
                         .graphicsLayer {
-                            // Offscreen so the shimmer below can be masked to the mark's own
-                            // alpha rather than painted as a rectangle across it.
                             compositingStrategy = CompositingStrategy.Offscreen
                             scaleX = 1f + glow * GlowSwell + exit * ExitSwell
                             scaleY = scaleX
@@ -155,15 +129,7 @@ fun WizardSplash(onBegin: () -> Unit) {
                         }
                         .drawWithContent {
                             drawContent()
-                            // SrcATop, not SrcIn. SrcIn replaces the destination's colour
-                            // everywhere, including where the band's gradient is transparent —
-                            // so the mark vanished and only the travelling band was visible, a
-                            // sliver of logo sliding across an empty screen. SrcAtop keeps the
-                            // destination where the source is clear and lightens it where the
-                            // band is, which is what a shimmer is. Both are masked to the mark's
-                            // own alpha, which is the part that was right: a blurred halo behind
-                            // the glyph fogs the wave, and the wave is the other half of this
-                            // screen.
+
                             val span = size.width * ShimmerWidth
                             val head = size.width * sweep
                             drawRect(
@@ -188,8 +154,6 @@ fun WizardSplash(onBegin: () -> Unit) {
             }
         }
 
-        // The prompt, below the mark and out of its way. It fades as the press takes over, so the
-        // last thing on screen is the mark alone.
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -212,26 +176,19 @@ fun WizardSplash(onBegin: () -> Unit) {
     }
 }
 
-/** How long the press takes before the wizard's first page is asked for. */
 private const val SplashEnterMs = 900
 
-/** Where in that press the glow has fully arrived (a fraction of [SplashEnterMs]). */
 private const val GlowPeak = 0.45f
 
-/** Where in the press the mark starts leaving. */
 private const val ExitStart = 0.55f
 
 private const val GlowSwell = 0.04f
 private const val ExitSwell = 0.22f
 
-/** One idle sweep through the mark. Slow: a shimmer this size reads as a scan if it is quick. */
 private const val ShimmerCycleMs = 4_200
 
-/** Half-width of the travelling band, as a fraction of the mark's width. */
 private const val ShimmerWidth = 0.45f
 
-/** The mark's share of the SHORT screen edge — the same fraction the boot sequence uses. */
 private const val LogoFraction = 0.42f
 
-/** How fast the prompt leaves relative to the press. Gone by roughly the glow's peak. */
 private const val PromptFadeRate = 2.4f

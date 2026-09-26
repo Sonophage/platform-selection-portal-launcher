@@ -26,13 +26,8 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
-/**
- * Settings ▸ Artwork's debug credentials row, end to end through the ViewModel. Debug variant only:
- * in release the ViewModel refuses the load and the loader is a stub.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArtworkSettingsDebugCredentialsTest {
-
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var loader: DebugCredentialsLoader
 
@@ -52,7 +47,7 @@ class ArtworkSettingsDebugCredentialsTest {
             metadataKeyProvider = mockk(relaxed = true) {
                 every { igdbClientIdFlow } returns flowOf(null)
                 every { ssUsernameFlow } returns flowOf(null)
-                // Both-halves predicates, read by uiState's combine.
+
                 every { hasIgdbCredentialsFlow } returns flowOf(false)
                 every { hasSsCredentialsFlow } returns flowOf(false)
             },

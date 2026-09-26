@@ -18,17 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
-/**
- * C16 task 3.2 — Current-vs-Incoming metadata and the four apply policies.
- *
- * The policy function is pure, so most cases need no mocks. The last group pins the one writer,
- * [ArtworkRepository.applyMetadata]: Fill Missing Only must go through the reversed-COALESCE
- * `updateMetadataIfMissing`, and Keep Current must not touch the table at all.
- */
 class MetadataApplyTest {
-
-    // ── Presets from provider candidates ────────────────────────────────────────
-
     private fun ss(
         title: String? = "Chrono Trigger",
         description: String? = "Time travel RPG",
@@ -55,10 +45,6 @@ class MetadataApplyTest {
 
     @Test
     fun `a game only Steam answered for is not "found on no source"`() {
-        // fetchForGame stops on isEmpty and reports "Not found on any source". Steam was not in
-        // that predicate at first, so a Windows game that ONLY Steam could serve would have had
-        // every asset it just fetched thrown away — the exact failure this provider exists to
-        // remove, reintroduced by the seam that decides whether anything was found.
         val steamOnly = candidates(
             steamDetails = com.psplauncher.feature.artwork.api.SteamAppDetails(
                 appId = "620",
@@ -77,9 +63,6 @@ class MetadataApplyTest {
 
     @Test
     fun `ScreenScraper becomes a preset, artwork-only answers never do`() {
-        // TheGamesDB was the second preset here until it was removed as a provider. ScreenScraper
-        // is the only one left that carries text, so the assertion that matters is the negative
-        // one: an artwork-only answer must not become a preset with nothing in it.
         val presets = MetadataApply.presetsFrom(
             candidates(
                 ssInfo = ss(),
@@ -101,8 +84,6 @@ class MetadataApplyTest {
         assertTrue(MetadataApply.presetsFrom(candidates(ssInfo = cacheShaped)).isEmpty())
     }
 
-    // ── The four policies ───────────────────────────────────────────────────────
-
     private val current: Map<MetadataField, Any?> = mapOf(
         MetadataField.TITLE to "Chrono Trigger",
         MetadataField.DESCRIPTION to "My own notes",
@@ -112,10 +93,10 @@ class MetadataApplyTest {
 
     private val incoming = MetadataPreset(
         provider = MatchProvider.SCREENSCRAPER,
-        title = "Chrono Trigger",            // same as current — never a change
-        description = "Time travel RPG",     // differs from a populated value
-        developer = "Square",                // fills an empty value
-        publisher = "   ",                   // blank — never offered, never written
+        title = "Chrono Trigger",
+        description = "Time travel RPG",
+        developer = "Square",
+        publisher = "   ",
         releaseYear = 1995,
     )
 
@@ -163,8 +144,6 @@ class MetadataApplyTest {
 
         assertTrue(plan.isEmpty())
     }
-
-    // ── The writer ──────────────────────────────────────────────────────────────
 
     private val gameDao = mockk<GameDao>(relaxed = true)
     private val metadataRepository = mockk<MetadataRepository>(relaxed = true)

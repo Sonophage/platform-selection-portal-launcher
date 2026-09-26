@@ -43,19 +43,9 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 
-/**
- * In-app PDF manual viewer — Android's [PdfRenderer], no external apps or libraries.
- *
- * Input: D-pad LEFT/RIGHT turn pages, UP/DOWN scroll within the page, B closes (all routed by
- * the ViewModel through [page]/[scrollSteps]); touch taps the left/right screen thirds to turn
- * pages, drags to scroll, ✕ to close.
- *
- * One page is rendered at a time (fit-to-width, off the main thread); [PdfRenderer] is not
- * thread-safe, so rendering is confined to the renderer's monitor.
- */
 @Composable
 fun ManualViewerOverlay(
-    source: String,                   // content:// document or internal file path
+    source: String,
     title: String,
     page: Int,
     scrollSteps: Int,
@@ -83,8 +73,7 @@ fun ManualViewerOverlay(
         opened?.let { onPageCount(it.pageCount) }
         onDispose {
             renderer.value = null
-            // Close under the same monitor the render path holds, so a page render in flight
-            // finishes before the renderer is torn down.
+
             runCatching { opened?.let { synchronized(it) { it.close() } } }
             runCatching { pfd?.close() }
         }
@@ -102,7 +91,7 @@ fun ManualViewerOverlay(
                             (p.height * scale).toInt().coerceAtLeast(1),
                             Bitmap.Config.ARGB_8888,
                         )
-                        bmp.eraseColor(android.graphics.Color.WHITE)   // PDF pages assume white paper
+                        bmp.eraseColor(android.graphics.Color.WHITE)
                         p.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                         bmp
                     }
@@ -128,8 +117,7 @@ fun ManualViewerOverlay(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xF2000000))
-            // Tap zones: outer thirds turn pages; center is neutral so drags/reading aren't
-            // hijacked. Registered on the container so scrolling still works.
+
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     when {
@@ -165,7 +153,6 @@ fun ManualViewerOverlay(
             }
         }
 
-        // Header: title + page counter + close. Kept on top of the page content.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -201,6 +188,4 @@ fun ManualViewerOverlay(
     }
 }
 
-// Fit-to-width render resolution: crisp on the 1080p-class handheld screens PFP targets while
-// keeping a page bitmap ~15 MB worst case; only one page is held at a time.
 private const val RENDER_WIDTH_PX = 1600

@@ -24,21 +24,8 @@ import com.psplauncher.core.data.database.entity.VideoLibraryEntity
 import com.psplauncher.core.data.database.entity.VideoPlaylistEntity
 import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
 
-/**
- * Backup-only data access. Centralises the read / wipe / bulk-insert queries the backup format-v2
- * export & restore needs for the tables the feature DAOs don't already expose that way, so those
- * DAOs stay focused on the app's own use cases.
- *
- * `platforms` is deliberately NOT wiped on restore — it is a seeded catalog with a few
- * user-editable columns. [restorePlatformPrefs] updates only those columns so a backup taken by an
- * older build can't erase platform definitions the current build added. `themes` is likewise not
- * wiped (built-ins are seeded once and never re-seeded); backed-up themes are upserted and the
- * active one re-asserted via [setActiveTheme].
- */
 @Dao
 interface BackupDao {
-
-    // ── Export getters ──────────────────────────────────────────────────
     @Query("SELECT * FROM platforms")             suspend fun getPlatforms(): List<PlatformEntity>
     @Query("SELECT * FROM memory_cards")          suspend fun getMemoryCards(): List<MemoryCardEntity>
     @Query("SELECT * FROM app_overrides")         suspend fun getAppOverrides(): List<AppOverrideEntity>
@@ -59,7 +46,6 @@ interface BackupDao {
     @Query("SELECT * FROM book_libraries")        suspend fun getBookLibraries(): List<BookLibraryEntity>
     @Query("SELECT * FROM books")                 suspend fun getBooks(): List<BookEntity>
 
-    // ── Bulk insert (REPLACE so explicit primary keys from the backup are honoured) ──
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertMemoryCards(rows: List<MemoryCardEntity>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAppOverrides(rows: List<AppOverrideEntity>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertCollections(rows: List<CollectionEntity>)
@@ -79,7 +65,6 @@ interface BackupDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBookLibraries(rows: List<BookLibraryEntity>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBooks(rows: List<BookEntity>)
 
-    // ── Wipe (child rows first; parents rely on this ordering, not just FK cascade) ──
     @Query("DELETE FROM collection_games")      suspend fun clearCollectionGames()
     @Query("DELETE FROM collections")           suspend fun clearCollections()
     @Query("DELETE FROM playlist_tracks")       suspend fun clearPlaylistTracks()
@@ -99,7 +84,6 @@ interface BackupDao {
     @Query("DELETE FROM hidden_placements")     suspend fun clearHiddenPlacements()
     @Query("DELETE FROM category_items")        suspend fun clearCategoryItems()
 
-    // ── Platform / theme merge helpers (no wipe) ────────────────────────
     @Query(
         """
         UPDATE platforms

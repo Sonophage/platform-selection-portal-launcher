@@ -15,26 +15,16 @@ import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 import java.util.UUID
 
-/**
- * Runs a metadata/artwork scrape batch as real background work: survives leaving the settings
- * screen, shows live progress in the notification shade, and is cancellable from the UI or the
- * notification. Cancellation is cooperative — the repository loop suspends between games and
- * network calls, so cancelling stops after the in-flight game and everything fetched so far
- * is kept.
- */
 @HiltWorker
 class MetadataScrapeWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
     private val artworkRepository: ArtworkRepository,
 ) : CoroutineWorker(appContext, params) {
-
     override suspend fun doWork(): Result {
         val notifier = BackgroundTaskNotifier(applicationContext)
         val mode = inputData.getString(KEY_MODE) ?: MODE_MISSING
-        // Absent for the two library-wide modes; a platform id narrows the same "missing" pass to
-        // one card. The repository has had scrapeMissingForPlatform all along — it was reachable
-        // only from the XMB's card context menu, never through this worker.
+
         val platformId = inputData.getString(KEY_PLATFORM)
         val label = when {
             platformId != null -> "Scraping missing artwork: ${platformId.uppercase()}"
@@ -45,8 +35,7 @@ class MetadataScrapeWorker @AssistedInject constructor(
         var lastNotified = 0L
 
         val onProgress: (ScrapeProgress) -> Unit = { p ->
-            // Notifications are rate-limited by the system — refresh at most ~2×/second; the
-            // in-app progress rides setProgress on every event.
+
             val now = System.currentTimeMillis()
             if (now - lastNotified >= 500 || p.current == p.total) {
                 lastNotified = now
@@ -69,15 +58,12 @@ class MetadataScrapeWorker @AssistedInject constructor(
         }
 
         return try {
-            // A platform wins over the mode: "all" means the whole library, and there is no
-            // sense in which one card can be re-scraped as all of them.
             val result = when {
                 platformId != null -> artworkRepository.scrapeMissingForPlatform(platformId, onProgress)
                 mode == MODE_ALL -> artworkRepository.reScrapeAllGames(onProgress)
                 else -> artworkRepository.scrapeMissingOnly(onProgress)
             }
-            // The stop reason leads when there is one: "42 failed" with no explanation reads
-            // as a broken library, and the actual cause is usually that a quota ran out.
+
             val counts = "${result.succeeded} succeeded, ${result.failed} failed of ${result.total}"
             notifier.complete(
                 TASK_ID, "Artwork scrape finished",
@@ -109,7 +95,6 @@ class MetadataScrapeWorker @AssistedInject constructor(
         const val MODE_MISSING = "missing"
         const val KEY_MODE = "mode"
 
-        /** Narrows a [MODE_MISSING] pass to one Memory Card. Absent means the whole library. */
         const val KEY_PLATFORM = "platform"
         const val KEY_CURRENT = "current"
         const val KEY_TOTAL = "total"
@@ -119,16 +104,9 @@ class MetadataScrapeWorker @AssistedInject constructor(
         const val KEY_SOURCE = "source"
         const val KEY_ASSET = "asset"
         const val KEY_ERROR = "error"
-        /** Why ScreenScraper stopped part-way, in the user's words, or absent when it did not. */
+
         const val KEY_STOPPED_REASON = "stopped_reason"
 
-        /**
-         * Enqueues a scrape (no-op if one is already running — KEEP policy).
-         *
-         * [platformId] narrows it to one card. The KEEP policy is doing real work for that case:
-         * the ScreenScraper account this is written against allows ONE thread, so a per-card
-         * scrape starting while a library-wide one runs would have the two fighting over it.
-         */
         fun enqueue(context: Context, mode: String, platformId: String? = null): UUID {
             val request = OneTimeWorkRequestBuilder<MetadataScrapeWorker>()
                 .setInputData(

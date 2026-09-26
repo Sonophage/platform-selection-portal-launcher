@@ -9,22 +9,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * v45 — series and cover art on `books`.
- *
- * The claim worth testing is that an existing library survives the column add. A user who scanned
- * books on v44 has rows this migration must not disturb, and `ALTER TABLE ADD COLUMN` on SQLite
- * rewrites nothing, so the rows should come through byte for byte with the three new columns
- * reading null until a rescan fills them.
- *
- * As in [Migration43To44Test], the shape of the table is deliberately NOT asserted here:
- * `runMigrationsAndValidate` compares the result against the exported v45 schema and fires before
- * any assertion in this class, so a column-shape test here could never be made to fail on its own.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration44To45Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
@@ -50,12 +37,11 @@ class Migration44To45Test {
                 "SELECT title, author, relative_path, size_bytes, series, series_index, cover_uri " +
                     "FROM books WHERE id = 'b1'"
             ) {
-                // What was already there is still there, unchanged.
                 assertEquals("Dune", it.getText(0))
                 assertEquals("Frank Herbert", it.getText(1))
                 assertEquals("scifi", it.getText(2))
                 assertEquals(900L, it.getLong(3))
-                // The three new columns exist and are empty until a rescan reads the EPUB.
+
                 assertTrue(it.isNull(4), "series should be null before a rescan")
                 assertTrue(it.isNull(5), "series_index should be null before a rescan")
                 assertTrue(it.isNull(6), "cover_uri should be null before a rescan")

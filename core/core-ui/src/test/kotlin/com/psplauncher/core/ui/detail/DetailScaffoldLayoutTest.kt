@@ -32,23 +32,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The detail frame's layout contract, on a real composition (Robolectric JVM Compose test — the
- * same pattern as feature-xmb's AppPickerThreeRowsTest).
- *
- * The design requires the helper footer to be a *permanent layout row* rather than an overlay, and
- * requires fading its hints never to move the body. Both are geometry facts about a composed tree,
- * so nothing short of laying one out can check them.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w480dp-h640dp")
 class DetailScaffoldLayoutTest {
-
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
-    /** The viewport the page body is allowed to use: everything above the footer. */
     private fun bodyViewportBottom(): Float =
         composeRule.onNode(hasScrollAction()).fetchSemanticsNode().boundsInRoot.bottom
 
@@ -84,7 +74,6 @@ class DetailScaffoldLayoutTest {
                         )
                     },
                 ) {
-                    // Far taller than the viewport, so the body really does scroll.
                     Column(Modifier.fillMaxWidth().height(2400.dp).background(Color.DarkGray)) {}
                 }
             }
@@ -110,7 +99,6 @@ class DetailScaffoldLayoutTest {
             bodyViewportBottom() <= footer.top + 0.5f,
         )
 
-        // Fading the prompts (touch input) must not move anything: same reserved height, same body.
         val viewportBefore = bodyViewportBottom()
         composeRule.runOnIdle { hintsVisible = false }
         composeRule.waitForIdle()
@@ -140,11 +128,10 @@ class DetailScaffoldLayoutTest {
         }
         composeRule.waitForIdle()
 
-        // The ◀ title / subtitle header, with the platform keeping its own casing.
         composeRule.onNodeWithText("◀").assertExists()
         composeRule.onNodeWithText("Nintendo DS").assertExists()
         composeRule.onNodeWithText("ROM").assertExists()
-        // Unmerged: the clickable back target merges both texts into one node with one set of bounds.
+
         val title = composeRule.onNodeWithText("Nintendo DS", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val subtitle = composeRule.onNodeWithText("ROM", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("the subtitle sits under the title", subtitle.top >= title.bottom - 0.5f)

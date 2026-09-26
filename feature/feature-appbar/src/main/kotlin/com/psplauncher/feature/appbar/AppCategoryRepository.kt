@@ -12,7 +12,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// An installed app resolved into a specific XMB category, with its display label and pin state.
 data class CategorizedApp(
     val packageName: String,
     val label: String,
@@ -23,12 +22,6 @@ data class CategorizedApp(
 
 private const val ITEM_TYPE_APP = "app"
 
-// Resolves installed apps into XMB categories and applies user customizations. The contract:
-//   - An app with NO customization is placed by AppClassifier (automatic default).
-//   - As soon as the user moves/adds/removes/pins it, the app becomes "customized" and its
-//     placement comes solely from category_items rows — automatic classification no longer
-//     applies, so scans and package updates never overwrite the user's choice.
-//   - Hidden apps never appear; renamed apps use their custom label.
 @Singleton
 class AppCategoryRepository @Inject constructor(
     private val installedAppRepository: InstalledAppRepository,
@@ -38,7 +31,6 @@ class AppCategoryRepository @Inject constructor(
 ) {
     @Volatile private var cache: List<InstalledApp> = emptyList()
 
-    // Emits whenever assignment or override state changes, so the XMB can re-resolve.
     fun changes(): Flow<Unit> =
         combine(categoryDao.observeAppItems(), appOverrideDao.observeAll()) { _, _ -> }
 
@@ -55,17 +47,8 @@ class AppCategoryRepository @Inject constructor(
         return cache
     }
 
-    // Public accessor for the installed-app picker (Android Library / Video / Music "add apps").
     suspend fun allInstalledApps(): List<InstalledApp> = installedApps()
 
-    // Packages that currently live in a category — the picker's pre-check baseline so reopening
-    // "Add Apps" shows current membership checked.
-    //
-    // Membership has TWO sources and both must be read:
-    //   1. explicit rows in category_items (apps the user has customized), and
-    //   2. implicit classification — a non-customized app whose AppClassifier default includes
-    //      this category (e.g. YouTube → "videos") has NO junction row until the user edits it,
-    //      yet it displays in the category and must read as a member in the picker.
     suspend fun packagesIn(categoryId: String): Set<String> {
         val explicit = categoryDao.getAppItems()
             .filter { it.categoryId == categoryId }
@@ -79,8 +62,6 @@ class AppCategoryRepository @Inject constructor(
     }
 
     private fun appByPackage(pkg: String): InstalledApp? = cache.firstOrNull { it.packageName == pkg }
-
-    // ── Resolution ───────────────────────────────────────────────────────────────
 
     suspend fun appsForCategory(categoryId: String): List<CategorizedApp> {
         val apps      = installedApps()
@@ -110,8 +91,6 @@ class AppCategoryRepository @Inject constructor(
             )
         }.sortedWith(compareByDescending<CategorizedApp> { it.pinned }.thenBy { it.label.lowercase() })
     }
-
-    // ── User customization ─────────────────────────────────────────────────────────
 
     suspend fun moveToCategory(pkg: String, categoryId: String) {
         markCustomized(pkg)
@@ -152,8 +131,6 @@ class AppCategoryRepository @Inject constructor(
 
     fun launch(pkg: String) = installedAppRepository.launchApp(pkg)
 
-    // Converts an app's automatic placement into explicit rows the first time the user edits
-    // it, so subsequent automatic classification never overrides the user's choice.
     private suspend fun materialize(pkg: String) {
         val ov = appOverrideDao.getByPackage(pkg)
         if (ov?.customized == true) return

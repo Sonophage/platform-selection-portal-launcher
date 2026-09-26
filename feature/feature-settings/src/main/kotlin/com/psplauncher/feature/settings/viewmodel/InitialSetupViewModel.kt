@@ -35,87 +35,63 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * The pages of the first-run wizard, in order. RetroArch and Vita3K exist only when installed.
- *
- * [PERSONALIZE] is one page for four things — theme, sounds, boot logo and the XMB's sizing —
- * because they are all the same question ("how should it look and sound?") and asking it four
- * times in a row on a first run is four pages of someone not yet having any content to look at.
- * Each row opens the real settings screen and comes back, so nothing here is a second copy of
- * those screens.
- */
 enum class SetupStep {
     WELCOME, PERMISSIONS, ROM_ROOTS, MUSIC, VIDEO, PHOTO, BOOKS, ARTWORK, SERVICES,
     VITA, RETROARCH, PERSONALIZE, FINISH,
 }
 
-/** A detected artwork source offered for the embedded quick-import (label + system count). */
 @Immutable
 data class ArtworkSourceUi(val label: String, val systems: Int)
 
 @Immutable
 data class InitialSetupUiState(
     val step: SetupStep = SetupStep.WELCOME,
-    // True when RetroArch is installed — gates whether the RETROARCH page appears.
+
     val retroArchInstalled: Boolean = false,
-    // True when Vita3K is installed — gates whether the VITA data-folder page appears.
+
     val vita3KInstalled: Boolean = false,
-    // Multi-root lists per section (Library-Manager rows — a section can span several folders).
+
     val romRoots: List<RootFolderRow> = emptyList(),
     val musicRoots: List<RootFolderRow> = emptyList(),
     val videoRoots: List<RootFolderRow> = emptyList(),
     val photoRoots: List<RootFolderRow> = emptyList(),
     val bookRoots: List<RootFolderRow> = emptyList(),
-    // Grants, read imperatively rather than observed: none of the three has a change broadcast we
-    // could subscribe to, so the page refreshes them when it opens and whenever the user comes
-    // back from the system screen it sent them to.
+
     val hasNotifications: Boolean = false,
     val hasUsageAccess: Boolean = false,
     val isHomeLauncher: Boolean = false,
-    // Artwork is a SINGLE folder; sources under its import/ folder license the quick-import row.
+
     val artworkFolderName: String? = null,
     val artworkSources: List<ArtworkSourceUi> = emptyList(),
-    // Services — connected state plus the public identity to show for it.
+
     val hasSgdb: Boolean = false,
     val igdbClientId: String = "",
-    // ScreenScraper accounts only matter when the build ships dev credentials.
+
     val ssEnabled: Boolean = false,
     val ssUsername: String = "",
-    // RetroArch cores link.
+
     val retroArchLinked: Boolean = false,
     val retroArchCoreCount: Int? = null,
     val retroArchDetecting: Boolean = false,
-    // Vita3K data-folder (ux0) link — display name of the granted folder, null = not set.
+
     val vitaFolderName: String? = null,
     val message: String? = null,
-    // Per-service validation results (\"Testing…\" / \"Valid …\" / \"Invalid …\"), shown inline.
+
     val igdbStatus: String? = null,
     val ssStatus: String? = null,
-    // OPTIONAL XMB auto-fit: when checked on the Finish page, finishing the wizard writes an
-    // XmbLayoutPreset.autoFit() entry into the same per-form-factor pref the "Adjust XMB
-    // Layout" editor uses. Off by default — the feature is never pushed on users, and anything
-    // configured here can be undone in Display settings.
+
     val autoFitXmbLayout: Boolean = false,
 ) {
     val hasIgdb: Boolean get() = igdbClientId.isNotBlank()
 
-    /**
-     * The pages this run of the wizard will actually show.
-     *
-     * [stepNumber] and [stepCount] are read off ONE list on purpose: "step 4 of 9" is a pair, and
-     * a header that counted the position through the gated flow while counting the total over
-     * every page would quietly promise a step that never arrives.
-     */
     private val reachableSteps: List<SetupStep>
         get() = SetupStep.entries.filter {
             (it != SetupStep.RETROARCH || retroArchInstalled) &&
                 (it != SetupStep.VITA || vita3KInstalled)
         }
 
-    /** 1-based page number within the reachable (RetroArch/Vita3K-gated) flow — hidden pages skip. */
     val stepNumber: Int get() = (reachableSteps.indexOf(step) + 1).coerceAtLeast(1)
 
-    /** How many pages this run has in total. The denominator of [stepNumber]. */
     val stepCount: Int get() = reachableSteps.size
     val hasScreenScraper: Boolean get() = ssUsername.isNotBlank()
     val anyFolderSet: Boolean get() =
@@ -123,8 +99,6 @@ data class InitialSetupUiState(
             photoRoots.isNotEmpty() || artworkFolderName != null
 }
 
-// Typed intermediate groups so the combine stays compiler-checked — no positional
-// Array<Any?> casts that silently shift when a flow is added or reordered.
 @Immutable
 private data class RootLists(
     val rom: List<RootFolderRow>,
@@ -132,12 +106,10 @@ private data class RootLists(
     val video: List<RootFolderRow>,
     val photo: List<RootFolderRow>,
     val book: List<RootFolderRow>,
-    val artwork: String?,   // artwork folder display name
-    val vita: String?,      // Vita3K ux0 folder display name
+    val artwork: String?,
+    val vita: String?,
 )
 
-// Who the artwork services think we are, as one value. With TheGamesDB gone this is three flows
-// rather than four, comfortably inside combine's typed overload.
 @Immutable
 private data class ServiceIdentities(
     val hasSgdb: Boolean,
@@ -145,34 +117,12 @@ private data class ServiceIdentities(
     val ssUsername: String,
 )
 
-// Must match XMBViewModel.KEY_INITIAL_SETUP_SEEN — both read/write the same pref.
 private val KEY_INITIAL_SETUP_SEEN = booleanPreferencesKey("initial_setup_seen")
 
-/**
- * RetroArch ships one package per ABI — com.retroarch.aarch64 is the one nearly every device has,
- * and plain com.retroarch is the legacy build almost none of them do.
- *
- * This was an exact-match getPackageInfo("com.retroarch"), so on a device carrying the aarch64
- * build the wizard reported RetroArch absent and silently dropped its page from the flow. The
- * rest of the codebase already matched by family (EmulatorLaunchPreference,
- * EmulatorPlatformMapping, RetroArchCoreScanner, KnownEmulatorPackages) — this was the one place
- * that did not, and a missing page is the failure that reports nothing.
- */
 private const val RETROARCH_FAMILY = "com.retroarch"
 
-// Vita3K ships under one package name plus commonly-shared variants; any installed means its
-// data-folder (ux0) page should be offered. Same set as KnownEmulatorCatalog.
 private val VITA3K_PACKAGES = listOf("org.vita3k.emulator", "org.vita3k.emulator.ikhoeyZX")
 
-/**
- * First-run setup wizard, broken into one task per page per the approved plan: Welcome → ROM
- * Roots → Music → Video → Photo → Artwork → Online Services → Vita* → RetroArch* → Finish
- * (* only when the matching app is installed). Each folder section is multi-root exactly like Settings ▸ Library
- * ROM Root Access and the Music/Video/Photo screens, artwork is one folder with an embedded
- * quick-import offer, and services mirror Settings ▸ Artwork. Pure glue — every value is
- * stored through the same repository/provider the corresponding settings screen uses, so
- * anything configured here shows up there and vice versa. Everything is optional.
- */
 @HiltViewModel
 class InitialSetupViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -191,21 +141,12 @@ class InitialSetupViewModel @Inject constructor(
     private val romScanner: com.psplauncher.feature.library.scanner.RomScanner,
     private val folderHintResolver: com.psplauncher.core.data.platform.PlatformFolderHintResolver,
     private val memoryCardRepository: com.psplauncher.core.data.repository.MemoryCardRepository,
-    // The two grant-holders, borrowed rather than re-implemented: "is usage access on" and "are
-    // we the Home app" already have exactly one answer each in the app drawer's repositories, and
-    // a wizard that asked the platform itself would be a second one to keep in step.
+
     private val installedAppRepository: com.psplauncher.feature.appbar.InstalledAppRepository,
     private val launcherShortcuts: com.psplauncher.feature.appbar.LauncherShortcutRepository,
 ) : ViewModel() {
-
-    // Wizard-local state (page + transient messages + RetroArch status); the folder/service rows
-    // are mirrored from the stores so they never go stale.
-    // ssEnabled used to be a build constant readable here; it is now stored state, so it starts
-    // false and is filled in by the init block below alongside the other detected values.
     private val scratch = MutableStateFlow(InitialSetupUiState())
 
-    // Detected artwork sources kept beside (not inside) UiState so state carries only display
-    // data; aligned by index with artworkSources.
     private var detectedArtworkSources: List<DetectedImportSource> = emptyList()
 
     init {
@@ -223,11 +164,6 @@ class InitialSetupViewModel @Inject constructor(
         refreshGrants()
     }
 
-    /**
-     * Re-reads the three grants. Called when the Permissions page opens and every time the user
-     * returns from a system screen — none of these fires a broadcast we could observe, so the
-     * alternative is a page that keeps saying "Not granted" after the user has just granted it.
-     */
     fun refreshGrants() {
         scratch.update {
             it.copy(
@@ -238,20 +174,14 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    /** The system role request (Q+) or the Home settings screen. */
     fun homeRoleIntent(): android.content.Intent = launcherShortcuts.homeRoleRequestIntent()
 
     private fun hasNotificationPermission(): Boolean =
-        // Below API 33 the permission is granted at install time, so there is nothing to ask for
-        // and the row must not offer to.
+
         android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU ||
             context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
 
-    // Display-name rows derive per-flow; grant status is snapshotted at emission time so a lost
-    // grant (reinstall) reports ACCESS_LOST immediately, like the settings screens.
-    // combine() is typed to 5 flows — the folder roots pack into one RootLists, then the Vita3K
-    // ux0 folder is layered on top (keeping the typed lambda, never an Array<Any?> cast).
     private val rootLists = combine(
         combine(
             romRootRepository.roots,
@@ -272,8 +202,7 @@ class InitialSetupViewModel @Inject constructor(
             )
         },
         vita3KLibrary.ux0TreeUriFlow,
-        // Books joined here rather than inside: combine's typed overload tops out at five, and
-        // the inner one is already full.
+
         mediaRootRepository.roots(MediaRootKind.BOOK),
     ) { lists, vita, book ->
         lists.copy(
@@ -322,7 +251,6 @@ class InitialSetupViewModel @Inject constructor(
 
     private fun isRetroArchInstalled(): Boolean = runCatching {
         context.packageManager.getInstalledPackages(0).any {
-            // On the dot: com.retroarchive is not a RetroArch build.
             it.packageName == RETROARCH_FAMILY || it.packageName.startsWith("$RETROARCH_FAMILY.")
         }
     }.getOrDefault(false)
@@ -332,22 +260,10 @@ class InitialSetupViewModel @Inject constructor(
             runCatching { context.packageManager.getPackageInfo(it, 0) }.isSuccess
         }
 
-    // ── Step navigation ───────────────────────────────────────────────────────
-
-    /**
-     * Set while the wizard has sent the user to a real settings screen and expects them back.
-     *
-     * The wizard's overlay leaves composition for the excursion, and its onDispose calls
-     * [resetWizard] — which would return a ten-step run to page one for the crime of opening the
-     * theme picker. This makes exactly the next reset a no-op; every other one still fires, so a
-     * wizard genuinely closed still starts over next time.
-     */
     private var parkedForExcursion = false
 
-    /** Called immediately before Make It Yours opens one of the four screens. */
     fun parkForExcursion() { parkedForExcursion = true }
 
-    /** Back to Welcome with transient state cleared. See old resetWizard contract. */
     fun resetWizard() {
         if (parkedForExcursion) {
             parkedForExcursion = false
@@ -363,7 +279,6 @@ class InitialSetupViewModel @Inject constructor(
         )
     }
 
-    /** The steps in play — defeats the RetroArch and Vita3K pages when their app isn't installed. */
     private fun reachableSteps(): List<SetupStep> =
         SetupStep.entries.filter {
             (it != SetupStep.RETROARCH || scratch.value.retroArchInstalled) &&
@@ -378,7 +293,6 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    /** Steps one page back. Returns false when already on the first page (caller exits). */
     fun previousStep(): Boolean {
         if (scratch.value.step == SetupStep.WELCOME) return false
         val order = reachableSteps()
@@ -393,14 +307,11 @@ class InitialSetupViewModel @Inject constructor(
         return true
     }
 
-    // ── ROM roots (multi-root, Library-Manager style) ──────────────────────────
-
     fun addRomRoot(uri: Uri) {
         viewModelScope.launch {
             romRootRepository.persist(uri, writable = true)
             romRootRepository.add(uri.toString())
-            // Auto-detect + scan on the runner's own scope so it survives the wizard closing —
-            // this pass creates the consoles and stamps lastScannedAt.
+
             romRootScanRunner.kickoff()
         }
     }
@@ -419,11 +330,6 @@ class InitialSetupViewModel @Inject constructor(
 
     fun rescanRomRoots() = romRootScanRunner.kickoff()
 
-    /**
-     * B3: offer to scaffold one ES-DE subfolder per supported platform under the first ROM root
-     * ("where do I put my ROMs?"). Same call Library Manager's folder-setup flow makes — the
-     * scanner then auto-creates Memory Cards for any folder that maps to a platform.
-     */
     fun createStandardRomFolders() {
         val firstRoot = scratch.value.romRoots.firstOrNull()?.treeUri ?: return
         viewModelScope.launch {
@@ -442,8 +348,6 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    // ── Music / Video / Photo roots (multi-root) ───────────────────────────────
-
     fun addMediaRoot(kind: MediaRootKind, uri: Uri) {
         viewModelScope.launch {
             mediaRootRepository.persist(uri)
@@ -455,8 +359,7 @@ class InitialSetupViewModel @Inject constructor(
     fun removeMediaRoot(kind: MediaRootKind, treeUri: String) {
         viewModelScope.launch {
             mediaRootRepository.remove(kind, treeUri)
-            // Reconcile the library rows with the remaining roots (drops the removed row) and
-            // rescan the survivors.
+
             wizardMediaScanRunner.kickoff(kind)
         }
     }
@@ -471,9 +374,6 @@ class InitialSetupViewModel @Inject constructor(
 
     fun rescanMediaRoot(kind: MediaRootKind) = wizardMediaScanRunner.kickoff(kind)
 
-    // ── Artwork (single folder) ────────────────────────────────────────────────
-
-    /** Links [uri] as the artwork folder and offers a quick-import when import/ holds sources. */
     fun onArtworkFolderPicked(uri: Uri) {
         viewModelScope.launch {
             val result = artworkImportManager.linkFolder(uri)
@@ -483,8 +383,7 @@ class InitialSetupViewModel @Inject constructor(
                 }
                 return@launch
             }
-            // Zero-copy adoption of anything already in the folder (same pass Settings ▸ Artwork
-            // Import runs on pick), then scan for importable sources.
+
             val scan = runCatching { artworkImportManager.relinkLibrary() }.getOrNull()
             val sources = runCatching { artworkImportManager.detectSources() }.getOrDefault(emptyList())
             detectedArtworkSources = sources
@@ -507,7 +406,6 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    /** Releases the link (files are never touched) and clears the import offer. */
     fun forgetArtworkFolder() {
         viewModelScope.launch {
             artworkImportManager.forgetFolder()
@@ -521,7 +419,6 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    /** Copies the first detected source into the artwork library (never moves first-run files). */
     fun importArtworkNow() {
         val detected = detectedArtworkSources.firstOrNull()
         val label = scratch.value.artworkSources.firstOrNull()?.label
@@ -549,8 +446,6 @@ class InitialSetupViewModel @Inject constructor(
             }
         }
     }
-
-    // ── RetroArch cores folder ─────────────────────────────────────────────────
 
     fun linkRetroArch(uri: Uri) {
         viewModelScope.launch {
@@ -597,10 +492,6 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    // ── Vita3K data folder (ux0) ───────────────────────────────────────────────
-
-    /** Grants the Vita3K `ux0` folder (persisting the SAF read grant, the same store the
-     *  Library Manager reads) so installed Vita titles can be discovered and scanned later. */
     fun linkVitaFolder(uri: Uri) {
         viewModelScope.launch {
             vita3KLibrary.setUx0Folder(uri)
@@ -614,7 +505,6 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    /** Releases the Vita3K data-folder link (files are never touched). */
     fun forgetVitaFolder() {
         viewModelScope.launch {
             vita3KLibrary.clear()
@@ -623,8 +513,6 @@ class InitialSetupViewModel @Inject constructor(
             }
         }
     }
-
-    // ── Services ──────────────────────────────────────────────────────────────
 
     fun connectSgdb(apiKey: String) {
         if (apiKey.isBlank()) return
@@ -642,7 +530,6 @@ class InitialSetupViewModel @Inject constructor(
         }
     }
 
-    /** Same live check as Settings ▸ Artwork (shared via [ServiceConnectors]). */
     fun testIgdbCredentials(clientId: String, clientSecret: String) {
         viewModelScope.launch {
             scratch.update { it.copy(igdbStatus = "Testing…") }
@@ -653,7 +540,6 @@ class InitialSetupViewModel @Inject constructor(
 
     fun dismissIgdbStatus() = scratch.update { it.copy(igdbStatus = null) }
 
-    /** Same live check as Settings ▸ Artwork (shared via [ServiceConnectors]). */
     fun testSsCredentials(username: String, password: String) {
         viewModelScope.launch {
             scratch.update { it.copy(ssStatus = "Testing…") }
@@ -664,26 +550,15 @@ class InitialSetupViewModel @Inject constructor(
 
     fun dismissSsStatus() = scratch.update { it.copy(ssStatus = null) }
 
-    // ── Optional XMB auto-fit (Finish page) ──────────────────────────────────
-
-    /** Flip the opt-in checkbox on the Finish page. Nothing is written until [finishSetup]. */
     fun toggleAutoFitXmbLayout(enabled: Boolean) {
         scratch.update { it.copy(autoFitXmbLayout = enabled) }
     }
 
-    /**
-     * Write the auto-fit preset for the CURRENT form-factor bucket (idempotent). The same write as
-     * Display ▸ XMB Layout ▸ Biblically Accurate PSP XMB, which therefore shows as applied after it.
-     */
     private suspend fun writeAutoFitPreset() {
         val target = PspXmbLayout.forWindow(context)
         context.pfpDataStore.edit { prefs -> PspXmbLayout.write(prefs, target) }
     }
 
-    /**
-     * Finish the wizard. If the user opted in, write the auto-fit preset into the XMB layout
-     * pref (same store the editor writes) before marking setup complete.
-     */
     fun finishSetup() {
         viewModelScope.launch {
             if (scratch.value.autoFitXmbLayout) {
@@ -700,7 +575,6 @@ class InitialSetupViewModel @Inject constructor(
             scratch.update { it.copy(message = "ScreenScraper connected", ssStatus = null) }
         }
     }
-
 
     fun dismissMessage() = scratch.update { it.copy(message = null) }
 }

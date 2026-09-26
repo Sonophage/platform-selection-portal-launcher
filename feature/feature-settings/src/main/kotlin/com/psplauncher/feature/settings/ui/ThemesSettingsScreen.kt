@@ -109,10 +109,6 @@ private fun ThemesSettingsContent(
     val ptfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { onImportPtfTheme(it) } }
     val pfpPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { onImportPfpTheme(it) } }
 
-    // "Save Current Look as Theme" name entry, drawn in the launcher's own window like every other
-    // prompt in the app. It was a Material3 AlertDialog, which renders into a separate platform
-    // Window, so Activity.dispatchKeyEvent never runs and the pad never reaches it: no A, no B, no
-    // D-pad, and system Back only closing the keyboard. Measured on the device; see PfpOverlayCard.
     var showSaveNameDialog by remember { mutableStateOf(false) }
     var saveName by remember { mutableStateOf("") }
     if (showSaveNameDialog) {
@@ -140,7 +136,7 @@ private fun ThemesSettingsContent(
     var iconStripFocused by remember { mutableStateOf(false) }
     val iconStripRequester = remember { FocusRequester() }
     var iconIndex by remember { mutableIntStateOf(0) }
-    // Icon color picker state
+
     var customPicker by remember { mutableStateOf(false) }
     var pickerHue by remember { mutableStateOf(0f) }
     var pickerSat by remember { mutableStateOf(0f) }
@@ -249,10 +245,6 @@ private fun ThemesSettingsContent(
                     onClick  = onOpenColorSchemePicker,
                 )
 
-                // Hidden while the colour is following the wallpaper: the toggle below is the
-                // control then, and this row would be a second one for the same value that
-                // clears it without turning the toggle off -- which is exactly the
-                // two-things-for-one-setting confusion this screen is losing.
                 state.accentOverrideArgb.takeIf { !state.accentFromWallpaper }?.let { accent ->
                     SettingsRow(
                         label    = "Custom Theme Color",
@@ -284,9 +276,6 @@ private fun ThemesSettingsContent(
                     )
                 }
 
-                // Was "New Theme from Photo", which opened a second picture picker to set a
-                // second wallpaper. The wallpaper is chosen one screen over, under Wallpaper &
-                // Text; all this ever wanted to say is whether the colour comes from it.
                 SettingsToggleRow(
                     label    = "Color from Wallpaper",
                     sublabel = when {
@@ -445,9 +434,7 @@ private fun FocusableStrip(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            // The same plate every focused row wears. Without it the cursor arriving here was
-            // invisible: the strip's own highlight is a ring on one swatch, and the swatch it
-            // lands on is the selected one, which already had a ring.
+
             .padding(horizontal = 40.dp)
             .settingsSelectedPlate(isFocused)
             .focusRequester(fr)
@@ -466,7 +453,6 @@ private fun FocusableStrip(
             .focusable(),
     ) { content(isFocused) }
 }
-
 
 @Composable
 private fun SavedThemeCardRow(themes: List<PfpThemeStore.SavedTheme>, focusedIndex: Int? = null, onApply: (String) -> Unit, onDelete: (String) -> Unit, onShare: (String) -> Unit) {

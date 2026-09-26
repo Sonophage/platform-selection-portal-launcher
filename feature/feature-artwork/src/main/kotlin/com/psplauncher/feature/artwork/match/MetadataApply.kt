@@ -3,15 +3,6 @@ package com.psplauncher.feature.artwork.match
 import com.psplauncher.core.data.database.entity.GameEntity
 import com.psplauncher.feature.artwork.MetadataCandidates
 
-/**
- * C16 task 3.2 — Current-vs-Incoming metadata, and the four ways to apply it.
- *
- * Pure: nothing here reads or writes the database. `ArtworkRepository.applyMetadata` is the only
- * writer and it asks [MetadataApply.plan] what to write, so the preview's "will change" markers and
- * the SQL that runs come from the same function and cannot disagree.
- */
-
-/** One text field a [MetadataPreset] can carry, in preview order. `players` stays out (Non-Goals). */
 enum class MetadataField(val label: String) {
     TITLE("Title"),
     DESCRIPTION("Description"),
@@ -26,20 +17,15 @@ enum class MetadataField(val label: String) {
 }
 
 enum class MetadataApplyPolicy(val label: String) {
-    /** Every incoming value that differs overwrites the current one. A blank never clears. */
     REPLACE_ALL("Replace All"),
 
-    /** Only fields empty today are filled — `GameDao.updateMetadataIfMissing`. */
     FILL_MISSING_ONLY("Fill Missing Only"),
 
-    /** Replace All, restricted to the fields the user ticked. */
     CHOOSE_FIELDS("Choose Fields"),
 
-    /** Close the preview and write nothing. */
     KEEP_CURRENT("Keep Current"),
 }
 
-/** One Current-vs-Incoming line. Only fields the provider actually supplied get a row. */
 data class MetadataFieldRow(
     val field: MetadataField,
     val current: Any?,
@@ -48,25 +34,12 @@ data class MetadataFieldRow(
     val differs: Boolean get() = incoming != current
 }
 
-/** What the preview shows: the game's stored values and every non-empty provider preset. */
 data class MetadataPreview(
     val current: Map<MetadataField, Any?>,
     val presets: List<MetadataPreset>,
 )
 
 object MetadataApply {
-
-    /**
-     * Text presets from one retrieval. Only providers that return text can produce one, and
-     * ProviderCapabilities is where "returns text" is declared — `suppliesMetadata`. Every
-     * provider with that flag must be able to appear here, which MetadataPresetCoverageTest
-     * asserts, because the two drifting apart is invisible: the capability table says Steam
-     * supplies metadata, this function did not offer it, and the screen answered "No source
-     * recognised this game" about a game Steam had just described. Seen on the device.
-     *
-     * IGDB's `IgdbGameInfo` carries cover/hero URLs and no text today, and SteamGridDB is
-     * artwork-only by design; neither claims suppliesMetadata and neither is offered.
-     */
     fun presetsFrom(candidates: MetadataCandidates): List<MetadataPreset> = listOfNotNull(
         candidates.ssInfo?.let { ss ->
             MetadataPreset(
@@ -92,19 +65,11 @@ object MetadataApply {
                 publisher = steam.publisher,
                 releaseYear = steam.releaseYear,
                 genre = steam.genre,
-                // Steam's store record carries no age rating, franchise or community score in a
-                // form worth taking: the age rating is a per-territory board block, and the
-                // review score is a percentage over a vote count, not a rating out of ten. Left
-                // null rather than approximated.
+
             )
         },
     ).filterNot { it.isEmpty }
 
-    /**
-     * The stored values a preset is compared against. TITLE is `scraped_title`, never the user's
-     * title override: a preset can refresh the scraped name, but the override always wins on screen
-     * and nothing here can write it.
-     */
     fun currentOf(game: GameEntity): Map<MetadataField, Any?> = mapOf(
         MetadataField.TITLE to game.scrapedTitle,
         MetadataField.DESCRIPTION to game.description,
@@ -118,7 +83,6 @@ object MetadataApply {
         MetadataField.COMMUNITY_RATING to game.communityRating,
     )
 
-    /** The preset's usable values. Null and blank both mean "said nothing" and are dropped. */
     fun incomingOf(preset: MetadataPreset): Map<MetadataField, Any> = buildMap {
         fun offer(field: MetadataField, value: Any?) {
             if (value == null || (value is String && value.isBlank())) return
@@ -143,17 +107,9 @@ object MetadataApply {
         }
     }
 
-    /** Fields that would change — what Choose Fields starts with ticked. */
     fun changedFields(current: Map<MetadataField, Any?>, incoming: MetadataPreset): Set<MetadataField> =
         rows(current, incoming).filter { it.differs }.mapTo(mutableSetOf()) { it.field }
 
-    /**
-     * Exactly what [policy] writes: field → new value. Empty means no write at all.
-     *
-     * Fill Missing Only treats NULL as missing and nothing else, mirroring the reversed COALESCE it
-     * runs through — a stored empty string is kept by the SQL, so the preview must not promise to
-     * fill it.
-     */
     fun plan(
         current: Map<MetadataField, Any?>,
         incoming: MetadataPreset,

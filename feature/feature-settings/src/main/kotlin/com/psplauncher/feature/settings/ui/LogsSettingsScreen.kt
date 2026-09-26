@@ -35,17 +35,13 @@ fun LogsSettingsScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // The log row the controller cursor is hovering — the options-menu target. Cleared when a
-    // non-log row takes focus (or logs are cleared), so the menu can never act on a stale name.
     var focusedLog by remember { mutableStateOf<String?>(null) }
 
-    // Per-log context menu (options button), PSP-style like the Themes screen's card menu.
     var menuFor by remember { mutableStateOf<String?>(null) }
     var menuIndex by remember { mutableIntStateOf(0) }
     val menuRows = listOf(PspMenuRow("Share"))
 
     Box(modifier = modifier) {
-
     SettingsPageScaffold(
         subtitle = "Logs",
         onBack   = onBack,
@@ -53,7 +49,6 @@ fun LogsSettingsScreen(
         onInterceptAction = { action ->
             val m = menuFor
             when {
-                // Open menu captures ALL input while visible.
                 m != null -> {
                     when (action) {
                         GamepadAction.NAVIGATE_UP   -> menuIndex = (menuIndex - 1).coerceAtLeast(0)
@@ -68,7 +63,7 @@ fun LogsSettingsScreen(
                     }
                     true
                 }
-                // Options button on a hovered log — whichever face button the user's X/Y layout binds.
+
                 action == GamepadAction.OPEN_CONTEXT_MENU -> {
                     focusedLog?.let { menuFor = it; menuIndex = 0 }
                     true
@@ -112,7 +107,6 @@ fun LogsSettingsScreen(
         }
     }
 
-    // Context menu over the whole screen (controller: hover + options button; touch can tap rows).
     menuFor?.let { name ->
         PspContextMenuOverlay(
             title          = name,
@@ -125,19 +119,15 @@ fun LogsSettingsScreen(
             onDismiss      = { menuFor = null },
         )
     }
-
     }
 }
 
-// Content URI for one log through the app's FileProvider — the receiving app gets read access
-// to that single file only. Null when the file no longer exists.
 private fun logFileUri(context: Context, fileName: String): Uri? {
     val file = File(context.filesDir, "logs/$fileName")
     if (!file.exists()) return null
     return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }
 
-/** Opens one log in an external text viewer via the system "Open with" chooser. */
 private fun openLogExternally(context: Context, fileName: String) {
     runCatching {
         val uri = logFileUri(context, fileName) ?: return
@@ -152,8 +142,6 @@ private fun openLogExternally(context: Context, fileName: String) {
     }.onFailure { Timber.w(it, "Could not open log file externally") }
 }
 
-// Shares one log via the system share sheet. Files are already redacted at write time, so
-// nothing sensitive can leave even here.
 private fun shareLogFile(context: Context, fileName: String) {
     runCatching {
         val uri = logFileUri(context, fileName) ?: return

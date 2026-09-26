@@ -3,13 +3,7 @@ package com.psplauncher.studio.io
 import com.psplauncher.themekit.PtfUnpacker
 import java.io.File
 
-/**
- * Writes a [PtfUnpacker.Dump] to disk as reference assets for theme authors: every
- * decoded image as a PNG (`slot{N}_res{M}.png`, the wallpaper also as `wallpaper.png`),
- * non-image payloads as `.bin`, plus a `report.txt` inventory.
- */
 object PtfUnpackWriter {
-
     data class Summary(val images: Int, val other: Int, val failed: Int)
 
     fun write(dump: PtfUnpacker.Dump, outDir: File): Summary {
@@ -31,7 +25,7 @@ object PtfUnpackWriter {
                     img.setRGB(0, 0, image.width, image.height, image.argb, 0, image.width)
                     val png = ImageCodecs.toPngBytes(img)
                     File(outDir, "$base.png").writeBytes(png)
-                    // The wallpaper slot's BMP is the asset authors want first — alias it.
+
                     if (res.slotId == 1 && res.kind == PtfUnpacker.Resource.Kind.BMP) {
                         File(outDir, "wallpaper.png").writeBytes(png)
                     }

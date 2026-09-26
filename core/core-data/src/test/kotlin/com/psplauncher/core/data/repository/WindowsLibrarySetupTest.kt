@@ -14,14 +14,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Decision logic of [WindowsLibrarySetup] over a fake SAF surface: find-vs-create, read-only
- * degradation, idempotence, and the explicit-pick override
- * (docs/windows-library-refactor-plan.md section 2).
- */
 @RunWith(RobolectricTestRunner::class)
 class WindowsLibrarySetupTest {
-
     private val internalRoot = "content://com.android.externalstorage.documents/tree/primary%3ARoms"
     private val sdRoot = "content://com.android.externalstorage.documents/tree/408C-3861%3ARoms"
 
@@ -44,7 +38,6 @@ class WindowsLibrarySetupTest {
         scanRecursively     = false,
     )
 
-    /** Fake SAF: existing dirs keyed by "parentDocId/name" (lowercase); create appends or refuses. */
     private class FakeOps(
         existing: Map<String, String> = emptyMap(),
         private val writable: Boolean = true,
@@ -98,7 +91,7 @@ class WindowsLibrarySetupTest {
     fun `existing windows folder under any root is found and assigned`() = runTest {
         coEvery { memoryCards.getById("windows") } returns card()
         coEvery { romRoots.getAll() } returns listOf(internalRoot, sdRoot)
-        // Only the SD root has a windows folder (case differs); import already exists.
+
         val ops = FakeOps(
             existing = mapOf(
                 "408C-3861:Roms/Windows" to "408C-3861:Roms/Windows",
@@ -165,7 +158,7 @@ class WindowsLibrarySetupTest {
         assertEquals(WindowsSetupState.Ready("/storage/emulated/0/MyGames"), state)
         coVerify(exactly = 0) { romRoots.getAll() }
         coVerify(exactly = 0) { memoryCards.setRomDirectory(any(), any()) }
-        // The drop-folder is still kept alive inside the picked folder.
+
         assertEquals(listOf("primary:MyGames/import"), ops.created)
     }
 
@@ -184,7 +177,7 @@ class WindowsLibrarySetupTest {
     fun `importFolders resolves only existing import drop-folders under the windows surfaces`() = runTest {
         coEvery { memoryCards.getById("windows") } returns card()
         coEvery { romRoots.getAll() } returns listOf(internalRoot, sdRoot)
-        // Both roots have windows folders; only the internal one has import/ yet.
+
         val ops = FakeOps(
             existing = mapOf(
                 "primary:Roms/windows" to "primary:Roms/windows",

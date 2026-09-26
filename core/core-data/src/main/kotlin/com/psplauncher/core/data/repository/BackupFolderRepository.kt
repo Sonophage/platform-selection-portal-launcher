@@ -14,15 +14,8 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Persisted SAF folder where backups are written. Backed up (inert without a live grant) so a
-// restore can pre-point the Backup & Restore folder picker at the same location.
 private val KEY_BACKUP_FOLDER_TREE_URI = stringPreferencesKey("backup_folder_tree_uri")
 
-/**
- * The user-chosen backup destination, held as a persisted `ACTION_OPEN_DOCUMENT_TREE` grant. Using
- * SAF means backups need no storage permission, survive an uninstall, and stay user-accessible —
- * unlike a raw write to a public folder (which required MANAGE_EXTERNAL_STORAGE).
- */
 @Singleton
 class BackupFolderRepository @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -39,7 +32,6 @@ class BackupFolderRepository @Inject constructor(
         Timber.i("Backup folder set: $treeUri")
     }
 
-    /** Persists a read+write grant (backups must be written, listed and read back). */
     fun persist(uri: Uri) {
         runCatching {
             context.contentResolver.takePersistableUriPermission(

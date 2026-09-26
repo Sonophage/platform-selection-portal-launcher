@@ -15,32 +15,12 @@ import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * The ROM payload identity used for ScreenScraper hash lookups and portable-artwork matching.
- *
- * [crc32] uppercase 8-char hex, null when the payload was missing or above the hash size cap.
- * [sizeBytes] payload size (zip-inner for zipped ROMs), null when unknown.
- * [fileName] the on-disk file name (the zip's own name for zipped ROMs — ScreenScraper matches
- * primarily on hash+size; the name is its fallback signal and DAT names keep the stem anyway).
- */
 data class RomIdentity(
     val crc32: String?,
     val sizeBytes: Long?,
     val fileName: String?,
 )
 
-/**
- * Streams a CRC-32 over the ROM payload without ever holding it in memory.
- *
- * Payload selection:
- *  • plain file → the file bytes
- *  • .zip (zipped cartridge ROMs, DB v23) → the first real entry inside; ScreenScraper's DAT
- *    hashes are of the inner ROM, so hashing the archive itself would never match
- *  • SAF-only games (romUri, no readable raw path) → streamed via ContentResolver
- *
- * Files above [maxHashBytes] are not hashed (multi-GB disc images stream for minutes over SAF);
- * size + filename still return so hash-less lookups stay strong (hash + size + name tuple).
- */
 @Singleton
 class RomHasher @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -83,7 +63,6 @@ class RomHasher @Inject constructor(
     ): RomIdentity {
         val isZip = fileName.orEmpty().lowercase(Locale.US).endsWith(".zip")
 
-        // Non-zip: outer size is the payload size, so the cap can short-circuit before any I/O.
         if (!isZip && knownSize != null && knownSize > maxHashBytes) {
             return RomIdentity(crc32 = null, sizeBytes = knownSize, fileName = fileName)
         }
@@ -107,17 +86,10 @@ class RomHasher @Inject constructor(
     }
 
     companion object {
-        // Above this we skip hashing and rely on size+name. Covers every cartridge ROM and most
-        // PSP/PSX-era images; multi-GB GC/Wii/PS2 images fall back to name+size matching.
         const val DEFAULT_MAX_HASH_BYTES = 256L * 1024 * 1024
 
-        // Zip entries that are packaging noise, never the ROM payload.
         private val NON_ROM_ENTRY_EXTENSIONS = setOf("txt", "nfo", "diz", "md", "xml", "dat")
 
-        /**
-         * Hashes the first plausible ROM entry of a zip stream. Pure JVM — unit-tested directly.
-         * Returns null for archives with no usable entry.
-         */
         fun hashFirstZipEntry(stream: InputStream, maxHashBytes: Long): RomIdentity? {
             val zip = ZipInputStream(stream.buffered())
             var entry: ZipEntry? = zip.nextEntry
@@ -135,10 +107,6 @@ class RomHasher @Inject constructor(
             return null
         }
 
-        /**
-         * CRC-32 of [stream], counting bytes as it goes. Returns (null, null) if the stream runs
-         * past [maxHashBytes] — the caller falls back to size-only identity. Pure JVM.
-         */
         fun crcOfStream(stream: InputStream, maxHashBytes: Long): Pair<String?, Long?> {
             val crc = CRC32()
             val buf = ByteArray(64 * 1024)

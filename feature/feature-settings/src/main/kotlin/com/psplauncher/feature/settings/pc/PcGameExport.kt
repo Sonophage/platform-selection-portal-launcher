@@ -9,19 +9,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 
-/**
- * One `.pfpgame` file: a manually added PC game, or a pinned shortcut, as written by Export Manual
- * Games and read back by Scan Import Folder (C18).
- *
- * GameNative and Winlator export a game to a file PFP can import; a game added by id, a legacy
- * `INSTALL_SHORTCUT` capture and a pin had nothing of the kind, so a fresh install lost them or
- * left their artwork unconnected. This carries what a fresh install needs to bring the game back
- * and reconnect its artwork by the exact names it was saved under. It carries no artwork bytes.
- *
- * The file sits on shared storage, where any app can write it, so nothing in it is trusted as it
- * stands: [PcGameExportCodec.decode] validates its shape, and the importer validates the launch
- * intent before it is stored.
- */
 @Serializable
 data class PcGameExport(
     val format: String = PcGameExportCodec.FORMAT,
@@ -39,14 +26,9 @@ data class PcGameExport(
     val steamGridDbId: Long? = null,
     val artwork: List<PcGameExportArtwork> = emptyList(),
 ) {
-    /**
-     * A pinned shortcut. Pin reconcile brings the game itself back, so a pin entry is only matched,
-     * for its artwork names and fill-only identity, and never creates or launches anything.
-     */
     val isPin: Boolean get() = shortcutId != null
 }
 
-/** One artwork file the game had, by the name it was saved under (`artwork_records.portable_name`). */
 @Serializable
 data class PcGameExportArtwork(
     val kind: String = "",
@@ -54,11 +36,9 @@ data class PcGameExportArtwork(
     val portableName: String = "",
 )
 
-/** What reading a `.pfpgame` body produced. */
 sealed interface PcGameExportDecode {
     data class Valid(val export: PcGameExport) : PcGameExportDecode
 
-    /** Not usable. [reason] completes "This export file …" for a log or a report. */
     data class Rejected(val reason: String) : PcGameExportDecode
 }
 
@@ -67,41 +47,26 @@ object PcGameExportCodec {
     const val VERSION = 1
     const val EXTENSION = "pfpgame"
 
-    // One game's entry is a few kilobytes. Anything this large, or listing this many files, was not
-    // written by Export Manual Games.
     const val MAX_CHARS = 256 * 1024
     const val MAX_ARTWORK_ITEMS = 200
 
-    // A hand-edited or hostile file could carry an arbitrarily long string here; these three are
-    // shown as game titles, so cap them at the same length the Steam achievements parser already
-    // caps an untrusted title at (SteamCommunityAchievementsParser.MAX_TITLE_CHARS), truncating
-    // rather than rejecting — a too-long title is still a valid game to import.
     const val MAX_TITLE_CHARS = 200
 
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
-        // Users open these files, as they do the launchers' own exports.
+
         prettyPrint = true
     }
 
-    /** The file body for [export], always stamped with this version's [FORMAT] and [VERSION]. */
     fun encode(export: PcGameExport): String =
         json.encodeToString(PcGameExport.serializer(), export.copy(format = FORMAT, version = VERSION))
 
-    /**
-     * Reads a `.pfpgame` body. Never throws: anything unusable is [PcGameExportDecode.Rejected].
-     *
-     * Another format is rejected, and a newer version is refused whole rather than half read. A valid
-     * entry comes back normalized: trimmed, blank optional values and non-positive provider ids as
-     * null, unusable artwork items dropped, and a pin entry's launch intent removed.
-     */
     fun decode(text: String): PcGameExportDecode {
         if (text.length > MAX_CHARS) return PcGameExportDecode.Rejected("is too large to be a game export")
         val root = try {
             Json.parseToJsonElement(text) as? JsonObject
         } catch (e: IllegalArgumentException) {
-            // SerializationException, for a body that is not JSON at all.
             null
         } ?: return PcGameExportDecode.Rejected("is not a PlayFieldPortal game export")
         if ((root["format"] as? JsonPrimitive)?.contentOrNull != FORMAT) {
@@ -136,9 +101,6 @@ object PcGameExportCodec {
             return PcGameExportDecode.Rejected("has neither a launch intent nor a pinned shortcut")
         }
 
-        // The store and its app id are evidence PAIR; either side failing to validate means neither
-        // is trustworthy (StorefrontIdentity's own contract — an app id only means something within
-        // its store).
         val normalizedStore = StorefrontIdentity.normalizeStore(raw.storefront)
         val storefrontGameId = raw.storefrontGameId.orNullIfBlank()
         val hasValidStorefrontPair = normalizedStore != null && StorefrontIdentity.isPlausibleAppId(storefrontGameId)
@@ -150,8 +112,7 @@ object PcGameExportCodec {
                 userTitleOverride = raw.userTitleOverride.orNullIfBlank()?.take(MAX_TITLE_CHARS),
                 launcherPackage = launcherPackage,
                 shortcutId = shortcutId,
-                // A pin entry only matches: an intent inside one is never kept, so it can never be
-                // stored or launched, whatever the file says.
+
                 launchIntentUri = if (shortcutId != null) null else launchIntentUri,
                 storefront = if (hasValidStorefrontPair) normalizedStore else null,
                 storefrontGameId = if (hasValidStorefrontPair) storefrontGameId else null,
@@ -169,7 +130,6 @@ object PcGameExportCodec {
         )
     }
 
-    /** False for a name that could escape its artwork folder or carry a control character. */
     private fun isSafePortableName(name: String): Boolean =
         '/' !in name && '\\' !in name && ".." !in name && name.none { it.isISOControl() }
 

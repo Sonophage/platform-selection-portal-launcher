@@ -8,24 +8,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * Pins the physical-position → per-family art mapping.
- *
- * The mapping regressed once already: a printed-letter lookup collapsed "B" and
- * "A" onto the same position, so the App Drawer footer drew two identical
- * glyphs. These tests exist so a position can never silently resolve to the
- * wrong family's letter again.
- */
 class ControllerIconResolverTest {
-
-    /**
-     * The families that ship an icon pack, and the ones that are labels only.
-     *
-     * Keyboard and Touch resolve entirely through the printed-label fallback — the same path a
-     * DualSense touchpad takes on an Xbox pad — so every assertion about ART has to name the three
-     * that have it rather than looping over the enum. GlyphFamilyCoverageTest holds the rule that
-     * spans both: whatever the launcher prompts with must render SOMEHOW in every family.
-     */
     private val ART_FAMILIES = listOf(
         ControllerDisplayType.PLAYSTATION,
         ControllerDisplayType.NINTENDO,
@@ -36,9 +19,6 @@ class ControllerIconResolverTest {
         ControllerDisplayType.KEYBOARD,
         ControllerDisplayType.TOUCH,
     )
-
-
-    // ── Face positions: the reversal that makes letters unusable as keys ─────
 
     @Test
     fun `south face is Cross, A, and B respectively`() {
@@ -58,8 +38,6 @@ class ControllerIconResolverTest {
 
     @Test
     fun `Nintendo mirrors Xbox on both face axes`() {
-        // Same physical position, opposite silkscreen — the whole reason the
-        // resolver is keyed on position instead of letter.
         assertEquals("A", ControllerIcon.FACE_SOUTH.printedLabelFor(ControllerDisplayType.XBOX))
         assertEquals("B", ControllerIcon.FACE_SOUTH.printedLabelFor(ControllerDisplayType.NINTENDO))
         assertEquals("B", ControllerIcon.FACE_EAST.printedLabelFor(ControllerDisplayType.XBOX))
@@ -93,14 +71,12 @@ class ControllerIconResolverTest {
             val art = faces.map { it.drawableForOrNull(family) }
             assertEquals("$family draws a face position twice", 4, art.toSet().size)
         }
-        // The label-only families are held to the same rule on the path they actually use.
+
         for (family in LABEL_FAMILIES) {
             val labels = faces.mapNotNull { it.printedLabelFor(family) }
             assertEquals("$family prints a face position twice", labels.size, labels.toSet().size)
         }
     }
-
-    // ── Every family supports the full command-bar vocabulary ────────────────
 
     @Test
     fun `command bar positions resolve for every family with art`() {
@@ -118,8 +94,6 @@ class ControllerIconResolverTest {
 
     @Test
     fun `the label-only families are the ones that ship no art, and nothing else is`() {
-        // The split this file now depends on, asserted rather than assumed. A fourth pack added
-        // without updating ART_FAMILIES would leave it untested by every loop above.
         assertEquals(
             ControllerDisplayType.entries.toSet(),
             (ART_FAMILIES + LABEL_FAMILIES).toSet(),
@@ -131,8 +105,6 @@ class ControllerIconResolverTest {
             assertNull("$family is in LABEL_FAMILIES with art", ControllerIcon.FACE_SOUTH.drawableForOrNull(family))
         }
     }
-
-    // ── Family-exclusive inputs degrade instead of crashing ──────────────────
 
     @Test
     fun `touchpad is PlayStation-only and returns null elsewhere`() {
@@ -159,7 +131,6 @@ class ControllerIconResolverTest {
 
     @Test
     fun `every icon that resolves to art also has a printed label or is stick-or-dpad art`() {
-        // Sticks and D-pads are drawn, never lettered, so they are exempt.
         val unlettered = setOf(
             ControllerIcon.DPAD_UP, ControllerIcon.DPAD_DOWN, ControllerIcon.DPAD_LEFT,
             ControllerIcon.DPAD_RIGHT, ControllerIcon.DPAD_ALL,

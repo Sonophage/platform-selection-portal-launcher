@@ -5,17 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The still-over-video mask, which decides which half of the crossbar's background is a photograph
- * and which half is a clip.
- *
- * Worth its own test because every way of getting it wrong still renders. Reversed, the clip plays
- * under the labels and the still covers the empty side. Made solid throughout, the snap is
- * invisible and looks like a decode failure. Made transparent throughout, the artwork is gone and
- * looks like a missing file. None of it throws.
- */
 class XMBGameBackdropTest {
-
     private val stops = xmbStillOverVideoStops()
 
     @Test
@@ -37,9 +27,6 @@ class XMBGameBackdropTest {
 
     @Test
     fun `the transition happens around the middle of the screen, not at an edge`() {
-        // "Half the background is the image" is the design. A fade that finished in the first
-        // tenth would be a vignette; one that finished in the last tenth would be a clip nobody
-        // can see. Both are what a careless tweak to the two constants produces.
         assertTrue("solid band ends at $XMB_STILL_SOLID_END", XMB_STILL_SOLID_END in 0.25f..0.55f)
         assertTrue("fade ends at $XMB_STILL_FADE_END", XMB_STILL_FADE_END in 0.55f..0.85f)
         assertTrue("the fade must have width", XMB_STILL_FADE_END > XMB_STILL_SOLID_END)
@@ -59,8 +46,6 @@ class XMBGameBackdropTest {
 
     @Test
     fun `the mask is greyscale, so it tints nothing`() {
-        // DstIn reads the alpha channel; a coloured mask would still work and would still be a
-        // mistake waiting for someone to read the colour as meaningful.
         stops.forEach { (at, color) ->
             assertTrue("stop at $at is not black or transparent", color == Color.Black || color == Color.Transparent)
         }

@@ -17,18 +17,12 @@ import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Theme ids become a folder name (filesDir/themes/{id}) and the DB primary key, so they must be a
-// short, filesystem-safe token — this both prevents path traversal via the id and keeps ids sane.
 private val SAFE_THEME_ID = Regex("[A-Za-z0-9._-]{1,64}")
 
-// Decompression limits — a .xmbtheme is a background image, a short boot clip and a handful of
-// small sounds. These caps stop a hostile/corrupt archive from exhausting memory or disk (zip bomb)
-// while staying well clear of any legitimate pack.
-// Theme archives carry a boot video, so the per-entry cap is looser here than the shared default.
 private val THEME_ZIP_LIMITS = ZipLimits(
     maxEntries    = 512,
-    maxEntryBytes = 64L * 1024 * 1024,   // 64 MB per file (generous for a boot mp4)
-    maxTotalBytes = 128L * 1024 * 1024,  // 128 MB across the whole archive
+    maxEntryBytes = 64L * 1024 * 1024,
+    maxTotalBytes = 128L * 1024 * 1024,
 )
 
 sealed class ThemeLoadResult {
@@ -38,15 +32,6 @@ sealed class ThemeLoadResult {
     data class IoError(val cause: Throwable) : ThemeLoadResult()
 }
 
-/**
- * Parses a .xmbtheme ZIP package and installs it into the app's internal storage.
- *
- * The ZIP must contain a `theme.json` that conforms to [XmbThemeManifest]. Optional asset
- * files (`background.jpg`, `boot_animation.mp4`, `sounds/`) are extracted to
- * `filesDir/themes/{id}/` only when the corresponding flag in the manifest is true.
- *
- * Use [loadFromStream] directly in tests to avoid requiring a real ContentResolver.
- */
 @Singleton
 class XmbThemeLoader @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -85,8 +70,6 @@ class XmbThemeLoader @Inject constructor(
                 )
             }
 
-            // The id becomes a folder name and DB key — reject anything that isn't a safe token so
-            // a crafted id (e.g. "../../databases/pfp_database") can't escape filesDir.
             if (!SAFE_THEME_ID.matches(manifest.id)) {
                 return@withContext ThemeLoadResult.InvalidFormat(
                     "Invalid theme id '${manifest.id}' — use letters, numbers, '.', '_' or '-' (max 64)"
@@ -136,14 +119,11 @@ class XmbThemeLoader @Inject constructor(
             themeDao.upsert(entity)
             Timber.i("Theme installed: ${manifest.id} (${manifest.name})")
             ThemeLoadResult.Success(manifest.id)
-
         } catch (e: Exception) {
             Timber.w(e, "Unexpected error loading theme")
             ThemeLoadResult.IoError(e)
         }
     }
-
-    // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun extractAsset(
         entries: Map<String, ByteArray>,
@@ -158,8 +138,6 @@ class XmbThemeLoader @Inject constructor(
         return dest.absolutePath
     }
 
-    // Extracts the entire sounds/ directory if hasSoundPack is true.
-    // Returns the path to the sounds/ subfolder, or null if not present.
     private fun extractSoundPack(
         entries: Map<String, ByteArray>,
         themeDir: File,
@@ -172,7 +150,7 @@ class XmbThemeLoader @Inject constructor(
         val soundsDir = File(themeDir, "sounds")
         soundsDir.mkdirs()
         soundEntries.forEach { (name, bytes) ->
-            // Zip-slip guard: a crafted entry name (e.g. "sounds/../../db") is dropped, not written.
+
             val dest = safeChild(themeDir, name) ?: return@forEach
             dest.parentFile?.mkdirs()
             dest.writeBytes(bytes)
@@ -180,9 +158,6 @@ class XmbThemeLoader @Inject constructor(
         return soundsDir.absolutePath
     }
 
-    // Resolves [relativePath] under [baseDir] and returns the destination only if it stays inside
-    // baseDir. Entry names that traverse out (../, absolute paths, symlink-style tricks) resolve to
-    // a canonical path outside the base and are rejected — the core zip-slip defense.
     private fun safeChild(baseDir: File, relativePath: String): File? {
         val base = baseDir.canonicalFile
         val target = File(base, relativePath).canonicalFile
@@ -195,9 +170,6 @@ class XmbThemeLoader @Inject constructor(
         }
     }
 
-    // Reads all ZIP entries as raw ByteArrays so both text (JSON) and binary (images, audio) can be
-    // handled uniformly. The caps live in BoundedZipReader now — this used to be one of three
-    // hand-rolled readers enforcing the same policy at three different quality levels.
     private fun readZipEntries(stream: InputStream): Map<String, ByteArray> {
         val map = mutableMapOf<String, ByteArray>()
         BoundedZipReader.read(stream, THEME_ZIP_LIMITS) { entry ->
@@ -205,5 +177,4 @@ class XmbThemeLoader @Inject constructor(
         }
         return map
     }
-
 }

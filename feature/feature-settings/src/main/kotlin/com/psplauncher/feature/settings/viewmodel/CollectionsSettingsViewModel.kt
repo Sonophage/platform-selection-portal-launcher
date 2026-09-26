@@ -21,7 +21,6 @@ class CollectionsSettingsViewModel @Inject constructor(
     private val collectionRepository: CollectionRepository,
     private val categoryRepository: CategoryRepositoryImpl,
 ) : ViewModel() {
-
     val collections: StateFlow<List<GameCollection>> =
         collectionRepository.observeCollections()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -48,8 +47,6 @@ class CollectionsSettingsViewModel @Inject constructor(
         viewModelScope.launch { collectionRepository.delete(id) }
     }
 
-    /** Sets the collection's icon (a key from the shared category icon catalog). Null resets it to
-     *  the default memory-card art. */
     fun setIcon(id: Long, iconKey: String?) {
         viewModelScope.launch { collectionRepository.setIcon(id, iconKey) }
     }

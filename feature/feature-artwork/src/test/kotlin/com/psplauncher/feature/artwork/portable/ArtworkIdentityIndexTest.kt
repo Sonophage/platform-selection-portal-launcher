@@ -6,13 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * C16 task D.1 — the durable-identity index that stops artwork identity being spelled as a filename.
- *
- * Pure model plus codec, so it pins without a device or a SAF tree.
- */
 class ArtworkIdentityIndexTest {
-
     private fun entry(
         platformId: String = "snes",
         kind: String = "ICON",
@@ -27,8 +21,6 @@ class ArtworkIdentityIndexTest {
         romCrc32 = romCrc32, ssId = ssId, igdbId = igdbId, sgdbId = sgdbId,
         artworkKey = artworkKey,
     )
-
-    // ── Codec ─────────────────────────────────────────────────────────────────
 
     @Test fun `round trips through encode and parse`() {
         val index = ArtworkIdentityIndex(entries = listOf(entry(), entry(kind = "HERO")))
@@ -46,8 +38,6 @@ class ArtworkIdentityIndexTest {
         assertNull(ArtworkIdentityIndex.parse("{ not json"))
         assertNull(ArtworkIdentityIndex.parse(""))
     }
-
-    // ── Tri-state read (task 1.3 / D3) ───────────────────────────────────────
 
     @Test fun `one bad row is dropped and the rest load`() {
         val json = """
@@ -68,8 +58,6 @@ class ArtworkIdentityIndexTest {
         assertNull(ArtworkIdentityIndex.parse(json))
     }
 
-    // A future version may add fields; an older build must keep reading the file rather than
-    // treating the whole library as unidentified.
     @Test fun `unknown keys are ignored`() {
         val json = """
             {"format_version":1,"entries":[
@@ -82,12 +70,6 @@ class ArtworkIdentityIndexTest {
         assertEquals("A1B2C3D4", parsed!!.entries.single().romCrc32)
     }
 
-    // The serialized names are ArtworkEntryMetadata's, so a v1 metadata.json's identity fields stay
-    // readable. Renaming them would strand every library written before this task.
-    //
-    // tgdb_id is no longer in this list: TheGamesDB was removed as a provider, so the field is no
-    // longer written. Nothing is stranded by that, because both readers are built with
-    // ignoreUnknownKeys -- an older library carrying tgdb_id still parses, and the key is ignored.
     @Test fun `serial names match the v1 entry metadata`() {
         val text = ArtworkIdentityIndex.encode(ArtworkIdentityIndex(entries = listOf(entry())))
         listOf("rom_crc32", "ss_id", "igdb_id", "sgdb_id", "platform_id", "portable_name")
@@ -95,9 +77,6 @@ class ArtworkIdentityIndexTest {
     }
 
     @Test fun `an older library carrying tgdb_id still parses`() {
-        // The compatibility half of the removal, asserted rather than assumed: ignoreUnknownKeys
-        // is what makes dropping a serialized field safe, and it is easy to drop a field from a
-        // format whose reader is strict and not find out until someone opens an old library.
         val withRetiredKey = """
             {"entries":[{"platform_id":"snes","kind":"ICON","portable_name":"ct",
              "rom_crc32":"FF","ss_id":1,"tgdb_id":2,"igdb_id":3}]}
@@ -108,8 +87,6 @@ class ArtworkIdentityIndexTest {
         assertEquals(1, parsed?.entries?.size)
         assertEquals(listOf("crc:FF", "ss:1", "igdb:3"), parsed?.entries?.first()?.tokens())
     }
-
-    // ── Identity tokens ───────────────────────────────────────────────────────
 
     @Test fun `tokens are emitted only for the ids the entry actually has`() {
         assertEquals(
@@ -123,7 +100,6 @@ class ArtworkIdentityIndexTest {
         assertTrue("with nothing durable it must fall through to name matching", bare.tokens().isEmpty())
     }
 
-    // CRC is content-derived, so it outranks a scraper id, which outranks the name-derived key.
     @Test fun `tokens come out strongest evidence first`() {
         val all = entry(romCrc32 = "FF", ssId = 1, igdbId = 3, sgdbId = 4, artworkKey = "k")
         assertEquals(listOf("crc:FF", "ss:1", "igdb:3", "sgdb:4", "key:k"), all.tokens())
@@ -133,16 +109,12 @@ class ArtworkIdentityIndexTest {
         assertEquals(entry(romCrc32 = "a1b2c3d4").tokens(), entry(romCrc32 = "A1B2C3D4").tokens())
     }
 
-    // ── Lookup ────────────────────────────────────────────────────────────────
-
     @Test fun `find locates an entry by platform, kind and portable name`() {
         val index = ArtworkIdentityIndex(entries = listOf(entry(), entry(kind = "HERO", ssId = 99)))
         assertEquals(1234L, index.find("snes", "ICON", "Final Fantasy VI")?.ssId)
         assertEquals(99L, index.find("snes", "HERO", "Final Fantasy VI")?.ssId)
     }
 
-    // Relink lowercases portable names everywhere it matches them; the index must agree or a file
-    // saved as "Final Fantasy VI" would not be found from "final fantasy vi".
     @Test fun `find is case-insensitive on name and platform`() {
         val index = ArtworkIdentityIndex(entries = listOf(entry()))
         assertNotNull(index.find("SNES", "ICON", "final fantasy vi"))
@@ -153,8 +125,6 @@ class ArtworkIdentityIndexTest {
         assertNull(index.find("snes", "ICON", "Chrono Trigger"))
         assertNull(index.find("snes", "LOGO", "Final Fantasy VI"))
     }
-
-    // ── Upsert ────────────────────────────────────────────────────────────────
 
     @Test fun `upsert replaces the row for the same file rather than duplicating it`() {
         val index = ArtworkIdentityIndex(entries = listOf(entry()))
@@ -168,8 +138,6 @@ class ArtworkIdentityIndexTest {
             .upsert(entry(kind = "HERO"))
         assertEquals(2, index.entries.size)
     }
-
-    // ── Bulk upsert (task D.4 backfill) ───────────────────────────────────────
 
     @Test fun `upsertAll adds new rows and replaces matching ones in one pass`() {
         val index = ArtworkIdentityIndex(entries = listOf(entry(), entry(kind = "HERO")))
@@ -185,8 +153,6 @@ class ArtworkIdentityIndexTest {
         assertEquals(index, index.upsertAll(emptyList()))
     }
 
-    // Backfill runs on every relink, so a second scan over an unchanged library must produce an
-    // identical index — otherwise it would rewrite the file on the SD card every time.
     @Test fun `upsertAll is idempotent`() {
         val rows = listOf(entry(), entry(kind = "HERO"))
         val once = ArtworkIdentityIndex().upsertAll(rows)

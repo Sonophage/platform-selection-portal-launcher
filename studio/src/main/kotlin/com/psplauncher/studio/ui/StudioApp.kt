@@ -46,7 +46,6 @@ fun StudioApp(viewModel: StudioViewModel, window: Frame) {
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
-                // ── Toolbar ──
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -58,8 +57,6 @@ fun StudioApp(viewModel: StudioViewModel, window: Frame) {
                             ?.let(viewModel::openFile)
                     }) { Text("Open…") }
                     OutlinedButton(onClick = {
-                        // Same file set the launcher's Display settings invite: image OR short
-                        // video. onWallpaperPicked routes video formats into the motion gate.
                         FileDialogs.openFile(window, "Import wallpaper or video", setOf("png", "jpg", "jpeg", "bmp", "webp", "mp4", "m4v", "webm", "gif"))
                             ?.let(viewModel::onWallpaperPicked)
                     }) { Text("Wallpaper…") }
@@ -86,18 +83,13 @@ fun StudioApp(viewModel: StudioViewModel, window: Frame) {
 
                     Box(Modifier.weight(1f))
                     if (state.busy) {
-                        // Deliberately static (no spinner): CMP 1.6.11's frame-animated M3
-                        // indicators have crashed the desktop node chain (see studio README note).
                         Text("Working…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 HorizontalDivider()
 
-                // ── Preview + inspector ──
                 Row(Modifier.weight(1f)) {
                     Column(Modifier.weight(1f).fillMaxHeight().background(Color(0xFF141414))) {
-                        // Preview surface switcher — the accent tints menus too, so all
-                        // three states are authorable-by-eye.
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.padding(start = 16.dp, top = 10.dp),
@@ -121,8 +113,7 @@ fun StudioApp(viewModel: StudioViewModel, window: Frame) {
                     VerticalDivider()
                     Column(Modifier.width(360.dp).fillMaxHeight()) {
                         var tab by remember { mutableStateOf(0) }
-                        // Plain buttons instead of M3 TabRow: its animated indicator (composed
-                        // modifier on the frame clock) is a crash suspect on CMP 1.6.11 desktop.
+
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                             TabButton("Theme", selected = tab == 0, modifier = Modifier.weight(1f)) { tab = 0 }
                             TabButton("Icons", selected = tab == 1, modifier = Modifier.weight(1f)) { tab = 1 }
@@ -133,8 +124,6 @@ fun StudioApp(viewModel: StudioViewModel, window: Frame) {
                                 state = state,
                                 viewModel = viewModel,
                                 onChooseWallpaper = {
-                                    // Mirrors the launcher: one pick dialog for image-or-video,
-                                    // dispatched by extension inside the ViewModel.
                                     FileDialogs.openFile(window, "Import wallpaper or video", setOf("png", "jpg", "jpeg", "bmp", "webp", "mp4", "m4v", "webm", "gif"))
                                         ?.let(viewModel::onWallpaperPicked)
                                 },
@@ -161,7 +150,6 @@ fun StudioApp(viewModel: StudioViewModel, window: Frame) {
                 }
                 HorizontalDivider()
 
-                // ── Status line ──
                 Text(
                     text = state.batchProgress?.let { "Converting ${it.current}  (${it.done}/${it.total})" }
                         ?: state.statusMessage

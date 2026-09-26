@@ -7,7 +7,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AccentDeriverTest {
-
     private fun image(width: Int = 60, height: Int = 30, argbAt: (Int, Int) -> Int): BmpImage {
         val px = IntArray(width * height) { i -> argbAt(i % width, i / width) }
         return BmpImage(width, height, px)
@@ -29,7 +28,6 @@ class AccentDeriverTest {
 
     @Test
     fun `dominant hue wins - pink wallpaper yields pink accent`() {
-        // Soft pink field (classypink-like) with a gray minority.
         val img = image { x, _ -> if (x < 45) 0xFFF4B6D2.toInt() else 0xFF808080.toInt() }
         val accent = assertNotNull(AccentDeriver.deriveAccent(img))
         val hue = hueOf(accent)
@@ -46,12 +44,12 @@ class AccentDeriverTest {
 
     @Test
     fun `pastel source is boosted to a usable accent strength`() {
-        val img = image { _, _ -> 0xFFF4B6D2.toInt() } // pale pink: s≈0.25, v≈0.96
+        val img = image { _, _ -> 0xFFF4B6D2.toInt() }
         val accent = assertNotNull(AccentDeriver.deriveAccent(img))
         val r = accent shr 16 and 0xFF; val g = accent shr 8 and 0xFF; val b = accent and 0xFF
         val v = maxOf(r, g, b) / 255f
         val s = if (v == 0f) 0f else (maxOf(r, g, b) - minOf(r, g, b)).toFloat() / maxOf(r, g, b)
-        // Floors are applied in HSV; the 8-bit RGB round-trip can shave ~0.005 off.
+
         assertTrue(s >= 0.54f, "saturation should be boosted to ~0.55, got $s")
         assertTrue(v >= 0.84f, "value should be boosted to ~0.85, got $v")
     }

@@ -5,12 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Spec §15/§16: modal navigation priority, context stacking, and exact focus restoration
- * on close — including the destructive-action fallback to the nearest focusable neighbor.
- */
 class NavigationEngineModalTest {
-
     private fun node(
         key: String,
         onSelect: (() -> Unit)? = null,
@@ -30,12 +25,10 @@ class NavigationEngineModalTest {
         assertEquals("mYes", engine.focusedKey)
         assertTrue(engine.isModalActive)
 
-        // Modal navigation moves within the modal, never the underlying graph.
         assertEquals("mNo", engine.dispatch(NavigationCommand.Direction(NavigationDirection.DOWN)))
         assertEquals("mNo", engine.focusedKey)
         assertEquals("mYes", engine.dispatch(NavigationCommand.Direction(NavigationDirection.UP)))
 
-        // Closing restores the exact previous focus ('b') on the resumed graph.
         assertEquals("b", engine.popContext())
         assertFalse(engine.isModalActive)
         assertEquals("b", engine.focusedKey)
@@ -52,7 +45,7 @@ class NavigationEngineModalTest {
         engine.replaceNodes(listOf(node("mOk")))
         engine.dispatch(NavigationCommand.Direction(NavigationDirection.DOWN))
         engine.dispatch(NavigationCommand.Direction(NavigationDirection.DOWN))
-        // Underlying context still focused on 'a'; modal clamped on its single node.
+
         assertEquals("mOk", engine.focusedKey)
 
         engine.popContext()
@@ -71,13 +64,10 @@ class NavigationEngineModalTest {
         engine.replaceNodes(listOf(node("mConfirm"), node("mCancel")))
         engine.setFocused("mConfirm")
 
-        // Confirm performs the destructive action: 'b' is deleted from the underlying graph
-        // (simulating what the screen does after the modal closes and layout settles).
         engine.dispatch(NavigationCommand.Confirm)
         engine.popContext()
-        assertEquals("b", engine.focusedKey)  // restored, node still present at this instant
+        assertEquals("b", engine.focusedKey)
 
-        // Layout settles: the screen reports the updated node list without 'b'.
         engine.replaceNodes(listOf(node("a"), node("c")))
         assertEquals("nearest survivor by order", "c", engine.focusedKey)
     }

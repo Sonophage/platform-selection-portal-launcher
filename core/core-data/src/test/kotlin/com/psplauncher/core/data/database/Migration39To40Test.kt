@@ -13,7 +13,6 @@ import kotlin.test.assertNull
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration39To40Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
@@ -28,11 +27,11 @@ class Migration39To40Test {
         }
 
         helper.runMigrationsAndValidate(40, listOf(PFPDatabase.MIGRATION_39_40)).use { db ->
-            // Existing rows keep region NULL (detected on the next scan that touches them).
+
             db.singleRow("SELECT region FROM games WHERE rom_path = '/roms/pe2-1.cue'") {
                 assertNull(if (it.isNull(0)) null else it.getText(0))
             }
-            // The column is writable with a detected region value.
+
             db.execSQL("UPDATE games SET region = 'NTSC_U' WHERE rom_path = '/roms/pe2-1.cue'")
             db.singleRow("SELECT region FROM games WHERE rom_path = '/roms/pe2-1.cue'") {
                 assertEquals("NTSC_U", it.getText(0))
@@ -42,12 +41,6 @@ class Migration39To40Test {
 
     @Test
     fun `v40 drops the legacy partial primary index from a broken v39 database`() {
-        // Regression: the v39-era build created a partial unique index (index_games_one_disc_primary)
-        // via raw SQL. Room cannot express partial indexes in its schema export, so its
-        // post-migration validation refused to open such a database ("Migration didn't properly
-        // handle: games") and the app crashed on every launch. Reproduce that exact state and
-        // assert the migration heals it: validation passes (runMigrationsAndValidate throws
-        // otherwise), the index is gone, and the region column is added.
         helper.createDatabase(39).use { db ->
             db.execSQL(
                 "CREATE UNIQUE INDEX IF NOT EXISTS index_games_one_disc_primary " +

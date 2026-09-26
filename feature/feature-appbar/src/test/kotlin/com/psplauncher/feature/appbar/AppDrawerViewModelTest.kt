@@ -22,7 +22,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppDrawerViewModelTest {
-
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var repository: InstalledAppRepository
     private lateinit var viewModel: AppDrawerViewModel
@@ -35,12 +34,11 @@ class AppDrawerViewModelTest {
         every { repository.hasUsageAccess() } returns true
         viewModel = AppDrawerViewModel(
             repository,
-            mockk(relaxed = true),   // menuSound
-            mockk(relaxed = true),   // gameRepository
-            mockk(relaxed = true),   // memoryCardRepository
-            // The launch disc's gate. Relaxed, so awaitHandOff returns at once: these tests are
-            // about which app is launched, not about the ceremony in front of it.
-            mockk(relaxed = true),   // mediaLaunchGate
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+
+            mockk(relaxed = true),
         )
     }
 
@@ -49,12 +47,8 @@ class AppDrawerViewModelTest {
         Dispatchers.resetMain()
     }
 
-    // ── Filter logic ──────────────────────────────────────────────────────
-
     @Test
     fun `the drawer opens on Recently Used, not on the full alphabetical list`() = runTest {
-        // All Apps is 45 icons in alphabetical order on the owner's device — a list you read
-        // rather than recognise. Opening on what you were last using is the point of the section.
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
             val state = awaitItem()
@@ -78,9 +72,6 @@ class AppDrawerViewModelTest {
 
     @Test
     fun `APPS shows neither emulators nor games, and an app that is both is in both`() = runTest {
-        // The owner's rule. An emulator he has also marked as a game belongs under Emulators AND
-        // under Games — hiding it from one would make that section a lie — but it is not an
-        // "app", which is the distinction Apps exists to draw and All Apps cannot.
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.setFilter(AppFilter.APPS)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -91,8 +82,6 @@ class AppDrawerViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // No `if` around this. Guarding it on the fixture happening to contain such an app is how
-        // an assertion ends up passing because it never ran.
         val both = fakeApps().filter { it.isEmulator && it.isGame }.map { it.label }
         assertTrue("the fixture must contain an app that is both, or this proves nothing", both.isNotEmpty())
 
@@ -121,9 +110,7 @@ class AppDrawerViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertTrue("the row holds only emulators", state.sectionApps.all { it.isEmulator })
-            // The other half of the same rule. The list below the row is the complement, built
-            // from the negation of this predicate rather than a filter of its own, so an emulator
-            // turning up in both halves means the two have come apart.
+
             assertTrue("the list below holds no emulators", state.otherApps.none { it.isEmulator })
             cancelAndIgnoreRemainingEvents()
         }
@@ -164,8 +151,6 @@ class AppDrawerViewModelTest {
         }
     }
 
-    // ── Search logic ──────────────────────────────────────────────────────
-
     @Test
     fun `search query filters by app label case-insensitively`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
@@ -181,10 +166,7 @@ class AppDrawerViewModelTest {
     @Test
     fun `clearing search query restores full list`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
-        // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
-        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
-        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+
         viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.setSearchQuery("PPSSPP")
@@ -210,8 +192,6 @@ class AppDrawerViewModelTest {
         }
     }
 
-    // ── Selection ─────────────────────────────────────────────────────────
-
     @Test
     fun `onAppSelected updates selectedIndex in state`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
@@ -230,19 +210,13 @@ class AppDrawerViewModelTest {
         verify { repository.openUsageAccessSettings() }
     }
 
-    // ── Options menu / BACK semantics ─────────────────────────────────────
-
     @Test
     fun `back on the open options menu closes just the menu`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
-        // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
-        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
-        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+
         viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // Controller Y opens the focused app's options module (grid focus is on index 0).
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
@@ -251,8 +225,6 @@ class AppDrawerViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // BACK pops the menu; the drawer's grid state (which lives beside menuApp in this VM and
-        // is what the shell needs to keep the drawer open) is untouched.
         viewModel.handleGamepadAction(GamepadAction.BACK)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
@@ -267,18 +239,14 @@ class AppDrawerViewModelTest {
 
     @Test
     fun `category cycling works out of an empty recently-used filter`() = runTest {
-        // A user who hasn't granted usage access: no app carries a lastUsedAt, so the RECENT
-        // filter is empty. L1/R1 must still cycle out of it (it previously stranded the cursor -
-        // the empty-grid guard swallowed PREV/NEXT_CATEGORY along with grid navigation).
         coEvery { repository.getInstalledApps() } returns fakeApps().map { it.copy(lastUsedAt = 0L) }
         viewModel = AppDrawerViewModel(
             repository,
-            mockk(relaxed = true),   // menuSound
-            mockk(relaxed = true),   // gameRepository
-            mockk(relaxed = true),   // memoryCardRepository
-            // The launch disc's gate. Relaxed, so awaitHandOff returns at once: these tests are
-            // about which app is launched, not about the ceremony in front of it.
-            mockk(relaxed = true),   // mediaLaunchGate
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+
+            mockk(relaxed = true),
         )
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.setFilter(AppFilter.RECENT)
@@ -290,9 +258,6 @@ class AppDrawerViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // R1 leaves the empty RECENT section. RECENT is FIRST in the enum now, so the escape is
-        // NEXT rather than PREV — the destination was always an artefact of the order, the thing
-        // being proven is that an empty section is never a dead end.
         viewModel.handleGamepadAction(GamepadAction.NEXT_CATEGORY)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
@@ -300,7 +265,6 @@ class AppDrawerViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // L1 walks back into the empty section, and R1 gets out again.
         viewModel.handleGamepadAction(GamepadAction.PREV_CATEGORY)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
@@ -310,9 +274,6 @@ class AppDrawerViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // RECENT is the first filter — PREV clamps (no wrap), staying on the still-empty section
-        // as a harmless no-op rather than a crash. Clamping is only safe BECAUSE the other
-        // direction always works; that is the pair, and both halves are asserted here.
         viewModel.handleGamepadAction(GamepadAction.PREV_CATEGORY)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
@@ -330,10 +291,7 @@ class AppDrawerViewModelTest {
     @Test
     fun `back after opening uninstall guard rail closes the dialog not the drawer`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
-        // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
-        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
-        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+
         viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -355,22 +313,6 @@ class AppDrawerViewModelTest {
         }
     }
 
-    // ── Uninstall prompt cursor ──────────────────────────────────────────
-    //
-    // The prompt used to have no cursor at all: it was drawn with Cancel and Uninstall side by
-    // side, nothing focused, and the ViewModel read "SELECT confirms, anything else cancels".
-    // That was coherent only because nothing on screen said otherwise. Now that it is the shared
-    // stacked overlay with a visible cursor, SELECT has to mean "the button you are on", and the
-    // button you start on has to be the harmless one.
-
-    /**
-     * Opens the uninstall prompt for PPSSPP, leaving the cursor wherever it opens.
-     *
-     * Walks to whatever row Uninstall is on rather than pressing DOWN a fixed number of times.
-     * The counted version was two presses, and adding "Add to Cross Bar" to the top of the menu
-     * turned all three uninstall tests red at once while the uninstall path itself was untouched.
-     * Fake apps have no isSystemApp flag, so the Uninstall action is present for every row.
-     */
     private fun openUninstallPrompt() {
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -385,10 +327,7 @@ class AppDrawerViewModelTest {
     @Test
     fun `the uninstall prompt opens with the cursor on Cancel`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
-        // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
-        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
-        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+
         viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
         openUninstallPrompt()
@@ -402,8 +341,6 @@ class AppDrawerViewModelTest {
 
     @Test
     fun `pressing confirm the instant the prompt opens does not uninstall anything`() = runTest {
-        // The reason the cursor starts on Cancel. Uninstall is reached from a menu whose last
-        // press was also SELECT, so a second one arrives easily and by reflex.
         testDispatcher.scheduler.advanceUntilIdle()
         openUninstallPrompt()
         viewModel.handleGamepadAction(GamepadAction.SELECT)
@@ -417,13 +354,8 @@ class AppDrawerViewModelTest {
 
     @Test
     fun `moving to Uninstall and confirming does uninstall`() = runTest {
-        // The other direction. If this passed while the test above also passed by the prompt simply
-        // never confirming, the guard rail would be a wall.
         testDispatcher.scheduler.advanceUntilIdle()
-        // These are about the menu / search / uninstall paths, not about which section opens, so
-        // the section is chosen explicitly rather than relying on the drawer's default. Emulators
-        // because it puts PPSSPP — the app every one of these acts on — first in the row, which
-        // is where the cursor opens. All Apps used to serve that purpose and no longer exists.
+
         viewModel.setFilter(AppFilter.EMULATORS)
         testDispatcher.scheduler.advanceUntilIdle()
         openUninstallPrompt()
@@ -446,8 +378,6 @@ class AppDrawerViewModelTest {
 
     @Test
     fun `a reopened prompt starts on Cancel again, whatever the last answer was`() = runTest {
-        // State that survived the close would put the cursor on Uninstall for the NEXT app, which
-        // is the worst possible place for it to be remembered.
         testDispatcher.scheduler.advanceUntilIdle()
         openUninstallPrompt()
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
@@ -460,8 +390,6 @@ class AppDrawerViewModelTest {
         }
     }
 
-    // ── isLoading ────────────────────────────────────────────────────────
-
     @Test
     fun `isLoading is false after initial load completes`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
@@ -472,17 +400,12 @@ class AppDrawerViewModelTest {
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────
-
     private val fakeDrawable: Drawable = mockk(relaxed = true)
 
     private fun fakeApps() = listOf(
         InstalledApp(packageName = "org.ppsspp.ppsspp",           label = "PPSSPP",    icon = fakeDrawable, isEmulator = true,  isGame = false),
         InstalledApp(packageName = "com.retroarch",                label = "RetroArch", icon = fakeDrawable, isEmulator = true,  isGame = false),
-        // An emulator the user has also marked as a game. Not a curiosity: on the owner's device
-        // 8 of 8 emulators are tagged this way, and it is the case the Apps/Games/Emulators rule
-        // turns on. Without it in the fixture the "in both" assertion below has nothing to find
-        // and passes by doing nothing.
+
         InstalledApp(packageName = "org.dolphinemu.dolphinemu",    label = "Dolphin",   icon = fakeDrawable, isEmulator = true,  isGame = true),
         InstalledApp(packageName = "com.mojang.minecraftpe",       label = "Minecraft", icon = fakeDrawable, isEmulator = false, isGame = true, lastUsedAt = 2_000L),
         InstalledApp(packageName = "com.psplauncher.launcher", label = "PFP",       icon = fakeDrawable, isEmulator = false, isGame = false),
@@ -491,10 +414,6 @@ class AppDrawerViewModelTest {
 
     @Test
     fun `under a tab the two halves partition every app, with nothing lost or doubled`() = runTest {
-        // The 8q body shows a tab's own apps in a row and everything else in a list beneath. Both
-        // halves come from AppFilter.matches and its negation, which is the only reason they can
-        // be trusted to cover the drawer exactly once. This passes trivially today — and that is
-        // the point: the day the list below is given a filter of its own, it stops passing.
         testDispatcher.scheduler.advanceUntilIdle()
         listOf(AppFilter.APPS, AppFilter.EMULATORS, AppFilter.GAMES).forEach { filter ->
             viewModel.setFilter(filter)

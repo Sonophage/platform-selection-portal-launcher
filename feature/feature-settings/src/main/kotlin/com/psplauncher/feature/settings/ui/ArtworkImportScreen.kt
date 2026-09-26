@@ -23,11 +23,6 @@ import com.psplauncher.core.common.format.formatByteSize
 import com.psplauncher.feature.settings.viewmodel.ArtworkImportViewModel
 import java.util.Locale
 
-/**
- * Artwork Folder & Import — links the user-owned artwork library folder and imports existing
- * artwork dropped under `import/<Launcher>` (ES-DE in V1). PSP-minimal: plain rows, no wizardry;
- * every destructive step is explicit.
- */
 @Composable
 fun ArtworkImportScreen(
     onBack: () -> Unit,
@@ -56,7 +51,6 @@ fun ArtworkImportScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState),
         ) {
-            // ── Artwork folder ────────────────────────────────────────────────
             SettingsGroup("Artwork Folder")
 
             SettingsRow(
@@ -78,7 +72,6 @@ fun ArtworkImportScreen(
                 )
             }
 
-            // ── Import sources ────────────────────────────────────────────────
             if (state.folderLinked && state.grantAlive) {
                 SettingsGroup("Import Existing Artwork")
 
@@ -120,7 +113,6 @@ fun ArtworkImportScreen(
                     onClick  = if (state.relinking || state.importRunning) null else ({ viewModel.relinkLibrary() }),
                 )
 
-                // ── Internal-storage migration (M-F2) ────────────────────────
                 if (state.internalFiles > 0 || state.migrationRunning) {
                     SettingsGroup("App Storage")
                     if (state.migrationRunning) {
@@ -157,7 +149,6 @@ fun ArtworkImportScreen(
                 )
             }
 
-            // ── Preview ───────────────────────────────────────────────────────
             if (state.planning) {
                 SettingsGroup("Import Preview")
                 SettingsRow(label = "Building preview…", sublabel = "Matching artwork to your games")
@@ -208,7 +199,6 @@ fun ArtworkImportScreen(
                     onToggle = { viewModel.toggleMoveFiles(it) },
                 )
 
-                // ── Ambiguous review ─────────────────────────────────────────
                 if (plan.ambiguous.isNotEmpty()) {
                     SettingsGroup("Review Ambiguous Matches (${plan.ambiguous.size})")
                     plan.ambiguous.forEachIndexed { index, entry ->
@@ -244,13 +234,11 @@ fun ArtworkImportScreen(
                 }
             }
 
-            // ── Running import ────────────────────────────────────────────────
             if (state.importRunning) {
                 SettingsGroup("Importing")
                 Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 10.dp)) {
                     LinearProgressIndicator(
-                        // Coerced: a per-game failure counts its remaining items in bulk, which
-                        // can briefly overshoot the per-item counter.
+
                         progress = {
                             if (state.importTotal > 0)
                                 (state.importDone.toFloat() / state.importTotal).coerceIn(0f, 1f)
@@ -276,7 +264,6 @@ fun ArtworkImportScreen(
                 )
             }
 
-            // ── Reports ───────────────────────────────────────────────────────
             if (state.reports.isNotEmpty()) {
                 SettingsGroup("Import Report")
                 state.reports.forEach { report ->
@@ -288,7 +275,6 @@ fun ArtworkImportScreen(
                 )
             }
 
-            // ── Notices ───────────────────────────────────────────────────────
             state.notice?.let {
                 SettingsRow(label = it, sublabel = "Tap to dismiss", onClick = { viewModel.dismissError() })
             }

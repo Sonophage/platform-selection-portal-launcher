@@ -10,17 +10,6 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import timber.log.Timber
 
-/**
- * The auto-detect half of a ROM-root pass, extracted from [RomRootScanRunner] so the automatic
- * rescan triggers (app resume, media mount, USB unplug) can run it ahead of the incremental
- * rescan — a ROM dropped into a console's folder that has no Memory Card yet is picked up on
- * the next trigger, not only when the user opens Settings ▸ Auto-Detect.
- *
- * Walks every granted root's top-level subfolders, maps each to a platform by its ES-DE folder
- * name, creates a Memory Card for any system whose folder actually contains ROMs (empty ES-DE
- * folders are skipped), and upserts the found games through the same baseline + disc-set
- * reconcile path as the manual pass.
- */
 @Singleton
 class RomRootDiscoveryScanner @Inject constructor(
     private val memoryCardRepository: MemoryCardRepository,
@@ -39,10 +28,8 @@ class RomRootDiscoveryScanner @Inject constructor(
         val skipped: Int,
     )
 
-    /** Walks every granted root's top-level subfolders and auto-creates + scans consoles it finds ROMs in. */
     suspend fun discover(): Report = discover(romRootRepository.getAll())
 
-    /** Walks [roots]' top-level subfolders and auto-creates + scans consoles it finds ROMs in. */
     suspend fun discover(roots: List<String>): Report {
         if (roots.isEmpty()) return Report(0, emptySet(), 0, 0, 0)
 
@@ -65,7 +52,7 @@ class RomRootDiscoveryScanner @Inject constructor(
 
                 val exts = memoryCardRepository.getById(platformId)?.supportedExtensions
                     ?.takeIf { it.isNotEmpty() } ?: platform.romExtensions
-                if (exts.isEmpty()) continue   // nothing scannable for this platform
+                if (exts.isEmpty()) continue
 
                 val baseline = try {
                     existingRomPathResolver.baselineFor(platformId)
@@ -88,7 +75,7 @@ class RomRootDiscoveryScanner @Inject constructor(
                     )
                 )?.newGames.orEmpty()
 
-                if (found.isEmpty()) continue   // empty (or fully-known) folder → no card, no change
+                if (found.isEmpty()) continue
 
                 if (platformId !in haveCard) {
                     memoryCardRepository.addCard(
@@ -101,8 +88,7 @@ class RomRootDiscoveryScanner @Inject constructor(
                     newCards++
                 }
                 found.forEach { gameRepository.upsert(it) }
-                // Same incremental disc-set join as LibraryScanner: a disc added into an
-                // already-scanned .m3u set is union-reconciled against the pre-scan rows.
+
                 discSetReconciler.reconcilePlatform(platformId, baseline.games, found)
                 memoryCardRepository.recordScan(platformId, System.currentTimeMillis())
                 discovered.add(platformId)

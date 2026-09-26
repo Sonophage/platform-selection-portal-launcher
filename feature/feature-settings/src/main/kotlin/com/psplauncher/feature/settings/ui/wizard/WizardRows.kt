@@ -68,37 +68,16 @@ import com.psplauncher.feature.settings.ui.SettingsSubtext
 import com.psplauncher.feature.settings.ui.SettingsText
 import com.psplauncher.feature.settings.ui.rememberControllerRowRegistration
 
-// ── Wizard row family ───────────────────────────────────────────────────────────
-//
-// The first-run wizard's PSP-styled rows. Every row registers through the SAME controller-row
-// helpers the settings rows use (rememberControllerRowRegistration), so UP/DOWN traversal,
-// SELECT activation, LEFT/RIGHT inline actions, keep-in-view scrolling and focus restoration
-// behave identically to Settings — only the skin differs: inset rounded cursor, no dividers,
-// centered page chrome around them.
-
-/**
- * The wizard's generic row. Rows with a real [onClick] claim the page's initial focus; rows
- * with only inline [actions] (root rows) do not, so a page always opens on its first ACTION.
- */
 @Composable
 fun WizardRow(
     label: String,
     modifier: Modifier = Modifier,
     sublabel: String? = null,
     focusKey: String? = null,
-    /**
-     * The right-hand side of the row, in the row's own [RowScope].
-     *
-     * A RowScope so a value can pin itself to the LABEL's line with `Modifier.align(Top)`. A
-     * row's sublabel wraps to two lines often enough, and a centre-aligned value then floats
-     * halfway down beside it, pointing at nothing — which is what made the Permissions rows look
-     * loose. A checkbox still centres, because it is a control for the whole row rather than a
-     * reading of its first line.
-     */
+
     trailing: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
     actions: List<SettingsRowAction> = emptyList(),
-    // Root rows: while an inline action holds focus, the row-level cursor fill is suppressed so
-    // the action's own background is the sole highlight (same rule as the settings DirectoryRow).
+
     hideRowHighlightOnActionFocus: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
@@ -190,7 +169,6 @@ fun WizardRow(
     }
 }
 
-/** Label + value row (summary entries, connected-service status). */
 @Composable
 fun WizardValueRow(
     label: String,
@@ -213,18 +191,13 @@ fun WizardValueRow(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.End,
-                // Top, plus the label's own optical offset: the value reads as the answer to the
-                // LABEL, so it belongs on the label's line whatever the sublabel does below it.
+
                 modifier = Modifier.align(Alignment.Top).padding(top = 2.dp),
             )
         },
     )
 }
 
-/**
- * One managed root folder, mirroring Library Manager's directory row: non-selectable body with
- * Edit (re-link/re-point) and Remove as inline controller actions reached via LEFT/RIGHT.
- */
 @Composable
 fun WizardRootRow(
     name: String,
@@ -269,7 +242,6 @@ fun WizardRootRow(
     )
 }
 
-/** Checkbox row (terms-style toggles): SELECT/tap flips the drawn checkbox. */
 @Composable
 fun WizardCheckboxRow(
     label: String,
@@ -293,13 +265,6 @@ fun WizardCheckboxRow(
     )
 }
 
-/**
- * The PSP rounded input field: near-white pill with dark text, confirm-to-edit like the
- * settings field (SELECT/tap enters edit and opens the keyboard; IME Done or focus leaving
- * exits). Optional [onAdvance] renders the reference's circular ▶ button at the field's right
- * edge — a real controller node too (DOWN from the field, SELECT advances) as well as a
- * touch target.
- */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun WizardTextField(
@@ -327,9 +292,6 @@ fun WizardTextField(
     )
     val fr = row.focusRequester
 
-    // The keyboard follows edit mode only — navigating onto the field never opens it (the
-    // readOnly→editable flip restarts the input session, so settle a frame, re-assert focus,
-    // settle again, then show — same sequence as SettingsTextFieldRow).
     LaunchedEffect(editing) {
         if (editing) {
             withFrameNanos { }
@@ -367,9 +329,7 @@ fun WizardTextField(
                         imeAction = ImeAction.Done,
                     ),
                     keyboardActions = KeyboardActions(onDone = { editing = false }),
-                    // Same dark outlined field as SettingsTextFieldRow — white text on a
-                    // transparent container, accent border when focused / divider when not.
-                    // No separate border shape: the Material outline follows the host theme.
+
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = SettingsText,
                         unfocusedTextColor = SettingsText,
@@ -385,7 +345,6 @@ fun WizardTextField(
                         .then(row.positionReporting)
                         .onFocusChanged { state ->
                             if (state.isFocused) {
-                                // SELECT over the field starts editing (opens the keyboard).
                                 focusTracker { editing = true }
                                 reportFocused(fr)
                             } else {
@@ -393,8 +352,7 @@ fun WizardTextField(
                             }
                         },
                 )
-                // While not editing, a non-focusable tap layer lets touch users enter edit
-                // mode; pointerInput adds no focus target, so D-pad traversal is untouched.
+
                 if (!editing) {
                     Box(
                         modifier = Modifier
@@ -411,7 +369,6 @@ fun WizardTextField(
     }
 }
 
-/** The reference's glowing ▶ circle — controller node (DOWN from the field) + touch target. */
 @Composable
 private fun WizardAdvanceButton(onAdvance: () -> Unit, focusKey: String?) {
     val focusTracker = LocalSettingsFocusTracker.current
@@ -449,7 +406,6 @@ private fun WizardAdvanceButton(onAdvance: () -> Unit, focusKey: String?) {
     }
 }
 
-/** Amber transient message (validation / status). SELECT or tap dismisses; never claims focus. */
 @Composable
 fun WizardMessageRow(
     message: String,
@@ -463,7 +419,7 @@ fun WizardMessageRow(
     val row = rememberControllerRowRegistration(
         prefix = "wizardmsg",
         focusKey = null,
-        claimInitialFocus = false,   // a transient status never steals the page's opening focus
+        claimInitialFocus = false,
         selectable = true,
         onSelect = onDismiss,
     )
@@ -496,7 +452,6 @@ fun WizardMessageRow(
     }
 }
 
-/** Small uppercase group label inside a page (services sections, summary groups). */
 @Composable
 fun WizardSectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
@@ -511,7 +466,6 @@ fun WizardSectionHeader(title: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** Body paragraph (welcome intro, explanations). */
 @Composable
 fun WizardInfoText(text: String, modifier: Modifier = Modifier) {
     Text(

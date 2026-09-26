@@ -50,22 +50,6 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.components.PfpHintBar
 import com.psplauncher.core.ui.components.StatusStripHeight
 
-// ── Console-style detail page: background, scaffold, header, footer ───────────
-//
-// The one page frame every full-page library entry (games, apps, videos) shares, in the approved
-// PS3-era information-page direction: a see-through breadcrumb header over a thin divider, a scrolling body
-// centered at a readable maximum width, and a permanent controller-helper footer pinned in its own
-// layout row.
-//
-// Everything here is accent-derived from the active PFP/XMB theme — no baked-in blue and no fixed
-// color asset — so the page follows whichever color scheme (and monthly "Original" hue) is active.
-//
-// Why this lives in core-ui rather than a feature module: two feature modules render full-page
-// entry details (feature-xmb's Game Detail and App Detail), features must not depend on each
-// other, and a second copy of these surfaces would drift. Same reasoning as ControllerHintBar.
-
-// Page tones, all read from the theme's detail palette (see DetailPalette.kt: the App Drawer's colors
-// with the mockup's layering).
 internal val DetailTextPrimary: Color @Composable @ReadOnlyComposable get() = detailPalette().textPrimary
 internal val DetailTextMuted: Color @Composable @ReadOnlyComposable get() = detailPalette().textMuted
 internal val DetailRowFill: Color @Composable @ReadOnlyComposable get() = detailPalette().rowFill
@@ -73,43 +57,17 @@ internal val DetailRowEdge: Color @Composable @ReadOnlyComposable get() = detail
 internal val DetailDivider: Color @Composable @ReadOnlyComposable get() = detailPalette().divider
 internal val DetailFocusEdge: Color @Composable @ReadOnlyComposable get() = detailPalette().focus
 
-// ── Button tones ──────────────────────────────────────────────────────────────
-//
-// The detail pages' buttons invert on focus rather than wearing a colour: at rest they are
-// translucent glass over the page, and the focused one becomes a near-white slab with dark text.
-// That is the tvOS idiom, and it reads at arm's length in a way a coloured fill plus a thin ring
-// does not -- the focused control is the brightest thing on the page by a wide margin.
-//
-// It replaced a fixed green Launch button. The green was the one element on these pages that
-// ignored the theme entirely, which mattered more once the pages started taking their colour
-// from the game's own artwork: a green slab sat on top of every game's palette.
-
-/** Resting fill: glass, so the page's colour reads through every button equally. */
 val DetailButtonRest = Color.White.copy(alpha = 0.13f)
 
-/**
- * The resting fill for a COMPACT launch button — a sixth of the ordinary one.
- *
- * It is enough to hold the shape against artwork and not enough to read as a control. The
- * compact form is used where the button is a legend for the pad, so a plate as solid as a real
- * button's is the wrong promise.
- */
 val DetailButtonRestCompact = Color.White.copy(alpha = 0.06f)
 
-/** Focused fill. Not pure white: pure white blooms against a dark page. */
 val DetailButtonFocusFill = Color(0xFFEDEDED)
 
-/** Label on the focused fill. Near-black rather than black, to match the fill's softness. */
 val DetailButtonFocusText = Color(0xFF101014)
 
-/** Readable maximum width for the page body, plus its side margins. */
 val DetailContentMaxWidth: Dp = 920.dp
 val DetailContentPadding: Dp = 28.dp
 
-/**
- * The height the helper footer always reserves. Fixed on purpose: the footer's prompts change with
- * context (and fade out entirely for touch input), and neither may move the body's geometry.
- */
 val DetailFooterHeight: Dp = 58.dp
 
 internal val DetailTextShadow = Shadow(
@@ -118,10 +76,6 @@ internal val DetailTextShadow = Shadow(
     blurRadius = 4f,
 )
 
-/**
- * The page surface colors: the App Drawer's translucent theme gradient, with see-through header and
- * footer bands, so the XMB wave reads through the page exactly as it does through the drawer.
- */
 @Composable
 @ReadOnlyComposable
 internal fun detailSurfaceTop(): Color = detailPalette().pageTop
@@ -134,12 +88,6 @@ internal fun detailSurfaceBottom(): Color = detailPalette().pageBottom
 @ReadOnlyComposable
 internal fun detailHeaderSurface(): Color = detailPalette().header
 
-/**
- * The whole-page backdrop: the App Drawer's translucent theme gradient (deep top easing into a
- * midtone), so the XMB wave reads through it exactly as it does through the drawer. Never a texture.
- *
- * [content] is a [BoxScope], so callers can stack modals/overlays on top of the page.
- */
 @Composable
 fun PfpDetailBackground(
     modifier: Modifier = Modifier,
@@ -153,16 +101,6 @@ fun PfpDetailBackground(
     )
 }
 
-/**
- * The detail page frame: pinned breadcrumb header, scrolling body, pinned helper footer.
- *
- * The body scrolls under [scrollState] the caller owns — controller focus and touch must share one
- * scroll owner, so the screen that drives focus-driven scrolling passes its state in here.
- *
- * [overlay] is the top layer of the page's own stack: blocking overlays (context menus, pickers,
- * viewers) belong there rather than inside the scrolling body, so they cover the whole screen and
- * cannot be scrolled away.
- */
 @Composable
 fun PfpDetailScaffold(
     modifier: Modifier = Modifier,
@@ -171,11 +109,7 @@ fun PfpDetailScaffold(
     horizontalPadding: Dp = DetailContentPadding,
     header: @Composable () -> Unit = {},
     footer: @Composable () -> Unit = {},
-    /**
-     * The layer UNDER the page: the entry's own artwork, full-bleed (see [PfpDetailArtBackdrop]).
-     * Drawn over the plain page gradient and under everything else, including the header and the
-     * footer, so their see-through bands show the art rather than the theme.
-     */
+
     backdrop: @Composable BoxScope.() -> Unit = {},
     overlay: @Composable BoxScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
@@ -183,18 +117,10 @@ fun PfpDetailScaffold(
     PfpDetailBackground(modifier = modifier.fillMaxSize()) {
         backdrop()
         Column(modifier = Modifier.fillMaxSize()) {
-            // The status strip is drawn over this page by the shell. A Spacer rather than top
-            // padding on the Column: padding would push the FOOTER up by the same band and leave
-            // a gap along the bottom edge, where the hint bar is meant to sit flush. This pushes
-            // only the header down, and the body between them shrinks to match -- which is what
-            // LocalDetailViewportHeight reports, so detailHeroHeightFor keeps sizing the hero
-            // against the room the page actually has.
             Spacer(Modifier.height(StatusStripHeight))
             header()
-            // Hard viewport edge: nothing in the body may paint into the header or footer rows.
+
             BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
-                // The body's real viewport, so the page can size its top band to fit above the
-                // footer (see detailHeroHeightFor).
                 CompositionLocalProvider(LocalDetailViewportHeight provides maxHeight) {
                     Column(
                         modifier = Modifier
@@ -213,17 +139,8 @@ fun PfpDetailScaffold(
     }
 }
 
-/** The height of the scrolling body between the header and the footer (unbounded outside a scaffold). */
 val LocalDetailViewportHeight = staticCompositionLocalOf { Dp.Infinity }
 
-/**
- * The breadcrumb header: `◀` + title over a small subtitle (e.g. `Nintendo DS` / `ROM`), the same
- * shape as the App Drawer's header, over a thin divider like the drawer's.
- *
- * Deliberately non-focusable for the controller — Back is a button, not a page node — but the arrow
- * and the title stack are one touch target that returns off the page, and it is the only header
- * chrome, so touch users always have a way back even when the controller cursor is hidden.
- */
 @Composable
 fun PfpDetailBreadcrumb(
     title: String,
@@ -239,10 +156,6 @@ fun PfpDetailBreadcrumb(
                 .padding(start = DetailContentPadding, end = DetailContentPadding, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Deliberately unweighted: a Row measures unweighted children first, in order, so the
-            // breadcrumb claims its full width before [trailing] and is never cut short by it. (It
-            // used to share a weight with the spacer below, which handed it only half the leftover
-            // space.) Past the screen width it still ellipsizes against the Row's own bound.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -253,8 +166,6 @@ fun PfpDetailBreadcrumb(
                         onClick = onBack,
                     ),
             ) {
-                // 48dp touch target (Android's minimum) around a 16sp glyph, so the arrow stays easy to
-                // hit without a visible chip.
                 Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                     Text(text = "◀", color = DetailTextMuted, fontSize = 16.sp)
                 }
@@ -280,7 +191,7 @@ fun PfpDetailBreadcrumb(
             if (trailing != null) {
                 Spacer(Modifier.width(16.dp))
                 Spacer(Modifier.weight(1f))
-                // Gets whatever the breadcrumb leaves; clipped rather than pushing into it.
+
                 Box(modifier = Modifier.clipToBounds(), contentAlignment = Alignment.CenterEnd) { trailing() }
             }
         }
@@ -288,30 +199,12 @@ fun PfpDetailBreadcrumb(
     }
 }
 
-/**
- * The permanent controller-helper footer: a real layout row below the scrolling body, never an
- * overlay.
- *
- * Geometry is reserved whether or not the prompts are showing or resolving, so fading the hints
- * (existing PFP behaviour: hints fade while the last input was touch) never moves content.
- */
 @Composable
 fun PfpDetailHelperFooter(
     items: List<ControllerPromptItem>,
     modifier: Modifier = Modifier,
     visible: Boolean = true,
-    /**
-     * Runs a tapped prompt through the page's own action handler.
-     *
-     * Null draws a bar that names buttons and does nothing to a finger, which is what every
-     * detail page had: the shared bar, in the shared slot, inert. On a device with no pad that is
-     * an action with no route at all, and on one with a pad it is a control that lies about being
-     * one.
-     *
-     * Give it the SAME function the page already hands its gamepad events — not a second lambda
-     * written for touch. Two routes to one action is the pair that stops agreeing, and the half
-     * nobody presses is the half that rots.
-     */
+
     onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     val alpha by animateFloatAsState(
@@ -319,10 +212,7 @@ fun PfpDetailHelperFooter(
         animationSpec = tween(200),
         label = "pfpDetailHelperFooter",
     )
-    // The shared [PfpHintBar], in a slot that reserves [DetailFooterHeight] whether the bar is
-    // showing or not. The fill and the divider rule that used to be here are gone with the pill:
-    // the bar brings its own scrim, and a detail page's body clips to its own viewport, so nothing
-    // scrolls under it either way.
+
     Box(
         modifier = modifier.fillMaxWidth().height(DetailFooterHeight),
         contentAlignment = Alignment.BottomCenter,
@@ -331,7 +221,6 @@ fun PfpDetailHelperFooter(
     }
 }
 
-/** A small all-caps label that names a band of the page (e.g. `MEDIA PREVIEW`). */
 @Composable
 fun PfpDetailSectionLabel(
     text: String,
@@ -347,13 +236,6 @@ fun PfpDetailSectionLabel(
     )
 }
 
-/**
- * The focus ring every controller-focusable detail surface shares: a thin bright edge plus a lift in
- * fill, applied inside the node's own bounds so focus never changes layout.
- *
- * Deliberately not a scale animation: a scaled focus target moves its neighbours, which is exactly
- * the layout shift the approved design forbids.
- */
 @Composable
 internal fun Modifier.detailFocusRing(
     focused: Boolean,

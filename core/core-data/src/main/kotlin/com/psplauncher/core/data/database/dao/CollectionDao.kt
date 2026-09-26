@@ -11,7 +11,6 @@ import com.psplauncher.core.data.database.entity.CollectionGameEntity
 import com.psplauncher.core.data.database.entity.GameEntity
 import kotlinx.coroutines.flow.Flow
 
-// Collection + its current game count, used to render the collection list without N queries.
 data class CollectionWithCount(
     @Embedded val collection: CollectionEntity,
     val game_count: Int,
@@ -19,7 +18,6 @@ data class CollectionWithCount(
 
 @Dao
 interface CollectionDao {
-
     @Query(
         """
         SELECT c.*, (
@@ -88,7 +86,6 @@ interface CollectionDao {
     @Query("SELECT * FROM collections WHERE id = :id")
     suspend fun getById(id: Long): CollectionEntity?
 
-    // Games in a collection, in the order they were added (oldest first).
     @Query(
         """
         SELECT display_game.* FROM games display_game
@@ -123,7 +120,6 @@ interface CollectionDao {
     )
     fun observeGames(collectionId: Long): Flow<List<GameEntity>>
 
-    // Which collections a given game belongs to — drives the checkmarks in "Add to Collection".
     @Query("SELECT collection_id FROM collection_games WHERE game_id = :gameId")
     fun observeCollectionIdsForGame(gameId: Long): Flow<List<Long>>
 
@@ -163,7 +159,6 @@ interface CollectionDao {
     @Query("DELETE FROM collections WHERE id = :id")
     suspend fun delete(id: Long)
 
-    // Re-adding an existing membership is a no-op (composite PK + IGNORE).
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addGame(join: CollectionGameEntity)
 

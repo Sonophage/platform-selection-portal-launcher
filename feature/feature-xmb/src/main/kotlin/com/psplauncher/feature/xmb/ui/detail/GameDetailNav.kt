@@ -8,38 +8,15 @@ import com.psplauncher.core.navigation.NavigationLogger
 import com.psplauncher.core.navigation.NavigationNode
 import com.psplauncher.core.navigation.NavigationTouchAction
 
-/**
- * Stable identity for a media tile: the asset itself, never its position in the strip. Lives here
- * (not in the ViewModel) because both the graph and the screen have to derive the same key.
- */
 internal fun mediaStableId(media: DetailMedia): String =
     if (media.isVideo) "v:${media.uri}" else "i:${media.uri}"
 
-// ── Game Detail navigation (unified engine adapter) ───────────────────────────
-//
-// Game Detail used to be navigated by four ad-hoc index fields (`mainFocus`, `discFocusIndex`,
-// `mediaFocus`, `pageScrollSteps`) scattered between the ViewModel and the screen. This adapter
-// replaces them with the shared core-navigation engine:
-//
-//   * every controller-actionable element is a stable semantic node (never a visible list index);
-//   * UP/DOWN moves between visual rows using reported geometry, LEFT/RIGHT between a row's
-//     siblings, and neither wraps;
-//   * the page graph is one context, every blocking overlay is a modal context pushed on top — the
-//     paused page keeps its focused node and gets it back exactly when the modal closes;
-//   * navigation input is ignored (never buffered) until the screen reports readiness, and dropped
-//     while an alignment animation holds the recovery lock.
-//
-// The adapter stays pure: it never touches Compose or the repository layer. It builds generic
-// nodes, reports focus changes, and hands activations back through [onActivate] with the node's
-// stable key. That keeps the whole navigation contract unit-testable on the JVM.
-
-/** Stable semantic keys for the Game Detail page. Never derive these from list positions. */
 object GameDetailKeys {
     const val LAUNCH = "game-detail:launch"
     const val ACTIONS = "game-detail:actions"
-    /** The one secondary button on the page. Its dropdown holds what the pills used to be. */
+
     const val DETAILS = "game-detail:details"
-    /** The footer's heart and gear, beside Play. The gear opens Options — scrape and edit live there. */
+
     const val FAVORITE = "game-detail:favorite"
     const val OPTIONS = "game-detail:options-button"
     const val DISCS = "game-detail:discs"
@@ -68,7 +45,6 @@ object GameDetailKeys {
     const val CONFIRM_REMOVE = "game-detail:confirm-remove"
     const val CONFIRM_CANCEL = "game-detail:confirm-cancel"
 
-    // ── Modal context ids ─────────────────────────────────────────────────────
     const val MODAL_DETAILS = "game-detail:modal:details"
     const val MODAL_OPTIONS = "game-detail:modal:options"
     const val MODAL_EMULATOR_PICKER = "game-detail:modal:emulator-picker"
@@ -83,61 +59,35 @@ object GameDetailKeys {
     const val MODAL_ARTWORK_STUDIO = "game-detail:modal:artwork-studio"
 }
 
-/**
- * What the page's node graph is built from. A plain snapshot of the loaded game's visible
- * affordances — deliberately not the whole UI state, so the graph can be unit-tested without a
- * ViewModel, a database or a Compose runtime.
- */
 data class GameDetailNavContent(
-    /** 0 until the game row is loaded and the page can render. */
+
     val gameId: Long = 0L,
     val loaded: Boolean = false,
-    /** Emulator controls apply (false for package-backed Android/Windows entries). */
+
     val showEmulatorControls: Boolean = false,
-    /** Disc members in visual order; empty unless this is a multi-disc set. */
+
     val discIds: List<Long> = emptyList(),
-    /** Media strip stable ids in visual order (videos first, then screenshots). */
+
     val mediaIds: List<String> = emptyList(),
-    /**
-     * The panel is on its media page, so the tiles are on screen and reachable.
-     *
-     * The strip used to be a row of the scrolling body and its tiles were always in the graph.
-     * They are a PAGE now, and a node the user cannot see is a place the cursor can vanish into,
-     * so they join the graph only while that page is showing.
-     */
+
     val onMediaPage: Boolean = false,
 )
 
-/**
- * Game Detail's navigation state, backed by the shared [NavigationEngine].
- *
- * Not thread-safe by design: every caller runs on the main thread (ViewModel input handling and the
- * UI's geometry reporting), exactly like the Compose state it replaced.
- */
 class GameDetailNav(
     private val logger: NavigationLogger = NavigationLogger.NONE,
 ) {
     private val engine = NavigationEngine(contextId = "game-detail", logger = logger)
 
-    /** Called with a node's stable key when it is activated (Confirm or tap). */
     var onActivate: (String) -> Unit = {}
 
     private var content = GameDetailNavContent()
 
-    /** Last known node geometry (root-space Y per key), reported by the screen. */
     private var geometry: Map<String, Float> = emptyMap()
 
-    /** The node list currently registered in the active context. */
     private var registeredNodes: List<NavigationNode> = emptyList()
 
-    /** The page has had its opening cursor placed once. See [registerPageGraph]. */
     private var openingFocusPlaced = false
 
-    /**
-     * Rows that hand the cursor straight to a child on vertical arrival. Their container is a visual
-     * band (the action row, the disc row, the media strip) rather than something a user acts on,
-     * so parking the cursor on it would cost an extra RIGHT press for no information.
-     */
     private val autoEnterRows = setOf(GameDetailKeys.ACTIONS, GameDetailKeys.DISCS, GameDetailKeys.MEDIA)
 
     val focusedKey: String? get() = engine.focusedKey
@@ -146,13 +96,6 @@ class GameDetailNav(
     val isModalActive: Boolean get() = engine.isModalActive
     val activeContextId: String get() = engine.activeContextId
 
-    /**
-     * Every key the cursor can actually reach, inline children included.
-     *
-     * Not the engine's [NavigationEngine.focusableKeys], which reports only top-level nodes: the
-     * action buttons, discs and media tiles are children (LEFT/RIGHT siblings), so a caller asking
-     * "can the user reach this?" needs the whole graph.
-     */
     fun reachableKeys(): Set<String> = registeredNodes
         .flatMap { node ->
             buildList {
@@ -162,29 +105,12 @@ class GameDetailNav(
         }
         .toSet()
 
-    // ── Graph ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Rebuild the page graph from [newContent]. The engine preserves the focused key when it still
-     * exists and recovers to the nearest surviving node — by former visual position, then by
-     * registration order — when it does not, so unrelated asynchronous content changes never reset
-     * the cursor to Launch.
-     *
-     * While a modal context is up the page graph is frozen: the modal owns the active context, and
-     * re-registering here would overwrite the modal's own nodes. The pending page graph is applied
-     * when the modal closes.
-     */
     fun updateContent(newContent: GameDetailNavContent) {
         content = newContent
         if (engine.isModalActive) return
         registerPageGraph()
     }
 
-    /**
-     * Report the on-screen Y of the nodes the page actually composed. Geometry is what makes
-     * UP/DOWN follow the visual layout (and what lets a removed node's focus recover to whatever
-     * took its place on screen).
-     */
     fun reportGeometry(map: Map<String, Float>) {
         if (map.isEmpty()) return
         geometry = geometry + map
@@ -194,21 +120,12 @@ class GameDetailNav(
 
     private fun registerPageGraph() {
         registeredNodes = pageNodes()
-        // The same map is the previous geometry: it still holds the position of any node this
-        // update removed, which is exactly what focus recovery needs to look up.
+
         engine.replaceNodesWithGeometry(registeredNodes, geometry, geometry)
         placeOpeningFocus()
         normalizeFocus()
     }
 
-    /**
-     * The page opens on Play, not on the first node in the graph.
-     *
-     * The footer reads heart, gear, Play, left to right, and the engine focuses the first node it
-     * is given — which would charge two RIGHT presses for the one thing the page exists to do.
-     * Only ever done ONCE, and only while nothing is focused yet, so a later content update can
-     * never yank the cursor back off whatever the user moved it to.
-     */
     private fun placeOpeningFocus() {
         if (openingFocusPlaced) return
         if (engine.focusedKey == null) return
@@ -216,14 +133,6 @@ class GameDetailNav(
         engine.setFocused(GameDetailKeys.LAUNCH)
     }
 
-    /**
-     * Keep the cursor off the visual bands that hold no action of their own.
-     *
-     * A removed node recovers to its owning row first (the engine's rule), and a row is a legitimate
-     * answer for a row that is *itself* actionable — but the action, disc and media bands are
-     * not: parking there would hide the cursor on something with nothing to confirm, so it steps
-     * into the band's first child instead.
-     */
     private fun normalizeFocus() {
         val key = engine.focusedKey ?: return
         if (key !in autoEnterRows) return
@@ -233,13 +142,7 @@ class GameDetailNav(
     private fun pageNodes(): List<NavigationNode> {
         if (!content.loaded) return emptyList()
         val nodes = mutableListOf<NavigationNode>()
-        // The page is a panel and a footer now. Overview, the information band and the media strip
-        // were rows of a scrolling body; they are PAGES, walked with L1/R1, and a page is not a
-        // node — so the graph is the footer, the disc row, and the media tiles while their page
-        // is up. Nothing else on this screen is something you move a cursor to.
-        //
-        // Favorite and Options are real buttons rather than rows inside a dropdown, which is what
-        // the owner asked for: the gear is where scrape and edit live.
+
         nodes += container(
             GameDetailKeys.ACTIONS,
             listOf(
@@ -273,8 +176,7 @@ class GameDetailNav(
         selectable: Boolean = false,
     ): NavigationNode = NavigationNode(
         key = key,
-        // Focusable so vertical traversal can land on it (and then step into a child); never
-        // selectable, because a band itself does nothing when confirmed.
+
         selectable = selectable,
         children = children,
     )
@@ -283,24 +185,8 @@ class GameDetailNav(
         onActivate(key)
     }
 
-    // ── Readiness ─────────────────────────────────────────────────────────────
-
-    /**
-     * The page's first usable graph is on screen, so controller input may start. Before this point
-     * the engine ignores input entirely rather than buffering it — nothing fires late when the page
-     * finishes loading.
-     */
     fun markReady() = engine.markReady()
 
-    // ── Input ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Dispatch one controller action. Returns the key the cursor is on afterwards (null when nothing
-     * is focusable, or when the input was gated and dropped).
-     *
-     * Back and the Options shortcut are deliberately NOT handled here: whether Back closes a modal,
-     * a picker or the page is domain knowledge the ViewModel owns.
-     */
     fun handleAction(action: GamepadAction): String? = when (action) {
         GamepadAction.NAVIGATE_UP -> move(NavigationDirection.UP)
         GamepadAction.NAVIGATE_DOWN -> move(NavigationDirection.DOWN)
@@ -316,12 +202,9 @@ class GameDetailNav(
     private fun move(direction: NavigationDirection): String? {
         val previousChildIndex = childIndex(engine.focusedKey)
         val landed = engine.dispatch(NavigationCommand.Direction(direction))
-            // A boundary stop (or a gated input) returns null: the cursor simply stays put.
+
             ?: return engine.focusedKey
-        // Bands are never a resting place (see normalizeFocus): a vertical arrival steps into the
-        // child nearest the horizontal position the cursor came from — the "nearest reasonable
-        // horizontal neighbour" rule, without which every row change would cost an extra RIGHT
-        // press — and a horizontal one ran off the row's edge, so it stops at the first child.
+
         if (landed !in autoEnterRows) return landed
         val children = childKeys(landed)
         if (children.isEmpty()) return landed
@@ -334,7 +217,6 @@ class GameDetailNav(
         return engine.focusedKey
     }
 
-    /** Index of [key] among its row's children, or -1 when it is a top-level node. */
     private fun childIndex(key: String?): Int {
         if (key == null) return -1
         registeredNodes.forEach { node ->
@@ -351,24 +233,12 @@ class GameDetailNav(
             ?.map { it.key }
             .orEmpty()
 
-    /** A touch on a known node: mark touch input, move logical focus there, then activate it. */
     fun touch(key: String): Boolean = engine.dispatchTouch(key, NavigationTouchAction.TAP)
 
-    /** Any touch anywhere else — hides the controller cursor without moving logical focus. */
     fun markTouchInput() = engine.markTouchInput()
 
-    /** Realign nav focus with the UI (used when the page restores a saved node). */
     fun setFocused(key: String?) = engine.setFocused(key)
 
-    // ── Modal contexts ────────────────────────────────────────────────────────
-
-    /**
-     * Push a blocking overlay's own navigation context. The page graph keeps its focused node and
-     * receives no input until [popModal].
-     *
-     * [preferredFocus] is where the overlay's cursor starts ("Apply", the currently selected
-     * emulator, the row the picker was left on); without one the first node takes it.
-     */
     fun pushModal(
         contextId: String,
         nodes: List<NavigationNode> = emptyList(),
@@ -376,20 +246,12 @@ class GameDetailNav(
     ) {
         engine.pushModal(contextId)
         registeredNodes = nodes
-        // Modal graphs are short vertical lists; they get registration order, never the page's Y.
+
         engine.replaceNodes(nodes)
         if (preferredFocus != null) engine.setFocused(preferredFocus)
         if (engine.focusedKey == null) engine.focusFirst()
     }
 
-    /**
-     * Re-register the active modal's nodes — its rows can arrive after the overlay opened (metadata
-     * retrieval, the collection list, the installed-emulator catalog).
-     *
-     * [preferredFocus] is applied only when the overlay had no cursor yet, so a row arriving late
-     * can never steal focus from the user. The engine keeps the focused key otherwise, or recovers
-     * to the nearest survivor when the node it was on disappeared.
-     */
     fun updateModalNodes(nodes: List<NavigationNode>, preferredFocus: String? = null) {
         val hadFocus = engine.focusedKey != null
         registeredNodes = nodes
@@ -397,22 +259,14 @@ class GameDetailNav(
         if (!hadFocus && preferredFocus != null) engine.setFocused(preferredFocus)
     }
 
-    /** Pop the top modal context. Returns the page node to restore the cursor to. */
     fun popModal(): String? {
         val restored = engine.popContext()
-        // The page graph may have changed while the modal was up; apply it now that its context is
-        // active again (and keep the restored key when it still exists).
+
         engine.setFocused(restored)
         registerPageGraph()
         return engine.focusedKey
     }
 
-    // ── Recovery lock ─────────────────────────────────────────────────────────
-
-    /**
-     * Block navigation while the page aligns the focused node (focus-driven scrolling). Repeated
-     * input during the lock is dropped, never queued.
-     */
     fun beginRecoveryLock() = engine.beginRecoveryLock()
 
     fun endRecoveryLock() = engine.endRecoveryLock()

@@ -13,11 +13,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PtfConversionTest {
-
     private fun buildPtf(name: String = "Neon") = TestFixtures.buildPtf(
         name = name,
         firmware = "6.60",
-        // Saturated red wallpaper so accent derivation has a clear dominant hue.
+
         wallpaperBmp = TestFixtures.buildBmp(64, 36) { _, _ -> 0xFFE01030.toInt() },
     )
 
@@ -33,10 +32,8 @@ class PtfConversionTest {
         assertEquals("neon.ptf", source.file)
         assertEquals("6.60", source.firmware)
 
-        // Accent is a well-formed opaque #RRGGBB in the red hue family.
         assertTrue(Regex("#[0-9A-F]{6}").matches(bundle.manifest.accentColor), bundle.manifest.accentColor)
 
-        // Wallpaper decodes back as a PNG of the original dimensions.
         val png = assertNotNull(bundle.wallpaper)
         val image = assertNotNull(ImageIO.read(png.inputStream()))
         assertEquals(64, image.width)
@@ -55,7 +52,7 @@ class PtfConversionTest {
             name = "Old Theme",
             firmware = "3.70",
             wallpaperBmp = TestFixtures.buildBmp(8, 4) { _, _ -> 0xFF3050E0.toInt() },
-            compressionMethod = 1, // LZR
+            compressionMethod = 1,
         )
         val outcome = assertIs<ConvertOutcome.Converted>(PtfConversion.convert(ptf, "old.ptf"))
         assertNotNull(outcome.bundle.wallpaper)
@@ -70,11 +67,11 @@ class PtfConversionTest {
             wallpaperBmp = TestFixtures.buildBmp(8, 4) { _, _ -> 0xFF3050E0.toInt() },
             compressionMethod = 1,
         )
-        for (i in 0x140 + 37 until ptf.size) ptf[i] = 0x5A // trash the LZR stream body
+        for (i in 0x140 + 37 until ptf.size) ptf[i] = 0x5A
         val outcome = assertIs<ConvertOutcome.Converted>(PtfConversion.convert(ptf, "old.ptf"))
         assertEquals(null, outcome.bundle.wallpaper)
         assertTrue(assertNotNull(outcome.warning).contains("damaged"), "warning was: ${outcome.warning}")
-        // Accent falls back to the default when there is no wallpaper to derive from.
+
         assertEquals(PtfConversion.toHexRgb(PtfConversion.DEFAULT_ACCENT), outcome.bundle.manifest.accentColor)
     }
 

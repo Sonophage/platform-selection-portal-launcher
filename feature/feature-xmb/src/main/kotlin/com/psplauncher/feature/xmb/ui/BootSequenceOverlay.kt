@@ -33,46 +33,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
-// Boot sequence timing constants (ms)
 private const val FADE_IN_MS  = 800
 private const val HOLD_MS     = 1_400L
 private const val FADE_OUT_MS = 600
 
-/**
- * Hard cap on the WHOLE presentation, watchdog-enforced. The import gate already caps a boot clip
- * at [UiMediaLimits.BOOT_MAX_MS] (10 s) and the player clips to it again — this is the third and
- * last line: whatever the players are doing, boot ends and the launcher appears.
- */
 private const val HARD_CAP_MS = 12_000L
 
-/**
- * The PSP-style startup presentation, optionally replaced by the user's own video and/or audio.
- *
- * **Historical note.** This file used to carry a rule that boot must NEVER play the user's video —
- * boot being the most contended moment on the device. The project owner reversed that decision;
- * custom boot media is now a supported feature. The reversal is only safe because of the guard
- * rails that replaced the rule, and it is off again if any of them is removed:
- *
- *  1. The import gate caps a boot clip at 10 s and 25 MB, and rejects a file whose duration cannot
- *     be read at all (a file we cannot time is a file we cannot bound).
- *  2. The media item is clipped to the same cap in the pipeline, so the decoder itself stops.
- *  3. [HARD_CAP_MS] is a watchdog that does not consult the players: on timeout the boot completes
- *     regardless of what any of them is doing.
- *  4. A player error completes the presentation immediately; a video that will not decode falls
- *     back to the built-in logo animation rather than to a black screen.
- *  5. [onComplete] fires EXACTLY once across natural end, skip, error, and timeout.
- *
- * Boot still does not play the user's MOTION WALLPAPER — that restriction is unrelated to this
- * reversal and stays, and is now moot for the built-in path: boot draws flat black and no
- * background component at all.
- *
- * The four combinations (default/custom × video/audio) all work. [bootVideoPath] null means the
- * built-in logo animation. [bootAudioPath] is what XMBViewModel resolved via `resolveBootAudio`:
- * the user's boot sound, else the bundled opening chime ONLY when there is no custom video, else
- * null (a custom video keeps its own audio track). So a non-null [bootAudioPath] still means
- * "mute the clip and play this instead" — the ViewModel guarantees it is never the bundled chime
- * stacked under a custom video. There is no bundled boot .mp4 and none should be added.
- */
 @Composable
 fun BootSequenceOverlay(
     onComplete: () -> Unit,
@@ -85,12 +51,11 @@ fun BootSequenceOverlay(
     val overlayAlpha = remember { Animatable(1f) }
 
     val currentComplete by rememberUpdatedState(onComplete)
-    // Exactly-once across the four ways this can end.
+
     val completed = remember { AtomicBoolean(false) }
 
-    // Set by whichever component owns the timeline: the logo animation, or the custom video.
     var presentationDone by remember { mutableStateOf(false) }
-    // A custom video that fails to decode hands the timeline back to the logo animation.
+
     var useLogoAnimation by remember(bootVideoPath) { mutableStateOf(bootVideoPath == null) }
 
     LaunchedEffect(Unit) {
@@ -98,7 +63,6 @@ fun BootSequenceOverlay(
             snapshotFlow { presentationDone }.first { it }
         } != null
         if (endedNaturally) {
-            // Dissolve the overlay → the identical XMB background is revealed beneath.
             overlayAlpha.animateTo(0f, animationSpec = tween(FADE_OUT_MS))
         } else {
             Timber.w("Boot watchdog fired after ${HARD_CAP_MS}ms — completing boot regardless")
@@ -106,7 +70,6 @@ fun BootSequenceOverlay(
         if (completed.compareAndSet(false, true)) currentComplete()
     }
 
-    // The built-in presentation: logo eases in over the wave, holds, then the timeline ends.
     LaunchedEffect(useLogoAnimation) {
         if (!useLogoAnimation) return@LaunchedEffect
         logoScale.animateTo(1f, animationSpec = tween(FADE_IN_MS))
@@ -122,49 +85,22 @@ fun BootSequenceOverlay(
         contentAlignment = Alignment.Center,
     ) {
         if (bootVideoPath != null && !useLogoAnimation) {
-            // The user's clip owns the whole screen. Black underneath so letterboxing (there
-            // should be none — the layer centre-crops) never shows the wave through a seam.
             Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                 OneShotVideoLayer(
                     path = bootVideoPath,
                     clipEndMs = UiMediaLimits.BOOT_MAX_MS,
                     onEnded = { presentationDone = true },
                     onFailed = {
-                        // Fall back to the built-in animation rather than a black screen.
                         useLogoAnimation = true
                     },
-                    // A custom boot SOUND replaces the clip's own audio; without one the clip
-                    // keeps its track. Two audio sources at once is never what the user meant.
+
                     muted = bootAudioPath != null,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
         } else {
-            // BLACK. Not the themed wave, which is what this drew for as long as it existed.
-            //
-            // The reason it drew the wave was that boot and menu would then be "visually
-            // identical", so the dissolve at the end revealed the same picture it was already
-            // showing. That premise is dead: the launcher opens on the Last Played shelf, whose
-            // backdrop is the focused game's own dark artwork, so boot was holding a bright amber
-            // gradient for 2.8 seconds and then crossfading to something dark. Measured on the
-            // panel: RGB (158, 91, 55) from 0.07s to 2.33s, falling to (53, 43, 41) by 2.93s.
-            //
-            // "let it only do black it can go to it's tint once the recent screen is displayed" —
-            // so the colour now arrives WITH the content that justifies it, and boot is a black
-            // field with the mark on it. The wave goes with the gradient; it is the gradient's
-            // folds, and white-on-black lines under a logo are a different screen, not this one
-            // with the colour removed.
             Box(modifier = Modifier.fillMaxSize().background(Color.Black))
 
-            // The boot mark, drawn through PortalIcon because it is exactly what that entry point
-            // is for: a single-colour silhouette whose alpha carries the shape. The art is black
-            // on transparency, so the tint is what makes it visible on the wave — and it follows
-            // the theme's icon colour instead of being hardcoded white.
-            //
-            // The mark fills its own square (unlike the icon art, which is inset for the adaptive
-            // safe zone), so the box is a fraction of the screen rather than the whole of it.
-            // A fraction also keeps the mark at the same share of the SHORT edge on a phone, a
-            // handheld and a tablet, and can never overflow a small screen the way a fixed dp can.
             PortalIcon(
                 painter = painterResource(CoreUiR.drawable.psp_logo),
                 contentDescription = "PSPLauncher",
@@ -178,7 +114,6 @@ fun BootSequenceOverlay(
                     },
             )
 
-            // Subtitle
             Text(
                 text = "PSPLauncher",
                 color = Color.White.copy(alpha = 0.6f),
@@ -192,8 +127,6 @@ fun BootSequenceOverlay(
             )
         }
 
-        // Independent of the video: one failing must not stop the other. Composed inside the same
-        // overlay so it is released the moment boot leaves composition.
         if (bootAudioPath != null) {
             OneShotAudioLayer(path = bootAudioPath, clipEndMs = UiMediaLimits.BOOT_MAX_MS)
         }

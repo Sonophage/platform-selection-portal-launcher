@@ -9,21 +9,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Validates the additive v37 missing-ROM columns (is_missing / last_seen_at) against the exported
- * schemas. The pre-existing curated row must survive untouched, is_missing must default to 0
- * (not missing) and last_seen_at to NULL (never confirmed present yet).
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration36To37Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
     @Test
     fun `v37 adds is_missing and last_seen_at without touching existing rows`() {
-        // Seed a v36 database with one curated (favorited) game.
         helper.createDatabase(36).use { db ->
             db.execSQL(
                 "INSERT INTO games (title, platform_id, is_favorite, favorite_sort_order, " +
@@ -32,15 +25,13 @@ class Migration36To37Test {
             )
         }
 
-        // Run the migration and validate the result against the exported 37 schema.
         helper.runMigrationsAndValidate(37, listOf(PFPDatabase.MIGRATION_36_37)).use { db ->
             db.singleRow("SELECT title, is_favorite, is_missing, last_seen_at FROM games") {
-                // Non-destructive: the row and its curation survived the migration.
                 assertEquals("Chrono Trigger", it.getText(0))
                 assertEquals(1, it.getLong(1).toInt())
-                // New columns get their safe defaults for the pre-existing row.
-                assertEquals(0, it.getLong(2).toInt())   // is_missing defaults to 0 (not missing)
-                assertTrue(it.isNull(3))                 // last_seen_at defaults to NULL
+
+                assertEquals(0, it.getLong(2).toInt())
+                assertTrue(it.isNull(3))
             }
         }
     }

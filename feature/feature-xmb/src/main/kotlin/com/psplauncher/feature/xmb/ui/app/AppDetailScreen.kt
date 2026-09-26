@@ -90,13 +90,8 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
-// Neutral dark surfaces stay fixed; accent/focus colors come from the active theme via
-// menuCursorFill()/menuCursorEdge() so this screen follows the chosen color scheme.
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
 private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+
 private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val ActionFill    = Color(0xFF1B1B26)
 
@@ -107,8 +102,7 @@ fun AppDetailScreen(
     collectionCategoryId: String = "games",
     pendingGamepadAction: GamepadAction? = null,
     onGamepadActionConsumed: () -> Unit = {},
-    // Touch header pill shown only when the last input was touch (AUTO), like the XMB App Drawer
-    // button; any touch on the screen reports back via [onTouchInput].
+
     showTouchControls: Boolean = true,
     onTouchInput: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -134,9 +128,7 @@ fun AppDetailScreen(
             onBack()
         }
     }
-    // ONE route, used by the pad below and by the footer's tapped prompts. See the longer note
-    // on the same pattern in GameDetailScreen: a second lambda for touch is a second answer to
-    // one question.
+
     val routeAction: (GamepadAction) -> Unit = { viewModel.handleGamepadAction(it) }
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null) {
@@ -161,15 +153,9 @@ fun AppDetailScreen(
     val game = state.game ?: return
     val pfpColors = LocalPFPColors.current
 
-    // Same translucent theme-gradient backdrop as the Music browser, so the XMB wave stays visible
-    // behind and all full-screen menus read consistently.
-    // The same detail frame as Game Detail (core-ui's shared scaffold): breadcrumb header, accent
-    // surface, scrolling body of full-width rows, permanent helper footer. Apps have no metadata or
-    // description — just Launch, artwork and options — so the body is simply shorter.
     PfpDetailScaffold(
         modifier = modifier
-            // Any touch marks the input source as touch (revealing the header pill) without
-            // consuming the event.
+
             .pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false); onTouchInput() } },
         header = {
             PfpDetailBreadcrumb(
@@ -206,7 +192,6 @@ fun AppDetailScreen(
             )
         }
 
-        // Name editor overlay
         AnimatedVisibility(
             visible = state.isEditingName,
             enter   = fadeIn(),
@@ -226,7 +211,6 @@ fun AppDetailScreen(
             }
         }
 
-        // Artwork picker overlay
         AnimatedVisibility(
             visible = state.showArtworkPicker,
             enter   = fadeIn(),
@@ -241,7 +225,6 @@ fun AppDetailScreen(
             )
         }
 
-        // Add-to-collection overlay
         AnimatedVisibility(
             visible = state.collectionPicker.visible,
             enter   = fadeIn(),
@@ -260,7 +243,6 @@ fun AppDetailScreen(
     ) {
         Spacer(Modifier.height(16.dp))
 
-        // The banner is the app's Background (heroes are a game-only surface).
         PfpDetailHeroBanner(
             artworkUri  = game.artworkUri ?: game.heroUri,
             title       = game.displayTitle,
@@ -271,16 +253,11 @@ fun AppDetailScreen(
 
         Spacer(Modifier.height(DetailRowSpacing + 6.dp))
 
-        // The hero-banner form of the detail page: icon tile, Launch, quick actions beneath.
-        // Game Detail used to share it and no longer does -- it puts the entry's artwork behind
-        // the whole page now. An app has a launcher icon and no key art, so there is nothing to
-        // put back there, which is why this page keeps the banner.
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            // Customized icon when set, the package's own icon otherwise.
             PfpDetailIconTile(uri = null, title = game.displayTitle) {
                 AppIconPreview(
                     packageName   = game.packageName ?: "",
@@ -328,18 +305,11 @@ fun AppDetailScreen(
     }
 }
 
-/**
- * The App Detail page's helper prompts. Apps have no emulator, coins or media, so the footer is the
- * same three actions in every context — but it still reserves its row, so nothing shifts when it
- * fades for touch input.
- */
 private fun appDetailHelperItems(): List<ControllerPromptItem> = listOf(
     ControllerPromptItem(GamepadAction.SELECT, "Launch"),
     ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
     ControllerPromptItem(GamepadAction.BACK, "Back"),
 )
-
-// ── App icon preview (PSP rect if custom, native drawable otherwise) ───────────
 
 @Composable
 private fun AppIconPreview(
@@ -387,8 +357,6 @@ private fun NativeAppIcon(packageName: String, modifier: Modifier = Modifier) {
         }
     }
 }
-
-// ── Artwork picker overlay ────────────────────────────────────────────────────
 
 @Composable
 private fun AppArtworkPicker(
@@ -488,7 +456,6 @@ private fun AppArtworkPicker(
                 }
             }
 
-            // Local file + clear row
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

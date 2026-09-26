@@ -9,20 +9,9 @@ import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * The MIME rule is the one thing here that is not shared with music and video, and it exists
- * because of the same provider quirk that shapes [BookFileFilter]: most SAF providers report
- * `application/octet-stream` for `.epub`.
- *
- * That type is a provider saying "I do not know". Forwarding it to `ACTION_VIEW` resolves no
- * reader, so a book would refuse to open with no visible cause, for a file the library scanned
- * happily. The row only exists because the filter already decided it was an EPUB, so that is what
- * gets asserted on the way out.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class BookIntentResolverTest {
-
     private val resolver = BookIntentResolver(ApplicationProvider.getApplicationContext())
 
     private fun book(mime: String?) = Book(

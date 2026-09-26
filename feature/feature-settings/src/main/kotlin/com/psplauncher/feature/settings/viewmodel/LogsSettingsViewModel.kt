@@ -21,8 +21,6 @@ data class LogFileItem(
     val sizeKb: String,
 )
 
-// Logs open in an external viewer (Confirm) or share via the system sheet (options menu) — no
-// in-app viewer, so the state is just the file list.
 data class LogsSettingsUiState(
     val logFiles: List<LogFileItem> = emptyList(),
 )
@@ -31,7 +29,6 @@ data class LogsSettingsUiState(
 class LogsSettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(LogsSettingsUiState())
     val uiState: StateFlow<LogsSettingsUiState> = _uiState.asStateFlow()
 

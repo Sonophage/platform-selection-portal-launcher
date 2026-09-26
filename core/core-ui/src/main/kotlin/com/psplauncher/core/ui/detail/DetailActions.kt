@@ -36,13 +36,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.psplauncher.core.ui.image.rememberArtworkModel
 
-// ── Primary action region ─────────────────────────────────────────────────────
-//
-// Launch is the page's primary action and its strongest focus treatment; the quick actions beneath
-// it are secondary. Both keep the shared focus language (thin bright edge + slight fill lift, no
-// scale, no layout shift) so the whole app reads as one cursor.
-
-/** The 196×110 icon frame beside the launch action. */
 val DetailIconTileWidth = 196.dp
 val DetailIconTileHeight = 110.dp
 
@@ -53,33 +46,18 @@ fun PfpDetailLaunchButton(
     focused: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    // A caller may tint the RESTING state (the video page marks its lead action this way). The
-    // focused state is never tinted: exactly one control is focused, and it always looks the same
-    // so the eye can find it without reading anything.
+
     fill: Color = DetailButtonRest,
-    /**
-     * Half-size, for a placement where this is a LEGEND rather than a control.
-     *
-     * The Recent shelf's is never focused -- the cursor lives in the card column and A on a card
-     * already fires it -- so at full size it read as the biggest, most important thing on a page
-     * whose subject is the artwork behind it. A detail screen's Launch is the opposite: it is the
-     * one control you reach for, and it keeps every pixel.
-     */
+
     compact: Boolean = false,
 ) {
-    // A pill, not a rounded rectangle: at this height the radius is half the height, which is what
-    // makes a tvOS button read as a button rather than as a card.
     val shape = RoundedCornerShape(percent = 50)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = if (compact) 32.dp else 58.dp)
             .clip(shape)
-            // Compact resting state is nearly nothing. This form is a legend, and a legend with
-            // a solid plate behind it is a button -- which is exactly what it must not look like
-            // on a page where the cursor is somewhere else entirely. Enough tint to sit on
-            // artwork, not enough to be reached for. A caller that passes its own [fill] still
-            // gets it, compact or not.
+
             .background(
                 when {
                     focused -> DetailButtonFocusFill
@@ -87,15 +65,7 @@ fun PfpDetailLaunchButton(
                     else -> fill
                 }
             )
-            // The cursor's bright edge, AFTER the fill so it draws on top of it.
-            //
-            // The inverted fill alone is unmistakable on artwork, which is where this button was
-            // designed. It is not unmistakable on a pale overlay card, and a destructive confirm
-            // is exactly that: a light Cancel that happens to be focused next to a pink Remove
-            // that is not, where the eye reads the tint as "this is the one that will happen".
-            // Reported from the device as "it didn't delete" — the A-press had hit Cancel, and
-            // nothing on screen said so. Same edge colour as Modifier.menuCursor, which is the
-            // treatment every menu row in the app already uses to mean "this one".
+
             .border(
                 width = if (focused) 2.dp else 0.dp,
                 color = if (focused) menuCursorEdge() else Color.Transparent,
@@ -122,8 +92,7 @@ fun PfpDetailLaunchButton(
             text = label,
             color = content,
             fontSize = if (compact) 13.sp else 19.sp,
-            // Semibold, not bold. The focused pill already carries the emphasis; bold on top of
-            // the inversion is two shouts for one thing.
+
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -131,12 +100,6 @@ fun PfpDetailLaunchButton(
     }
 }
 
-/**
- * A labelled quick action under Launch.
- *
- * An action that is not [available] stays in its slot (so the page's action set never moves) but is
- * disabled: drained, untappable, and left out of the controller graph by the caller.
- */
 @Composable
 fun PfpDetailQuickAction(
     label: String,
@@ -147,8 +110,6 @@ fun PfpDetailQuickAction(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    // Same pill, same inversion, smaller: the secondary row reads as the same kind of control as
-    // Launch rather than as a different family of tile.
     val shape = RoundedCornerShape(percent = 50)
     val content = if (focused) DetailButtonFocusText else DetailTextPrimary
     Row(
@@ -159,7 +120,7 @@ fun PfpDetailQuickAction(
             .semantics(mergeDescendants = true) {
                 contentDescription?.let { this.contentDescription = it }
             }
-            // Disabled rather than hidden: TalkBack reads it as a dimmed button, and taps do nothing.
+
             .clickable(enabled = available, role = Role.Button, onClick = onClick)
             .alpha(if (available) 1f else 0.38f)
             .padding(horizontal = 18.dp, vertical = 10.dp),
@@ -185,7 +146,6 @@ fun PfpDetailQuickAction(
     }
 }
 
-/** The game's icon/cover tile. [content] overrides the artwork (e.g. a package icon preview). */
 @Composable
 fun PfpDetailIconTile(
     uri: String?,

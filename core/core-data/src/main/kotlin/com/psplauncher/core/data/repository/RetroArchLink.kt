@@ -15,27 +15,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * A user-granted SAF link into RetroArch's own document tree, used to discover which libretro
- * cores are actually installed.
- *
- * RetroArch's own tree, which is NOT the visible `/RetroArch` folder on shared storage. That
- * folder holds config, saves, playlists and system files and has never held a core; the cores are
- * in the app's private data directory, which is exactly why the DocumentsProvider exists. Picking
- * the visible folder is the easy mistake — it is named RetroArch and it is right there — and it
- * lands in [CoreInventory.EmptyTree], which the settings screen now names rather than reporting
- * as "0 cores detected".
- *
- * Why this exists: RetroArch stores cores in private internal storage that no other app can read,
- * so PFP otherwise cannot tell an installed core from a missing one and drops the user into a
- * silent black screen. RetroArch exposes its directories through a DocumentsProvider; a one-time
- * `ACTION_OPEN_DOCUMENT_TREE` grant lets PFP enumerate the `cores` folder and know exactly what's
- * installed.
- *
- * Without a link PFP offers no RetroArch cores at all. It used to fall back to offering a curated
- * guess, which is what produced the black screens; see [CoreInventory] for why that state is now
- * named rather than papered over.
- */
 @Singleton
 class RetroArchLink @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -49,7 +28,6 @@ class RetroArchLink @Inject constructor(
         Timber.i("RetroArch linked: $treeUri")
     }
 
-    /** Forgets the tree AND the remembered inventory — an explicit unlink means "know nothing". */
     suspend fun clear() {
         context.pfpDataStore.edit {
             it.remove(KEY)
@@ -63,15 +41,6 @@ class RetroArchLink @Inject constructor(
         }.onFailure { Timber.w(it, "Could not persist RetroArch tree grant for $uri") }
     }
 
-    /**
-     * What PFP knows about the installed cores right now — see [CoreInventory] for the states and
-     * the rule about which of them may drive a deletion.
-     *
-     * A successful read is cached, so a later loss of the SAF grant degrades to
-     * [CoreInventory.Remembered] instead of silently erasing the user's RetroArch setup. Every
-     * failure path below degrades the same way, deliberately: an inventory we could not read is
-     * never evidence that a core is gone.
-     */
     suspend fun inventory(): CoreInventory {
         val treeUriStr = linkedTreeUri() ?: return CoreInventory.Unlinked
 
@@ -83,9 +52,6 @@ class RetroArchLink @Inject constructor(
         val rootDocId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
             ?: return remembered()
 
-        // The linked folder may itself be the cores dir, or contain it one or two levels down
-        // (RetroArch's base dir → cores/). Search a shallow tree for a folder named "cores"; if
-        // none is found, treat the linked folder's own .so files as the core set.
         val cores = runCatching {
             val coresDocId = findCoresDocId(treeUri, rootDocId) ?: rootDocId
             context.contentResolver.querySafChildren(treeUri, coresDocId)
@@ -111,7 +77,6 @@ class RetroArchLink @Inject constructor(
         return CoreInventory.Verified(cores)
     }
 
-    /** The last successfully-read inventory, or [CoreInventory.Unlinked] if there has never been one. */
     private suspend fun remembered(): CoreInventory {
         val cached = context.pfpDataStore.data.first()[KEY_CACHED_CORES].orEmpty()
         if (cached.isEmpty()) return CoreInventory.Unlinked
@@ -124,7 +89,6 @@ class RetroArchLink @Inject constructor(
             .onFailure { Timber.w(it, "Could not cache RetroArch core inventory") }
     }
 
-    // Breadth-first, depth-limited search for a child directory named "cores".
     private fun findCoresDocId(treeUri: Uri, startDocId: String, maxDepth: Int = 2): String? {
         var frontier = listOf(startDocId)
         val cr = context.contentResolver
@@ -142,11 +106,6 @@ class RetroArchLink @Inject constructor(
     }
 
     companion object {
-        // RETROARCH_DOCUMENTS_AUTHORITY used to live here as "com.retroarch.documents". It was
-        // unused, and it was wrong: the authority is per build — the aarch64 package exposes
-        // com.retroarch.aarch64.documents — so anything that had started matching on it would
-        // have rejected the provider nearly every user actually has. The tree the user grants
-        // carries its own authority and nothing here needs to name one.
         private val KEY = stringPreferencesKey("retroarch_documents_tree_uri")
         private val KEY_CACHED_CORES = stringSetPreferencesKey("retroarch_cached_core_files")
     }

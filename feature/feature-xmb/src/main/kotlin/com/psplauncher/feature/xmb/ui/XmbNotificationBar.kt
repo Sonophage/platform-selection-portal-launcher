@@ -39,41 +39,16 @@ import com.psplauncher.feature.xmb.viewmodel.NoticeFocus
 import com.psplauncher.core.ui.notification.SystemToast
 import com.psplauncher.core.ui.notification.ToastKind
 
-// ── The notification bar ──────────────────────────────────────────────────────
-//
-// What the toast pill became. The pill appeared in the top centre, said its piece for three
-// seconds and was gone; anything you were not looking at you never saw. The newest report sits in
-// the status strip's left half now, and pressing that corner pulls the rest of them down.
-//
-// TWO COLUMNS, one per source: the device's own notifications on the left, this launcher's on the
-// right. They are not interleaved because they are different kinds of thing — the launcher's are
-// events that happened and are done, the system's are ongoing and stay until something dismisses
-// them. One list sorted by time is a list where half the rows can be acted on and half can only be
-// read, saying nothing about which is which.
-//
-// The wash is the context rail's shape turned a quarter — ramped top to bottom off the edge it
-// drops from rather than left to right off the edge the rail hugs — but DARKER than the rail's.
-// Two different colours on purpose: the rail puts short labels beside an edge and wants the
-// wallpaper to keep showing, and this puts sentences across the middle of the screen over whatever
-// art happens to be behind them.
-
-/**
- * What the sheet's top row is showing, or null when it has nothing to show.
- *
- * One row, two tenants — a playing track or the last game you were in — so the drawing is one
- * shape and the difference is in what the primary does. [progress] is null for the game, which
- * has no position to report: a bar at zero would be a claim, not an absence.
- */
 data class NoticeMedia(
     val title: String,
     val detail: String?,
     val artUri: String?,
-    /** 0..1, or null when there is nothing to scrub. */
+
     val progress: Float?,
-    /** "1:04 / 3:58", already formatted by whoever knows the clock. */
+
     val elapsed: String?,
     val isPlaying: Boolean,
-    /** Skip is a music idea; the game row has one control and it is Resume. */
+
     val hasTransport: Boolean,
     val primaryLabel: String,
 )
@@ -82,13 +57,13 @@ data class NoticeMedia(
 fun XmbNotificationBar(
     open: Boolean,
     items: List<SystemToast>,
-    /** The device's own notifications. Empty when access is not granted. */
+
     android: List<AndroidNotice> = emptyList(),
-    /** Shown in place of the system row when the permission has never been granted. */
+
     androidAccessGranted: Boolean = true,
-    /** The row across the top. Null when nothing is playing and nothing has been played. */
+
     media: NoticeMedia? = null,
-    /** The row the cursor is on, so the controller and the finger see the same sheet. */
+
     focus: NoticeFocus? = null,
     onGrantAndroidAccess: () -> Unit = {},
     onNoticeTapped: (String) -> Unit = {},
@@ -101,14 +76,6 @@ fun XmbNotificationBar(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
-        // THE CATCHER GOES FIRST, which is to say UNDERNEATH.
-        //
-        // It was declared last and therefore drawn on top of the sheet, which was harmless while
-        // nothing in the sheet could be pressed: it caught the press that lands anywhere else and
-        // there was no anywhere else. Now the rows open notifications and the media row has a
-        // transport, and a full-screen clickable over all of them takes every one of those presses
-        // and closes the sheet instead. It also obscured them: uiautomator reported a sheet with
-        // no contents at all, because an opaque clickable covering a node prunes it.
         if (open) {
             Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
         }
@@ -118,9 +85,6 @@ fun XmbNotificationBar(
             exit = slideOutVertically(tween(180)) { -it } + fadeOut(tween(180)),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            // The wash covers the WHOLE screen, not the sheet's own height: it ended where the
-            // content ended, which drew a horizontal edge across the middle of the wallpaper with
-            // the rows floating above it. Full height, solid across the rows, gone by the bottom.
             Column(
                 verticalArrangement = Arrangement.spacedBy(RowGap),
                 modifier = Modifier
@@ -132,12 +96,9 @@ fun XmbNotificationBar(
                             1f to Color.Transparent,
                         ),
                     )
-                    // Clear of the strip: it is what you pressed to get here and it stays legible,
-                    // the same way the context rail draws under it rather than over.
+
                     .padding(top = StripHeight + 10.dp),
             ) {
-                // Full width, above both columns: it is one thing about the whole device, where
-                // the columns below are two lists from two sources.
                 media?.let {
                     MediaRow(
                         media = it,
@@ -166,8 +127,7 @@ fun XmbNotificationBar(
                                     detail = notice.text,
                                     accent = null,
                                     focused = (focus as? NoticeFocus.Notice)?.key == notice.key,
-                                    // Only where it goes somewhere. A row that takes a press and
-                                    // does nothing is the fault the keyboard prompts had.
+
                                     onClick = if (notice.canOpen) ({ onNoticeTapped(notice.key) }) else null,
                                     onDismiss = if (notice.canDismiss) ({ onNoticeDismissTapped(notice.key) }) else null,
                                 )
@@ -179,8 +139,6 @@ fun XmbNotificationBar(
                         if (items.isEmpty()) {
                             EmptyNote("Nothing has happened yet")
                         } else {
-                            // No focus and no press: these are reports of finished work. The
-                            // cursor does not stop here, so nothing draws as though it could.
                             items.take(ColumnRows).forEach { toast ->
                                 NoticeCard(
                                     lead = if (toast.kind == ToastKind.ERROR) "!" else "\u2713",
@@ -209,7 +167,6 @@ fun XmbNotificationBar(
     }
 }
 
-/** One labelled column: the source's name, then what it has to say, down the page. */
 @Composable
 private fun NoticeColumn(label: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = modifier) {
@@ -238,13 +195,6 @@ private fun EmptyNote(text: String, onClick: (() -> Unit)? = null) {
     )
 }
 
-/**
- * One notification, as a card in its row.
- *
- * [lead] is what goes in the badge — an app's initial for a system notice, a tick or a bang for
- * one of the launcher's. [accent] tints it where the kind means something; a system notification
- * has no kind, so it takes the neutral badge every monogram in this app wears.
- */
 @Composable
 private fun NoticeCard(
     lead: String,
@@ -260,9 +210,7 @@ private fun NoticeCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(RailCorner))
-            // The focused card takes the rail's white capsule rather than a ring: this sheet and
-            // the context rail are the same idea in two directions, and a second way of saying
-            // "you are here" is a second thing to keep in step.
+
             .background(
                 if (focused) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.07f),
             )
@@ -323,13 +271,6 @@ private fun NoticeCard(
     }
 }
 
-/**
- * The row across the top of the sheet: what is playing, how far through, and its controls.
- *
- * Its progress is a hairline under the text rather than a bar beside it, the same shape the
- * battery took across the top of the screen — a line that is part of the thing it describes reads
- * as a property of it, where a bar next to it reads as a second control.
- */
 @Composable
 private fun MediaRow(
     media: NoticeMedia,
@@ -407,7 +348,6 @@ private fun MediaRow(
     }
 }
 
-/** One transport control, sized like the keycaps the hint bar draws rather than like a button. */
 @Composable
 private fun TransportKey(label: String, onClick: () -> Unit, wide: Boolean = false) {
     Text(
@@ -433,44 +373,18 @@ private val RowGap = 8.dp
 private val ColumnGap = 22.dp
 private val EdgeGap = 20.dp
 
-/** How many each column shows. It is a glance, not a shade — forty would run off the screen. */
 private const val ColumnRows = 5
 
-/**
- * Darker than the rail's [XmbScrim], deliberately.
- *
- * The rail lays short labels along an edge and wants the wallpaper to keep showing through; this
- * lays sentences across the middle of the screen over whatever art is behind them, and at the
- * rail's 77% they were legible against a dark wallpaper and not against a bright one.
- */
 private val SheetScrim = Color(0xF2050200)
 
-/**
- * How far down the SCREEN the wash stays solid before it starts to go.
- *
- * The rows live in the top third, so this holds well past them and then has the rest of the height
- * to disappear over — a short fade at the bottom of a full-screen wash is a band, not a gradient.
- */
 private const val ScrimHold = 0.34f
 
 private val TitleSize = NotificationBarStyle.TitleSp.sp
 private val DetailSize = NotificationBarStyle.DetailSp.sp
 
-/**
- * The bar's type sizes, against the bundle's own legibility floor.
- *
- * The floor — "No text below 28 px at native res." — was written for the toast card this replaces,
- * and it applies here for the same reason: these are sentences a user reads, not chrome. The
- * status strip's own 8-10sp is deliberately under it and always was; a clock you glance at and a
- * report you read are not the same kind of text.
- *
- * Kept as plain numbers so a JVM test can check them without a Compose runtime.
- */
 object NotificationBarStyle {
-    /** The design's stated floor, in pixels on its own 1920x1080 frame. */
     const val LegibilityFloorPx = 28f
 
-    /** This panel: 374dpi. 1080 physical pixels over 462dp. */
     const val PanelDensity = 2.3375f
 
     const val TitleSp = 13f

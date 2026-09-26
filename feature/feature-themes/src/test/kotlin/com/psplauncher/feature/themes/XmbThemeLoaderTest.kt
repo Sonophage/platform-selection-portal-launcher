@@ -20,7 +20,6 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 class XmbThemeLoaderTest {
-
     @get:Rule val tempFolder = TemporaryFolder()
 
     private lateinit var context: Context
@@ -34,8 +33,6 @@ class XmbThemeLoaderTest {
         every { context.filesDir } returns tempFolder.root
         loader = XmbThemeLoader(context, themeDao)
     }
-
-    // ── loadFromStream — success ──────────────────────────────────────────────
 
     @Test
     fun `valid zip returns Success and upserts entity`() = runTest {
@@ -99,11 +96,9 @@ class XmbThemeLoaderTest {
         assertFalse(slot.captured.isBuiltIn)
     }
 
-    // ── loadFromStream — failure modes ────────────────────────────────────────
-
     @Test
     fun `zip without theme_json returns InvalidFormat`() = runTest {
-        val stream = buildZip { /* no manifest */ }
+        val stream = buildZip {  }
 
         val result = loader.loadFromStream(stream)
 
@@ -180,15 +175,13 @@ class XmbThemeLoaderTest {
     @Test
     fun `empty zip returns InvalidFormat`() = runTest {
         val bos = ByteArrayOutputStream()
-        ZipOutputStream(bos).use { /* close immediately */ }
+        ZipOutputStream(bos).use {  }
         val stream = ByteArrayInputStream(bos.toByteArray())
 
         val result = loader.loadFromStream(stream)
 
         assertTrue(result is ThemeLoadResult.InvalidFormat)
     }
-
-    // ── Asset extraction ──────────────────────────────────────────────────────
 
     @Test
     fun `background asset extracted when hasBackground is true`() = runTest {
@@ -258,14 +251,12 @@ class XmbThemeLoaderTest {
         assertTrue("Should be a directory", themeDir.isDirectory)
     }
 
-    // ── Security: zip-slip, id traversal, and size caps ───────────────────────
-
     @Test
     fun `sound entry with path traversal is not written outside the theme dir`() = runTest {
         val manifest = XmbThemeManifest(id = "slip", name = "Slip", hasSoundPack = true)
         val stream = buildZip {
             writeManifest(manifest)
-            // Escapes themes/slip/ up into filesDir — must be rejected, not written.
+
             putNextEntry(ZipEntry("sounds/../../pwned.txt"))
             write("owned".toByteArray())
             closeEntry()
@@ -273,7 +264,6 @@ class XmbThemeLoaderTest {
 
         val result = loader.loadFromStream(stream)
 
-        // The install still succeeds; the hostile entry is silently dropped.
         assertTrue("Expected Success, got $result", result is ThemeLoadResult.Success)
         assertFalse(
             "Traversal entry must not escape the theme dir",
@@ -308,8 +298,6 @@ class XmbThemeLoaderTest {
         assertTrue("Expected IoError for entry-count overflow, got $result", result is ThemeLoadResult.IoError)
         coVerify(exactly = 0) { themeDao.upsert(any()) }
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun buildZip(block: ZipOutputStream.() -> Unit): ByteArrayInputStream {
         val bos = ByteArrayOutputStream()

@@ -7,9 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** C18 task X.4 — what one `.pfpgame` entry does to the library. */
 class PcGameImportPlannerTest {
-
     private val fileIntent = "intent:#Intent;action=banner.hub.LAUNCH_GAME;component=banner.hub/com.xiaoji.egggame.DeepLinkActivity;S.localGameId=local_1f2e;B.autoStartGame=true;launchFlags=0x10000000;end"
     private val sanitizedIntent = "intent:#Intent;action=banner.hub.LAUNCH_GAME;component=banner.hub/com.xiaoji.egggame.DeepLinkActivity;S.localGameId=local_1f2e;B.autoStartGame=true;end"
 
@@ -52,8 +50,6 @@ class PcGameImportPlannerTest {
         userTitleOverride = userTitleOverride,
     )
 
-    // ── Trusting the launch intent ────────────────────────────────────────────
-
     @Test
     fun `an intent for a launcher that is not installed or not verified is skipped`() {
         val decision = PcGameImportPlanner.plan(entry, trusted.copy(launcherVerified = false), emptyList())
@@ -79,8 +75,6 @@ class PcGameImportPlannerTest {
             PcGameImportPlanner.plan(entry, trusted.copy(sanitizedIntentUri = null), emptyList()),
         )
     }
-
-    // ── Creating and filling ──────────────────────────────────────────────────
 
     @Test
     fun `no match creates exactly one game, launched by the sanitized intent`() {
@@ -170,8 +164,6 @@ class PcGameImportPlannerTest {
         assertTrue(PcGameImportPlanner.plan(entry, trusted, listOf(psx)) is PcGameImportDecision.Create)
     }
 
-    // ── Pins ──────────────────────────────────────────────────────────────────
-
     private val pinEntry = entry.copy(launchIntentUri = null, shortcutId = "game_620", userTitleOverride = null)
 
     @Test
@@ -192,8 +184,6 @@ class PcGameImportPlannerTest {
 
         assertEquals(PcGameImportDecision.Skip(PcGameImportSkip.PIN_NOT_IN_LIBRARY), decision)
     }
-
-    // ── Claims ────────────────────────────────────────────────────────────────
 
     @Test
     fun `an entry's artwork becomes claims keyed by lowercased name`() {
@@ -235,8 +225,6 @@ class PcGameImportPlannerTest {
     fun `a claim with no matching record is unresolved, and relink is needed`() {
         val claims = PcGameArtworkClaims().apply { add(entry, gameId = 12) }.toMap()
 
-        // After a fresh install there are no records at all; a record under another game or kind
-        // does not fulfil the claim either.
         val unresolved = PcGameArtworkClaims.unresolved(
             claims,
             mapOf(12L to listOf(record(12, "HERO", "Portal 2 (Co-op)")), 13L to listOf(record(13, "ICON", "Portal 2 (Co-op)"))),
@@ -257,10 +245,6 @@ class PcGameImportPlannerTest {
         assertTrue(unresolved.isEmpty())
     }
 
-    // ── Identity seeds (C16 task D.4b) ────────────────────────────────────────
-
-    // The point of the export was that it carries real ids; before this they were hauled across a
-    // wipe and then the artwork was reconnected by name anyway.
     @Test
     fun `an entry's artwork also seeds durable identity from the export's ids`() {
         val seeds = PcGameArtworkClaims()
@@ -272,12 +256,10 @@ class PcGameImportPlannerTest {
         assertEquals("windows", icon.platformId)
         assertEquals(55L, icon.ssId)
         assertEquals(66L, icon.igdbId)
-        // A PC game has no ROM, so there is nothing to hash.
+
         assertNull(icon.romCrc32)
     }
 
-    // Seeds keep the name's own casing: the index lowercases on lookup, and the row should read
-    // the way the file is actually spelled.
     @Test
     fun `a seed keeps the portable name as exported`() {
         val seeds = PcGameArtworkClaims()
@@ -287,8 +269,6 @@ class PcGameImportPlannerTest {
         assertTrue(seeds.any { it.portableName == "Portal 2 (Co-op)" })
     }
 
-    // The shared fixture carries ids, so they have to be stripped deliberately here — an export
-    // with nothing durable in it is exactly the case that must seed nothing.
     @Test
     fun `an export carrying no ids at all seeds nothing`() {
         val anonymous = entry.copy(ssId = null, igdbId = null, steamGridDbId = null)
@@ -299,7 +279,6 @@ class PcGameImportPlannerTest {
         assertTrue("a row with no durable id would resolve to nobody", seeds.isEmpty())
     }
 
-    // Same rule as claims: if two games name the same file, neither may assert identity for it.
     @Test
     fun `a contested name seeds no identity`() {
         val seeds = PcGameArtworkClaims().apply {

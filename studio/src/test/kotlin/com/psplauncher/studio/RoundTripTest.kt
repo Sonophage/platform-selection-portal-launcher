@@ -11,9 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlinx.coroutines.test.TestScope
 
-/** Editor state → exported bundle bytes → codec read → identical theme. */
 class RoundTripTest {
-
     @Test
     fun `studio state exports and reopens identically`() {
         val viewModel = StudioViewModel(TestScope())
@@ -33,7 +31,7 @@ class RoundTripTest {
         val bundle = PfpThemeBundle(
             manifest = manifest,
             wallpaper = state.wallpaperPng,
-            preview = ByteArray(32) { 3 }, // stand-in for the rendered frame
+            preview = ByteArray(32) { 3 },
             icons = state.iconOverrides.mapValues { (_, png) -> ThemeImage(png, "png") },
         )
 

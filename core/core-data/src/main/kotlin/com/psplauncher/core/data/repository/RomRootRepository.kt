@@ -16,29 +16,17 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Multiple ROM roots (internal storage + SD card + …). Stored newline-joined under one string key
-// so they ride the existing backup string-key mechanism (tree URIs are URL-encoded and never
-// contain newlines). The legacy single-root key is read as a fallback so older installs/backups
-// migrate transparently.
 private val KEY_ROM_ROOT_TREE_URIS = stringPreferencesKey("library_rom_root_tree_uris")
 private val KEY_LEGACY_ROM_ROOT    = stringPreferencesKey("library_rom_root_tree_uri")
 
-/**
- * The user's ROM root folders. Each is a persisted `ACTION_OPEN_DOCUMENT_TREE` grant; because SAF
- * tree grants are recursive, every console's subfolder under a root is readable without a separate
- * grant. Multiple roots let a library span internal storage and an SD card. Re-linking a root after
- * a wipe re-enables every console it contains in one tap (managed under Library ▸ ROM Root Access).
- */
 @Singleton
 class RomRootRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    /** All configured ROM roots, in the order they were added. */
     val roots: Flow<List<String>> = context.pfpDataStore.data.map { readRoots(it) }
 
     suspend fun getAll(): List<String> = readRoots(context.pfpDataStore.data.first())
 
-    /** Adds a root (deduplicated, order-preserving). No-op for a blank URI. */
     suspend fun add(treeUri: String) {
         if (treeUri.isBlank()) return
         val next = LinkedHashSet(getAll()).apply { add(treeUri) }.toList()
@@ -52,7 +40,6 @@ class RomRootRepository @Inject constructor(
         Timber.i("ROM root removed: $treeUri (total ${next.size})")
     }
 
-    /** Replaces one root URI with another (used when a re-link picks a different folder). */
     suspend fun replace(oldTreeUri: String, newTreeUri: String) {
         if (newTreeUri.isBlank()) return
         val current = getAll()
@@ -64,7 +51,6 @@ class RomRootRepository @Inject constructor(
         writeRoots(next.toList())
     }
 
-    /** Takes a persistable grant. Read-only by default; pass [writable] for the ES-DE folder setup. */
     fun persist(uri: Uri, writable: Boolean = false) {
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
             (if (writable) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
@@ -78,7 +64,7 @@ class RomRootRepository @Inject constructor(
             ?.split('\n')?.map { it.trim() }?.filter { it.isNotEmpty() }
             .orEmpty()
         if (plural.isNotEmpty()) return plural
-        // Migration fallback: a single legacy root written by an earlier build.
+
         return prefs[KEY_LEGACY_ROM_ROOT]?.takeIf { it.isNotBlank() }?.let { listOf(it) } ?: emptyList()
     }
 
@@ -86,13 +72,12 @@ class RomRootRepository @Inject constructor(
         context.pfpDataStore.edit { prefs ->
             if (roots.isEmpty()) prefs.remove(KEY_ROM_ROOT_TREE_URIS)
             else prefs[KEY_ROM_ROOT_TREE_URIS] = roots.joinToString("\n")
-            // Collapse the legacy key once migrated so it can't shadow later edits.
+
             prefs.remove(KEY_LEGACY_ROM_ROOT)
         }
     }
 
     companion object {
-        /** Root tree URI → its raw filesystem path (pure string math, no file access). */
         fun rawPathOfTree(treeUri: String): String? {
             val docId = treeDocId(treeUri) ?: return null
             return docIdToRawPath(docId)
@@ -101,14 +86,11 @@ class RomRootRepository @Inject constructor(
         fun treeDocId(treeUri: String): String? =
             runCatching { DocumentsContract.getTreeDocumentId(Uri.parse(treeUri)) }.getOrNull()
 
-        /** Document id of a named subfolder directly under a root tree (e.g. root + "gba"). */
         fun childDocIdOf(treeUri: String, subfolderName: String): String? {
             val root = treeDocId(treeUri) ?: return null
             return "$root/$subfolderName"
         }
 
-        // Mirrors RomScanner.safDocumentIdToRawPath: "primary:Roms" → "/storage/emulated/0/Roms",
-        // "1A2B-3C4D:Games" → "/storage/1A2B-3C4D/Games". Null for opaque (non-volume) ids.
         fun docIdToRawPath(documentId: String): String? {
             val parts = documentId.split(":", limit = 2)
             if (parts.size != 2 || parts[1].isBlank()) return null
@@ -120,9 +102,6 @@ class RomRootRepository @Inject constructor(
             }
         }
 
-        // Pure string-math helper, testable on the JVM: maps a root's document id plus a raw
-        // directory path onto the subfolder document id a scan should start from.
-        // e.g. root "primary:Roms" + "/storage/emulated/0/Roms/GBA" → "primary:Roms/GBA".
         fun childDocIdFrom(rootDocId: String, rootRawPath: String, romDirectory: String): String? {
             val normRoot = rootRawPath.trimEnd('/')
             val normDir  = romDirectory.trimEnd('/')

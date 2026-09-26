@@ -7,7 +7,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class StorefrontIdentityTest {
-
     @Test
     fun `GameNative intents name the store explicitly`() {
         assertEquals(
@@ -29,8 +28,6 @@ class StorefrontIdentityTest {
         )
     }
 
-    // The adapter itself defaults game_source to STEAM when the caller leaves it blank, so a
-    // GameNative intent without one is a Steam launch — not an unknown store.
     @Test
     fun `a GameNative intent with no game_source falls back to Steam, like the adapter does`() {
         assertEquals(
@@ -64,7 +61,7 @@ class StorefrontIdentityTest {
         assertNull(StorefrontIdentity.fromLaunchIntentUri(null))
         assertNull(StorefrontIdentity.fromLaunchIntentUri(""))
         assertNull(StorefrontIdentity.fromLaunchIntentUri("not an intent uri at all"))
-        // Winlator launches by shortcut path.
+
         assertNull(
             StorefrontIdentity.fromLaunchIntentUri(
                 "intent:#Intent;component=com.winlator/.MainActivity;" +
@@ -95,12 +92,11 @@ class StorefrontIdentityTest {
     fun `percent-encoded extra values are decoded`() {
         assertEquals(
             "STEAM" to "620",
-            // Uri.encode leaves alphanumerics alone, but an encoded value must still round-trip.
+
             StorefrontIdentity.fromLaunchIntentUri("intent:#Intent;i.app_id=620;S.game_source=STEAM%20;end"),
         )
     }
 
-    // Extras carry a typed prefix; plain intent fields must never be read as one.
     @Test
     fun `intent fields are not mistaken for extras`() {
         assertNull(

@@ -5,9 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** C18 task X.1 — the `.pfpgame` file that Export Manual Games writes and Scan Import Folder reads. */
 class PcGameExportCodecTest {
-
     private val bannerHubGame = PcGameExport(
         title = "Portal 2",
         scrapedTitle = "Portal 2",

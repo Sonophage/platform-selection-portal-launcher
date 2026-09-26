@@ -8,23 +8,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 data class DebugState(
-    // Data source
+
     val useFakeData: Boolean = true,
 
-    // Scenario simulation
     val scenario: DebugScenario = DebugScenario.FULL_LIBRARY,
 
-    // XMB wave control
     val forceWaveMode: ForceWaveMode = ForceWaveMode.NONE,
 
-    // Overlay controls
     val showBootOnNextLaunch: Boolean = false,
     val showTaskTray: Boolean = false,
 
-    // Thermal simulation
     val simulatedThermalStatus: SimulatedThermal = SimulatedThermal.NONE,
 
-    // Performance overlay
 )
 
 enum class DebugScenario(val label: String) {
@@ -53,7 +48,6 @@ enum class SimulatedThermal(val label: String) {
 
 @Singleton
 class DebugController @Inject constructor() {
-
     private val _state = MutableStateFlow(DebugState())
     val state: StateFlow<DebugState> = _state.asStateFlow()
 
@@ -76,7 +70,6 @@ class DebugController @Inject constructor() {
 
     fun setSimulatedThermal(thermal: SimulatedThermal) =
         _state.update { it.copy(simulatedThermalStatus = thermal) }
-
 
     fun reset() = _state.update { DebugState() }
 }

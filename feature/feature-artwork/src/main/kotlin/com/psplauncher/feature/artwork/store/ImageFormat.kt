@@ -1,10 +1,5 @@
 package com.psplauncher.feature.artwork.store
 
-/**
- * Magic-byte image sniffing. Downloads are streamed to disk without decoding (no more
- * decode→re-encode quality loss), so this header check is what stops a CDN error page or
- * truncated response from being saved as artwork.
- */
 enum class ImageFormat(val ext: String) {
     JPEG("jpg"),
     PNG("png"),
@@ -13,7 +8,6 @@ enum class ImageFormat(val ext: String) {
     BMP("bmp");
 
     companion object {
-        /** Sniffs the first bytes of a file ([header] should be ≥ 12 bytes). Null = not an image. */
         fun sniff(header: ByteArray): ImageFormat? {
             fun at(i: Int) = header.getOrNull(i)?.toInt()?.and(0xFF)
             fun ascii(from: Int, text: String) =

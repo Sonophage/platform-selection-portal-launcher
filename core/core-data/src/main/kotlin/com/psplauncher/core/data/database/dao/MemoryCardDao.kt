@@ -9,8 +9,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MemoryCardDao {
-
-    // Pinned cards first, then manual sort order, then display name as a stable tiebreak.
     @Query("SELECT * FROM memory_cards ORDER BY pinned DESC, sort_order ASC, display_name ASC")
     fun observeAll(): Flow<List<MemoryCardEntity>>
 
@@ -41,8 +39,6 @@ interface MemoryCardDao {
     @Query("UPDATE memory_cards SET rom_directory = :dir WHERE platform_id = :platformId")
     suspend fun setRomDirectory(platformId: String, dir: String?)
 
-    // Sets both the SAF tree URI (launch/scan source of truth) and the derived raw path (display /
-    // {rom_path}) in one call so they never drift apart.
     @Query("UPDATE memory_cards SET tree_uri = :treeUri, rom_directory = :dir WHERE platform_id = :platformId")
     suspend fun setSafFolder(platformId: String, treeUri: String?, dir: String?)
 

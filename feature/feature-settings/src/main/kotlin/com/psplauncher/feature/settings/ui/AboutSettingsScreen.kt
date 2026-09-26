@@ -16,16 +16,13 @@ fun AboutSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The real installed version, from PackageManager — a library module's BuildConfig can't
-    // know the app's versionName/versionCode (the old hardcoded copy here went stale).
     val context = LocalContext.current
     val packageInfo = remember {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
     }
     val versionName = packageInfo?.versionName ?: "unknown"
     val versionCode = packageInfo?.longVersionCode?.toString() ?: "unknown"
-    // Value rows are focusable, so the cursor walks the list and focus-driven scrolling brings
-    // each row into view — no manual scroll interception needed.
+
     SettingsPageScaffold(
         subtitle = "About",
         onBack   = onBack,

@@ -8,17 +8,11 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Persists and reads launch outcomes ([launch_outcomes], core-data). The DAO stays a dumb log
- * table; this recorder is where the launcher's typed verdicts ([LaunchOutcomeStatus], [LaunchSource])
- * map to stored strings and back. Suspend throughout: every accessor may touch Room.
- */
 @Singleton
 class LaunchOutcomeRecorder @Inject constructor(
     private val dao: LaunchOutcomeDao,
     @ProfileIoDispatcher private val io: CoroutineDispatcher,
 ) {
-
     suspend fun record(outcome: LaunchOutcome) = withContext(io) {
         dao.insert(outcome.toEntity())
         Timber.i(

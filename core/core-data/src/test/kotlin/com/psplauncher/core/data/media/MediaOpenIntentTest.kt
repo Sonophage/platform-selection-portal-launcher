@@ -12,14 +12,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The half music, video and books share. Each of these pins something that fails silently: the app
- * opens, nothing crashes, and the user just sees the wrong thing happen.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class MediaOpenIntentTest {
-
     private val uri = "content://com.example/tree/doc"
 
     @Test
@@ -33,8 +28,6 @@ class MediaOpenIntentTest {
 
     @Test
     fun `a null or blank package stays unpinned so the system can choose`() {
-        // Blank is the shape a section's own sentinel arrives in once it has been mapped away.
-        // Pinning it would aim the intent at a package name that does not exist.
         assertNull(MediaOpenIntent.build(uri, "audio/*", null).`package`)
         assertNull(MediaOpenIntent.build(uri, "audio/*", "").`package`)
         assertNull(MediaOpenIntent.build(uri, "audio/*", "   ").`package`)

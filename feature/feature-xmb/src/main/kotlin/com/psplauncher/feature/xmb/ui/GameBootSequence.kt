@@ -27,86 +27,27 @@ import com.psplauncher.core.ui.wave.WaveStyle
 import kotlin.math.exp
 import kotlin.math.pow
 
-/**
- * The full length of the bundled `sfx_launch.mp3` — exactly 2.000 s at 48 kHz.
- * The sequence and the sound start together and end together; nothing here is padded or clipped.
- *
- * **This was 5 000 with the previous sample, and the shape of the sound changed with the number.**
- * The old one was a long swell with three separate attacks, which is what gave the sequence a
- * build. This one is a single hit: it peaks at 200 ms and is essentially silent from 700 ms, so
- * the visible part of the sequence is now its first third and the rest is the tail going out.
- * That is the sound's shape, not a tuning choice — see the table below, which is measured.
- */
 private const val SEQUENCE_MS = 2_000
 
-/** The sound's leading digital silence — the sequence holds pure black across it. */
 private const val LEAD_SILENCE_MS = 50f
 
-/**
- * The measured loudness of `sfx_launch.mp3`: 50 ms-window RMS, normalized to its own peak
- * (at 200 ms), decimated to the points where the curve actually changes direction.
- *
- * This table is why the light lands on the sound instead of near it. The bloom's brightness IS
- * this curve, so the attack at 200 ms and the decay through 450 ms show up on screen without
- * anyone hand-tuning a fade to match them by ear.
- *
- * **Re-measure and replace the table if the sample is ever swapped.** 50 ms-window RMS over the
- * decoded mono PCM, normalized to the file's own peak, decimated to the turning points. A new
- * sample with the same name would otherwise leave the light peaking where the old sound used to.
- */
 private val LOUDNESS: List<Pair<Int, Float>> = listOf(
     0 to 0.00f, 50 to 0.11f, 100 to 0.37f, 150 to 0.82f, 200 to 1.00f,
     250 to 0.60f, 300 to 0.37f, 350 to 0.22f, 400 to 0.14f, 450 to 0.06f,
     500 to 0.03f, 650 to 0.01f, 2_000 to 0.00f,
 )
 
-// The single sweep, windowed on the sound's one attack (crest at the attack's own ms). The second
-// sweep is gone with the second attack it was windowed on: a sweep with no hit under it is motion
-// the sound does not account for, which is the thing this file exists to avoid.
 private const val FIRST_SWEEP_START_MS = 60
 private const val FIRST_SWEEP_END_MS = 320
 private const val SECOND_SWEEP_START_MS = 320
 private const val SECOND_SWEEP_END_MS = 700
 
-// The title rises once the hit has decayed and rides the sequence out.
 private const val TITLE_FADE_START_MS = 700
 private const val TITLE_FADE_MS = 300
 
-// The whole frame sinks to black over the sound's own tail, started early enough that the screen
-// is genuinely black when the emulator takes it.
-//
-// These four numbers are bound to SEQUENCE_MS and were the trap when it changed: left at their
-// 5 000 ms values they both sit PAST the end of a 2 000 ms timeline, so `ms` never reaches either.
-// The title would have faded in never, and — worse — the decay would never start, handing the
-// emulator a fully lit screen, which is the one thing the KDoc below says must not happen.
 private const val DECAY_START_MS = 1_500
 private const val DECAY_MS = 500
 
-/**
- * The built-in GameBoot presentation — a PSP-style light sweep drawn in Compose, beat-matched to
- * the bundled launch sound over its full 2.000 s.
- *
- * This is GameBoot's default, and deliberately NOT a bundled video: it is drawn on a surface that
- * is already live, so it costs no decoder warm-up at the one moment the user is waiting for their
- * game, it scales to any screen, it picks up the user's theme colours, and it can drop its motion
- * without dropping its timing — none of which a shipped MP4 could do. A user who wants something
- * else assigns their own clip, and [GameBootOverlay] plays that instead, with its own audio.
- *
- * **Real time, not animation time.** The timeline is driven by [withFrameMillis] deltas rather
- * than an `Animatable` + `tween`, because tween durations are scaled by the system's animator
- * duration setting: with animations turned down (developer options, or a battery/accessibility
- * profile) a tween-driven sequence finishes early or instantly, the gate's await returns, and the
- * emulator takes the screen while the sound is still playing. Frame deltas are wall-clock, so
- * two seconds is two seconds and the light stays locked to the sample it was measured from.
- *
- * **Motion budget: less motion, not less time.** [BootSequenceOverlay] hardcodes
- * `WaveStyle.ANIMATED` because it runs once per app start. GameBoot runs on EVERY launch, so it
- * honors the user's wave style instead — a deliberate deviation from BootSequenceOverlay's stance.
- * A frozen or reduced style replaces the bloom and both sweeps with one still frame, but the
- * presentation still runs its full length. Shortening it instead would end the visual while the
- * sound was still going and hand the screen to the emulator mid-presentation, which is the one
- * thing this sequence must not do.
- */
 @Composable
 fun GameBootSequence(
     gameTitle: String,
@@ -120,9 +61,6 @@ fun GameBootSequence(
     val currentOnFinished by rememberUpdatedState(onFinished)
 
     LaunchedEffect(Unit) {
-        // Wall-clock frame deltas: see the KDoc — an animator-scaled tween would let the launch
-        // overtake the presentation. One frame per iteration, so `ms` advances once per drawn
-        // frame and nothing polls.
         val startMs = withFrameMillis { it }
         while (true) {
             val elapsed = (withFrameMillis { it } - startMs).toFloat()
@@ -133,8 +71,7 @@ fun GameBootSequence(
     }
 
     val decay = 1f - ((ms - DECAY_START_MS) / DECAY_MS).coerceIn(0f, 1f)
-    // The reduced form shows the title for the whole presentation rather than fading it in, but
-    // still sinks to black at the end: the emulator must never be handed a lit screen.
+
     val titleAlpha = if (reduced) decay else {
         val fadeIn = ((ms - TITLE_FADE_START_MS) / TITLE_FADE_MS).coerceIn(0f, 1f)
         fadeIn * decay
@@ -142,8 +79,6 @@ fun GameBootSequence(
 
     Box(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // Theme gradient base — the wave's own convention: white light over the user's theme
-            // rather than a tinted light, so the sequence picks up custom themes for free.
             drawRect(
                 brush = Brush.linearGradient(
                     colorStops = arrayOf(
@@ -155,8 +90,6 @@ fun GameBootSequence(
             )
 
             if (reduced) {
-                // One still frame for the whole presentation — no bloom growth, no sweeps. It
-                // runs the same two seconds so the visual and the sound end together.
                 drawRect(
                     brush = Brush.radialGradient(
                         colors = listOf(Color.White.copy(alpha = 0.30f * decay), Color.Transparent),
@@ -168,8 +101,6 @@ fun GameBootSequence(
                 return@Canvas
             }
 
-            // The bloom rides the measured loudness: it grows and brightens exactly where the
-            // sound does, including the dip after the first hit and the late lift at 4 250 ms.
             val loudness = loudnessAt(ms)
             val bloomAlpha = loudness * decay
             if (bloomAlpha > 0.001f) {
@@ -182,8 +113,6 @@ fun GameBootSequence(
                 )
             }
 
-            // Two sweeps, one per attack: a narrow scout on the 2 050 ms hit, then a wider,
-            // brighter pass whose crest lands on the 2 900 ms peak.
             sweepProgress(ms, FIRST_SWEEP_START_MS, FIRST_SWEEP_END_MS)?.let {
                 drawSweep(size.width, it, intensity = 0.55f * decay)
             }
@@ -191,8 +120,6 @@ fun GameBootSequence(
                 drawSweep(size.width, it, intensity = decay)
             }
 
-            // Pure-black hold over the sound's leading silence, and the matching sink to black
-            // under its fade-out: the sequence starts and ends on black by construction.
             val hold = 1f - (ms / LEAD_SILENCE_MS).coerceIn(0f, 1f)
             if (hold > 0f) drawRect(Color.Black.copy(alpha = hold))
             if (decay < 1f) drawRect(Color.Black.copy(alpha = 1f - decay))
@@ -212,10 +139,6 @@ fun GameBootSequence(
     }
 }
 
-/**
- * The measured loudness at [ms], linearly interpolated between [LOUDNESS] points. Clamped at both
- * ends so a frame delivered slightly past [SEQUENCE_MS] reads as silence rather than wrapping.
- */
 private fun loudnessAt(ms: Float): Float {
     if (ms <= LOUDNESS.first().first) return LOUDNESS.first().second
     if (ms >= LOUDNESS.last().first) return LOUDNESS.last().second
@@ -229,17 +152,9 @@ private fun loudnessAt(ms: Float): Float {
     return LOUDNESS.last().second
 }
 
-/** 0 to 1 across a sweep's window, or null when [ms] is outside it and nothing should be drawn. */
 private fun sweepProgress(ms: Float, startMs: Int, endMs: Int): Float? =
     if (ms < startMs || ms > endMs) null else (ms - startMs) / (endMs - startMs)
 
-/**
- * One vertical light band crossing the screen left to right. Per column: an exp crest (the bright
- * band) over a smoothstep sheet (the wash trailing it) — the same construction `drawFold` uses
- * for the XMB wave's horizontal folds, rotated 90 degrees so the light moves across instead of
- * sitting at the bottom. [t] is 0 to 1 across the sweep's window; the crest travels 8% to 92% of
- * the width. [intensity] scales the whole band, which is what makes the second pass the bigger one.
- */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSweep(
     w: Float,
     t: Float,
@@ -252,8 +167,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSweep(
     val stops = List(n) { i ->
         val x = i / (n - 1).toFloat() * w
         val u = (x - centre) / bandWidth
-        val crest = exp(-(u * 2.6f).pow(2))              // the bright band itself
-        val sheet = smoothstep(-1.4f, 0.55f, u) * 0.45f  // the wash trailing the crest
+        val crest = exp(-(u * 2.6f).pow(2))
+        val sheet = smoothstep(-1.4f, 0.55f, u) * 0.45f
         val alpha = ((crest * 0.85f + sheet) * intensity).coerceIn(0f, 0.8f)
         Color.White.copy(alpha = alpha)
     }

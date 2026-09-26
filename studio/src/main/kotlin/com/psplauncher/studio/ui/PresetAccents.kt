@@ -1,10 +1,5 @@
 package com.psplauncher.studio.ui
 
-/**
- * The 12 preset accent swatches — the launcher's XmbColorScheme wave colors (11 fixed
- * presets + the "Original" January teal). Values mirror core-domain XmbColorScheme.resolve;
- * they can't be imported here because that enum lives in an Android module.
- */
 data class PresetAccent(val name: String, val argb: Int)
 
 val PRESET_ACCENTS: List<PresetAccent> = listOf(

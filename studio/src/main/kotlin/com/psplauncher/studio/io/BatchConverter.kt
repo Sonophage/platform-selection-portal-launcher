@@ -9,18 +9,11 @@ data class BatchSummary(
     val converted: List<String>,
     val skippedCxmb: List<String>,
     val failed: List<Pair<String, String>>,
-    /** Converted, but with a caveat (e.g. wallpaper lost to unsupported LZR compression). */
+
     val warnings: List<Pair<String, String>> = emptyList(),
 )
 
-/**
- * Folder-of-PTFs → folder-of-pfpthemes. Runs synchronously — callers dispatch to IO and
- * feed [onProgress] into UI state. [renderPreview] is best-effort: a preview that fails to
- * render never fails the conversion (the bundle is still valid without one).
- */
 object BatchConverter {
-
-    /** Sanity ceiling per run — a folder with thousands of PTFs is a mistake, not a batch. */
     private const val MAX_BATCH_FILES = 500
 
     fun convertFolder(
@@ -66,7 +59,6 @@ object BatchConverter {
         return BatchSummary(converted, skipped, failed, warnings)
     }
 
-    /** `name.pfptheme`, `name (2).pfptheme`, ... — never silently overwrite. */
     private fun uniqueTarget(dir: File, baseName: String): File {
         var candidate = File(dir, "$baseName.${PfpThemeCodec.FILE_EXTENSION}")
         var n = 2

@@ -22,8 +22,6 @@ import org.junit.Before
 import org.junit.Test
 
 class RomRootDiscoveryScannerTest {
-    // childDocIdOf / rawPathOfTree are companion helpers over DocumentsContract + Uri —
-    // untestable on the JVM, so the companion is mocked and the doc-id math is stubbed.
     private val romRootRepository = mockk<RomRootRepository>(relaxed = true)
 
     private val gbcPlatform = Platform(
@@ -110,8 +108,6 @@ class RomRootDiscoveryScannerTest {
         }
     }
 
-    // ── Discovery: new console created and scanned ─────────────────────────
-
     @Test
     fun `folder with roms and no card creates a card and scans it`() = runTest {
         stubCatalog(gbcPlatform)
@@ -138,8 +134,6 @@ class RomRootDiscoveryScannerTest {
         assertEquals(1, report.newCards)
     }
 
-    // ── Existing card: folder is surveyed, no new card ─────────────────────
-
     @Test
     fun `folder whose card already exists does not create a second card`() = runTest {
         stubCatalog(gbcPlatform)
@@ -159,8 +153,6 @@ class RomRootDiscoveryScannerTest {
         assertEquals(0, report.newCards)
     }
 
-    // ── Folder with no ROMs: no card, no scan ──────────────────────────────
-
     @Test
     fun `empty folder does not create a card`() = runTest {
         stubCatalog(gbcPlatform)
@@ -178,8 +170,6 @@ class RomRootDiscoveryScannerTest {
         assertTrue(report.discoveredPlatforms.isEmpty())
     }
 
-    // ── Folder name doesn't map to a catalog platform: ignored ─────────────
-
     @Test
     fun `folder name that maps to no platform is skipped`() = runTest {
         stubCatalog(gbcPlatform)
@@ -191,16 +181,13 @@ class RomRootDiscoveryScannerTest {
 
         val report = scanner().discover()
 
-        // Only gbc becomes a card — the unknown folder is skipped before any platform lookup.
         coVerify(exactly = 1) {
             memoryCardRepository.addCard(platformId = "gbc", displayName = any(), romDirectory = any(), emulatorId = null)
         }
         coVerify(exactly = 1) { gameRepository.upsert(any()) }
-        // Both top-level folders are walked, even the one that maps to no platform.
+
         assertEquals(2, report.scannedFolders)
     }
-
-    // ── Platform with no supported extensions: skipped, never scanned ──────
 
     @Test
     fun `platform without extensions is skipped`() = runTest {
@@ -215,15 +202,12 @@ class RomRootDiscoveryScannerTest {
 
         val report = scanner().discover()
 
-        // gbc still creates its card; the extension-less extless platform is never scanned.
         coVerify(exactly = 1) {
             memoryCardRepository.addCard(platformId = "gbc", displayName = any(), romDirectory = any(), emulatorId = null)
         }
         coVerify(exactly = 1) { gameRepository.upsert(any()) }
         assertEquals(2, report.scannedFolders)
     }
-
-    // ── No roots configured: no-op ─────────────────────────────────────────
 
     @Test
     fun `no rom roots configured is a no-op`() = runTest {
@@ -237,8 +221,6 @@ class RomRootDiscoveryScannerTest {
         coVerify(exactly = 0) { gameRepository.upsert(any()) }
         assertEquals(0, report.scannedFolders)
     }
-
-    // ── Baseline failure: folder skipped, never crashes the pass ──────────
 
     @Test
     fun `baseline failure skips the folder without aborting the pass`() = runTest {

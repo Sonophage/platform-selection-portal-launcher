@@ -18,14 +18,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * The restore path is the only place where one user action — opening a file — reaches both
- * arbitrary writes under `filesDir` and an attacker-chosen `ComponentName` that later receives a
- * URI grant. Before this seam existed, `BackupManagerTest` had nine tests and none of them covered
- * slip, bombs, or non-root paths.
- */
 class RestoreArchiveTest {
-
     @get:Rule val temp = TemporaryFolder()
 
     private val roots = listOf("artwork", "wallpaper", "emulator_profiles")
@@ -55,20 +48,10 @@ class RestoreArchiveTest {
 
     private fun text(s: String) = s.toByteArray()
 
-    // ── The archive this app itself writes ────────────────────────────────────
-
-    /**
-     * `BackupManager` bundles `artwork/`, `wallpaper/`, `custom-icons/` and `ui-media/` whole and
-     * caps NOTHING on its side, so a real library's backup is thousands of files and gigabytes —
-     * a 1.53 GB archive is an ordinary one. Reading it with [ZipLimits]' defaults (512 entries,
-     * 128 MB total) means the app refuses a file it produced minutes earlier, and the restore
-     * fails with no message. These two assertions are the writer and the reader agreeing.
-     */
     @Test
     fun `a backup past the theme-sized defaults still restores under the backup limits`() {
         val entries = (1..600).map { "files/artwork/$it.png" to ByteArray(512) }.toTypedArray()
 
-        // The defaults refuse it — that is the bug, pinned so it cannot come back quietly.
         val rejected = runCatching { read(backup(*entries), ZipLimits()) }.exceptionOrNull()
         assertTrue(
             "the theme-sized defaults are expected to refuse a library-sized backup, got $rejected",
@@ -91,16 +74,12 @@ class RestoreArchiveTest {
         )
     }
 
-    // ── JSON entries ──────────────────────────────────────────────────────────
-
     @Test
     fun `json entries outside the files prefix are returned as text`() {
         val bundle = read(backup("manifest.json" to text("""{"formatVersion":1}""")))
 
         assertEquals("""{"formatVersion":1}""", bundle.jsonEntries["manifest.json"])
     }
-
-    // ── Root confinement — the gap this seam closes ───────────────────────────
 
     @Test
     fun `a staged file under a bundled root is kept`() {
@@ -114,8 +93,6 @@ class RestoreArchiveTest {
 
     @Test
     fun `a staged file outside every bundled root is refused, not written`() {
-        // The live DataStore lives here. Overwriting it turns the app into a crash loop, and it
-        // is inside filesDir, so a staging-only confinement check let it through.
         val bundle = read(
             backup(
                 "files/datastore/pfp.preferences_pb" to text("corrupt"),
@@ -158,12 +135,8 @@ class RestoreArchiveTest {
         assertTrue(bundle.refusals.isNotEmpty())
     }
 
-    // ── Bombs ─────────────────────────────────────────────────────────────────
-
     @Test(expected = com.psplauncher.core.archive.ZipLimitExceededException::class)
     fun `a compression bomb in a json entry is refused instead of inflated`() {
-        // 8 MB of one repeated byte deflates to a few KB. readBackup used to call an uncapped
-        // zip.readBytes() here and hold the result for the whole restore.
         read(backup("games.json" to ByteArray(8 * 1024 * 1024)), ZipLimits(maxEntryBytes = 64 * 1024))
     }
 
@@ -172,8 +145,6 @@ class RestoreArchiveTest {
         val many = Array(40) { "e$it.json" to text("{}") }
         read(backup(*many), ZipLimits(maxEntries = 10))
     }
-
-    // ── Emulator profile admission ────────────────────────────────────────────
 
     @Test
     fun `a restored profile carrying a custom command is stripped from the bundle`() {
@@ -211,8 +182,6 @@ class RestoreArchiveTest {
         assertFalse(File(filesDir, "emulator_profiles/custom_profiles.json").exists())
         assertTrue(bundle.refusals.isNotEmpty())
     }
-
-    // ── Housekeeping ──────────────────────────────────────────────────────────
 
     @Test
     fun `commit clears the managed roots so a restore replaces rather than merges`() {

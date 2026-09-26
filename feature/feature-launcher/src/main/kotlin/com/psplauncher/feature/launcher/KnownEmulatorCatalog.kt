@@ -4,7 +4,7 @@ import com.psplauncher.core.domain.model.IntentType
 import com.psplauncher.core.domain.model.LaunchTemplate
 
 internal data class KnownEmulator(
-    val packageNames: List<String>,   // tried in order; first installed one wins
+    val packageNames: List<String>,
     val suggestedName: String,
     val platformIds: List<String>,
     val intentType: IntentType = IntentType.ACTION_VIEW,
@@ -20,24 +20,9 @@ internal data class KnownEmulator(
     val useSafUri: Boolean = false,
 )
 
-/**
- * Curated launch recipes for standalone emulators, verified against the ES-DE Android
- * launch database and community find rules — see docs/emulator-intent-catalog-research.md
- * for sources and per-entry provenance. Only platforms present in PlatformSeeder get
- * entries; verified recipes for unseeded systems (MSX, 3DO, Jaguar, J2ME, ...) live in
- * the research doc until their platforms exist.
- *
- * Not representable yet (see research doc, Section C): GameNative (int extra), ScummVM
- * (sidecar game-id launch), RPCSX (emulation activity not exported). Winlator/GameHub/
- * GameNative are handled by the PC launcher subsystem, not this catalog.
- */
 internal object KnownEmulatorCatalog {
     val entries: List<KnownEmulator> = listOf(
 
-        // ── PS Vita ────────────────────────────────────────────────────────────
-        // Launches an INSTALLED title by its Title ID (ux0:app/<TITLE_ID>), not a ROM file:
-        // AppStartParameters = ["-r", "<TITLE_ID>"]. The scanner supplies the id as the game's
-        // launchToken (see VitaGameScanner). No rom data URI.
         KnownEmulator(
             packageNames      = listOf("org.vita3k.emulator", "org.vita3k.emulator.ikhoeyZX"),
             suggestedName     = "Vita3K",
@@ -55,7 +40,6 @@ internal object KnownEmulatorCatalog {
             intentArrayExtras = mapOf("AppStartParameters" to listOf("-r", LaunchTemplate.TITLE_ID)),
         ),
 
-        // ── PSP ──────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("org.ppsspp.ppssppgold", "org.ppsspp.ppsspp"),
             suggestedName = "PPSSPP",
@@ -65,7 +49,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── PS1 ──────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames     = listOf("com.github.stenzek.duckstation"),
             suggestedName    = "DuckStation",
@@ -77,8 +60,7 @@ internal object KnownEmulatorCatalog {
             intentFlags      = listOf("CLEAR_TASK", "CLEAR_TOP"),
         ),
         KnownEmulator(
-            // ePSXe only accepts a raw filesystem path; it cannot read content:// URIs,
-            // so SAF-managed libraries will not launch through it.
+
             packageNames  = listOf("com.epsxe.ePSXe"),
             suggestedName = "ePSXe",
             platformIds   = listOf("psx", "ps1"),
@@ -101,8 +83,7 @@ internal object KnownEmulatorCatalog {
             mimeType      = "application/octet-stream",
         ),
         KnownEmulator(
-            // From the ARMSX2 team; reuses the ARMSX2 frontend (com.armsx2.* classes) under
-            // its own package. Scheme-only VIEW filter on the exported Main activity.
+
             packageNames  = listOf("com.nanodata.armsx"),
             suggestedName = "ARMSX1",
             platformIds   = listOf("psx", "ps1"),
@@ -110,7 +91,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── PS2 ──────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("xyz.aethersx2.android"),
             suggestedName = "NetherSX2 / AetherSX2",
@@ -139,9 +119,7 @@ internal object KnownEmulatorCatalog {
             intentFlags   = listOf("CLEAR_TASK", "CLEAR_TOP"),
         ),
         KnownEmulator(
-            // NetherSX2 fork with a rewritten frontend: no EmulationActivity/bootPath.
-            // Boots via ACTION_VIEW + content:// URI into the exported MainActivity alias
-            // (scheme-only intent filter — the resolver's no-MIME fallback applies).
+
             packageNames  = listOf("com.armsx2"),
             suggestedName = "ARMSX2",
             platformIds   = listOf("ps2"),
@@ -171,7 +149,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── PS3 ──────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("aenu.aps3e.premium", "aenu.aps3e"),
             suggestedName = "aPS3e",
@@ -182,8 +159,7 @@ internal object KnownEmulatorCatalog {
             intentExtras  = mapOf("iso_uri" to "{rom_uri}"),
         ),
         KnownEmulator(
-            // RPCS3 port on the ARMSX2 frontend (com.armsx2.* classes, com.armsx3 package).
-            // Scheme-only VIEW filter on the exported Main activity.
+
             packageNames  = listOf("com.armsx3"),
             suggestedName = "ARMSX3",
             platformIds   = listOf("ps3"),
@@ -191,7 +167,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Nintendo DS ───────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("me.magnum.melonds"),
             suggestedName = "melonDS",
@@ -202,8 +177,7 @@ internal object KnownEmulatorCatalog {
             intentExtras  = mapOf("uri" to "{rom_uri}"),
         ),
         KnownEmulator(
-            // The LAUNCH_ROM action is package-prefixed, so the nightly build needs its
-            // own entry rather than an extra package on the stable one.
+
             packageNames  = listOf("me.magnum.melonds.nightly"),
             suggestedName = "melonDS Nightly",
             platformIds   = listOf("nds", "ds"),
@@ -230,7 +204,7 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
         KnownEmulator(
-            // NooDS only accepts a raw filesystem path in its LaunchPath extra.
+
             packageNames  = listOf("com.hydra.noods"),
             suggestedName = "NooDS",
             platformIds   = listOf("nds", "ds", "gba"),
@@ -248,7 +222,6 @@ internal object KnownEmulatorCatalog {
             mimeType      = "application/octet-stream",
         ),
 
-        // ── GameCube / Wii ────────────────────────────────────────────────────
         KnownEmulator(
             packageNames    = listOf("org.dolphinemu.dolphinemu"),
             suggestedName   = "Dolphin",
@@ -286,7 +259,6 @@ internal object KnownEmulatorCatalog {
             intentExtras  = mapOf("AutoStartFile" to "{rom_uri}"),
         ),
 
-        // ── Wii U ─────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("info.cemu.cemu"),
             suggestedName = "Cemu",
@@ -295,8 +267,7 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
         KnownEmulator(
-            // Older builds shipped under a different-case package with a matching
-            // activity FQCN, so they need a separate entry.
+
             packageNames  = listOf("info.cemu.Cemu"),
             suggestedName = "Cemu (legacy)",
             platformIds   = listOf("wiiu"),
@@ -304,7 +275,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── 3DS ──────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("org.azahar_emu.azahar"),
             suggestedName = "Azahar (3DS)",
@@ -331,7 +301,7 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
         KnownEmulator(
-            // Citra MMJ launches through a GamePath extra with a raw filesystem path.
+
             packageNames  = listOf("org.citra.emu"),
             suggestedName = "Citra MMJ (3DS)",
             platformIds   = listOf("3ds", "n3ds"),
@@ -370,11 +340,6 @@ internal object KnownEmulatorCatalog {
             activityClass = "com.panda3ds.pandroid.app.MainActivity",
         ),
 
-        // ── Switch ────────────────────────────────────────────────────────────
-        // The yuzu lineage's EmulationActivity only accepts action
-        // android.nfc.action.TECH_DISCOVERED with the ROM as a content:// data URI
-        // (attachRomData). Driver-spoof builds (com.miHoYo.*, com.antutu.*) are
-        // deliberately excluded — package name alone would mislabel the real app.
         KnownEmulator(
             packageNames  = listOf("dev.eden.eden_emulator", "dev.eden.eden_emulator.nightly",
                                    "dev.legacy.eden_emulator"),
@@ -462,7 +427,6 @@ internal object KnownEmulatorCatalog {
             activityClass = "emu.skyline.EmulationActivity",
         ),
 
-        // ── Game Boy / GBC / GBA ─────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("io.mgba", "com.mgba.mgba"),
             suggestedName = "mGBA",
@@ -510,8 +474,7 @@ internal object KnownEmulatorCatalog {
             mimeType      = "application/octet-stream",
             useSafUri     = true,
         ),
-        // Pizza Boy launches via a rom_uri string extra; each package variant has its own
-        // activity FQCN, so pro/free are separate entries.
+
         KnownEmulator(
             packageNames  = listOf("it.dbtecno.pizzaboygbapro"),
             suggestedName = "Pizza Boy GBA Pro",
@@ -556,7 +519,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── N64 ──────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("org.mupen64plusae.v3.fzurita.pro",
                                    "org.mupen64plusae.v3.fzurita",
@@ -576,7 +538,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── NES / Famicom ─────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.NesEmu"),
             suggestedName = "NES.emu",
@@ -594,7 +555,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── SNES ──────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.Snes9xPlus"),
             suggestedName = "Snes9x EX+",
@@ -604,7 +564,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Virtual Boy ───────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.simongellis.vvb"),
             suggestedName = "Virtual Virtual Boy",
@@ -613,7 +572,6 @@ internal object KnownEmulatorCatalog {
             intentFlags   = listOf("CLEAR_TASK", "CLEAR_TOP"),
         ),
 
-        // ── Genesis / Mega Drive / Master System / Game Gear ──────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.MdEmu"),
             suggestedName = "MD.emu (Genesis)",
@@ -649,7 +607,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Saturn ────────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("org.devmiyax.yabasanshioro2.pro", "org.devmiyax.yabasanshioro2"),
             suggestedName = "Yaba Sanshiro 2 (Saturn)",
@@ -669,7 +626,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── PC Engine ─────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.PceEmu"),
             suggestedName = "PCE.emu",
@@ -679,7 +635,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Neo Geo ───────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.NeoEmu"),
             suggestedName = "NEO.emu",
@@ -689,7 +644,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Neo Geo Pocket ────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.NgpEmu"),
             suggestedName = "NGP.emu",
@@ -699,7 +653,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Arcade / MAME ─────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.seleuco.mame4d2024"),
             suggestedName = "MAME4droid 2024",
@@ -715,7 +668,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── WonderSwan ────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.SwanEmu"),
             suggestedName = "Swan.emu",
@@ -725,7 +677,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Atari Lynx ────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.LynxEmu"),
             suggestedName = "Lynx.emu",
@@ -735,7 +686,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Atari 2600 ────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.A2600Emu"),
             suggestedName = "2600.emu",
@@ -745,7 +695,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Commodore 64 ──────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.explusalpha.C64Emu"),
             suggestedName = "C64.emu",
@@ -755,7 +704,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Dreamcast ─────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.flycast.emulator", "com.flycast.emulator.gles2"),
             suggestedName = "Flycast (Dreamcast)",
@@ -773,7 +721,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Symbian ───────────────────────────────────────────────────────────
         KnownEmulator(
             packageNames  = listOf("com.github.eka2l1"),
             suggestedName = "EKA2L1 (Symbian)",
@@ -783,10 +730,8 @@ internal object KnownEmulatorCatalog {
             mimeType      = "application/octet-stream",
         ),
 
-        // ── Xbox ──────────────────────────────────────────────────────────────
         KnownEmulator(
-            // X1 BOX, the Android xemu port. LauncherActivity is the only exported activity
-            // (scheme-only content/file VIEW filter); it hands the game on to MainActivity.
+
             packageNames  = listOf("com.izzy2lost.x1box"),
             suggestedName = "X1 BOX (xemu)",
             platformIds   = listOf("xbox"),
@@ -794,9 +739,6 @@ internal object KnownEmulatorCatalog {
             useSafUri     = true,
         ),
 
-        // ── Xbox 360 ──────────────────────────────────────────────────────────
-        // X360 Mobile exposes X360MobileGameLaunchActivity with an ACTION_VIEW filter
-        // (file/content scheme, */* type, pathPattern *.iso/.xex/.zar/.xbla).
         KnownEmulator(
             packageNames  = listOf("emu.x360.mobile"),
             suggestedName = "X360 Mobile",

@@ -27,7 +27,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SetupStateProviderTest {
-
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var romRootRepository: RomRootRepository
@@ -49,7 +48,7 @@ class SetupStateProviderTest {
         romRootRepository = mockk()
         memoryCardRepository = mockk()
         emulatorProfileRepository = mockk()
-        // Defaults: everything missing. The provider calls .first() on these flows itself.
+
         every { romRootRepository.roots } returns flowOf(emptyList())
         every { memoryCardRepository.observeAll() } returns flowOf(emptyList())
         every { emulatorProfileRepository.profiles } returns flowOf(emptyList())
@@ -60,8 +59,6 @@ class SetupStateProviderTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
-
-    // ── current() — the imperative snapshot ──────────────────────────────
 
     @Test
     fun `empty install reports NO_ROM_ROOT first`() = runTest(testDispatcher) {
@@ -94,8 +91,6 @@ class SetupStateProviderTest {
         assertTrue(state.isPlayable)
     }
 
-    // Store failures degrade to "missing" rather than crashing the shell.
-
     @Test
     fun `store read failures degrade to missing`() = runTest(testDispatcher) {
         every { romRootRepository.roots } throws java.io.IOException("datastore gone")
@@ -104,12 +99,8 @@ class SetupStateProviderTest {
         assertEquals(SetupGap.NO_ROM_ROOT, provider.current().firstGap)
     }
 
-    // ── observe() — the reactive stream ──────────────────────────────────
-
     @Test
     fun `observe re-derives as setup progresses`() = runTest(testDispatcher) {
-        // Mutable sources so the wizard-completion simulation arrives on the SAME flow instances
-        // the collector subscribed to (re-stubbing the mock would swap the flows entirely).
         val romRoots = MutableStateFlow<List<String>>(emptyList())
         val cards = MutableStateFlow<List<MemoryCard>>(emptyList())
         val emulators = MutableStateFlow<List<EmulatorProfile>>(emptyList())
@@ -122,7 +113,6 @@ class SetupStateProviderTest {
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(SetupGap.NO_ROM_ROOT, states.first().firstGap)
 
-        // Simulate the wizard completing.
         romRoots.value = listOf("/sdcard/roms")
         cards.value = listOf(MemoryCard(platformId = "psx", displayName = "PlayStation"))
         emulators.value = listOf(profile())

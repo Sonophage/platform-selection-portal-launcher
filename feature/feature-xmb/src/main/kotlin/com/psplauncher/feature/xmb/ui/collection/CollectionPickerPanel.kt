@@ -28,10 +28,6 @@ import com.psplauncher.core.ui.detail.PfpTextPromptOverlay
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
-// ── Shared, controller-navigable "Add to Collection" picker ──────────────────
-// Used by both the console Game Detail and the Android App Detail screens. The owning
-// ViewModel holds the state and routes D-Pad/A/B input; this renders it and forwards taps.
-
 data class CollectionPickerOption(
     val id: Long,
     val name: String,
@@ -41,7 +37,7 @@ data class CollectionPickerOption(
 data class CollectionPickerUi(
     val visible: Boolean = false,
     val options: List<CollectionPickerOption> = emptyList(),
-    // 0..options.size — the last index (== options.size) is the "Create New Collection" row.
+
     val selectedIndex: Int = 0,
     val showCreateDialog: Boolean = false,
     val createText: String = "",
@@ -50,11 +46,8 @@ data class CollectionPickerUi(
     val isCreateRow: Boolean get() = selectedIndex >= options.size
 }
 
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
 private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+
 private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val RowFill = Color(0xFF1B1B26)
 private val CheckGreen = Color(0xFF45C46A)
@@ -102,7 +95,7 @@ fun CollectionPickerPanel(
                         onClick = { onRowClick(index) },
                     )
                 }
-                // Final row — create a brand-new collection.
+
                 PickerRow(
                     label = "＋  Create New Collection",
                     trailingCheck = false,
@@ -123,12 +116,6 @@ fun CollectionPickerPanel(
     }
 
     if (ui.showCreateDialog) {
-        // In-window, not an AlertDialog. A dialog gets its own platform Window, so while it was up
-        // the Activity's dispatchKeyEvent never ran: on the tablet A, B and the D-pad all did
-        // nothing here and only touch could escape. Both hosts of this panel already answered BACK
-        // for this state (GameDetailViewModel.cancelCreateCollection and AppDetailViewModel's
-        // twin) -- those branches were simply unreachable, and drawing in the launcher's own
-        // window is the whole fix.
         PfpTextPromptOverlay(
             title = "New Collection",
             value = ui.createText,

@@ -3,15 +3,7 @@ package com.psplauncher.feature.xmb.ui
 import androidx.annotation.DrawableRes
 import com.psplauncher.feature.xmb.R
 
-/**
- * Resolves a platform ID to the PNG filename (without extension) under
- * assets/systems/physical-media/.  Returns the platformId unchanged when it
- * already has a matching file; maps known aliases to the file that exists.
- * Returns null for digital-only platforms that have no physical media.
- */
 fun physicalMediaAssetName(platformId: String?): String? = when (platformId) {
-
-    // ── Aliases that differ from the PNG filename ──────────────────────────────
     "ps1"                            -> "psx"
     "fam", "famicom"                 -> "nes"
     "ds"                             -> "nds"
@@ -29,24 +21,14 @@ fun physicalMediaAssetName(platformId: String?): String? = when (platformId) {
     "ws"                             -> "wonderswan"
     "wsc"                            -> "wonderswancolor"
 
-    // ── Digital-only — no physical media ──────────────────────────────────────
-    // "windows" is NOT here: PC games ship on discs, so the card gets windows.png (the same
-    // disc silhouette PS2 uses) rather than falling through to the generic cartridge. Storefront
-    // platforms stay digital-only.
     "android", "steam",
     "gog", "default"                 -> null
 
-    // ── Everything else: platformId == filename ────────────────────────────────
     else                             -> platformId
 }
 
-/**
- * Fallback generic vector drawable used when the PNG asset is absent.
- * Approximates the correct media shape for the platform.
- */
 @DrawableRes
 fun physicalMediaIconRes(platformId: String?): Int? = when (platformId) {
-
     "psx", "ps1",
     "ps2", "ps3",
     "saturn", "segacd", "sega32x",

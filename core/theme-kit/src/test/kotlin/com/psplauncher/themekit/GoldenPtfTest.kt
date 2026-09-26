@@ -7,13 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Golden tests against real PSP theme files (Sony's official examples + a fan theme).
- * The files are NOT committed (they're third-party content); tests self-skip unless the
- * corpus is present. Point [goldenDir] elsewhere with -Dthemekit.golden.dir=... .
- */
 class GoldenPtfTest {
-
     private val goldenDir = File(
         System.getProperty("themekit.golden.dir")
             ?: "${System.getProperty("user.home")}${File.separator}Downloads",
@@ -116,10 +110,10 @@ class GoldenPtfTest {
 
         val images = dump.resources.mapNotNull { it.image }
         assertTrue(images.size >= 55, "expected the full icon set, got ${images.size} images")
-        // The embedded 300x170 preview and the 480x272 wallpaper both decode.
+
         assertTrue(images.any { it.width == 300 && it.height == 170 }, "preview missing")
         assertTrue(images.any { it.width == 480 && it.height == 272 }, "wallpaper missing")
-        // Focused icon variants carry transparency.
+
         assertTrue(
             images.any { img -> img.argb.any { p -> (p ushr 24) == 0 } },
             "no transparent pixels anywhere — alpha lost?",

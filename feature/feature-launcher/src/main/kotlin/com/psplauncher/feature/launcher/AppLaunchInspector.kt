@@ -11,38 +11,27 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** A launchable installed app the user can pick as the basis for a custom emulator profile. */
 data class DetectableApp(
     val packageName: String,
     val label: String,
 )
 
 enum class DetectionConfidence {
-    KNOWN,       // matched the curated catalog — fields are reliable
-    BEST_GUESS,  // inferred from the app's declared ACTION_VIEW handler
-    MINIMAL,     // nothing detectable — user must fill it in
+    KNOWN,
+    BEST_GUESS,
+    MINIMAL,
 }
 
-/** A pre-filled draft profile plus how confident the detection is, for the wizard banner. */
 data class EmulatorSuggestion(
     val profile: EmulatorProfile,
     val confidence: DetectionConfidence,
     val note: String,
 )
 
-/**
- * Assisted custom-emulator setup. Lists installed apps, and for a chosen package produces a
- * best-effort [EmulatorProfile] draft by (1) matching the curated [KnownEmulatorCatalog], else
- * (2) inspecting the app's declared ACTION_VIEW handlers via [PackageManager], else (3) a minimal
- * stub for manual completion. Android can't reveal custom extra keys for unknown apps, so this is
- * intentionally assisted — the user reviews, optionally test-launches, and edits before saving.
- */
 @Singleton
 class AppLaunchInspector @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
-    // Lint warns per call site because a library module cannot see the app module's manifest.
     @Suppress("QueryPermissionsNeeded")
     fun listLaunchableApps(): List<DetectableApp> {
         val pm = context.packageManager
@@ -68,7 +57,6 @@ class AppLaunchInspector @Inject constructor(
             pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
         }.getOrDefault(packageName)
 
-        // 1) Curated catalog — exact, reliable fields (RetroArch cores come from auto-config, not here).
         KnownEmulatorCatalog.entries.firstOrNull { packageName in it.packageNames }?.let { known ->
             return EmulatorSuggestion(
                 profile = EmulatorProfile(
@@ -94,7 +82,6 @@ class AppLaunchInspector @Inject constructor(
             )
         }
 
-        // 2) Inspect declared ACTION_VIEW handlers (the Eden/AzaharPlus pattern).
         val viewComponent = resolveViewComponent(packageName)
         if (viewComponent != null) {
             return EmulatorSuggestion(
@@ -116,7 +103,6 @@ class AppLaunchInspector @Inject constructor(
             )
         }
 
-        // 3) Nothing detectable — minimal stub for manual completion.
         return EmulatorSuggestion(
             profile = EmulatorProfile(
                 id                   = DRAFT_ID,
@@ -135,10 +121,6 @@ class AppLaunchInspector @Inject constructor(
         )
     }
 
-    // Returns the exported activity that handles ACTION_VIEW for a content:// octet-stream ROM,
-    // or null if the app declares no such handler.
-    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
-    // Lint warns per call site because a library module cannot see the app module's manifest.
     @Suppress("QueryPermissionsNeeded")
     private fun resolveViewComponent(packageName: String): String? {
         val pm = context.packageManager

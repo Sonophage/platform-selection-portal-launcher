@@ -14,10 +14,8 @@ class DebugMenuViewModel @Inject constructor(
     private val debugController: DebugController,
     private val debugSeeder: DebugSeeder,
 ) : ViewModel() {
-
     val debugState: StateFlow<DebugState> = debugController.state
 
-    // Maps the current scenario to a preview XMBUiState for the right-panel live preview
     val previewState: XMBUiState
         get() = when (debugController.currentState.scenario) {
             DebugScenario.EMPTY_LIBRARY  -> PreviewData.emptyLibraryState
@@ -36,7 +34,6 @@ class DebugMenuViewModel @Inject constructor(
 
     fun setShowBootOnNextLaunch(show: Boolean) = debugController.setShowBootOnNextLaunch(show)
 
-
     fun reset() = debugController.reset()
 
     fun reseed(scenario: DebugScenario) {
@@ -44,5 +41,4 @@ class DebugMenuViewModel @Inject constructor(
             debugSeeder.reseed(scenario)
         }
     }
-
 }

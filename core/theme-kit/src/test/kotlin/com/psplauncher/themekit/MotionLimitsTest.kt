@@ -4,14 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * Pins the import gate for user-picked motion wallpapers. The single largest risk in the feature
- * is a user picking a 4K/60 200 MB clip and concluding the launcher is broken, so every rejection
- * must name its reason, and the boundary at each cap must land on the accepting side exactly at
- * the limit.
- */
 class MotionLimitsTest {
-
     private val ok = MotionLimits.Probe(
         mime = "video/mp4",
         width = 1920,
@@ -36,7 +29,7 @@ class MotionLimitsTest {
     fun `unsupported mime names the accepted formats`() {
         val error = MotionLimits.validate(ok.copy(mime = "video/x-msvideo"))
         assertEquals("Unsupported format — use MP4, WebM, or GIF", error)
-        // Static-image-only formats are rejected too — a still belongs to the plain wallpaper path.
+
         assertEquals(
             "Unsupported format — use MP4, WebM, or GIF",
             MotionLimits.validate(ok.copy(mime = "image/png")),
@@ -53,7 +46,7 @@ class MotionLimitsTest {
     fun `resolution over 1080p is rejected`() {
         assertEquals("Video is too large — 1080p or smaller", MotionLimits.validate(ok.copy(width = 1921, height = 1080)))
         assertEquals("Video is too large — 1080p or smaller", MotionLimits.validate(ok.copy(width = 1920, height = 1081)))
-        // 4K, the most likely accidental pick.
+
         assertEquals("Video is too large — 1080p or smaller", MotionLimits.validate(ok.copy(width = 3840, height = 2160)))
     }
 
@@ -86,8 +79,6 @@ class MotionLimitsTest {
 
     @Test
     fun `oversized GIF is rejected with the video-too-large message`() {
-        // GIFs decode on the CPU holding every frame's bitmap — the resolution cap matters more
-        // for them than for hardware-decoded video, but the message stays uniform.
         val error = MotionLimits.validate(ok.copy(mime = "image/gif", width = 2560, height = 1440))
         assertEquals("Video is too large — 1080p or smaller", error)
     }
@@ -102,11 +93,6 @@ class MotionLimitsTest {
 
     @Test
     fun `every known extension maps into the sets the codec and validator actually use`() {
-        // The silent-drop hazard: PfpThemeCodec.write skips a motion entry whose extension is
-        // outside MOTION_EXTENSIONS without a word. If these drift apart, a Studio-authored
-        // theme loses its video on export with no error anywhere. Every mapped extension must
-        // resolve to a supported MIME; the bundleable ones must land on an entry the writer
-        // actually stores.
         for (extension in MotionLimits.knownExtensions) {
             assertEquals(
                 "mimeForExtension($extension) must land in SUPPORTED_MIME",
@@ -122,8 +108,7 @@ class MotionLimitsTest {
                 )
             }
         }
-        // Known but not bundleable: the launcher plays animated WebP, but the bundle format
-        // has no motion.webp entry, so a Studio pick of webp cannot be stored.
+
         assertNull(MotionLimits.bundleExtensionFor("webp"))
     }
 
@@ -133,7 +118,7 @@ class MotionLimitsTest {
         assertEquals("mp4", MotionLimits.bundleExtensionFor("m4v"))
         assertEquals("webm", MotionLimits.bundleExtensionFor("webm"))
         assertEquals("gif", MotionLimits.bundleExtensionFor("gif"))
-        // Not a motion container at all — callers must treat null as "cannot bundle".
+
         assertNull(MotionLimits.bundleExtensionFor("avi"))
         assertNull(MotionLimits.bundleExtensionFor("mp3"))
     }

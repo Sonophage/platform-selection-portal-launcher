@@ -5,14 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The Options menu's headings are computed from the filtered action list, not the enum, because
- * two actions are conditional: Emulator is hidden on package-backed entries and Export Game is
- * offered on Windows only. A heading pinned to the enum's first member of a group would strand
- * itself the moment that member was filtered out.
- */
 class DetailActionSectionsTest {
-
     @Test
     fun `every action carries a heading only where its group starts`() {
         val all = DetailAction.entries
@@ -32,7 +25,6 @@ class DetailActionSectionsTest {
 
     @Test
     fun `hiding the first action of a group promotes the next one to carry the heading`() {
-        // What a package-backed entry actually gets: Emulator gone, so Saves heads Play.
         val visible = DetailAction.entries.filter { it != DetailAction.EMULATOR }
         val headings = sectionHeadings(visible)
 
@@ -44,7 +36,6 @@ class DetailActionSectionsTest {
 
     @Test
     fun `no group is left without a heading and none is drawn twice`() {
-        // A GBA ROM: no Export Game, which is the last-but-two of the File group.
         val visible = DetailAction.entries.filter { it != DetailAction.EXPORT }
         val headings = sectionHeadings(visible)
 
@@ -55,8 +46,6 @@ class DetailActionSectionsTest {
 
     @Test
     fun `Remove is last and is the only destructive action`() {
-        // It sat directly under Open Location in the flat list with nothing marking the change of
-        // weight. Its position is the guard, so it is asserted rather than assumed.
         assertEquals(DetailAction.REMOVE, DetailAction.entries.last())
         assertTrue(DetailAction.entries.none { it.section.isBlank() })
     }

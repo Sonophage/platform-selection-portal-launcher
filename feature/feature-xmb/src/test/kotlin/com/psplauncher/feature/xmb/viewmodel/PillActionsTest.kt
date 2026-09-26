@@ -8,16 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The pair the pill row lives or dies on: every pill id must be an id its row's context menu
- * offers, because a pill dispatches by opening that menu and activating that row.
- *
- * A renamed menu id does not break the build and does not crash — the pill simply stops doing
- * anything, which nobody reports and nobody notices until they wonder why Favorite "never works".
- * So the menus here are the REAL ones, built from the same builders the ViewModel calls.
- */
 class PillActionsTest {
-
     private fun state(directLaunch: Boolean = true) = XMBUiState(
         categories = listOf(
             Category(
@@ -71,15 +62,6 @@ class PillActionsTest {
         }
     }
 
-    /**
-     * Why a pill dispatches by ID and never by position.
-     *
-     * The rail drops every id the pill row already carries, so the two lists are not the same
-     * list and never can be: an index taken from the menu addresses a DIFFERENT action in the one
-     * activation reads. That is what shipped — Details ran Manage Collections, Favorite ran
-     * whatever had slid up into its slot — and nothing threw, because both lists are the same
-     * menu in the same order and every index in range is a real action.
-     */
     @Test
     fun `the rail cannot address a pill, so a menu index cannot either`() {
         val item    = game()
@@ -92,7 +74,6 @@ class PillActionsTest {
             rail.none { it.id in pillIds },
         )
 
-        // Concretely: the first pill's index in the menu names something else in the rail.
         val firstPill = pillsFor(item).first()
         val atThatIndex = rail.getOrNull(menu.indexOfFirst { it.id == firstPill.id })?.id
         assertTrue(
@@ -101,17 +82,6 @@ class PillActionsTest {
         )
     }
 
-    /**
-     * The shelf has no pill row, so nothing may offer a way into one.
-     *
-     * pillsFor answers about the ITEM and knows nothing about the screen, and a game row on the
-     * Last Played shelf is still a game row — so every rule that reads it directly will happily
-     * open a door on a screen that draws no pills. XMBItemList is the only thing that draws them
-     * and the shelf replaces it wholesale with LastPlayedPage.
-     *
-     * This was a real bug for one commit: DOWN at the end of the recents put the cursor into an
-     * invisible row, where confirm would have run an action nobody could see themselves choosing.
-     */
     @Test
     fun `the pill row is never visible on the home shelf`() {
         val onShelf = XMBUiState(
@@ -132,8 +102,6 @@ class PillActionsTest {
 
     @Test
     fun `the favourite pill follows the row it is drawn under`() {
-        // Both halves, because a pill that always says "Favorite" and always dispatches "favorite"
-        // would pass a test that only ever looked at an unfavourited game.
         assertEquals("Favorite", pillsFor(game(isFavorite = false)).first { it.id == "favorite" }.label)
         assertEquals("Unfavorite", pillsFor(game(isFavorite = true)).first { it.id == "unfavorite" }.label)
     }
@@ -146,9 +114,6 @@ class PillActionsTest {
 
     @Test
     fun `rows with no pills get no row at all`() {
-        // Each of these reaches a DIFFERENT context menu, or none, so app pills on any of them
-        // would dispatch ids that menu has never heard of. A platform card and a music track both
-        // carry enough of an XMBItem to look like an app row if the check is only "has a package".
         val platformCard = XMBItem(id = "card_psp", title = "PSP", platformId = "psp")
         val settingsRow = XMBItem(id = "settings_open", title = "Settings")
         val track = XMBItem(id = "t1", title = "Blue Monday", type = XMBItemType.MUSIC_TRACK)

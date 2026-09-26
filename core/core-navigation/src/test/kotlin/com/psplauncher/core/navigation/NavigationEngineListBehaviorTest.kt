@@ -6,12 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Port of the legacy ControllerNavigationStateTest behavioural contract onto the generic
- * navigation core (spec: PlayFieldPortal_Unified_Navigation_Architecture.md §25).
- */
 class NavigationEngineListBehaviorTest {
-
     private fun node(
         key: String,
         focusable: Boolean = true,

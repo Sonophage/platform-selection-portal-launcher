@@ -38,9 +38,6 @@ import com.psplauncher.core.ui.theme.StorefrontColors
 import com.psplauncher.core.ui.theme.deriveStorefrontColors
 import com.psplauncher.core.ui.theme.menuCursor
 
-// Resolved per theme rather than fixed: this screen draws the theme's own background gradient,
-// so a fixed white label is unreadable the moment the user picks a pale scheme. Same reason
-// MusicTrackPicker and the INLINE hint style resolve theirs. See PFPTheme.
 private val PickerText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
 
 @Composable
@@ -55,8 +52,6 @@ fun GamePickerScreen(
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
 
-    // Confirm/cancel both clear the picker — the ViewModel is retained across open/close, so
-    // selections must not carry over to the next time the picker is opened.
     val confirmAndClear: () -> Unit = {
         val (gameIds, collectionIds) = viewModel.getSelectedItems()
         onConfirm(gameIds, collectionIds)
@@ -67,7 +62,6 @@ fun GamePickerScreen(
         onCancel()
     }
 
-    // Scroll to keep selected item visible
     LaunchedEffect(state.selectedItemId) {
         if (state.selectedItemId != null) {
             val itemIds = buildPickerItemIds(state)
@@ -81,7 +75,6 @@ fun GamePickerScreen(
         }
     }
 
-    // Handle gamepad input
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null) {
             when (pendingGamepadAction) {
@@ -91,7 +84,7 @@ fun GamePickerScreen(
                 GamepadAction.OPEN_CONTEXT_MENU -> viewModel.toggleSelectedPlatform()
                 GamepadAction.BACK -> cancelAndClear()
                 GamepadAction.HOME -> confirmAndClear()
-                else -> {} // Other actions handled by parent
+                else -> {}
             }
             onGamepadActionConsumed()
         }
@@ -108,24 +101,15 @@ fun GamePickerScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            // The status strip is drawn over this screen by the shell, not by this screen: the
-            // picker is chrome, so the clock and the battery stay on top of it. Reserving the
-            // strip's height is what keeps the first row from ending up underneath them — the
-            // same thing AppDrawerScreen, the detail pages and the app picker each do.
+
             .padding(top = StatusStripHeight)
-            // The shared scrim, not this screen's own gradient. It used to draw the raw theme
-            // gradient at a flat 0.94 alpha, which made it read as a different surface from the
-            // App Drawer and the installed-app picker standing beside it; these anchors are
-            // solved for contrast rather than chosen. See storefrontColorsFor.
+
             .background(Brush.verticalGradient(listOf(sf.backgroundDeep, sf.backgroundMid))),
     ) {
-
-        // Content
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f),
         ) {
-            // Platform groups - use identity-based selection
             for ((groupIndex, group) in state.platformGroups.withIndex()) {
                 val platformId = group.platform.platformId
 
@@ -141,7 +125,6 @@ fun GamePickerScreen(
                     )
                 }
 
-                // Games in this platform
                 if (state.platformExpandedStates[platformId] == true) {
                     items(group.games) { game ->
                         GamePickerRow(
@@ -155,7 +138,6 @@ fun GamePickerScreen(
                 }
             }
 
-            // Collections section
             if (state.pcShortcuts.isNotEmpty()) {
                 item {
                     Text(
@@ -185,14 +167,8 @@ fun GamePickerScreen(
                     )
                 }
             }
-
         }
 
-        // ── Permanent footer: the shared bottom bar ───────────────────────
-        //
-        // Two Material3 TextButtons used to sit here, and the prompts sat under the title at the
-        // top — so this screen said "Cancel" twice, in two looks, at two ends, and named neither
-        // of the buttons that do it. One bar now, the same one every other screen draws.
         GamePickerHintBar(
             selectedCount = state.selectedGameIds.size + state.selectedCollectionIds.size,
             colors = sf,
@@ -210,12 +186,6 @@ fun GamePickerScreen(
     }
 }
 
-// ── The picker's footer ───────────────────────────────────────────────────────
-//
-// The shared [PfpHintBar]. The centre slot carries what the deleted header said — the screen's
-// name and the live count — because that is context rather than a control, and it is where
-// Settings and the installed-app picker already put context.
-
 @Composable
 private fun GamePickerHintBar(
     selectedCount: Int,
@@ -227,9 +197,7 @@ private fun GamePickerHintBar(
         items = listOf(
             ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Navigate"),
             ControllerPromptItem(GamepadAction.SELECT, "Toggle"),
-            // Only meaningful on a platform header, but the picker opens on one and the bar is
-            // fixed chrome — a prompt that comes and goes as the cursor moves down a list reads
-            // as flicker.
+
             ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Expand / Collapse"),
             ControllerPromptItem(GamepadAction.HOME, "Add"),
             ControllerPromptItem(GamepadAction.BACK, "Cancel"),

@@ -8,7 +8,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.Playlist
 
-// A user-created music playlist. Ordered among siblings by sort_order then created_at.
 @Serializable
 @Entity(tableName = "playlists")
 data class PlaylistEntity(
@@ -27,10 +26,6 @@ data class PlaylistEntity(
     val sortOrder: Int = 0,
 )
 
-// Membership of a track in a playlist. position keeps the user's manual ordering; a track may
-// appear in many playlists. Rows cascade-delete with their playlist. Tracks are referenced by id
-// (TEXT) — there is no FK to music_tracks so a track removed by a re-scan simply drops out of any
-// join (the orphan row is cleaned up opportunistically by the repository).
 @Serializable
 @Entity(
     tableName = "playlist_tracks",

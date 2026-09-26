@@ -6,9 +6,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PhysicalMediaIconsTest {
-
-    // ── physicalMediaAssetName: aliases map to the correct PNG filename ─────────
-
     @Test fun `ps1 alias resolves to psx`() = assertEquals("psx", physicalMediaAssetName("ps1"))
     @Test fun `psx is unchanged`() = assertEquals("psx", physicalMediaAssetName("psx"))
     @Test fun `fam alias resolves to nes`() = assertEquals("nes", physicalMediaAssetName("fam"))
@@ -44,7 +41,6 @@ class PhysicalMediaIconsTest {
     @Test fun `wonderswan is unchanged`() = assertEquals("wonderswan", physicalMediaAssetName("wonderswan"))
     @Test fun `wonderswancolor is unchanged`() = assertEquals("wonderswancolor", physicalMediaAssetName("wonderswancolor"))
 
-    // Direct-match platforms (platformId == filename)
     @Test fun `psp is unchanged`() = assertEquals("psp", physicalMediaAssetName("psp"))
     @Test fun `ps2 is unchanged`() = assertEquals("ps2", physicalMediaAssetName("ps2"))
     @Test fun `saturn is unchanged`() = assertEquals("saturn", physicalMediaAssetName("saturn"))
@@ -55,17 +51,13 @@ class PhysicalMediaIconsTest {
     @Test fun `ngp is unchanged`() = assertEquals("ngp", physicalMediaAssetName("ngp"))
     @Test fun `ngpc is unchanged`() = assertEquals("ngpc", physicalMediaAssetName("ngpc"))
 
-    // Digital-only — must return null
     @Test fun `android returns null`() = assertNull(physicalMediaAssetName("android"))
-    // Windows games ship on discs, so the card shows the same disc silhouette as PS2
-    // rather than falling through to the generic cartridge.
+
     @Test fun `windows resolves to its own disc asset`() =
         assertEquals("windows", physicalMediaAssetName("windows"))
     @Test fun `steam stays digital only`() = assertNull(physicalMediaAssetName("steam"))
     @Test fun `gog stays digital only`() = assertNull(physicalMediaAssetName("gog"))
     @Test fun `null returns null`() = assertNull(physicalMediaAssetName(null))
-
-    // ── physicalMediaIconRes: every platform alias has a vector fallback ────────
 
     @Test fun `psx fallback exists`() = assertNotNull(physicalMediaIconRes("psx"))
     @Test fun `ps1 fallback exists`() = assertNotNull(physicalMediaIconRes("ps1"))

@@ -5,16 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * Diagonal resolution on the D-pad's HAT axes.
- *
- * The XMB cursor is discrete, so one direction has to win. Priority used to be fixed at Y-before-X,
- * which made a horizontal press unreachable while a vertical was held — on device a LEFT tap sat
- * unheard for 274ms until UP was released, which reads as input lag because a D-pad is rolled
- * through diagonals constantly.
- */
 class HatDiagonalTest {
-
     private val UP = GamepadAction.NAVIGATE_UP
     private val DOWN = GamepadAction.NAVIGATE_DOWN
     private val LEFT = GamepadAction.NAVIGATE_LEFT
@@ -38,7 +29,6 @@ class HatDiagonalTest {
     }
 
     @Test fun `pressing LEFT while UP is held reports LEFT`() {
-        // The regression this function exists for: UP already deflected, X newly deflected.
         assertEquals(LEFT, dir(hatX = -1f, hatY = -1f, prevHatX = 0f, prevHatY = -1f, held = UP))
     }
 
@@ -47,7 +37,6 @@ class HatDiagonalTest {
     }
 
     @Test fun `holding a diagonal keeps the direction already being navigated`() {
-        // Neither axis is new; the user is mid-hold. It must not flap between axes.
         assertEquals(UP, dir(hatX = -1f, hatY = -1f, prevHatX = -1f, prevHatY = -1f, held = UP))
         assertEquals(LEFT, dir(hatX = -1f, hatY = -1f, prevHatX = -1f, prevHatY = -1f, held = LEFT))
     }
@@ -57,8 +46,6 @@ class HatDiagonalTest {
     }
 
     @Test fun `releasing one axis of a diagonal falls back to the axis still held`() {
-        // X returns to neutral while Y stays down — the remaining axis reports, so the hold
-        // continues instead of going silent.
         assertEquals(DOWN, dir(hatX = 0f, hatY = 1f, prevHatX = -1f, prevHatY = 1f, held = LEFT))
     }
 

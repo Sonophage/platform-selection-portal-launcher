@@ -24,7 +24,6 @@ class GameRepositoryImpl @Inject constructor(
     private val playSessionDao: PlaySessionDao,
     private val platformDao: PlatformDao,
 ) : GameRepository {
-
     override fun observeAll(): Flow<List<Game>> =
         gameDao.observeAll().map { entities -> entities.map { it.toDomain() } }.flowOn(Dispatchers.Default)
 
@@ -101,33 +100,11 @@ class GameRepositoryImpl @Inject constructor(
         gameDao.getByIntentUri(intentUri)?.toDomain()
 
     override suspend fun upsert(game: Game): Long {
-        // Keep the database invariant true before REPLACE touches the incoming row. This also
-        // makes callers safe on databases upgraded to v39 where the partial unique index exists.
         val discSetKey = game.discSetKey
         if (game.isDiscPrimary && discSetKey != null) {
             gameDao.clearOtherDiscPrimaries(discSetKey, game.id)
         }
-        // WHAT THE SCAN CANNOT KNOW, CARRIED FORWARD.
-        //
-        // This upsert is `@Insert(onConflict = REPLACE)`, which SQLite performs as DELETE then
-        // INSERT. It does not merge: every column the incoming entity does not carry is gone. A
-        // scanner builds its row from the filesystem, so anything the USER put on that game is
-        // destroyed unless it is read back first — and this is the one funnel every scanner goes
-        // through, so here is where it is read back.
-        //
-        // The added-date proved it: without the read-back every rescan restamped the whole
-        // library as new, which a test falsifies in one line. play_state is the same shape and is
-        // worse, because it fails SILENTLY — a mark would simply be gone, with nothing on screen
-        // to say so.
-        //
-        // I have NOT observed play_state being cleared on a device. I thought I had: a game I
-        // marked Completed read unmarked an hour later, and I wrote that down as a rescan wiping
-        // it. The owner had re-marked it Playing in between. The hazard is real and is visible in
-        // GameDao.upsert's own contract — REPLACE is a delete and an insert — but the incident
-        // was not, and a fix resting on an invented one is a fix nobody can check.
-        //
-        // ADD TO THIS LIST when you add a user-owned column. The test beside it fails loudly if
-        // the pair drifts, which is the only reason this comment is not the whole defence.
+
         val entity = game.toEntity()
         val existing = if (entity.id != 0L) gameDao.getById(entity.id) else null
         val merged = entity.copy(

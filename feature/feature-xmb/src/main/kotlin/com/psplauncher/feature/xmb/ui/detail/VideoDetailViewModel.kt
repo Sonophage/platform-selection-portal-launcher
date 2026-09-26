@@ -21,7 +21,6 @@ import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
 
-// A row in the video's Options menu. RESUME is only offered when there's a saved position.
 enum class VideoDetailAction(val label: String) {
     PLAY("Play"),
     RESUME("Resume"),
@@ -35,14 +34,13 @@ enum class VideoDetailAction(val label: String) {
     REMOVE("Remove From Library"),
 }
 
-// One playlist choice in the "Add to Playlist" picker; checked = the video is already a member.
 data class VideoPlaylistOption(val id: Long, val name: String, val checked: Boolean)
 
 data class VideoDetailUiState(
     val video: Video? = null,
     val siblings: List<Video> = emptyList(),
     val isLoading: Boolean = true,
-    // Primary buttons: [Play] (+ [Resume] when a position is saved) + [Options].
+
     val mainFocus: Int = 0,
     val showOptions: Boolean = false,
     val optionsIndex: Int = 0,
@@ -51,39 +49,28 @@ data class VideoDetailUiState(
     val titleText: String = "",
     val infoVisible: Boolean = false,
     val actionMessage: String? = null,
-    // Non-null triggers the system image picker for a custom thumbnail.
+
     val pickThumbnail: Boolean = false,
-    // Add-to-playlist picker.
+
     val showPlaylistPicker: Boolean = false,
     val playlistOptions: List<VideoPlaylistOption> = emptyList(),
     val playlistPickerIndex: Int = 0,
     val creatingPlaylist: Boolean = false,
     val newPlaylistName: String = "",
-    // Playback overlay.
+
     val playing: Boolean = false,
     val playStartPositionMs: Long = 0,
-    // External-player hand-off: overlay while launching, and a hard error dialog on failure.
-    /**
-     * True from the moment a film is handed to an external player until PFP has the screen again.
-     *
-     * A data class carrying the thumbnail and the player's name, because it used to drive a themed
-     * "Launching…" card. The launch disc replaced that card and nothing read either field any more
-     * — including the PackageManager lookup that produced the name, which was work done on every
-     * launch for a string with no reader. What is left is the one thing it is still for: input is
-     * swallowed while it is true, and the return path knows a hand-off happened.
-     */
+
     val handedOffToPlayer: Boolean = false,
     val launchError: String? = null,
     val closed: Boolean = false,
 ) {
     val hasResume: Boolean get() = (video?.resumePositionMs ?: 0) > 0
-    // Primary buttons: a watched video leads with Resume + Start from Beginning; an unwatched one
-    // just shows Play. (Options is appended by the screen.)
+
     val primaryActions: List<VideoDetailAction>
         get() = if (hasResume) listOf(VideoDetailAction.RESUME, VideoDetailAction.RESTART)
                 else listOf(VideoDetailAction.PLAY)
-    // Options list, kept free of redundancy: Play only when there's no resume point; Resume + Start
-    // from Beginning only when there is.
+
     val optionsActions: List<VideoDetailAction>
         get() = VideoDetailAction.entries.filter {
             when (it) {
@@ -95,8 +82,6 @@ data class VideoDetailUiState(
         }
 }
 
-// Treat playback as "finished" when it ends within this window of the duration — clears resume so
-// the next open starts fresh instead of jumping to the last few seconds.
 private const val RESUME_END_EPSILON_MS = 5_000L
 
 @HiltViewModel
@@ -106,7 +91,6 @@ class VideoDetailViewModel @Inject constructor(
     private val intentResolver: com.psplauncher.core.data.video.VideoIntentResolver,
     private val mediaLaunchGate: com.psplauncher.core.data.launch.MediaLaunchGate,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(VideoDetailUiState())
     val uiState: StateFlow<VideoDetailUiState> = _uiState.asStateFlow()
 
@@ -123,12 +107,9 @@ class VideoDetailViewModel @Inject constructor(
         }
     }
 
-    // ── Controller input ──────────────────────────────────────────────────────
-    // While the player overlay is up the screen forwards input straight to it, so this only runs
-    // for the detail page itself.
     fun handleGamepadAction(action: GamepadAction) {
         val s = _uiState.value
-        // The launch overlay swallows input; a launch error dialog dismisses on A/B.
+
         if (s.handedOffToPlayer) return
         if (s.launchError != null) {
             if (action == GamepadAction.SELECT || action == GamepadAction.BACK) dismissLaunchError()
@@ -144,7 +125,7 @@ class VideoDetailViewModel @Inject constructor(
                 _uiState.update { it.copy(creatingPlaylist = false, newPlaylistName = "") }
             }
             s.showPlaylistPicker -> {
-                val count = s.playlistOptions.size + 1  // +1 for "Create New Playlist"
+                val count = s.playlistOptions.size + 1
                 when (action) {
                     GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(playlistPickerIndex = (it.playlistPickerIndex - 1 + count) % count) }
                     GamepadAction.NAVIGATE_DOWN -> _uiState.update { it.copy(playlistPickerIndex = (it.playlistPickerIndex + 1) % count) }
@@ -168,8 +149,6 @@ class VideoDetailViewModel @Inject constructor(
                 }
             }
             else -> {
-                // Primary row: just [primaryActions]. Options is reached with Y/Triangle (below) or
-                // the touch Options pill — not an inline row.
                 val total = s.primaryActions.size.coerceAtLeast(1)
                 when (action) {
                     GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(mainFocus = (it.mainFocus - 1 + total) % total) }
@@ -203,8 +182,6 @@ class VideoDetailViewModel @Inject constructor(
         }
     }
 
-    // ── Favorites ───────────────────────────────────────────────────────────────
-
     fun toggleFavorite() {
         val v = _uiState.value.video ?: return
         viewModelScope.launch {
@@ -213,8 +190,6 @@ class VideoDetailViewModel @Inject constructor(
             _uiState.update { it.copy(video = it.video?.copy(isFavorite = next), actionMessage = if (next) "Added to Favorites" else "Removed from Favorites") }
         }
     }
-
-    // ── Add to playlist ───────────────────────────────────────────────────────────
 
     fun openPlaylistPicker() {
         val v = _uiState.value.video ?: return
@@ -239,7 +214,6 @@ class VideoDetailViewModel @Inject constructor(
         val s = _uiState.value
         val v = s.video ?: return
         if (index >= s.playlistOptions.size) {
-            // "Create New Playlist" row.
             _uiState.update { it.copy(creatingPlaylist = true, newPlaylistName = "") }
             return
         }
@@ -267,11 +241,6 @@ class VideoDetailViewModel @Inject constructor(
 
     fun cancelCreatePlaylist() = _uiState.update { it.copy(creatingPlaylist = false, newPlaylistName = "") }
 
-    // ── Playback ──────────────────────────────────────────────────────────────
-
-    // Routes a play request to the built-in player, an external app, or the system chooser based on
-    // the Default Player setting. External hand-off is validated first, shows a themed launch
-    // overlay, and surfaces a real error dialog (never fails silently, never crashes).
     fun play(positionMs: Long) {
         val video = _uiState.value.video ?: return
         viewModelScope.launch {
@@ -280,26 +249,21 @@ class VideoDetailViewModel @Inject constructor(
 
             val ask = pref == "ask"
             val pkg = if (ask) null else pref
-            // Verify the file, uri and a resolving activity BEFORE we fade out / hand off.
+
             intentResolver.validate(video, pkg)?.let { err ->
                 _uiState.update { it.copy(showOptions = false, launchError = err) }
                 return@launch
             }
             _uiState.update { it.copy(showOptions = false, handedOffToPlayer = true) }
-            // Best-effort: record that it was opened now so it appears under Recently Watched.
+
             markWatchedExternally(video)
-            // The disc, exactly as a book or a track gets one — drawn by the XMB shell, which sits
-            // above this screen. It suspends until the disc begins fading, so the player's cold
-            // start happens under the fade. Validation is already done above: a film that cannot
-            // open never shows a ceremony, the same rule the game path follows.
+
             mediaLaunchGate.awaitHandOff(video.effectiveThumbnailUri)
             val err = if (ask) intentResolver.launchChooser(video) else intentResolver.launch(video, pref)
             if (err != null) _uiState.update { it.copy(handedOffToPlayer = false, launchError = err) }
         }
     }
 
-    // Called when PFP regains focus after an external launch: drop the overlay and refresh just this
-    // video's metadata (resume / last-watched) — no library rescan, no focus/scroll reset.
     fun onReturnedFromExternal() {
         if (!_uiState.value.handedOffToPlayer) return
         _uiState.update { it.copy(handedOffToPlayer = false) }
@@ -310,27 +274,21 @@ class VideoDetailViewModel @Inject constructor(
         }
     }
 
-    // Defensive: if the hand-off never backgrounded us (rare), clear the overlay so it can't stick.
     fun clearExternalOverlay() = _uiState.update { it.copy(handedOffToPlayer = false) }
 
     fun dismissLaunchError() = _uiState.update { it.copy(launchError = null) }
 
-    // Clears the one-shot close flag once the screen has popped, so the retained ViewModel doesn't
-    // re-close the detail on the next open.
     fun onClosedHandled() = _uiState.update { it.copy(closed = false) }
 
     fun startPlayback(positionMs: Long) {
         _uiState.update { it.copy(playing = true, playStartPositionMs = positionMs, showOptions = false) }
     }
 
-    // External playback position can't be tracked, so just stamp lastWatchedAt (keeping any resume
-    // position) so the video still shows up under Recently Watched.
     private suspend fun markWatchedExternally(video: Video) {
         videoRepository.setResumePosition(video.id, video.resumePositionMs, System.currentTimeMillis())
     }
 
     fun onPlaybackExit() {
-        // Reload so the detail reflects the freshly-saved resume position.
         _uiState.update { it.copy(playing = false) }
         _uiState.value.video?.id?.let { loadVideo(it) }
     }
@@ -342,8 +300,6 @@ class VideoDetailViewModel @Inject constructor(
             else videoRepository.setResumePosition(videoId, positionMs, System.currentTimeMillis())
         }
     }
-
-    // ── Title ───────────────────────────────────────────────────────────────
 
     fun startEditTitle() {
         val v = _uiState.value.video ?: return
@@ -359,8 +315,6 @@ class VideoDetailViewModel @Inject constructor(
         }
     }
     fun cancelTitleEdit() = _uiState.update { it.copy(isEditingTitle = false) }
-
-    // ── Thumbnail ─────────────────────────────────────────────────────────────
 
     fun consumeThumbnailPick() = _uiState.update { it.copy(pickThumbnail = false) }
 
@@ -384,8 +338,6 @@ class VideoDetailViewModel @Inject constructor(
             Uri.fromFile(dest).toString().takeIf { dest.length() > 0 }
         }.getOrElse { Timber.w(it, "Thumbnail import failed"); null }
     }
-
-    // ── Remove ────────────────────────────────────────────────────────────────
 
     fun confirmRemove() {
         val v = _uiState.value.video ?: return

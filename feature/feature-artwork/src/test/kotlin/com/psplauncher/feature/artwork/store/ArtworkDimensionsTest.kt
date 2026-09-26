@@ -7,16 +7,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/**
- * The Artwork Dimension & Aspect Ratio Policy's suggested test list, plus the two properties the
- * policy states as rules rather than rows: source dimensions beat the preset, and the variable
- * platforms are marked as such.
- */
 class ArtworkDimensionsTest {
-
     private val tolerance = 0.001f
-
-    // ── The policy's suggested platform list ─────────────────────────────────
 
     @Test
     fun `the policy's suggested platforms carry their stated canvases`() {
@@ -62,8 +54,6 @@ class ArtworkDimensionsTest {
         assertFalse(ArtworkDimensions.hasBoxArtPreset(null))
     }
 
-    // ── The corrections the policy calls out by name ─────────────────────────
-
     @Test
     fun `PSP and Vita no longer share a ratio`() {
         val psp = ArtworkDimensions.boxArt("psp").aspectRatio
@@ -83,7 +73,6 @@ class ArtworkDimensionsTest {
 
     @Test
     fun `the platforms that used to fall through now have their own rows`() {
-        // Every one of these resolved to the generic 0.70 branch in the pre-6_5 table.
         val formerlyGeneric = listOf(
             "ps2", "ps3", "gc", "wii", "wiiu", "nes", "megadrive", "mastersystem", "gamegear",
             "sega32x", "atari2600", "atari5200", "atari7800", "atarilynx", "neogeo", "x360",
@@ -95,13 +84,9 @@ class ArtworkDimensionsTest {
                 "$platformId should have its own row",
             )
         }
-        // Several of those rows ARE 430x600, the same canvas the generic fallback carries. That is
-        // the policy's value for them, not a fall-through — which is why this asserts on the row's
-        // presence rather than on its dimensions differing.
+
         assertEquals(ArtworkDimensions.GenericBoxArt.aspectRatio, ArtworkDimensions.boxArt("ps2").aspectRatio)
     }
-
-    // ── Aliases already in the tree ──────────────────────────────────────────
 
     @Test
     fun `every alias resolves to its canonical platform's canvas`() {
@@ -130,11 +115,8 @@ class ArtworkDimensionsTest {
         assertEquals(ArtworkDimensions.GenericBoxArt, ArtworkDimensions.boxArt("   "))
     }
 
-    // ── Source dimensions beat the preset ────────────────────────────────────
-
     @Test
     fun `a known source ratio beats the platform preset`() {
-        // The policy's own worked example: SNES preset is landscape, the downloaded scan is tall.
         assertEquals(
             500f / 700f,
             ArtworkDimensions.boxArtAspect("snes", sourceWidth = 500, sourceHeight = 700),
@@ -151,8 +133,6 @@ class ArtworkDimensionsTest {
         assertEquals(preset, ArtworkDimensions.boxArtAspect("ps2", 430, 0), tolerance)
         assertEquals(preset, ArtworkDimensions.boxArtAspect("ps2", -430, -600), tolerance)
     }
-
-    // ── Variable platforms ───────────────────────────────────────────────────
 
     @Test
     fun `the policy's source-aware platforms are marked source-preferred`() {
@@ -174,8 +154,6 @@ class ArtworkDimensionsTest {
         assertFalse(ArtworkDimensions.boxArt("psp").sourceAspectPreferred)
         assertFalse(ArtworkDimensions.boxArt("gc").sourceAspectPreferred)
     }
-
-    // ── Coverage of the shipped platform list ────────────────────────────────
 
     @Test
     fun `every seeded platform has its own box-art canvas`() {

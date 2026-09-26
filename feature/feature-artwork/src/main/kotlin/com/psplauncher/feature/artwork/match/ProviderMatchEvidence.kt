@@ -10,30 +10,12 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * The real provider lookups behind [GameMatcher] — C16 task 2.3.
- *
- * Retrieval only: nothing here writes a column. The Studio decides what to do with a candidate,
- * and only an explicit Change Match persists one (AD-7).
- *
- * What each provider can be asked is [ProviderCapabilities]' business, not this class's — the
- * matcher never calls a lookup a provider cannot serve, so the unsupported branches below are
- * defensive rather than load-bearing.
- */
 @Singleton
 class ProviderMatchEvidence @Inject constructor(
     private val steamGridDb: SteamGridDbApi,
     private val screenScraper: ScreenScraperApi,
     private val igdbApi: IgdbApi,
 ) : MatchEvidenceSource {
-
-    /**
-     * ScreenScraper's game for a ROM checksum.
-     *
-     * The CRC alone is a weaker tuple than SS's documented hash+size+filename, but it is the only
-     * part persisted on the game row (`rom_crc32`), and SS accepts it: a hit is real evidence, a
-     * miss simply falls through to the next tier.
-     */
     override suspend fun candidateByRomHash(
         provider: MatchProvider,
         crc32: String,
@@ -56,23 +38,13 @@ class ProviderMatchEvidence @Inject constructor(
         )
     }
 
-    /**
-     * SteamGridDB's game for a storefront pair.
-     *
-     * Only the Steam half resolves: `/games/steam/{appid}` is the one direct storefront lookup the
-     * API offers. An Epic, GOG or Amazon id is not silently retried as a Steam id — a cross-store
-     * id is a different game, and guessing one is exactly the collision the stored PAIR exists to
-     * prevent.
-     */
     override suspend fun candidateByStorefront(
         provider: MatchProvider,
         storefront: String,
         storefrontGameId: String,
     ): GameCandidate? {
         if (provider != MatchProvider.STEAMGRIDDB) return null
-        // steamAppIdOf, not a second hand-written "STEAM" comparison: the same question is now
-        // asked by the Steam store provider, and two answers to it is how a cross-store id gets
-        // sent to Steam.
+
         val appId = steamAppIdOf(storefront, storefrontGameId) ?: return null
 
         val game = steamGridDb.getGameBySteamAppId(appId) ?: return null
@@ -83,29 +55,11 @@ class ProviderMatchEvidence @Inject constructor(
         )
     }
 
-    /**
-     * Multi-result title search: SteamGridDB's autocomplete, IGDB's `search`, and
-     * `ByGameName` and ScreenScraper's `jeuRecherche`. These back Tier 3 and Change Match; a saved
-     * id or ROM checksum still wins first (Tiers 1-2).
-     *
-     * [platformId] scopes ScreenScraper (`systemeid`) when the
-     * platform is mapped. SGDB indexes games rather than platform releases, and the tree has no IGDB
-     * platform-id table, so those two search every platform. The matcher establishes uniqueness on
-     * the returned list.
-     *
-     * A failed ScreenScraper search throws `SsSearchFailedException`, never an empty list, so it is
-     * not remembered as "nothing found". The other providers still report failures as empty lists.
-     * ScreenScraper on a platform without ROM files answers an empty list without a request.
-     */
     override suspend fun searchByTitle(
         provider: MatchProvider,
         query: String,
         platformId: String,
     ): List<GameCandidate> = when (provider) {
-        // Steam has no title endpoint at all: appdetails takes an app id and nothing else. An
-        // empty list is the honest answer, and ProviderCapabilities already keeps Steam out of
-        // `searchable`, so a Change Match picker never asks. This branch exists because the
-        // compiler is right to demand it, not because it can be reached from the UI.
         MatchProvider.STEAM_STORE -> emptyList()
         MatchProvider.STEAMGRIDDB -> steamGridDb.searchGame(query)
             .onFailure { Timber.d(it, "SGDB search failed for '%s'", query) }
@@ -118,7 +72,7 @@ class ProviderMatchEvidence @Inject constructor(
                     releaseYear = it.releaseDate?.let(::yearOf),
                 )
             }
-        // IgdbApi already rethrows cancellation and maps every other failure to an empty list.
+
         MatchProvider.IGDB -> igdbApi.searchGames(query).mapNotNull { game ->
             val name = game.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             GameCandidate(
@@ -129,25 +83,12 @@ class ProviderMatchEvidence @Inject constructor(
                 thumbUrl = game.cover?.imageId?.let { IgdbApi.coverThumbUrl(it) },
             )
         }
-        // Not asked on a platform without ROM files (AD-23). ScreenScraper catalogues few of those
-        // releases: on device the Windows search found nothing for any title, and cost 3.5 s of the
-        // account's single request slot on every open. Change Match goes straight to
-        // [searchScreenScraperOnAnyPlatform] there, which is the way to a console release.
+
         MatchProvider.SCREENSCRAPER ->
             if (platformId in PLATFORMS_WITHOUT_ROMS) emptyList()
             else screenScraper.searchGames(platformId, query).map(::ssCandidate)
     }
 
-    /**
-     * ScreenScraper's name search across every system, for Change Match only.
-     *
-     * ScreenScraper catalogues few Windows releases, so a Windows install's platform-scoped search
-     * can find nothing while the same game exists on its console releases. Only the user may pick
-     * across platforms: the matcher never calls this, because an automatic cross-platform match is a
-     * guess. Each candidate names its system so the picker can show which release it is.
-     *
-     * Hits on [preferredPlatformId]'s own system come first; the rest keep ScreenScraper's ranking.
-     */
     suspend fun searchScreenScraperOnAnyPlatform(query: String, preferredPlatformId: String): List<GameCandidate> {
         val preferredSystem = ScreenScraperApi.PLATFORM_IDS[preferredPlatformId]
         return screenScraper.searchGames(platformId = null, title = query)
@@ -155,13 +96,6 @@ class ProviderMatchEvidence @Inject constructor(
             .map(::ssCandidate)
     }
 
-    /**
-     * Whether Change Match should skip the platform search and ask every system straight away.
-     *
-     * True for ScreenScraper on platforms whose games have no ROM file. It catalogues few of those
-     * releases: on device the Windows search for Tactics Ogre found nothing under any title, yet
-     * cost three to four seconds of ScreenScraper's single request slot before the search that did.
-     */
     fun searchesEveryPlatformFirst(provider: MatchProvider, platformId: String): Boolean =
         provider == MatchProvider.SCREENSCRAPER && platformId in PLATFORMS_WITHOUT_ROMS
 
@@ -174,7 +108,6 @@ class ProviderMatchEvidence @Inject constructor(
         gameArtCount = hit.gameArtCount,
     )
 
-    /** Both SGDB and IGDB serve release dates as unix timestamps in seconds. */
     private fun yearOf(epochSeconds: Long): Int =
         java.time.Instant.ofEpochSecond(epochSeconds).atZone(java.time.ZoneOffset.UTC).year
 

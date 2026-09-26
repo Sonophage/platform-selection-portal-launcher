@@ -92,24 +92,10 @@ import com.psplauncher.core.ui.theme.LocalPFPColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.feature.artwork.store.ArtworkKind
 
-// The gap between grid tiles. Must equal StudioGridCapacity's GAP_DP, or the tiles drawn here stop
-// matching the capacity the ViewModel paged for.
 private val STUDIO_GRID_GAP = 8.dp
 
-// AD-19: the Current rail widens on a large window. Every other band is fixed in dp (AD-16), so a
-// bigger screen spends its extra width on grid columns, not on chrome.
 private const val STUDIO_WIDE_WINDOW_DP = 1000
 
-/**
- * Fullscreen Artwork Studio — controller-first artwork browser/editor for one game.
- * Layout follows the approved mock: destination tabs (LB/RB) → current-artwork panel +
- * available-artwork grid, source row (Left/Right in the SOURCES zone),
- * A = candidate preview → Apply, B = back, X = search, Y = per-slot options,
- * START = add the picked tiles on a multi-asset tab (SteamGridDB's mature filter is in the Y menu).
- *
- * (L2/R2 are unbound: no GamepadAction maps to KEYCODE_BUTTON_L2/R2 in GamepadBinding, so the
- * old "L2/R2 switch sources" line here described a binding that never existed.)
- */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ArtworkStudioScreen(
@@ -117,8 +103,7 @@ fun ArtworkStudioScreen(
     onClose: () -> Unit,
     pendingGamepadAction: GamepadAction? = null,
     onGamepadActionConsumed: () -> Unit = {},
-    // Touch presentation, resolved by the caller exactly as for Game Detail: tappable controls
-    // become pills. The Studio replaces Game Detail while open, so it reports touches itself.
+
     showTouchControls: Boolean = true,
     onTouchInput: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -130,7 +115,7 @@ fun ArtworkStudioScreen(
     LaunchedEffect(state.closed) {
         if (state.closed) {
             onClose()
-            viewModel.consumeClosed()   // clear immediately so reopening doesn't self-close
+            viewModel.consumeClosed()
         }
     }
     LaunchedEffect(pendingGamepadAction) {
@@ -140,7 +125,6 @@ fun ArtworkStudioScreen(
         }
     }
 
-    // Local file picker — mime set follows the destination kind.
     val localPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.applyLocal(uri)
     }
@@ -165,11 +149,6 @@ fun ArtworkStudioScreen(
     )
 }
 
-/**
- * The Studio itself, stateless: [state] in, [actions] out. Split from [ArtworkStudioScreen], which
- * owns the ViewModel, loading, closing and the file picker, so that this can be previewed with
- * sample state (ArtworkStudioPreview.kt).
- */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun ArtworkStudioContent(
@@ -185,8 +164,7 @@ internal fun ArtworkStudioContent(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // Any touch marks the input source as touch (revealing the pills), without consuming
-            // the event, as Game Detail does.
+
             .pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false); onTouchInput() } }
             .background(
                 Brush.verticalGradient(
@@ -196,12 +174,6 @@ internal fun ArtworkStudioContent(
             ),
     ) {
         Column(Modifier.fillMaxSize().padding(horizontal = 26.dp, vertical = 14.dp)) {
-
-            // ── Header row (36 dp) — back, game title, and the query the providers are asked for ──
-            // Studio-local rather than a shared breadcrumb: this row carries a trailing
-            // query field (L.3), and the breadcrumb's "Artwork Studio › category › source" trail
-            // is what the approved mock replaces with flat tabs. The back arrow still walks the
-            // level ladder exactly like B (grid → sources → categories → close).
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().height(36.dp),
@@ -236,11 +208,7 @@ internal fun ArtworkStudioContent(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                // ── Query field (Square / tap) — the query the providers are actually asked for ──
-                // Editable and non-destructive: it never renames the game, and Reset puts the
-                // game's own title back. Submit-only, so no provider is hit per keystroke.
-                // L.6: a guaranteed gap. At 833 dp a capped title plus "Artwork Studio · WINDOWS"
-                // left the weighted spacer ~2 dp, so the subtitle ran into the field.
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -257,8 +225,6 @@ internal fun ArtworkStudioContent(
                         .clickable(onClick = actions::openSearch)
                         .padding(horizontal = 10.dp),
                 ) {
-                    // The glyph is useful in controller mode, but touch mode already exposes the
-                    // query as a direct target and should not advertise controller-only hints.
                     if (!showTouchControls) {
                         ControllerPrompt(
                             action = GamepadAction.CHANGE_SORT,
@@ -294,16 +260,6 @@ internal fun ArtworkStudioContent(
                 }
             }
 
-            // ── Status band ─────────────────────────────────────────────────────────
-            //
-            // Three counters, fixed above the content and never inside a scroll, because the two
-            // things they answer are exactly the two the Studio could not: how much of THIS GAME
-            // is done without walking eleven tabs, and how close ScreenScraper's daily cap is
-            // before you hit it. Shape borrowed from NeoStation's scraping panel, where quota sits
-            // as a peer of progress rather than buried on an account page.
-            //
-            // It costs the grid zero or one rows, not a flat tax: StudioGridCapacity pages by the
-            // MEASURED slot, so a shorter slot only loses a row when it crosses a tile boundary.
             StudioStatusRow(
                 stats = studioStats(
                     filledKinds = state.filledKinds,
@@ -317,9 +273,6 @@ internal fun ArtworkStudioContent(
             )
 
             Spacer(Modifier.height(8.dp))
-
-            // ── Destination tabs (AD-18: flat, one press apart) — the LB/RB glyphs sit at both
-            // ends of the scrolling chip row, so a narrower screen keeps the selected chip visible.
 
             val tabListState = rememberLazyListState()
             LaunchedEffect(state.tabIndex) { tabListState.animateScrollToItem(state.tabIndex) }
@@ -379,40 +332,23 @@ internal fun ArtworkStudioContent(
                 }
             }
 
-            // L.4: the tab's contract caption moved into the rail, so the tabs band is one line.
-            // The wide-window rail width is read once here rather than re-derived inside the rail.
             val railWidth =
                 if (LocalConfiguration.current.screenWidthDp >= STUDIO_WIDE_WINDOW_DP) 200.dp else 150.dp
 
             Row(Modifier.weight(1f)) {
-
-                // ── Current artwork rail (AD-19: narrow on a handheld, wider on a tablet) ──
                 Column(Modifier.width(railWidth).fillMaxHeight()) {
-                    // L.6: the thumbnail is the inner column's ONLY weighted child, and the message
-                    // sits under that column at the rail's bottom. At 914 × 411 dp a portrait
-                    // thumbnail sized from the rail's width (~214 dp) pushed the Options pill off
-                    // the bottom. Weighted `fill = false`, it shrinks to the height left and keeps
-                    // its aspect, and Options still sits directly under it. A weighted spacer beside
-                    // it would split the free height and cap the thumbnail at half.
                     Column(Modifier.weight(1f)) {
-                        // The category and its display rule both live here now, so the header and tab
-                        // bands stay one line each (AD-16).
                         Text(
                             STUDIO_TABS[state.tabIndex].label,
                             color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                         )
-                        // L.6: an explicit line height, or the theme's 24 sp bodyLarge spaces a wrapped
-                        // caption ("XMB tile (Physical Media mode) · natural aspect") like two paragraphs.
+
                         Text(
                             STUDIO_TABS[state.tabIndex].contract,
                             color = Color.White.copy(alpha = 0.55f), fontSize = 9.5.sp, lineHeight = 12.sp,
                         )
                         Spacer(Modifier.height(6.dp))
-                        // The thumbnail is drawn in the ACTIVE TAB's tile shape rather than a fixed
-                        // 150 dp box, so the preview is judged the way the grid judges it. (The
-                        // mockup's 144×80 is ICON0's own crop target, which is that tab's data, not
-                        // its tile shape.) No fillMaxWidth: aspectRatio takes the rail's width when
-                        // the height allows it, and narrows rather than stretches when it does not.
+
                         Box(
                             modifier = Modifier
                                 .weight(1f, fill = false)
@@ -432,8 +368,7 @@ internal fun ArtworkStudioContent(
                                     },
                                     color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp,
                                 )
-                                // key(previewVersion) forces a fresh AsyncImage after an apply so the
-                                // preview reloads even when the portable library reused the same URI.
+
                                 state.currentUri != null -> androidx.compose.runtime.key(state.previewVersion) {
                                     AsyncImage(
                                         model = state.currentUri,
@@ -446,10 +381,10 @@ internal fun ArtworkStudioContent(
                             }
                         }
                         Spacer(Modifier.height(6.dp))
-                        // The Y hint replaces the old "Ⓨ · OPTIONS" pill; in touch mode it is an Options pill.
+
                         StudioOptionsControl(showTouchControls = showTouchControls, onClick = actions::openActions)
                     }
-                    // L.5: paging moved to the page line under the grid.
+
                     state.message?.let {
                         Text(
                             it, color = accent, fontSize = 11.sp,
@@ -460,12 +395,7 @@ internal fun ArtworkStudioContent(
 
                 Spacer(Modifier.width(18.dp))
 
-                // ── Available artwork ─────────────────────────────────────────
                 Column(Modifier.weight(1f).fillMaxHeight()) {
-
-                    // ── Sources row (24 dp) — chips styled like the tabs, plus SteamGridDB's mature badge ──
-                    // Scrolls rather than clips if a narrow screen cannot fit every chip; the row's
-                    // height never changes, so the grid slot below it stays measured.
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -478,8 +408,7 @@ internal fun ArtworkStudioContent(
                         sources.forEachIndexed { index, source ->
                             val selected = state.sourceIndex == index
                             val focusedZone = state.zone == StudioZone.SOURCES && selected
-                            // Disabled, not hidden: a keyless provider, or one with nothing for this
-                            // category, keeps its place and says why.
+
                             val badge = actions.sourceBadge(source)
                             val available = badge == null
                             Box(
@@ -508,8 +437,7 @@ internal fun ArtworkStudioContent(
                                 )
                             }
                         }
-                        // The mature filter's state, tappable for touch. A controller sets it from the
-                        // Y menu: START adds picks now (task 5.2), so the badge no longer shows a glyph.
+
                         val sgdbActive = sources.getOrNull(state.sourceIndex) == StudioSource.STEAMGRIDDB
                         if (sgdbActive) {
                             Box(
@@ -532,11 +460,6 @@ internal fun ArtworkStudioContent(
                         }
                     }
 
-                    // ── Match line (22 dp, task 2.3) ──────────────────────────
-                    // Who the active source thinks this game is. Only shown for a source that HAS
-                    // an identity: Local files are the user's own and nothing identifies them.
-                    // The band keeps its height even when empty, so switching to Local File does not
-                    // grow the grid slot and re-page the results (AD-16, AD-17).
                     Spacer(Modifier.height(6.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -554,11 +477,7 @@ internal fun ArtworkStudioContent(
                                 )
                             }
                             Spacer(Modifier.width(7.dp))
-                            // L.6: the title and badge share ONE weighted row. With the title weighted
-                            // `fill = false` beside a separate weighted spacer, Row split the free width
-                            // between the two and a short title left its unused half empty, so CHANGE
-                            // MATCH stopped ~115 dp short of the edge ("Tactics Ogre") while a long
-                            // title sat flush right.
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f),
@@ -580,8 +499,7 @@ internal fun ArtworkStudioContent(
                                         when {
                                             state.matchResolving -> "Matching on ${state.matchProvider.label}…"
                                             state.matchFailed    -> "${state.matchProvider.label} didn't answer"
-                                            // A dead end is stated plainly rather than left blank — it is
-                                            // the exact case Change Match exists to rescue.
+
                                             else                 -> "No ${state.matchProvider.label} match"
                                         },
                                         color = Color.White.copy(alpha = 0.6f), fontSize = 10.5.sp,
@@ -602,11 +520,7 @@ internal fun ArtworkStudioContent(
                                     )
                                 }
                             }
-                            // Forget Match only means anything once something was confirmed, and
-                            // it costs the user nothing: no artwork, no metadata is removed.
-                            // L.6: both buttons take the band's full 22 dp and pad only sideways, like
-                            // the source chips. Vertical padding left ~14 dp for the text, which the
-                            // Thor drew with CHANGE MATCH's lower half cut off.
+
                             if (state.matchIsConfirmed) {
                                 Box(
                                     modifier = Modifier
@@ -624,9 +538,7 @@ internal fun ArtworkStudioContent(
                                 }
                                 Spacer(Modifier.width(6.dp))
                             }
-                            // Always present, so the line keeps its shape across sources — but a
-                            // provider without title search has nothing to pick FROM, so there
-                            // the button is inert and says why rather than opening an empty list.
+
                             val canChange = state.canChangeMatch
                             Box(
                                 modifier = Modifier
@@ -648,9 +560,6 @@ internal fun ArtworkStudioContent(
                     }
                     Spacer(Modifier.height(6.dp))
 
-                    // ── Grid slot ─────────────────────────────────────────────
-                    // Whatever height is left belongs to the grid. Its measured size decides how many
-                    // tiles one page holds (AD-17); the ViewModel hears about it only when it changes.
                     BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
                         val slotWidth = maxWidth
                         val slotHeight = maxHeight
@@ -659,9 +568,7 @@ internal fun ArtworkStudioContent(
                         }
                         val columns = state.gridColumns
                         val rows = state.gridRows
-                        // The tab's true aspect at the measured width, so art is judged in the shape it is
-                        // used at. Capped at an even share of the height: the row clamp can keep one row
-                        // taller than a short slot, and the first frame still draws the unmeasured 4 × 5.
+
                         val tileWidth = (slotWidth - STUDIO_GRID_GAP * (columns - 1)) / columns
                         val tileHeight = maxOf(
                             0.dp,
@@ -673,8 +580,6 @@ internal fun ArtworkStudioContent(
 
                         val activeSource = actions.sourcesForTab().getOrNull(state.sourceIndex)
                         when {
-                            // Skeleton tiles, not a bare spinner: the grid keeps its shape while an
-                            // uncached page loads, so a source switch never flashes an empty panel.
                             state.resultsLoading -> LazyVerticalGrid(
                                 columns = GridCells.Fixed(columns),
                                 modifier = Modifier.fillMaxSize(),
@@ -708,15 +613,11 @@ internal fun ArtworkStudioContent(
                             state.results.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(
                                     when {
-                                        // "Nothing found" is a claim about an answer. A source
-                                        // with no credentials never sent the question, and saying
-                                        // it found nothing was the app inventing a result.
                                         activeSource != null &&
                                             activeSource in state.unavailableSources ->
                                             "${activeSource.label} needs an account or key. Add one under Settings, Artwork, Scraping Sources."
                                         activeSource != StudioSource.SCREENSCRAPER -> "No results"
-                                        // ScreenScraper art is fetched per game, so with no match there
-                                        // was nothing to ask for, which is not the same as having none.
+
                                         state.matchResolving -> "Looking for this game on ScreenScraper…"
                                         state.matchFailed    -> "ScreenScraper didn't answer. Use Change Match to search again."
                                         state.match == null  -> "No ScreenScraper match for this game. Use Change Match to pick one."
@@ -726,11 +627,8 @@ internal fun ArtworkStudioContent(
                                 )
                             }
                             else -> {
-                                // Touch long-press toggles a tile's live video preview; controller
-                                // focus previews automatically (one player at a time, ever).
                                 var touchPreviewIndex by remember(state.results) { mutableIntStateOf(-1) }
-                                // A page is exactly one gridful that fits the slot, so there is nothing to
-                                // scroll to: the focused tile is always on screen (AD-5).
+
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(columns),
                                     modifier = Modifier.fillMaxSize(),
@@ -753,8 +651,7 @@ internal fun ArtworkStudioContent(
                                                     RoundedCornerShape(8.dp),
                                                 )
                                                 .combinedClickable(
-                                                    // Routed like A: a multi-asset tab picks the tile,
-                                                    // and its preview is in the options menu (task 5.1).
+
                                                     onClick = {
                                                         if (state.selectsMultiple) actions.toggleSelection(index)
                                                         else actions.openCandidate(index)
@@ -788,9 +685,7 @@ internal fun ArtworkStudioContent(
                                                     modifier = Modifier.fillMaxSize(),
                                                 )
                                             }
-                                            // Over the art, not under it: a line below each tile would
-                                            // push the last row out of the slot. Hidden while a video
-                                            // plays so it never covers the preview.
+
                                             if (!previewing) art.label?.let {
                                                 Text(
                                                     it, color = Color.White.copy(alpha = 0.85f), fontSize = 9.sp,
@@ -806,8 +701,7 @@ internal fun ArtworkStudioContent(
                                                         .padding(horizontal = 5.dp, vertical = 3.dp),
                                                 )
                                             }
-                                            // Drawn inside the tile, so a pick never changes the
-                                            // measured slot (L.2). Top corner: the label owns the bottom.
+
                                             StudioTileBadge(
                                                 mark = state.tileMarkOf(art),
                                                 accent = accent,
@@ -823,7 +717,6 @@ internal fun ArtworkStudioContent(
                         }
                     }
 
-                    // ── Page line (16 dp, 40 dp in touch mode) — see StudioPageLine ──
                     Spacer(Modifier.height(6.dp))
                     StudioPageLine(
                         rangeStart = state.rangeStart,
@@ -844,16 +737,6 @@ internal fun ArtworkStudioContent(
                 }
             }
 
-            // Footer hints — per-zone, and resolved from the live bindings so the
-            // glyphs follow the user's controller type and any remapped layout.
-            //
-            // Search and options are appended from ONE place rather than repeated per zone: they
-            // apply at every level, and the three hand-written lists are exactly how the old
-            // "NSFW" label for X survived it being rebound to search. Paging is not listed (the
-            // page line carries its LB/RB glyphs) and neither is mature (its START badge does).
-            // Drawn for touch too. It used to be `if (!showTouchControls)`, which made this
-            // the one screen in the app with no bottom bar at all the moment you touched it —
-            // and the Studio is the screen with the most actions and the least obvious ones.
             PfpHintBar(
                 items = buildList {
                     when (state.zone) {
@@ -870,19 +753,17 @@ internal fun ArtworkStudioContent(
                             add(ControllerPromptItem(GamepadAction.BACK, "Back"))
                         }
                     }
-                    // START applies from any level, so its hint shows whenever this tab has changes waiting.
+
                     if (state.queueSummary.hasChanges) add(ControllerPromptItem(GamepadAction.HOME, "Apply"))
                     add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Search"))
                     add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"))
                 },
                 modifier = Modifier.padding(top = 6.dp),
-                // The same dispatcher the pad uses, one function up. Until now a tapped prompt
-                // here did nothing at all.
+
                 onAction = actions::handleGamepadAction,
             )
         }
 
-        // ── Candidate preview overlay ─────────────────────────────────────────
         state.candidate?.let { art ->
             Box(
                 Modifier
@@ -951,14 +832,6 @@ internal fun ArtworkStudioContent(
             }
         }
 
-        // ── Change Match overlay (task 2.3) ───────────────────────────────────
-        // The one place a wrong or absent match stops being a dead end. Backed by each provider's
-        // multi-result title search (SteamGridDB, IGDB, TheGamesDB).
-        //
-        // Controller-first, the WizardTextField way: the query field is a cursor stop, and the
-        // keyboard opens only when Select starts editing it. This overlay used to focus the field
-        // on open, which raised the IME — and an open IME receives key events before
-        // MainActivity.dispatchKeyEvent, so the D-pad, A and B never reached the ViewModel.
         if (state.changeMatchOpen) {
             val matchFocus = remember { FocusRequester() }
             val keyboard = LocalSoftwareKeyboardController.current
@@ -966,8 +839,6 @@ internal fun ArtworkStudioContent(
             val editing by rememberUpdatedState(state.changeMatchEditing)
             LaunchedEffect(state.changeMatchEditing) {
                 if (state.changeMatchEditing) {
-                    // Settle a frame around the readOnly→editable flip before showing the keyboard —
-                    // the same sequence as WizardTextField / SettingsTextFieldRow.
                     withFrameNanos { }
                     runCatching { matchFocus.requestFocus() }
                     withFrameNanos { }
@@ -977,8 +848,7 @@ internal fun ArtworkStudioContent(
                     focusManager.clearFocus()
                 }
             }
-            // The keyboard dismissed by its own Back key ends editing, so the pad drives the picker
-            // again. (If the insets never report it, the next pad press ends editing in the VM.)
+
             val imeVisible = WindowInsets.isImeVisible
             var imeWasShown by remember { mutableStateOf(false) }
             LaunchedEffect(imeVisible) {
@@ -1004,8 +874,7 @@ internal fun ArtworkStudioContent(
             ) {
                 Column(
                     Modifier
-                        // A margin, outside the panel's background, so a short window never has the
-                        // panel touching its edges.
+
                         .padding(vertical = 16.dp)
                         .width(520.dp)
                         .clip(RoundedCornerShape(12.dp))
@@ -1061,12 +930,11 @@ internal fun ArtworkStudioContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(matchFocus)
-                            // A tap focuses the field; that is touch asking to type, so enter edit mode.
+
                             .onFocusChanged { if (it.isFocused && !editing) actions.startChangeMatchEdit() },
                     )
                     Spacer(Modifier.height(12.dp))
-                    // A cross-platform list is offered, never assumed: another release's artwork may
-                    // not be what this game uses, so say where the list came from.
+
                     if (state.changeMatchAcrossPlatforms && !state.changeMatchLoading) {
                         Text(
                             "Includes other platforms. Check the platform before you pick.",
@@ -1089,10 +957,7 @@ internal fun ArtworkStudioContent(
                             "No games found. Try a shorter title, or the title without its edition.",
                             color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp,
                         )
-                        // Weighted without fill, so the Column measures the fixed rows (Search / Cancel and
-                        // the hint below included) first and the list takes only the height left. Unweighted,
-                        // a long list on a short window took its full 260 dp and the Column squeezed the
-                        // pill buttons measured after it.
+
                         else -> LazyColumn(
                             Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 260.dp),
                             state = resultsState,
@@ -1114,8 +979,7 @@ internal fun ArtworkStudioContent(
                                         color = Color.White, fontSize = 13.sp,
                                         modifier = Modifier.weight(1f),
                                     )
-                                    // Which release this is, and whether it has art of its own: once the list
-                                    // spans every platform, a release with none is a dead end to confirm.
+
                                     listOfNotNull(
                                         candidate.platformName,
                                         candidate.releaseYear?.toString(),
@@ -1164,7 +1028,6 @@ internal fun ArtworkStudioContent(
             }
         }
 
-        // ── Search overlay (X / tap) ──────────────────────────────────────────
         if (state.searchOpen) {
             val focusRequester = remember { FocusRequester() }
             LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
@@ -1257,7 +1120,6 @@ internal fun ArtworkStudioContent(
             }
         }
 
-        // ── Options menu overlay (Y / triangle) — the shared XMB-style context menu ──
         if (state.actionsOpen && !state.showFileInfo) {
             val menuActions = state.availableActions
             com.psplauncher.core.ui.components.PspContextMenuOverlay(
@@ -1268,13 +1130,11 @@ internal fun ArtworkStudioContent(
                 selectedIndex = state.resolvedActionsIndex,
                 onRowActivated = { index -> menuActions.getOrNull(index)?.let(actions::runAction) },
                 onDismiss = actions::closeActions,
-                // Darker than the XMB default — the grid behind is busy, so let it recede.
+
                 scrim = Color(0xA6000000),
             )
         }
 
-        // ── Confirmations: the apply confirmation (5.2) and the replace prompt (5.3) ──
-        // Both are described by state.confirmPrompt, so a further one needs no block of its own.
         state.confirmPrompt?.let { prompt ->
             com.psplauncher.core.ui.components.PspContextMenuOverlay(
                 title = prompt.title,
@@ -1288,7 +1148,6 @@ internal fun ArtworkStudioContent(
             )
         }
 
-        // ── Leave prompt (task 5.2): B from the categories while changes wait to be applied ──
         if (state.leavePromptOpen) {
             val waiting = state.selection.size + state.removals.size
             com.psplauncher.core.ui.components.PspContextMenuOverlay(
@@ -1303,7 +1162,6 @@ internal fun ArtworkStudioContent(
             )
         }
 
-        // ── File information panel ────────────────────────────────────────────
         if (state.showFileInfo) {
             val info = state.info
             Box(
@@ -1351,7 +1209,6 @@ internal fun ArtworkStudioContent(
             }
         }
 
-        // ── Stored-assets manager (task 5.4) ──────────────────────────────────
         if (state.managerOpen) {
             StudioAssetManagerPanel(
                 kindLabel = STUDIO_TABS[state.tabIndex].label,
@@ -1367,7 +1224,6 @@ internal fun ArtworkStudioContent(
             )
         }
 
-        // ── Crop / position editor ────────────────────────────────────────────
         state.cropEditorPath?.let { path ->
             StudioCropEditor(
                 path = path,
@@ -1384,8 +1240,7 @@ internal fun ArtworkStudioContent(
                 shape = CropShapeChoice.of(state.cropProfileOverride),
                 onOpenOptions = actions::openCropOptions,
             )
-            // The crop editor's context menu (task 6.3): the app's own overlay, so it reads like
-            // every other list in the Studio and the cursor behaves the same.
+
             if (state.cropOptionsOpen) {
                 val currentShape = CropShapeChoice.of(state.cropProfileOverride)
                 com.psplauncher.core.ui.components.PspContextMenuOverlay(
@@ -1419,11 +1274,6 @@ internal fun ArtworkStudioContent(
     }
 }
 
-/**
- * A tile's corner badge (tasks 5.1, 5.2, 5.3): a new pick is an accent check, a stored asset a green
- * check, the single-art tile the slot already holds a green dot, an unchecked stored asset a red ring
- * with "−", waiting an accent ring, downloading spins and failed a red "!".
- */
 @Composable
 private fun StudioTileBadge(
     mark: StudioTileMark,
@@ -1465,8 +1315,7 @@ private fun StudioTileBadge(
             modifier = modifier,
             size = size,
         )
-        // Same green as ADDED — it is the same fact, that the slot holds this asset — but a dot
-        // rather than a check, because a single-art tile was never added to anything.
+
         StudioTileMark.CURRENT -> Box(
             modifier.size(size).background(Color(0xFF66BB6A), circle),
             contentAlignment = Alignment.Center,
@@ -1490,19 +1339,6 @@ private fun StudioInfoRow(label: String, value: String) {
     }
 }
 
-/**
- * Crop/position editor: the untouched original fills the screen, a dimmed mask shows the crop
- * window (aspect-locked per kind by the ViewModel). Controller pans with the D-pad and zooms
- * with LB/RB; touch drags to pan and pinches to zoom.
- *
- * For the kinds that own an XMB tile or media-strip slot, a live inset in the top-right corner
- * shows the framed region as the finished artwork — see [StudioCropPreviewTile].
- *
- * ICON1 and VIDEO are cropped as video: when [videoPath] is non-null the clip plays behind the
- * frame AND inside the inset (task 6.6), so placement can be judged against the motion rather than
- * against whichever still frame happened to be extracted. [path] is that still, and remains the
- * fallback if the clip will not play.
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StudioCropEditor(
@@ -1521,8 +1357,7 @@ private fun StudioCropEditor(
     onOpenOptions: () -> Unit,
 ) {
     val accent = menuCursorEdge()
-    // The image transform behind the fixed frame is fully described by the current crop window;
-    // rememberUpdatedState keeps the gesture loop reading the LATEST values mid-drag.
+
     val geom = androidx.compose.runtime.rememberUpdatedState(
         CropGeom(srcW, srcH, cropL, cropT, cropR, cropB)
     )
@@ -1532,32 +1367,22 @@ private fun StudioCropEditor(
             decodeDisplayBitmap(path)?.asImageBitmap()
         }
     }
-    // Layered, not stacked: the image + dim mask fill the WHOLE screen on the bottom layer
-    // (clipped, so no zoom level can paint outside it), and the title/buttons/hints float on a
-    // layer above — the zoomed image slides underneath them instead of covering them. Only the
-    // crop frame's dimensions are static; everything else moves and scales behind it.
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.96f))) {
 
-        // ── Layer 1: full-screen source + fixed frame + dim mask ───────────────
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.96f))) {
         val image = bmp
-        // One gesture block for both sources: the frame is fixed and full-screen either way, so
-        // pan and zoom read the same numbers whether a still or a clip sits underneath.
+
         val gestures = Modifier.pointerInput(Unit) {
             detectTransformGestures { _, pan, zoom, _ ->
                 val g = geom.value
                 val l = cropLayoutFor(g, size.width.toFloat(), size.height.toFloat())
-                // Frame is fixed: dragging the image right shifts the framed region left.
+
                 if (pan.x != 0f || pan.y != 0f) onPan(-pan.x / l.imgDispW, -pan.y / l.imgDispH)
                 if (zoom != 1f) onZoom(zoom)
             }
         }
-        // ICON1/VIDEO are cropped as video (task 6.6): the clip plays behind the frame so framing
-        // can be judged against the motion, not against one arbitrary frame. Two players, because
-        // an ExoPlayer drives one surface and the inset is the second — see StudioCropVideo.kt.
+
         val canvasPlayer = if (videoPath != null) rememberCropClipPlayer(videoPath) else null
-        // Not created when the preview is off: that is the point of the switch for video kinds —
-        // no inset means no SECOND decoder. Flipping it off releases this one through
-        // rememberCropClipPlayer's DisposableEffect as it leaves composition.
+
         val insetPlayer =
             if (videoPath != null && previewEnabled) rememberCropClipPlayer(videoPath) else null
         SyncClipTo(leader = canvasPlayer, follower = insetPlayer)
@@ -1583,8 +1408,7 @@ private fun StudioCropEditor(
                             with(density) { l.imgDispH.toDp() },
                         ),
                 )
-                // The mask and frame ride above the clip, and carry the gestures — the video
-                // surface is a View and would swallow them.
+
                 androidx.compose.foundation.Canvas(Modifier.fillMaxSize().then(gestures)) {
                     drawCropMask(cropLayoutFor(geom.value, size.width, size.height), accent)
                 }
@@ -1610,7 +1434,6 @@ private fun StudioCropEditor(
             }
         }
 
-        // ── Layer 2: title, buttons, hints — always above the image ────────────
         Column(
             Modifier.fillMaxSize().padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1637,10 +1460,7 @@ private fun StudioCropEditor(
                         .clickable(onClick = onCancel)
                         .padding(horizontal = 18.dp, vertical = 9.dp),
                 )
-                // Ⓨ keeps the context button's app-wide meaning and opens the editor's menu. The
-                // preview switch (task 6.7) is the first row in it rather than its own button:
-                // Square opens search everywhere else in the Studio and START means Apply Changes,
-                // so there was no third button to give Crop Shape.
+
                 Text(
                     "Ⓨ  OPTIONS",
                     color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp,
@@ -1657,10 +1477,6 @@ private fun StudioCropEditor(
             )
         }
 
-        // ── Layer 2: live result preview (task 6.2) ────────────────────────────
-        // A fixed top-right inset, so the crop frame stays centred and the gesture maths that map
-        // pan onto it are untouched. It reads the bitmap layer 1 already decoded and the same crop
-        // window, so it costs no decode and holds no state; kinds with no XMB tile get no inset.
         val chrome = cropPreviewChromeFor(kind).takeIf { previewEnabled }
         val caption = cropPreviewCaptionFor(kind)
         val insetModifier = Modifier
@@ -1677,8 +1493,6 @@ private fun StudioCropEditor(
                     modifier = insetModifier,
                 )
             } else if (image != null) {
-                // Also the fallback when a clip fails to play: the extracted still is still a
-                // truthful preview of the crop, just a motionless one.
                 StudioCropPreviewTile(
                     image = image,
                     aspect = frameAspectFor(geom.value),
@@ -1692,32 +1506,23 @@ private fun StudioCropEditor(
     }
 }
 
-// Current crop window + source dimensions — everything the fixed-frame render/gesture needs.
 private data class CropGeom(
     val srcW: Int, val srcH: Int,
     val cropL: Float, val cropT: Float, val cropR: Float, val cropB: Float,
 )
 
-// The crop window's on-screen aspect. Extracted so the 6.2 result preview can show the SAME
-// rectangle the frame does: two copies of this expression would drift apart the moment a crop
-// profile changed, and the preview's whole claim is that it agrees with the frame beside it.
 private fun frameAspectFor(g: CropGeom): Float {
     val cw = (g.cropR - g.cropL).coerceAtLeast(0.0001f)
     val ch = (g.cropB - g.cropT).coerceAtLeast(0.0001f)
     return (cw * g.srcW) / (ch * g.srcH)
 }
 
-// The fixed frame's on-screen size: the crop window's aspect, fit to ~82% of the editor area.
 private fun frameSizeFor(g: CropGeom, areaW: Float, areaH: Float): Pair<Float, Float> {
     val frameAspect = frameAspectFor(g)
     val fw = if (frameAspect > areaW / areaH) 0.82f * areaW else 0.82f * areaH * frameAspect
     return fw to (fw / frameAspect)
 }
 
-// Where the frame sits and how the source must be scaled and shifted so the crop window lands
-// exactly on it. Extracted in 6.6: a still is painted by a DrawScope and a clip is positioned by
-// the layout system, and those two must place the same pixels in the same spot or panning would
-// move the image and the playing video by different amounts.
 private data class CropLayout(
     val fx: Float, val fy: Float, val fw: Float, val fh: Float,
     val imgLeft: Float, val imgTop: Float, val imgDispW: Float, val imgDispH: Float,
@@ -1727,7 +1532,7 @@ private fun cropLayoutFor(g: CropGeom, areaW: Float, areaH: Float): CropLayout {
     val (fw, fh) = frameSizeFor(g, areaW, areaH)
     val fx = (areaW - fw) / 2f
     val fy = (areaH - fh) / 2f
-    // Scale the source so the crop window maps exactly onto the fixed frame.
+
     val imgDispW = fw / (g.cropR - g.cropL).coerceAtLeast(0.0001f)
     val imgDispH = fh / (g.cropB - g.cropT).coerceAtLeast(0.0001f)
     return CropLayout(
@@ -1737,8 +1542,6 @@ private fun cropLayoutFor(g: CropGeom, areaW: Float, areaH: Float): CropLayout {
     )
 }
 
-// Dims everything outside the fixed frame, edge to edge, then strokes the frame. Identical for a
-// still and for a clip — only what sits underneath it differs.
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCropMask(
     l: CropLayout,
     accent: Color,
@@ -1757,7 +1560,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCropMask(
     )
 }
 
-// Decodes [path] downscaled to a display-friendly size (bake still reads the full original).
 private fun decodeDisplayBitmap(path: String): android.graphics.Bitmap? {
     val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
     android.graphics.BitmapFactory.decodeFile(path, bounds)
@@ -1768,9 +1570,6 @@ private fun decodeDisplayBitmap(path: String): android.graphics.Bitmap? {
     return android.graphics.BitmapFactory.decodeFile(path, opts)
 }
 
-// Small muted looping preview inside a grid tile — plays only while the tile is focused
-// (controller) or long-pressed (touch), so at most one decoder ever runs. TextureView, not
-// SurfaceView, so it composites inside the Studio like any other tile content.
 @Composable
 private fun StudioVideoTilePreview(url: String, modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -1780,10 +1579,7 @@ private fun StudioVideoTilePreview(url: String, modifier: Modifier = Modifier) {
     }
     var failed by remember(url) { mutableStateOf(false) }
     var triedLocal by remember(url) { mutableStateOf(false) }
-    // Starts as the remote URL. ScreenScraper's mediaJeu.php serves videos with no
-    // Content-Length and no range support, so a clip whose moov atom trails the media data
-    // can't stream progressively. On the first playback error we download the clip to cache
-    // and retry from the local file, which is fully seekable.
+
     var source by remember(url) { mutableStateOf(url) }
 
     val player = remember(source) {
@@ -1840,8 +1636,6 @@ private fun StudioVideoTilePreview(url: String, modifier: Modifier = Modifier) {
     )
 }
 
-// Downloads a tile-preview clip to cache (keyed by URL) so a non-seekable SS stream can play
-// from a local, seekable file. Capped so a full gameplay video can't fill the cache partition.
 private fun downloadTilePreviewVideo(context: android.content.Context, url: String): java.io.File? =
     runCatching {
         val name = "studio_vid_" + Integer.toHexString(url.hashCode()) + ".mp4"
@@ -1864,7 +1658,6 @@ private fun downloadTilePreviewVideo(context: android.content.Context, url: Stri
         dest.takeIf { it.length() > 0 } ?: run { dest.delete(); null }
     }.onFailure { timber.log.Timber.w(it, "Tile preview video download failed") }.getOrNull()
 
-// Center-crop matrix so the (usually 4:3) frame fills the tile.
 private fun studioTileCrop(view: android.view.TextureView, size: androidx.media3.common.VideoSize?) {
     val vw = size?.width?.toFloat() ?: return
     val vh = size.height.toFloat()
@@ -1877,8 +1670,6 @@ private fun studioTileCrop(view: android.view.TextureView, size: androidx.media3
     })
 }
 
-// One rendered PDF page (PdfRenderer, white backing, 2x scale) for the manual candidate
-// preview. Reports the page count once so the ViewModel can clamp navigation.
 @Composable
 private fun StudioPdfPage(
     path: String,
@@ -1930,14 +1721,6 @@ private fun StudioPdfPage(
     }
 }
 
-
-/**
- * The Studio's three counters, side by side and equal width.
- *
- * Equal width on purpose: they are peers, and a row that sized itself to its contents would move
- * every time the numbers changed, which on a screen you watch during a run is exactly the wrong
- * thing to do. Fixed height for the same reason — a missing quota must not shorten the row.
- */
 @Composable
 private fun StudioStatusRow(stats: List<StudioStat>, accent: Color) {
     Row(
@@ -1970,9 +1753,7 @@ private fun StudioStatusRow(stats: List<StudioStat>, accent: Color) {
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                // The bar is drawn only where a proportion exists. A counter with no cap — Found,
-                // or Requests before the account has answered — shows its number and no track,
-                // rather than an empty bar that reads as "zero of something".
+
                 stat.fraction?.let { f ->
                     Spacer(Modifier.height(4.dp))
                     Box(
@@ -1996,5 +1777,4 @@ private fun StudioStatusRow(stats: List<StudioStat>, accent: Color) {
     }
 }
 
-/** Fixed, so the row never changes height as numbers arrive or a cap turns out to be unknown. */
 private val STUDIO_STATUS_HEIGHT = 34.dp

@@ -6,7 +6,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WallpaperMetricsTest {
-
     private fun image(width: Int = 480, height: Int = 272, argbAt: (x: Int, y: Int) -> Int) =
         BmpImage(width, height, IntArray(width * height) { i -> argbAt(i % width, i / width) })
 
@@ -26,7 +25,6 @@ class WallpaperMetricsTest {
 
     @Test
     fun `soft vertical gradient is quiet`() {
-        // Sony-style soft wallpaper: luminance drifts gently top to bottom.
         val soft = image { _, y ->
             val v = (80 + (y * 100 / 272)).coerceIn(0, 255)
             0xFF000000.toInt() or (v shl 16) or (v shl 8) or v
@@ -39,7 +37,7 @@ class WallpaperMetricsTest {
     fun `luminance endpoints`() {
         assertEquals(0f, WallpaperMetrics.luminance(0xFF000000.toInt()))
         assertEquals(1f, WallpaperMetrics.luminance(0xFFFFFFFF.toInt()), 0.001f)
-        // Pure green is the brightest primary under Rec.601.
+
         assertTrue(
             WallpaperMetrics.luminance(0xFF00FF00.toInt()) >
                 WallpaperMetrics.luminance(0xFFFF0000.toInt()),

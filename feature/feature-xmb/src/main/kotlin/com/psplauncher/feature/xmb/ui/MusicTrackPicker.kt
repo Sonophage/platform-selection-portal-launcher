@@ -43,20 +43,11 @@ import com.psplauncher.feature.xmb.viewmodel.MusicTrackPickerState
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
-//
-// PickerText was left as Color.White when PickerSubtext was converted, so this screen drew its
-// track titles in white on its own theme-coloured gradient while the line under them was
-// correct. Half of a pair, with the comment explaining the bug sitting right beside it.
 private val PickerText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
 private val PickerSubtext: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val PickerCheck = Color(0xFF7CE5A2)
 private val CoverPlaceholder = Color(0xFF1B1B27)
 
-// Multi-select picker over all scanned tracks, used by a playlist's "Add Tracks" row. Selection and
-// commit are driven entirely by the ViewModel so controller and touch behave identically (mirrors
-// InstalledAppPicker).
 @Composable
 fun MusicTrackPicker(
     state: MusicTrackPickerState,
@@ -67,7 +58,6 @@ fun MusicTrackPicker(
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(state.selectedIndex) {
-        // Confirm row + one row per track; clamp so a stale cursor can't crash the LazyColumn.
         listState.animateScrollToItem(state.selectedIndex.coerceIn(0, state.tracks.size))
     }
 
@@ -98,9 +88,7 @@ fun MusicTrackPicker(
         )
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 28.dp)) {
             Text("Add to ${state.playlistName}", color = PickerText, fontSize = 22.sp, fontWeight = FontWeight.Light)
-            // The count alone. Its three prompts moved to the shared bar at the foot of the
-            // screen, where the other two pickers put theirs — this was the third picker still
-            // naming its buttons in a row of its own, halfway up the page.
+
             Spacer(Modifier.height(2.dp))
 
             if (state.tracks.isEmpty()) {
@@ -112,7 +100,6 @@ fun MusicTrackPicker(
             }
 
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                // Index 0 = Confirm row.
                 item {
                     PickerRow(
                         selected = state.selectedIndex == 0,
@@ -204,11 +191,6 @@ private fun PickerRow(
         content = content,
     )
 }
-
-// ── The picker's footer ───────────────────────────────────────────────────────
-//
-// The shared [PfpHintBar], with the count in the centre slot — the same shape AppPickerHintBar
-// and GamePickerHintBar use, so all three pickers say the same kind of thing in the same place.
 
 @Composable
 private fun MusicTrackPickerHintBar(

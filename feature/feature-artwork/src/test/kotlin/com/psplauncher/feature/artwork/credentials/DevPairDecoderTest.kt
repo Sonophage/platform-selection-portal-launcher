@@ -4,16 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * The bundled developer pair rides through a Gradle XOR encoder (see
- * feature-artwork/build.gradle.kts) and [DevPairDecoder] on the way back. The Gradle side and the
- * decoder must agree exactly or the provider silently turns off, so the round-trip is pinned here
- * with a mirrored implementation of the Gradle key derivation.
- */
 class DevPairDecoderTest {
-
-    // Mirrors the Gradle encoder: SHA-256(salt + propName) as the XOR keystream. If the Gradle
-    // derivation ever changes, this mirror must change with it — the tests fail first.
     private fun gradleKey(salt: String, propName: String): ByteArray =
         java.security.MessageDigest.getInstance("SHA-256")
             .digest(salt.toByteArray(Charsets.UTF_8) + propName.toByteArray(Charsets.UTF_8))

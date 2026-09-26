@@ -14,13 +14,6 @@ import javax.inject.Singleton
 
 private val KEY_TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
 
-/**
- * The user's TMDB key, stored the way every other service credential here is.
- *
- * Deliberately the same shape as SgdbApiKeyProvider — sealed through KeystoreSecretCipher, read
- * back with decryptOrLegacy — so there is one way credentials are handled in this app rather than
- * a second one invented for films.
- */
 @Singleton
 class TmdbApiKeyProvider @Inject constructor(
     @ApplicationContext private val context: Context,

@@ -24,30 +24,20 @@ import javax.inject.Inject
 data class ArtworkSettingsUiState(
     val hasApiKey: Boolean = false,
     val apiKeyMasked: String = "",
-    // The Artwork Studio crop editor's live result inset. Also switchable with Ⓨ inside the editor.
+
     val cropPreviewEnabled: Boolean =
         com.psplauncher.core.data.repository.CropPreviewPreferences.DEFAULT_ENABLED,
     val hasIgdbCredentials: Boolean = false,
     val igdbClientId: String = "",
     val igdbCredentialStatus: String? = null,
-    // ScreenScraper: ssEnabled = the bundled developer pair exists and scraping works at all;
-    // the user account is optional and only raises rate limits/quota. There is no user-entered
-    // developer pair — the build ships one (obfuscated) and there is nothing to override it with.
+
     val ssEnabled: Boolean = false,
     val hasSsCredentials: Boolean = false,
     val ssUsername: String = "",
     val ssCredentialStatus: String? = null,
-    // Set when a credential was saved but the Keystore refused to seal it, so it is on disk in
-    // plaintext. Silently degrading was the old behaviour and the user was never told.
+
     val unprotectedSecretWarning: String? = null,
-    // What is typed into the credential fields but not saved yet.
-    //
-    // Held here rather than in the screen's own remember, because on a 462dp-tall screen the
-    // keyboard covers everything below the field you are filling: entering a two-part credential
-    // means dismissing it to reach the second box, and any back press that leaves the pane took
-    // the half-typed pair with it. Three of the six drafts were also keyed on the stored value
-    // (`remember(state.igdbClientId)`), so a store emission could blank the field mid-entry.
-    // Surviving the keyboard is the whole point of them living up here.
+
     val drafts: CredentialDrafts = CredentialDrafts(),
     val status: ArtworkStatus = ArtworkStatus(),
     val isLoadingStatus: Boolean = false,
@@ -63,35 +53,31 @@ data class ArtworkSettingsUiState(
     val isRepairingLinks: Boolean = false,
     val confirmRescrapeAll: Boolean = false,
     val diskCacheSizeMb: String = "0 MB",
-    // Global default for how game tiles are drawn on the XMB (per-game overrides live in each
-    // game's Icon Display options menu).
+
     val iconDisplayMode: com.psplauncher.core.domain.model.IconDisplayMode =
         com.psplauncher.core.domain.model.IconDisplayMode.DEFAULT,
-    // Whether ICON1 video snaps play at all. Where they play is [snapPlacement].
+
     val animatedIcons: Boolean = true,
-    // Icon tile (PSP, Custom Icon mode only) or full-bleed behind the crossbar (PS3, any mode).
+
     val snapPlacement: com.psplauncher.core.domain.model.VideoSnapPlacement =
         com.psplauncher.core.domain.model.VideoSnapPlacement.DEFAULT,
-    // The focused game's scraped one-liner under its logo on the XMB.
+
     val gameMetadata: Boolean = true,
     val itemBackdrop: Boolean = true,
-    // How long the cursor must rest on a game before its video snap plays (Video Snap Delay,
-    // under the Animated Icons toggle). Seconds, clamped 1..5; default 1.5 matches the PSP.
+
     val icon1LingerDelaySeconds: Float = 1.5f,
     val downloadHeroes: Boolean = true,
     val downloadLogos: Boolean = true,
     val downloadManuals: Boolean = true,
     val downloadVideoSnaps: Boolean = false,
     val preferSteamGridDbHeroes: Boolean = false,
-    // Portable artwork folder is configured but its access grant died (SD removed, permission
-    // revoked) — surfaces a warning on the Artwork Folder & Import row.
+
     val artworkFolderGrantDead: Boolean = false,
-    // Debug builds only: load every artwork and achievement credential from one .properties file.
+
     val debugCredentialsAvailable: Boolean = com.psplauncher.feature.settings.BuildConfig.DEBUG,
     val debugCredentialsStatus: String? = null,
 )
 
-/** The credential text fields whose in-progress contents outlive the screen. */
 enum class CredentialField { SGDB_KEY, IGDB_CLIENT_ID, IGDB_CLIENT_SECRET, SS_USERNAME, SS_PASSWORD }
 
 @androidx.compose.runtime.Immutable
@@ -134,7 +120,6 @@ class ArtworkSettingsViewModel @Inject constructor(
     private val cropPreviewPreferences: com.psplauncher.core.data.repository.CropPreviewPreferences,
     private val debugCredentialsLoader: com.psplauncher.feature.settings.debug.DebugCredentialsLoader,
 ) : ViewModel() {
-
     private val _extra = MutableStateFlow(ArtworkSettingsUiState())
 
     init {
@@ -168,24 +153,19 @@ class ArtworkSettingsViewModel @Inject constructor(
                 _extra.update { it.copy(icon1LingerDelaySeconds = seconds) }
             }
         }
-        // The Artwork Studio's crop editor writes this same preference with its Ⓨ toggle, so the
-        // row follows a change made there without the screen being reopened.
+
         viewModelScope.launch {
             cropPreviewPreferences.enabledFlow.collect { enabled ->
                 _extra.update { it.copy(cropPreviewEnabled = enabled) }
             }
         }
-        // Startup grant check (§17): a configured folder whose grant died gets a visible
-        // warning instead of silently broken artwork.
+
         viewModelScope.launch {
             val configured = artworkFolderRepository.getTreeUri() != null
             val dead = configured && !artworkFolderRepository.hasLiveGrant()
             _extra.update { it.copy(artworkFolderGrantDead = dead) }
         }
-        // Scrapes run as WorkManager jobs (survive leaving this screen, show a notification,
-        // cancellable) — this observer is the single source of the in-app progress state, so
-        // reopening the screen mid-scrape reattaches to the live run. getInstance is guarded
-        // because plain JVM unit tests have no WorkManager initialized.
+
         runCatching { androidx.work.WorkManager.getInstance(context) }.getOrNull()?.let { wm ->
             viewModelScope.launch {
                 wm.getWorkInfosForUniqueWorkFlow(MetadataScrapeWorker.UNIQUE_NAME)
@@ -214,7 +194,7 @@ class ArtworkSettingsViewModel @Inject constructor(
             return
         }
         if (!_extra.value.isScraping) return
-        // Just finished — derive the summary from the terminal WorkInfo.
+
         val finished = infos.maxByOrNull { it.state.ordinal }
         val summary = when (finished?.state) {
             androidx.work.WorkInfo.State.SUCCEEDED -> {
@@ -224,9 +204,7 @@ class ArtworkSettingsViewModel @Inject constructor(
                 val counts = "$label: ${out.getInt(MetadataScrapeWorker.KEY_SUCCEEDED, 0)} succeeded, " +
                     "${out.getInt(MetadataScrapeWorker.KEY_FAILED, 0)} failed of " +
                     "${out.getInt(MetadataScrapeWorker.KEY_TOTAL, 0)}"
-                // A run that stopped part-way says why. Without this a quota that ran out and a
-                // library of unrecognised games produce the same sentence, and only one of them
-                // is worth doing anything about.
+
                 out.getString(MetadataScrapeWorker.KEY_STOPPED_REASON)
                     ?.let { "$counts. $it" }
                     ?: counts
@@ -240,18 +218,13 @@ class ArtworkSettingsViewModel @Inject constructor(
         refreshStatus()
     }
 
-    // ssEnabled comes from the credential source (bundled dev pair + stored user account), so it
-    // can change while the screen is open — it has to be a flow in the combine, not a one-shot read.
     private val ssAccounts = combine(
         metadataKeyProvider.ssUsernameFlow,
         screenScraperApi.isEnabledFlow,
-        // Whether the account is COMPLETE, asked of the provider rather than inferred from the
-        // username. A restore keeps ss_username and drops ss_password, so the username alone does
-        // not mean the account works -- and this screen was the thing telling the owner it did.
+
         metadataKeyProvider.hasSsCredentialsFlow,
     ) { username, enabled, hasBoth -> Triple(username, enabled, hasBoth) }
 
-    // Same pairing for IGDB: the public client id and whether the secret is actually there.
     private val igdb = combine(
         metadataKeyProvider.igdbClientIdFlow,
         metadataKeyProvider.hasIgdbCredentialsFlow,
@@ -297,11 +270,6 @@ class ArtworkSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Repoints every per-game backdrop that no longer resolves. See ArtworkLinkRepair: the column
-     * pointed into an internal store that was emptied, and nothing ever noticed because a missing
-     * backdrop just shows the wallpaper.
-     */
     fun repairArtworkLinks() {
         viewModelScope.launch {
             _extra.update { it.copy(isRepairingLinks = true, summary = null) }
@@ -375,8 +343,6 @@ class ArtworkSettingsViewModel @Inject constructor(
         _extra.update { it.copy(igdbCredentialStatus = null) }
     }
 
-    // ── ScreenScraper account ─────────────────────────────────────────────
-
     fun saveSsCredentials(username: String, password: String) {
         viewModelScope.launch {
             val protection = metadataKeyProvider.saveSsCredentials(username.trim(), password.trim())
@@ -405,18 +371,10 @@ class ArtworkSettingsViewModel @Inject constructor(
         _extra.update { it.copy(ssCredentialStatus = null) }
     }
 
-    // Note: the ScreenScraper developer pair is not user-entered — it ships obfuscated inside the
-    // APK and is exposed to settings only as the read-only ssEnabled state. See
-    // feature-artwork/credentials/BundledDevPairCredentialSource.kt.
-
     fun dismissUnprotectedSecretWarning() {
         _extra.update { it.copy(unprotectedSecretWarning = null) }
     }
 
-    /**
-     * Surfaces a Keystore seal failure. The value was still saved — losing the user's typing is
-     * worse than storing it unencrypted — but they get to know which of the two happened.
-     */
     private fun warnIfUnprotected(what: String, protection: SecretProtection) {
         if (protection == SecretProtection.PROTECTED) return
         _extra.update {
@@ -428,13 +386,6 @@ class ArtworkSettingsViewModel @Inject constructor(
         }
     }
 
-    // ── Debug credentials file (debug builds only) ────────────────────────
-
-    /**
-     * Reads the picked `.properties` file and saves every credential it holds. The read is capped
-     * ([com.psplauncher.feature.settings.debug.DEBUG_CREDENTIALS_MAX_BYTES]), so picking a video
-     * or a ROM by mistake is refused instead of being loaded into memory.
-     */
     fun loadDebugCredentials(uri: android.net.Uri) {
         if (!com.psplauncher.feature.settings.BuildConfig.DEBUG) return
         viewModelScope.launch {
@@ -456,7 +407,6 @@ class ArtworkSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Saves the credentials in [text] and shows what happened. The parsing and saving is debug-only code. */
     internal fun loadDebugCredentialsText(text: String) {
         if (!com.psplauncher.feature.settings.BuildConfig.DEBUG) return
         viewModelScope.launch {
@@ -486,7 +436,6 @@ class ArtworkSettingsViewModel @Inject constructor(
 
     fun scrapeMissingOnly() = startScrape(MetadataScrapeWorker.MODE_MISSING)
 
-    /** Stops the running scrape batch; everything fetched so far is kept. */
     fun cancelScrape() = MetadataScrapeWorker.cancel(context)
 
     private fun startScrape(mode: String) {
@@ -503,7 +452,6 @@ class ArtworkSettingsViewModel @Inject constructor(
 
     fun dismissSummary() = _extra.update { it.copy(summary = null) }
 
-    /** Drops the ScreenScraper media-URL cache; the next scrape refreshes it per game. */
     fun clearSsUrlCache() {
         viewModelScope.launch {
             artworkRepository.clearSsMediaCache()
@@ -515,7 +463,7 @@ class ArtworkSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             artworkRepository.clearCache()
             _extra.update { it.copy(diskCacheSizeMb = "0.0 MB") }
-            refreshStatus()   // status counts change too — every game is "missing" again
+            refreshStatus()
         }
     }
 
@@ -528,12 +476,10 @@ class ArtworkSettingsViewModel @Inject constructor(
         viewModelScope.launch { iconDisplayPreferences.setAnimatedIcons(enabled) }
     }
 
-    /** Where an approved video snap plays: the icon tile, or behind the crossbar. */
     fun setSnapPlacement(placement: com.psplauncher.core.domain.model.VideoSnapPlacement) {
         viewModelScope.launch { iconDisplayPreferences.setSnapPlacement(placement) }
     }
 
-    /** The focused row's artwork behind the shell, and its colour on the wave. */
     fun setItemBackdrop(enabled: Boolean) {
         _extra.update { it.copy(itemBackdrop = enabled) }
         viewModelScope.launch { iconDisplayPreferences.setItemBackdrop(enabled) }

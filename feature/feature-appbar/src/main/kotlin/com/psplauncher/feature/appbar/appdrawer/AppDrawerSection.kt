@@ -44,28 +44,6 @@ import com.psplauncher.feature.appbar.AppFilter
 import com.psplauncher.feature.appbar.InstalledApp
 import com.psplauncher.feature.appbar.SECTION_LIST_ROWS
 
-// ── The 8q body ───────────────────────────────────────────────────────────────
-//
-// What every tab except All Apps draws: the tab's own apps as one large row that scrolls
-// sideways, and every app that is NOT in the tab as a compact A-Z list under it, six rows tall,
-// its columns running off to the right. Both halves scroll the same way, because the row is the
-// one the owner asked to be able to "scroll to the left to view the hidden ones".
-//
-// [apps] is the matched apps followed by the rest, and [rowCount] is where the seam is, so this
-// file never re-derives who belongs where — see SectionLayout.kt for why that matters.
-//
-// Monograms, not icons, by decision: a letter on a tile tinted to the current wave colour. The
-// real Android icons are a different colour each, and the point of this view is that a tab reads
-// as one block of things. The installed-app picker draws the real icons instead, from the same
-// repository — the two views want opposite things from the same data.
-//
-// This used to end "the grid on All Apps still draws the icons". There is no All Apps tab; the
-// filters are RECENT / APPS / EMULATORS / GAMES (AppDrawerViewModel).
-//
-// Sizes are the mock's pixels on its 1920x1080 frame divided by this panel's density of 2.3375,
-// the same arithmetic ToastStyle does: 140px tile -> 60dp, 480px column -> 205dp, 58px row ->
-// 25dp, 48px list tile -> 20.5dp.
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun AppDrawerSection(
@@ -78,22 +56,14 @@ internal fun AppDrawerSection(
     onAppLaunched: (String) -> Unit,
     onAppMenu: (InstalledApp) -> Unit,
     colors: StorefrontColors,
-    /**
-     * How many rows the compact list actually drew, reported up so the cursor can step by the
-     * same number. Not optional in spirit — a caller that ignores it gets a grid that fills the
-     * panel and a cursor that still moves by six.
-     */
+
     onListRowsMeasured: (Int) -> Unit = {},
 ) {
     val rowState = rememberLazyListState()
     val listState = rememberLazyGridState()
-    // The seam, derived from the lists themselves rather than passed alongside them: a rowCount
-    // that disagreed with the list it describes would put the cursor on a different app than the
-    // one it is drawn under.
+
     val rowCount = matched.size
 
-    // Two scrollers, one cursor: whichever half holds it gets scrolled to. Clamped, because a
-    // cursor left past the end by a list that shrank mid-scroll would otherwise throw here.
     LaunchedEffect(selectedIndex, usingTouch, rowCount) {
         if (usingTouch) return@LaunchedEffect
         if (selectedIndex < rowCount) {
@@ -125,24 +95,14 @@ internal fun AppDrawerSection(
         if (rest.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
             SectionHeading(EverythingElse, colors)
-            // The list takes the height that is LEFT, and turns it into rows.
-            //
-            // It used to be `Fixed(SECTION_LIST_ROWS)` at a fixed height, which is six rows on
-            // every screen. Six is what fits the reference handheld; on a 668dp tablet it drew
-            // 150dp of list and left the bottom third of the panel bare, because the count was a
-            // constant and nothing measured the panel. The size of a row is the user's (the
-            // scale slider is a density multiplier, so ListRowHeight grows with it) — how many
-            // fit is the layout's, and that is this division.
+
             BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
                 val rows = (maxHeight / ListRowHeight).toInt().coerceIn(MIN_LIST_ROWS, MAX_LIST_ROWS)
-                // Report BEFORE drawing, and only on a change: the cursor arithmetic in
-                // sectionMove has to be given this same number or left/right steps by a column
-                // height the grid is not using.
+
                 LaunchedEffect(rows) { onListRowsMeasured(rows) }
                 LazyHorizontalGrid(
                     state = listState,
-                    // Fixed rows with items flowing rightward IS the mock's `grid-auto-flow:
-                    // column`: A-F down the first column, then G-L down the second.
+
                     rows = GridCells.Fixed(rows),
                     horizontalArrangement = Arrangement.spacedBy(ColumnGap),
                     modifier = Modifier.fillMaxWidth().height(ListRowHeight * rows),
@@ -232,13 +192,6 @@ private fun ListRow(
     }
 }
 
-/**
- * A letter on a tile tinted to the current wave colour.
- *
- * [StorefrontColors.accentHue] rather than a fixed white wash, so the drawer changes with the
- * theme the way the rest of the launcher does. The focused tile is the same hue turned up, plus
- * the cursor edge every other focused thing in the app wears.
- */
 @Composable
 private fun Monogram(
     label: String,
@@ -258,8 +211,7 @@ private fun Monogram(
             .then(if (focused) Modifier.border(2.dp, menuCursorEdge(), shape) else Modifier),
     ) {
         Text(
-            // The first character, whatever it is: an app called "8 Ball Pool" gets an 8, which
-            // is the letter its A-Z position sorts under anyway.
+
             text = label.trim().firstOrNull()?.uppercase() ?: "?",
             color = colors.textPrimary,
             fontSize = glyphSize,
@@ -268,14 +220,8 @@ private fun Monogram(
     }
 }
 
-/** The list under the row is the tab's complement, so it says so rather than "All apps". */
 private const val EverythingElse = "Everything else"
 
-// The mock's pixels over 2.3375. The two label sizes are held at the bundle's own legibility
-// floor of 28px (12sp) where the mock fell under it — the same call ToastStyle made, for the same
-// reason: the floor is the rule the whole bundle is drawn against and 26px is a slip inside one
-// card. The monogram glyphs keep the mock's ratio to their tile (0.42) instead, because a letter
-// filling an icon-sized square is a glyph, not reading matter, and 12sp would not fit a 20dp box.
 private val TileSize = 60.dp
 private val TileCell = 68.dp
 private val TileGap = 6.dp
@@ -285,15 +231,6 @@ private val TileLabelSize = 12.sp
 private val ListColumnWidth = 205.dp
 private val ListRowHeight = 25.dp
 
-/**
- * The band the measured row count is clamped into.
- *
- * The floor is not the design's six. On the shortest panel this app runs on, overflowing is worse
- * than showing fewer rows — a grid taller than the space it was given draws its bottom row under
- * the hint bar, which is the same class of bug the letter rail had. The ceiling is there so a
- * very tall window does not turn the list into a wall of twenty near-identical rows; past a dozen
- * the A-Z column stops being scannable, which is the only reason it is a list and not a grid.
- */
 private const val MIN_LIST_ROWS = 4
 private const val MAX_LIST_ROWS = 12
 private val ListTileSize = 20.dp

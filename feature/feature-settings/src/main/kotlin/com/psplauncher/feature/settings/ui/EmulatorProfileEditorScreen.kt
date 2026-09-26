@@ -22,12 +22,6 @@ import com.psplauncher.core.domain.model.IntentType
 import com.psplauncher.feature.settings.viewmodel.EmulatorTemplate
 import com.psplauncher.feature.settings.viewmodel.ProfileEditorState
 
-// This screen kept its own palette, which meant its text and accent ignored the user's theme while
-// every other settings screen followed it. Text and accent now read the shared settings roles, the
-// same composable getters SettingsScaffold exposes.
-//
-// Error and border stay fixed on purpose: a destructive red that shifted with the accent would stop
-// reading as a warning, and the border is chrome rather than a signal.
 private val EditorText: Color
     @Composable get() = SettingsText
 private val EditorSubtext: Color
@@ -65,9 +59,6 @@ fun EmulatorProfileEditorScreen(
 ) {
     val subtitle = if (editorState.isNew) "New Profile" else "Edit Profile"
 
-    // Custom-intent field guide (Advanced section). Shown while the ⓘ row is focused
-    // ("hovered" on a controller); pressing SELECT pins it open so it stays visible while
-    // the user edits the fields below.
     var intentHelpPinned  by remember { mutableStateOf(false) }
     var intentHelpFocused by remember { mutableStateOf(false) }
 
@@ -83,8 +74,6 @@ fun EmulatorProfileEditorScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState),
         ) {
-
-            // ── Detection banner (wizard) ─────────────────────────────────
             editorState.detectionNote?.let { note ->
                 Text(
                     text     = note,
@@ -93,7 +82,6 @@ fun EmulatorProfileEditorScreen(
                 )
             }
 
-            // ── Recommended templates ─────────────────────────────────────
             SettingsGroup("Recommended Templates")
             EmulatorTemplate.entries.forEach { template ->
                 SettingsRow(
@@ -103,7 +91,6 @@ fun EmulatorProfileEditorScreen(
                 )
             }
 
-            // ── Required fields ───────────────────────────────────────────
             SettingsGroup("Required")
 
             EditorTextField(
@@ -122,7 +109,6 @@ fun EmulatorProfileEditorScreen(
                 )
             }
 
-            // Intent type picker
             SettingsGroup("Launch Method")
 
             IntentType.entries.forEach { type ->
@@ -138,7 +124,6 @@ fun EmulatorProfileEditorScreen(
                 )
             }
 
-            // ── Optional fields ───────────────────────────────────────────
             SettingsGroup("Optional")
 
             EditorTextField(
@@ -179,7 +164,6 @@ fun EmulatorProfileEditorScreen(
                 singleLine    = false,
             )
 
-            // ── URI flags ─────────────────────────────────────────────────
             SettingsGroup("URI Flags")
 
             SettingsToggleRow(
@@ -196,11 +180,8 @@ fun EmulatorProfileEditorScreen(
                 onToggle = onUseSafUriChange,
             )
 
-            // ── Advanced ──────────────────────────────────────────────────
             SettingsGroup("Advanced")
 
-            // Info affordance for the custom-intent fields: focusing it (controller "hover")
-            // reveals the guide; pressing SELECT pins it open so it stays while editing below.
             SettingsRow(
                 label    = "How custom intents work",
                 sublabel = if (intentHelpPinned) "Press to hide the field guide"
@@ -251,7 +232,6 @@ fun EmulatorProfileEditorScreen(
                 placeholder   = "iso,cso,chd  (informational)",
             )
 
-            // ── Error message ─────────────────────────────────────────────
             editorState.errorMessage?.let { msg ->
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -261,7 +241,6 @@ fun EmulatorProfileEditorScreen(
                 )
             }
 
-            // ── Test ──────────────────────────────────────────────────────
             SettingsGroup("Test")
 
             SettingsRow(
@@ -270,7 +249,6 @@ fun EmulatorProfileEditorScreen(
                 onClick  = onTestLaunch,
             )
 
-            // ── Actions ───────────────────────────────────────────────────
             SettingsGroup("Actions")
 
             SettingsRow(
@@ -293,8 +271,6 @@ fun EmulatorProfileEditorScreen(
     }
 }
 
-// Confirm-to-edit: navigating onto the field no longer auto-opens the keyboard; the user
-// presses SELECT (A) to start typing. Delegates to the shared settings field.
 @Composable
 private fun EditorTextField(
     label: String,
@@ -312,8 +288,6 @@ private fun EditorTextField(
     )
 }
 
-// Inline field guide for the Advanced custom-intent inputs. Non-focusable text — the D-pad
-// cursor skips straight past it from the ⓘ row to the Intent Action field.
 @Composable
 private fun CustomIntentHelp() {
     Column(modifier = Modifier.padding(start = 64.dp, end = 48.dp, top = 2.dp, bottom = 12.dp)) {

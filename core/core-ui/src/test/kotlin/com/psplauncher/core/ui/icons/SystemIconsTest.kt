@@ -7,16 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/**
- * Keeps `SYSICON_PLATFORM_IDS` (the theme-kit console-slot registry) and the R8-safe static
- * `when` in [systemIconRes] in lockstep. The `when` must stay static — it is what stops R8's
- * resource shrinker stripping the `sysicon_*` drawables — so the test, not reflection, is the
- * guard: every registered platform id must resolve to dedicated art, never the fallback.
- *
- * Pure JVM: R.drawable.* fields are compile-time constants, so no Robolectric is needed.
- */
 class SystemIconsTest {
-
     @Test
     fun `platform id list is non-empty and unique`() {
         assertTrue(SYSICON_PLATFORM_IDS.isNotEmpty())

@@ -4,9 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-// Pure string-math derivation used by the single ROM-root scan path — no Android dependencies.
 class RomRootDerivationTest {
-
     @Test
     fun `docIdToRawPath maps primary and removable volumes`() {
         assertEquals("/storage/emulated/0/Roms", RomRootRepository.docIdToRawPath("primary:Roms"))
@@ -58,7 +56,7 @@ class RomRootDerivationTest {
                 romDirectory = "/storage/emulated/0/Games/GBA",
             )
         )
-        // Sibling that merely shares a name prefix must not match ("/Roms2" vs "/Roms").
+
         assertNull(
             RomRootRepository.childDocIdFrom(
                 rootDocId   = "primary:Roms",

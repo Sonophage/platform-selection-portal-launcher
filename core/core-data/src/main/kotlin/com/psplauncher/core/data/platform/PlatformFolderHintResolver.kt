@@ -3,29 +3,11 @@ package com.psplauncher.core.data.platform
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Detects platform from folder names in a ROM file path.
-// Used to resolve ambiguous extensions (.iso, .chd, .bin, .cue, .img)
-// that can belong to multiple platforms based on how the user organised their library.
-//
-// Folder name priority: deepest (most-specific) path segment wins.
-// e.g. /ROMs/PS2/action/game.iso → "ps2" from segment "ps2"
-//
-// Primary folder names follow EmulationStation Desktop Edition (ES-DE) conventions
-// so that a standard ES-DE roms/ layout is detected automatically without any
-// manual configuration.
 @Singleton
 class PlatformFolderHintResolver @Inject constructor() {
-
-    // Key  = lowercase folder segment (exact match)
-    // Value = platform ID matching PlatformSeeder — except "dos", "ports" and "scummvm" below,
-    //         which no seeded platform has yet, so a hit on those folder names resolves to an id
-    //         the database does not contain.
     private val hints: Map<String, String> = mapOf(
 
-        // ── Sony — ES-DE canonical first, then common aliases ──────────────
-
-        // PSX / PlayStation 1
-        "psx"                       to "psx",   // ES-DE canonical
+        "psx"                       to "psx",
         "ps1"                       to "psx",
         "playstation"               to "psx",
         "playstation1"              to "psx",
@@ -33,174 +15,142 @@ class PlatformFolderHintResolver @Inject constructor() {
         "sony playstation"          to "psx",
         "pcsxr"                     to "psx",
 
-        // PS2
-        "ps2"                       to "ps2",   // ES-DE canonical
+        "ps2"                       to "ps2",
         "playstation2"              to "ps2",
         "playstation 2"             to "ps2",
         "pcsx2"                     to "ps2",
         "aethersx2"                 to "ps2",
 
-        // PS3
-        "ps3"                       to "ps3",   // ES-DE canonical
+        "ps3"                       to "ps3",
         "playstation3"              to "ps3",
         "playstation 3"             to "ps3",
         "rpcs3"                     to "ps3",
 
-        // PSP
-        "psp"                       to "psp",   // ES-DE canonical
+        "psp"                       to "psp",
         "playstation portable"      to "psp",
         "ppsspp"                    to "psp",
         "ppsspp game"               to "psp",
-        "game"                      to "psp",   // PPSSPP default: /PSP/GAME/
+        "game"                      to "psp",
 
-        // PS Vita
-        "psvita"                    to "psvita", // ES-DE canonical
+        "psvita"                    to "psvita",
         "vita"                      to "psvita",
         "ps vita"                   to "psvita",
         "playstation vita"          to "psvita",
 
-        // ── Nintendo — ES-DE canonical first ──────────────────────────────
-
-        // NES
-        "nes"                       to "nes",    // ES-DE canonical
+        "nes"                       to "nes",
         "famicom"                   to "nes",
         "nintendo entertainment system" to "nes",
 
-        // SNES
-        "snes"                      to "snes",   // ES-DE canonical
+        "snes"                      to "snes",
         "super nintendo"            to "snes",
         "super famicom"             to "snes",
         "superfamicom"              to "snes",
         "sfc"                       to "snes",
 
-        // N64
-        "n64"                       to "n64",    // ES-DE canonical
+        "n64"                       to "n64",
         "nintendo 64"               to "n64",
         "nintendo64"                to "n64",
 
-        // Game Boy
-        "gb"                        to "gb",     // ES-DE canonical
+        "gb"                        to "gb",
         "gameboy"                   to "gb",
         "game boy"                  to "gb",
         "game boy original"         to "gb",
         "dmg"                       to "gb",
 
-        // Game Boy Color
-        "gbc"                       to "gbc",    // ES-DE canonical
+        "gbc"                       to "gbc",
         "gameboy color"             to "gbc",
         "game boy color"            to "gbc",
 
-        // GBA
-        "gba"                       to "gba",    // ES-DE canonical
+        "gba"                       to "gba",
         "gameboy advance"           to "gba",
         "game boy advance"          to "gba",
 
-        // NDS
-        "nds"                       to "nds",    // ES-DE canonical
+        "nds"                       to "nds",
         "ds"                        to "nds",
         "nintendo ds"               to "nds",
         "desmume"                   to "nds",
         "drastic"                   to "nds",
 
-        // 3DS — ES-DE uses "n3ds"
-        "n3ds"                      to "n3ds",   // ES-DE canonical
+        "n3ds"                      to "n3ds",
         "3ds"                       to "n3ds",
         "nintendo 3ds"              to "n3ds",
         "citra"                     to "n3ds",
 
-        // GameCube — ES-DE uses "gc"
-        "gc"                        to "gc",     // ES-DE canonical
+        "gc"                        to "gc",
         "gamecube"                  to "gc",
         "nintendo gamecube"         to "gc",
-        "dolphin"                   to "gc",     // Dolphin handles both GC and Wii
+        "dolphin"                   to "gc",
 
-        // Wii
-        "wii"                       to "wii",    // ES-DE canonical
+        "wii"                       to "wii",
         "nintendo wii"              to "wii",
 
-        // Wii U
-        "wiiu"                      to "wiiu",   // ES-DE canonical
+        "wiiu"                      to "wiiu",
         "wii u"                     to "wiiu",
         "nintendo wii u"            to "wiiu",
         "cemu"                      to "wiiu",
 
-        // Switch
-        "switch"                    to "switch", // ES-DE canonical
+        "switch"                    to "switch",
         "nintendo switch"           to "switch",
         "ryujinx"                   to "switch",
         "yuzu"                      to "switch",
 
-        // Virtual Boy
-        "virtualboy"                to "virtualboy", // ES-DE canonical
+        "virtualboy"                to "virtualboy",
         "virtual boy"               to "virtualboy",
 
-        // ── Sega ──────────────────────────────────────────────────────────
-
-        // Mega Drive / Genesis
-        "megadrive"                 to "megadrive", // ES-DE canonical
-        "genesis"                   to "megadrive", // ES-DE alias
+        "megadrive"                 to "megadrive",
+        "genesis"                   to "megadrive",
         "md"                        to "megadrive",
         "mega drive"                to "megadrive",
         "sega genesis"              to "megadrive",
         "sega mega drive"           to "megadrive",
         "sega megadrive"            to "megadrive",
 
-        // Saturn
-        "saturn"                    to "saturn",  // ES-DE canonical
+        "saturn"                    to "saturn",
         "sega saturn"               to "saturn",
         "yabasanshiro"              to "saturn",
 
-        // Dreamcast
-        "dreamcast"                 to "dreamcast", // ES-DE canonical
+        "dreamcast"                 to "dreamcast",
         "dc"                        to "dreamcast",
         "sega dreamcast"            to "dreamcast",
         "flycast"                   to "dreamcast",
         "redream"                   to "dreamcast",
 
-        // Game Gear
-        "gamegear"                  to "gamegear", // ES-DE canonical
+        "gamegear"                  to "gamegear",
         "game gear"                 to "gamegear",
         "gg"                        to "gamegear",
         "sega game gear"            to "gamegear",
 
-        // Master System
-        "mastersystem"              to "mastersystem", // ES-DE canonical
+        "mastersystem"              to "mastersystem",
         "master system"             to "mastersystem",
         "sms"                       to "mastersystem",
         "sega master system"        to "mastersystem",
         "mark iii"                  to "mastersystem",
 
-        // Sega CD
-        "segacd"                    to "segacd",  // ES-DE canonical
+        "segacd"                    to "segacd",
         "sega cd"                   to "segacd",
         "mega cd"                   to "segacd",
         "megacd"                    to "segacd",
 
-        // Sega 32X
-        "sega32x"                   to "sega32x", // ES-DE canonical
+        "sega32x"                   to "sega32x",
         "32x"                       to "sega32x",
         "sega 32x"                  to "sega32x",
 
-        // ── Atari ─────────────────────────────────────────────────────────
-
-        "atari2600"                 to "atari2600", // ES-DE canonical
+        "atari2600"                 to "atari2600",
         "atari 2600"                to "atari2600",
-        "atari"                     to "atari2600", // bare "atari" folder defaults to 2600
+        "atari"                     to "atari2600",
 
-        "atari5200"                 to "atari5200", // ES-DE canonical
+        "atari5200"                 to "atari5200",
         "atari 5200"                to "atari5200",
 
-        "atari7800"                 to "atari7800", // ES-DE canonical
+        "atari7800"                 to "atari7800",
         "atari 7800"                to "atari7800",
 
-        "atarilynx"                 to "atarilynx", // ES-DE canonical
+        "atarilynx"                 to "atarilynx",
         "atari lynx"                to "atarilynx",
         "lynx"                      to "atarilynx",
 
-        // ── NEC ───────────────────────────────────────────────────────────
-
-        "pcengine"                  to "pcengine", // ES-DE canonical
-        "turbografx"                to "pcengine", // common alias
+        "pcengine"                  to "pcengine",
+        "turbografx"                to "pcengine",
         "turbografx-16"             to "pcengine",
         "turbografx16"              to "pcengine",
         "pc engine"                 to "pcengine",
@@ -209,43 +159,34 @@ class PlatformFolderHintResolver @Inject constructor() {
         "tgcd"                      to "pcengine",
         "pcenginecd"                to "pcengine",
 
-        // ── SNK ───────────────────────────────────────────────────────────
-
-        "neogeo"                    to "neogeo",  // ES-DE canonical
+        "neogeo"                    to "neogeo",
         "neo geo"                   to "neogeo",
         "neo-geo"                   to "neogeo",
 
-        "ngp"                       to "ngp",     // ES-DE canonical (Neo Geo Pocket)
+        "ngp"                       to "ngp",
         "ngpc"                      to "ngp",
         "neo geo pocket"            to "ngp",
         "neogeopocket"              to "ngp",
 
-        // ── Bandai ────────────────────────────────────────────────────────
-
-        "wonderswan"                to "wonderswan",      // ES-DE canonical
-        "wonderswancolor"           to "wonderswancolor", // ES-DE canonical
+        "wonderswan"                to "wonderswan",
+        "wonderswancolor"           to "wonderswancolor",
         "wonder swan"               to "wonderswan",
         "wonder swan color"         to "wonderswancolor",
         "wsc"                       to "wonderswancolor",
 
-        // ── Commodore ─────────────────────────────────────────────────────
-
-        "c64"                       to "c64",     // ES-DE canonical
+        "c64"                       to "c64",
         "commodore 64"              to "c64",
         "commodore64"               to "c64",
         "vice"                      to "c64",
 
-        // ── Arcade ────────────────────────────────────────────────────────
-
-        "mame"                      to "mame",    // ES-DE canonical
-        "arcade"                    to "mame",    // ES-DE canonical alias
+        "mame"                      to "mame",
+        "arcade"                    to "mame",
         "fbneo"                     to "mame",
         "finalburn"                 to "mame",
         "final burn"                to "mame",
         "fba"                       to "mame",
         "naomi"                     to "mame",
 
-        // Capcom Play System — split out from generic MAME/arcade (ES-DE canonical cps1/2/3).
         "cps1"                      to "cps1",
         "cps-1"                     to "cps1",
         "cps 1"                     to "cps1",
@@ -257,18 +198,14 @@ class PlatformFolderHintResolver @Inject constructor() {
         "cps-3"                     to "cps3",
         "cps 3"                     to "cps3",
 
-        // ── PC / Other ─────────────────────────────────────────────────────
-
-        // ── Microsoft ──────────────────────────────────────────────────────
-        "xbox"                      to "xbox",    // ES-DE canonical
+        "xbox"                      to "xbox",
         "microsoft xbox"            to "xbox",
         "xemu"                      to "xbox",
-        "xbox360"                   to "x360",    // ES-DE canonical
+        "xbox360"                   to "x360",
         "x360"                      to "x360",
         "xbox 360"                  to "x360",
 
-        // ── PC ─────────────────────────────────────────────────────────────
-        "windows"                   to "windows", // ES-DE canonical
+        "windows"                   to "windows",
         "winlator"                  to "windows",
         "pc"                        to "windows",
 
@@ -278,16 +215,14 @@ class PlatformFolderHintResolver @Inject constructor() {
         "scummvm"                   to "scummvm",
     )
 
-    // Walk path segments from deepest to shallowest and return the first match.
-    // Returns null if no folder name maps to a known platform.
     fun detectFromPath(filePath: String): String? {
         val segments = filePath
             .replace('\\', '/')
             .split('/')
-            .dropLast(1)   // drop the filename itself
+            .dropLast(1)
             .map { it.trim().lowercase() }
             .filter { it.isNotEmpty() }
-            .reversed()    // deepest first
+            .reversed()
 
         for (segment in segments) {
             hints[segment]?.let { return it }
@@ -295,18 +230,11 @@ class PlatformFolderHintResolver @Inject constructor() {
         return null
     }
 
-    // Direct lookup for a single folder name (e.g. a ROM-root subfolder). Drives the ES-DE
-    // single-scan autoload: each root subfolder name is resolved to a platform id here.
-    // Returns null when the name isn't a recognised ES-DE system folder.
     fun detectFromFolderName(name: String): String? =
         hints[name.trim().lowercase()]
 
-    // The ES-DE canonical directory name to CREATE for a platform when setting up a fresh ROM
-    // structure (the inverse of the hint map). Our platform ids already follow ES-DE names, so
-    // this is identity except where ES-DE diverges. Using ES-DE names keeps libraries portable
-    // to/from an actual ES-DE install.
     fun esDeFolderName(platformId: String): String = when (platformId) {
-        "x360" -> "xbox360"   // ES-DE canonical Xbox 360 folder
+        "x360" -> "xbox360"
         else   -> platformId
     }
 }

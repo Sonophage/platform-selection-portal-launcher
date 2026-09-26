@@ -46,13 +46,8 @@ import com.psplauncher.feature.xmb.R
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.resolveIconDisplay
 
-// Canonical icon dimensions — portrait, close to actual PSP game case proportions
 private val ICON_WIDTH  = 62.dp
 private val ICON_HEIGHT = 86.dp
-
-// Native PSP ICON0.PNG presentation — 144 × 80 (ratio 1.8). The icon FILLS the size the
-// caller gives it (see GAME_ICON_* in XMBItemList) so it's a proper 144:80 rectangle, not a
-// tiny square. Used for every console's game icons for a consistent XMB look.
 
 private val PspShape    = RoundedCornerShape(4.dp)
 private val SquircleShape = com.psplauncher.core.ui.icons.AppIconContainerShape
@@ -63,8 +58,6 @@ private val CartridgePinColor       = Color(0xFF2E2E38)
 private val IconBorder              = Color(0x55FFFFFF)
 private val ShineColor              = Color(0x18FFFFFF)
 
-// ── Entry point — routes to the right icon composable ─────────────────────────
-
 @Composable
 fun GameIcon(
     item: XMBItem,
@@ -72,10 +65,6 @@ fun GameIcon(
     modifier: Modifier = Modifier,
 ) {
     when {
-        // Non-game app rows keep their treatment (decorated tile or launcher squircle).
-        // REAL games never land here — every platform, including package-backed
-        // Android/Windows games, renders through the icon display modes below, so
-        // Custom Icon's 144:80 letter-tile fallback is uniform across the library.
         item.isAndroidApp && !item.isRealGame && item.iconUri != null -> PspIcon0Icon(
             artworkUri  = item.iconUri,
             accentColor = item.accentColor?.let { Color(it) },
@@ -88,8 +77,6 @@ fun GameIcon(
             modifier    = modifier,
         )
 
-        // Legacy global icon style — the whole slot becomes the platform's media image. Drawn to
-        // the same NATURAL_ART_HEIGHT as Physical Media mode so the two read at one size.
         iconStyle == GameIconStyle.CARTRIDGE -> NaturalArtSlot(modifier) { artModifier ->
             PhysicalMediaIcon(
                 platformId  = item.platformId,
@@ -99,10 +86,6 @@ fun GameIcon(
             )
         }
 
-        // Icon display modes: per-game override ?: per-console override ?: global. ICON0 keeps the PSP
-        // 144:80 edge-to-edge fill (and hosts the ICON1 video snap while focused); the other
-        // modes render their art at natural aspect, drawn to NATURAL_ART_HEIGHT so they read at a
-        // comparable size — the layout slot itself is unchanged (see [NaturalArtSlot]).
         else -> {
             val resolved = resolveIconDisplay(
                 item,
@@ -110,7 +93,6 @@ fun GameIcon(
                 LocalIconDisplayModeByPlatform.current,
             )
             when {
-                // Physical Media with nothing scraped: the bundled per-platform cartridge/disc.
                 resolved.mode == IconDisplayMode.PHYSICAL_MEDIA && resolved.uri == null ->
                     NaturalArtSlot(modifier) { artModifier ->
                         PhysicalMediaIcon(
@@ -121,10 +103,6 @@ fun GameIcon(
                         )
                     }
 
-                // Box Art / 3D Box with nothing scraped: a letter tile shaped like the
-                // platform's box — the mode still reads visually even before a scrape.
-                // (ICON0 with no art must NOT land here — it falls through to the else
-                // branch, whose PspIcon0Icon draws the 144:80 landscape letter tile.)
                 resolved.uri == null &&
                     (resolved.mode == IconDisplayMode.BOX_ART || resolved.mode == IconDisplayMode.BOX_3D) ->
                     NaturalArtSlot(modifier) { artModifier ->
@@ -139,8 +117,7 @@ fun GameIcon(
                 resolved.naturalAspect -> NaturalArtSlot(modifier) { artModifier ->
                     NaturalAspectArtIcon(
                         artworkUri  = resolved.uri!!,
-                        // Box fronts are opaque rectangles and get the PSP frame; 3D boxes and
-                        // cartridge shots are transparent silhouettes and render frameless.
+
                         framed      = resolved.uri == item.boxArtUri,
                         accentColor = item.accentColor?.let { Color(it) },
                         title       = item.title,
@@ -162,8 +139,6 @@ fun GameIcon(
                             modifier    = Modifier.fillMaxSize(),
                         )
                         if (video != null) {
-                            // ICON1: the snap plays over the static icon, clipped to the same
-                            // PSP tile shape; the static ICON0 stays under it as the poster.
                             Icon1VideoOverlay(
                                 videoUri = video.uri,
                                 modifier = Modifier.fillMaxSize().clip(PspShape),
@@ -176,23 +151,8 @@ fun GameIcon(
     }
 }
 
-// ── Taller drawing budget for the natural-aspect modes ───────────────────────
-
-/**
- * Box Art / 3D Box / Physical Media draw their art at natural aspect, so fitting inside the
- * 126 × 70 ICON0 slot leaves a tall keep case only ~49 dp wide — far smaller on screen than the
- * ICON0 tile it replaces. These modes get a taller budget and overflow the slot symmetrically.
- *
- * 84 dp is the practical ceiling: XMBItemList's ROW_HEIGHT is 88 dp, so anything more and the
- * tiles in adjacent rows touch.
- */
 private val NATURAL_ART_HEIGHT = 84.dp
 
-/**
- * Keeps the LAYOUT slot exactly as the caller sized it (126 × 70) — row pitch, label alignment
- * and the tap target never move — while handing [content] a taller, centred drawing box. The
- * overflow is drawn, not clipped, so the art simply reads bigger in the same list.
- */
 @Composable
 private fun NaturalArtSlot(
     modifier: Modifier,
@@ -203,18 +163,8 @@ private fun NaturalArtSlot(
     }
 }
 
-// ── Box-shaped letter placeholder (Box Art / 3D Box modes, no art yet) ────────
-
-/**
- * Box-front aspect (width / height) per platform, for the placeholder tile — a PS1 jewel case
- * reads square, a SNES box landscape, a PS2 keep case tall. A thin wrapper over the shared
- * dimension policy, which owns the table; this is the placeholder path, so there are no source
- * dimensions to prefer over the preset.
- */
 fun boxArtAspectFor(platformId: String?): Float = ArtworkDimensions.boxArt(platformId).aspectRatio
 
-// Letter tile in the platform's box shape — same accent-gradient + initial treatment as the
-// ICON0 fallback, shrunk-wrapped exactly like real natural-aspect art would be.
 @Composable
 private fun BoxArtPlaceholderIcon(
     platformId: String?,
@@ -244,12 +194,6 @@ private fun BoxArtPlaceholderIcon(
     }
 }
 
-// ── Natural-aspect tile (Box Art / Physical Media / 3D Box modes) ─────────────
-//
-// The layout slot the caller sizes stays fixed (row pitch and label alignment never move);
-// the VISIBLE container shrink-wraps the artwork: largest natural-aspect rect that fits the
-// slot, centered, with the chrome (frame, backing) hugging the fitted bounds — no pillarbox.
-// Coil's intrinsic size drives the aspect, so nothing needs pre-recorded dimensions.
 @Composable
 private fun NaturalAspectArtIcon(
     artworkUri: String,
@@ -258,17 +202,15 @@ private fun NaturalAspectArtIcon(
     title: String,
     modifier: Modifier = Modifier,
 ) {
-    // Size.ORIGINAL is load-bearing: the painter is only drawn AFTER it succeeds, so without
-    // an explicit size the request would wait forever for draw-time constraints (blank tile).
     val painter = coil3.compose.rememberAsyncImagePainter(
         model = coil3.request.ImageRequest.Builder(LocalContext.current)
             .data(artworkUri)
             .size(coil3.size.Size.ORIGINAL)
-            // Changes when the bytes behind artworkUri are replaced in place, so the tile reloads.
+
             .memoryCacheKey(ArtworkRevisions.cacheKey(artworkUri))
             .build()
     )
-    // Coil 3 exposes the painter state as a StateFlow rather than a plain value.
+
     val state by painter.state.collectAsState()
     val ratio = (state as? coil3.compose.AsyncImagePainter.State.Success)
         ?.painter?.intrinsicSize
@@ -279,7 +221,7 @@ private fun NaturalAspectArtIcon(
         when {
             ratio != null -> Box(
                 modifier = Modifier
-                    .aspectRatio(ratio)   // largest natural-aspect rect inside the slot
+                    .aspectRatio(ratio)
                     .then(
                         if (framed) Modifier
                             .clip(PspShape)
@@ -296,17 +238,15 @@ private fun NaturalAspectArtIcon(
                 )
             }
             state is coil3.compose.AsyncImagePainter.State.Error -> PspIcon0Icon(
-                artworkUri  = null,   // letter tile — the art is unreadable
+                artworkUri  = null,
                 accentColor = accentColor,
                 title       = title,
                 modifier    = Modifier.fillMaxSize(),
             )
-            else -> Unit   // loading: keep the slot quiet; art appears when decoded
+            else -> Unit
         }
     }
 }
-
-// ── Native PSP ICON0.PNG (144 × 80, 16:9 landscape) ───────────────────────────
 
 @Composable
 fun PspIcon0Icon(
@@ -320,12 +260,11 @@ fun PspIcon0Icon(
     Box(
         modifier = modifier
             .clip(PspShape)
-            .background(Color(0xFF0A0A0F))   // backing behind the art
+            .background(Color(0xFF0A0A0F))
             .border(1.dp, IconBorder, PspShape),
         contentAlignment = Alignment.Center,
     ) {
         if (artworkUri != null) {
-            // Crop fills the 144:80 tile edge-to-edge with the (landscape) hero art.
             AsyncImage(
                 model              = rememberArtworkModel(artworkUri),
                 contentDescription = null,
@@ -350,7 +289,6 @@ fun PspIcon0Icon(
             }
         }
 
-        // Gloss shine at top
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -360,17 +298,6 @@ fun PspIcon0Icon(
         )
     }
 }
-
-// ── Physical media icon (Cartridge mode) ──────────────────────────────────────
-//
-// Replaces the entire game-icon slot with the platform's physical-media image.
-// No container, no border, no dark background — just the PNG.
-//
-// Image source: drop PNGs named {platformId}.png into
-//   feature/feature-xmb/src/main/assets/systems/physical-media/
-//   e.g. psx.png, snes.png, psp.png, megadrive.png …
-//
-// Fallback: built-in generic shape vector when the PNG is absent.
 
 private const val ASSET_BASE = "file:///android_asset/systems/physical-media"
 
@@ -390,7 +317,6 @@ fun PhysicalMediaIcon(
         contentAlignment = Alignment.Center,
     ) {
         if (assetName != null && !assetFailed) {
-            // Resolved filename: e.g. "ps1" → "psx.png", "dc" → "dreamcast.png".
             AsyncImage(
                 model              = "$ASSET_BASE/$assetName.png",
                 contentDescription = null,
@@ -399,7 +325,6 @@ fun PhysicalMediaIcon(
                 onError            = { assetFailed = true },
             )
         } else {
-            // Generic shape vector fallback (no container).
             Image(
                 painter            = painterResource(id = fallbackRes),
                 contentDescription = null,
@@ -409,8 +334,6 @@ fun PhysicalMediaIcon(
         }
     }
 }
-
-// ── Android app icon (round-square / squircle) ────────────────────────────────
 
 @Composable
 fun AndroidAppIcon(
@@ -436,8 +359,6 @@ fun AndroidAppIcon(
         }.getOrNull()
     }
 
-    // Center a fixed square inside whatever box we're given, so a wide game-icon container
-    // never stretches the app squircle.
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
     Box(
         modifier = Modifier
@@ -454,7 +375,6 @@ fun AndroidAppIcon(
                 modifier           = Modifier.fillMaxSize(),
             )
         } else {
-            // Fallback when icon can't be loaded
             Text(
                 text       = title.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
                 fontSize   = 20.sp,

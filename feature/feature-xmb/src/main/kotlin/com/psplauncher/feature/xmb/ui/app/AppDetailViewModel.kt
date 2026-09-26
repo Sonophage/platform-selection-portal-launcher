@@ -26,10 +26,6 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
-// The detail page for standard (non-game) apps — the same hero-card layout as the Game Detail
-// page (breadcrumb → hero card → icon + Launch/Options/Artwork), minus game metadata and
-// description. The banner is the app's custom Background; the tile is the customized icon or
-// the package icon. Editing actions split across the two square buttons' menus.
 enum class AppDetailOption(val label: String, val isDestructive: Boolean = false) {
     CHANGE_NAME("Change Display Name"),
     CHANGE_ICON("Change Game Icon"),
@@ -39,9 +35,8 @@ enum class AppDetailOption(val label: String, val isDestructive: Boolean = false
     ;
 
     companion object {
-        /** Rows behind the gear (Options) button. */
         val OPTIONS_MENU = listOf(CHANGE_NAME, ADD_TO_COLLECTION)
-        /** Rows behind the brush (Artwork) button. */
+
         val ARTWORK_MENU = listOf(CHANGE_ICON, CHANGE_BACKGROUND, RESET_ARTWORK)
     }
 }
@@ -49,15 +44,15 @@ enum class AppDetailOption(val label: String, val isDestructive: Boolean = false
 data class AppDetailUiState(
     val game: Game? = null,
     val isLoading: Boolean = true,
-    // Main page focus: 0 = Launch, 1 = Options (gear), 2 = Artwork (brush) — like Game Detail.
+
     val mainFocus: Int = 0,
-    // Which square-button menu is open, and the focused row inside it.
+
     val showOptions: Boolean = false,
     val showArtworkMenu: Boolean = false,
     val optionsIndex: Int = 0,
-    // Add-to-collection picker
+
     val collectionPicker: CollectionPickerUi = CollectionPickerUi(),
-    // Artwork picker overlay
+
     val showArtworkPicker: Boolean = false,
     val artworkPickerType: ArtworkType = ArtworkType.ICON,
     val artworkPickerLoading: Boolean = false,
@@ -81,12 +76,9 @@ class AppDetailViewModel @Inject constructor(
     private val artworkStore: ArtworkStore,
     private val appCategoryRepository: com.psplauncher.feature.appbar.AppCategoryRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(AppDetailUiState())
     val uiState: StateFlow<AppDetailUiState> = _uiState.asStateFlow()
 
-    // Home category for collections created from this screen — set by the caller so a collection
-    // made from a Network/App Store/custom app lands in that category, not the Main Game default.
     private var collectionCategoryId: String = "games"
 
     fun prepareForOpen() {
@@ -266,8 +258,6 @@ class AppDetailViewModel @Inject constructor(
         }
     }
 
-    // ── Display name editing ──────────────────────────────────────────────────
-
     fun startEditingName() {
         val current = _uiState.value.game?.displayTitle ?: ""
         _uiState.update { it.copy(isEditingName = true, nameText = current) }
@@ -300,8 +290,6 @@ class AppDetailViewModel @Inject constructor(
         _uiState.update { it.copy(isEditingName = false) }
     }
 
-    // ── Gamepad ───────────────────────────────────────────────────────────────
-
     fun handleGamepadAction(action: GamepadAction) {
         val s = _uiState.value
         if (s.isEditingName) {
@@ -323,7 +311,6 @@ class AppDetailViewModel @Inject constructor(
         handleMainGamepad(action)
     }
 
-    // Main page focus mirrors Game Detail: 0 = Launch, 1 = Options (gear), 2 = Artwork (brush).
     private fun handleMainGamepad(action: GamepadAction) {
         when (action) {
             GamepadAction.NAVIGATE_LEFT  -> _uiState.update { it.copy(mainFocus = (it.mainFocus - 1).coerceIn(0, MAIN_FOCUS_LAST), artworkMessage = null) }
@@ -335,7 +322,7 @@ class AppDetailViewModel @Inject constructor(
                 1    -> openOptions()
                 else -> openArtworkMenu()
             }
-            // Y / Triangle opens the Options menu directly, like Game Detail.
+
             GamepadAction.OPEN_CONTEXT_MENU -> openOptions()
             GamepadAction.BACK -> close()
             else -> Unit
@@ -344,7 +331,6 @@ class AppDetailViewModel @Inject constructor(
 
     private fun handleMenuGamepad(action: GamepadAction, rows: List<AppDetailOption>) {
         when (action) {
-            // Empty rows would make coerceIn's upper bound negative — clamp to a no-op instead.
             GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(optionsIndex = (it.optionsIndex - 1).coerceIn(0, rows.lastIndex.coerceAtLeast(0))) }
             GamepadAction.NAVIGATE_DOWN -> _uiState.update { it.copy(optionsIndex = (it.optionsIndex + 1).coerceIn(0, rows.lastIndex.coerceAtLeast(0))) }
             GamepadAction.SELECT        -> rows.getOrNull(_uiState.value.optionsIndex)?.let(::activateOption)
@@ -353,9 +339,6 @@ class AppDetailViewModel @Inject constructor(
         }
     }
 
-    // ── Launch / menus ────────────────────────────────────────────────────────
-
-    /** Launches the app itself — the Launch button's action (touch and controller). */
     fun launchApp() {
         val game = _uiState.value.game ?: return
         val pkg = game.packageName
@@ -376,8 +359,6 @@ class AppDetailViewModel @Inject constructor(
 
     fun closeMenus() = _uiState.update { it.copy(showOptions = false, showArtworkMenu = false) }
 
-    /** Activates a menu row (which may open its own overlay — the collection picker, name
-     *  editor, or artwork picker). */
     fun activateOption(option: AppDetailOption) {
         closeMenus()
         when (option) {
@@ -406,8 +387,6 @@ class AppDetailViewModel @Inject constructor(
             else -> Unit
         }
     }
-
-    // ── Add-to-collection picker ──────────────────────────────────────────────
 
     fun onCollectionsClicked() = openCollectionPicker()
 
@@ -439,8 +418,7 @@ class AppDetailViewModel @Inject constructor(
     private fun moveCollectionPicker(delta: Int) {
         _uiState.update {
             val cp = it.collectionPicker
-            // rowCount can be 0 while the picker's options load — no-op rather than an
-            // IllegalArgumentException from coercing into the empty range 0..-1.
+
             if (cp.rowCount <= 0) return@update it
             it.copy(collectionPicker = cp.copy(selectedIndex = (cp.selectedIndex + delta).coerceIn(0, cp.rowCount - 1)))
         }
@@ -491,8 +469,6 @@ class AppDetailViewModel @Inject constructor(
 
     private fun handleCollectionPickerInput(action: GamepadAction) {
         if (_uiState.value.collectionPicker.showCreateDialog) {
-            // A creates with the typed name, B cancels — the same contract as GameDetail's copy
-            // of this prompt, which shares the panel.
             when (action) {
                 GamepadAction.SELECT -> confirmCreateCollection()
                 GamepadAction.BACK   -> cancelCreateCollection()
@@ -514,7 +490,7 @@ class AppDetailViewModel @Inject constructor(
     }
 
     private companion object {
-        const val MAIN_FOCUS_LAST = 2   // 0 = Launch, 1 = Options, 2 = Artwork
+        const val MAIN_FOCUS_LAST = 2
     }
 
     private suspend fun saveArtwork(gameId: Long, type: ArtworkType, path: String?) {

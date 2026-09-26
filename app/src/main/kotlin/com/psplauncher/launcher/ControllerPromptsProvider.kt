@@ -18,18 +18,6 @@ import dagger.hilt.components.SingletonComponent
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.flow.combine
 
-/**
- * Supplies the ambient controller identity for every prompt in the app.
- *
- * Both halves are read here so a prompt is always internally consistent: the
- * family decides which art is drawn, the mappings decide which button. Reading
- * them separately in different screens is how footers drift out of sync with
- * the pad.
- *
- * An entry point rather than a ViewModel — this is process-wide chrome with no
- * state of its own, and threading it through the shell's ViewModel would tie
- * every feature module's footer to feature-xmb.
- */
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface ControllerPromptsEntryPoint {
@@ -54,8 +42,7 @@ fun ProvideControllerPrompts(content: @Composable () -> Unit) {
             ControllerPromptStyle(family = prefs.displayType, mappings = mappings)
         }
     }
-    // The default matches LocalControllerPromptStyle's, so the very first frame
-    // draws stock Xbox prompts rather than nothing while DataStore is read.
+
     val style by styleFlow.collectAsStateWithLifecycle(initialValue = ControllerPromptStyle())
 
     CompositionLocalProvider(LocalControllerPromptStyle provides style) {

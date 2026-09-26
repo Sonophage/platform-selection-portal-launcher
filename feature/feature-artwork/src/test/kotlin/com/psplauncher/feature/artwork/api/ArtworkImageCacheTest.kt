@@ -23,17 +23,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/**
- * Guards the wiring bug this class exists to prevent: Coil resolves `AsyncImage` and
- * `Context.imageLoader` through its singleton, so an injected-but-uninstalled loader means the app
- * displays from one cache and evicts from another. Every assertion below reads back through
- * `context.imageLoader` — the same path the UI takes — rather than through the instance the test
- * happens to hold, so it fails if the two ever come apart again.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class ArtworkImageCacheTest {
-
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var configuredLoader: ImageLoader
     private lateinit var cache: ArtworkImageCache
@@ -41,7 +33,7 @@ class ArtworkImageCacheTest {
     @Before
     fun setUp() {
         SingletonImageLoader.reset()
-        // The real provider from the Hilt module — the test asserts against the shipped config.
+
         configuredLoader = ArtworkModule.provideCoilImageLoader(context)
         cache = ArtworkImageCache(Provider { configuredLoader })
         cache.installAsSingleton()
@@ -59,8 +51,6 @@ class ArtworkImageCacheTest {
 
     @Test
     fun `the installed loader is the configured artwork loader, not a Coil default`() {
-        // A default singleton would put its disk cache in "image_cache"; ours is the 512 MB
-        // artwork cache. This is what proves installAsSingleton actually took effect.
         val directory = context.imageLoader.diskCache?.directory?.toString()
         assertNotNull(directory)
         assertTrue(directory.endsWith("artwork_cache"), "unexpected disk cache location: $directory")
@@ -92,8 +82,6 @@ class ArtworkImageCacheTest {
 
     @Test
     fun `evict drops the uri from the disk cache too`() {
-        // The disk half is what produces the user-visible symptom: re-scraped art reuses a stable
-        // filename, so a surviving disk entry keeps serving the previous bytes after a rescrape.
         val disk = context.imageLoader.diskCache!!
         disk.openEditor(URI)!!.apply {
             disk.fileSystem.write(data) { writeUtf8("stale bytes") }
@@ -108,8 +96,6 @@ class ArtworkImageCacheTest {
 
     @Test
     fun `evict bumps each uri's revision, so images already on screen reload`() {
-        // A stable URI rewritten in place leaves every AsyncImage showing it with an unchanged
-        // model; the revision is the only thing that tells those composables to load again.
         val uri = "content://artwork/revision-probe.png"
         val before = ArtworkRevisions.of(uri)
 

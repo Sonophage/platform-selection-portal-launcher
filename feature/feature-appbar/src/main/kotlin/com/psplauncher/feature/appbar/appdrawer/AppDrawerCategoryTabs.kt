@@ -29,13 +29,6 @@ import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.theme.StorefrontColors
 import com.psplauncher.feature.appbar.AppFilter
 
-// ── Horizontal category tabs ──────────────────────────────────────────────────
-//
-// The filter row communicates state — the L1/R1 buttons still drive it without focus ever
-// entering the row, and touch users can tap a tab directly. Selected: full-brightness label plus
-// a 2dp accent underline that slides out from under the text. Unselected: secondary text at 0.65
-// alpha, no background. No pills, no chips, no cards. Per-filter counts ride beside each label.
-
 private val TAB_SPACING = 28.dp
 
 @Composable
@@ -72,8 +65,6 @@ private fun AppDrawerCategoryTab(
     onClick: () -> Unit,
     colors: StorefrontColors,
 ) {
-    // The underline is drawn under the measured text row; its width animates 0 -> text width so
-    // the accent line slides out from under the label on selection (tween(140), no bounce).
     var contentWidthPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val underlineWidth by animateDpAsState(

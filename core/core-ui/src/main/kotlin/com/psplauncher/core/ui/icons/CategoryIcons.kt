@@ -3,20 +3,14 @@ package com.psplauncher.core.ui.icons
 import androidx.annotation.DrawableRes
 import com.psplauncher.core.ui.R
 
-/** A category icon a user can pick, backed by an individual drawable (no sprite sheet, no Canvas).
- *  XMB column glyphs use the `catbar_*` art; console icons use the `sysicon_*` art — both from the
- *  xmb-menu-es-de theme. */
 data class CategoryIcon(
     val key: String,
     val label: String,
     @DrawableRes val resId: Int,
 )
 
-/** Every icon a user can pick for a category, in picker order: the XMB column glyphs and the
- *  Favorites glyph first, then every bundled console icon. Single source of truth — the Settings
- *  picker and the XMB bar both resolve icons through [categoryIconFor]. */
 val CATEGORY_ICON_CATALOG: List<CategoryIcon> = listOf(
-    // ── XMB column glyphs ────────────────────────────────────────────────────────
+
     CategoryIcon("ic_settings",  "Settings",  R.drawable.catbar_settings),
     CategoryIcon("ic_photos",    "Photos",    R.drawable.catbar_photos),
     CategoryIcon("ic_music",     "Music",     R.drawable.catbar_music),
@@ -27,7 +21,7 @@ val CATEGORY_ICON_CATALOG: List<CategoryIcon> = listOf(
     CategoryIcon("ic_library",   "Library",   R.drawable.catbar_library),
     CategoryIcon("ic_favorites", "Favorites", R.drawable.catbar_favorites),
     CategoryIcon("ic_recent",    "Last Played", R.drawable.catbar_recent),
-    // ── Console icons (sysicon_* art, also used for memory-card media) ────────────
+
     CategoryIcon("ic_nes",            "NES",                  R.drawable.sysicon_nes),
     CategoryIcon("ic_snes",           "Super NES",            R.drawable.sysicon_snes),
     CategoryIcon("ic_n64",            "Nintendo 64",          R.drawable.sysicon_n64),
@@ -72,8 +66,6 @@ val CATEGORY_ICON_CATALOG: List<CategoryIcon> = listOf(
 
 private val CATALOG_BY_KEY: Map<String, CategoryIcon> = CATEGORY_ICON_CATALOG.associateBy { it.key }
 
-/** Legacy iconKeys saved by older builds (the sprite-sheet picker) mapped onto current catalog
- *  keys, so categories created before this change still resolve to the right art. */
 private val LEGACY_ALIASES: Map<String, String> = mapOf(
     "ic_arcade"      to "ic_mame",
     "ic_pc"          to "ic_windows",
@@ -90,15 +82,8 @@ private val LEGACY_ALIASES: Map<String, String> = mapOf(
     "ic_xbox"        to "ic_xbox360",
 )
 
-/** The games glyph — used whenever an iconKey can't be resolved. */
 val FALLBACK_CATEGORY_ICON: CategoryIcon = CATALOG_BY_KEY.getValue("ic_games")
 
-/**
- * Platform id for a console-art catalog key (`ic_nes` → `nes`), resolved through the legacy
- * aliases, or null when [iconKey] is an XMB column glyph or unknown. This is what routes
- * console-art categories through [ConsoleIcon]'s override lookup; only the exceptions where
- * the catalog key diverges from the asset id need spelling out.
- */
 fun consolePlatformIdFor(iconKey: String): String? {
     val resolved = CATALOG_BY_KEY[iconKey]?.key ?: LEGACY_ALIASES[iconKey] ?: return null
     return when (resolved) {
@@ -107,8 +92,6 @@ fun consolePlatformIdFor(iconKey: String): String? {
     }
 }
 
-/** Resolves any stored iconKey (current or legacy) to a catalog icon, falling back to the
- *  games glyph for unknown keys. */
 fun categoryIconFor(iconKey: String): CategoryIcon =
     CATALOG_BY_KEY[iconKey]
         ?: LEGACY_ALIASES[iconKey]?.let { CATALOG_BY_KEY[it] }

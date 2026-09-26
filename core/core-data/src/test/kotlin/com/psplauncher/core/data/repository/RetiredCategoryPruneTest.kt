@@ -14,20 +14,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Retiring a built-in category is a change to CODE that old DATA still contradicts. Two paths put
- * a retired row back in front of the user:
- *
- *  - an install first seeded by a build that still had the column, and
- *  - a restore, because `BackupManager` upserts whatever categories the archive carried — and the
- *    archive is usually written by the OLDER app you are migrating away from.
- *
- * The row that comes back is worse than a stale one: the icon it names is gone from the catalog,
- * and the shell has no branch for it, so it draws blank and does nothing when selected.
- */
 class RetiredCategoryPruneTest {
-
-    /** Minimal in-memory stand-in for the three calls the sweep and the reconcile make. */
     private class FakeCategories(seed: Map<String, CategoryEntity> = emptyMap()) {
         val rows = seed.toMutableMap()
         val clearedItemsFor = mutableListOf<String>()
@@ -39,7 +26,6 @@ class RetiredCategoryPruneTest {
             coEvery { dao.clearCategory(any()) } answers { clearedItemsFor += firstArg<String>(); Unit }
             val inserted = slot<List<CategoryEntity>>()
             coEvery { dao.insertAll(capture(inserted)) } answers {
-                // INSERT OR IGNORE: never overwrite a row the user already has.
                 inserted.captured.forEach { rows.putIfAbsent(it.id, it) }
                 Unit
             }
@@ -64,9 +50,6 @@ class RetiredCategoryPruneTest {
 
     @Test
     fun `a retired id is never also seeded as a live built-in`() = runTest {
-        // The pair that must agree. If an id is left in both lists the reconcile deletes it and
-        // immediately seeds it again on every cold start — the column flickers back and the sweep
-        // above looks broken for reasons nothing else explains.
         val fake = FakeCategories()
 
         CategoryRepositoryImpl(fake.dao).reconcileBuiltInCategories()

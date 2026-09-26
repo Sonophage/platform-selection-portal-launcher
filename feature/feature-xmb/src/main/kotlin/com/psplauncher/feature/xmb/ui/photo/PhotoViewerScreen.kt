@@ -61,26 +61,13 @@ import java.util.Locale
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
-// Neutral dark surfaces stay fixed; accent colors come from the active theme.
 private val ViewerBg = Color(0xFF000000)
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+
 private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+
 private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val PanelBg = Color(0xF0101018)
 
-// Header pills float over the photo itself, so they need a real scrim: the default 12% white
-// pill fill disappears on bright images (Prev/Next were unreadable on light photos).
-
-/**
- * PSP-style fullscreen photo viewer: just the image on black, all UI hidden until toggled.
- * Confirm toggles the controls, Back exits, the context-menu button opens Options, the bumpers
- * step previous/next, and the D-pad/stick pans when zoomed — the help row names those actions and
- * the shared resolver draws whichever buttons the user's pad binds them to. The Options menu
- * carries the wallpaper workflow (preview → apply), rotate/zoom, info, and Remove From Library.
- */
 @Composable
 fun PhotoViewerScreen(
     photoId: String,
@@ -89,8 +76,7 @@ fun PhotoViewerScreen(
     openWallpaperPreview: Boolean = false,
     pendingGamepadAction: GamepadAction? = null,
     onGamepadActionConsumed: () -> Unit = {},
-    // Touch header pills shown only when the last input was touch (AUTO), like the XMB App Drawer
-    // button; a tap on the photo reports back via [onTouchInput] (and toggles the controls layer).
+
     onTouchInput: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: PhotoViewerViewModel = hiltViewModel(),
@@ -100,8 +86,7 @@ fun PhotoViewerScreen(
     LaunchedEffect(photoId, libraryId, openWallpaperPreview) {
         viewModel.load(photoId, libraryId, openWallpaperPreview)
     }
-    // Reset `closed` after handling it — the ViewModel is retained across open/close, so a stale
-    // closed=true would otherwise instantly re-close the viewer the next time it's opened.
+
     LaunchedEffect(state.closed) { if (state.closed) { onBack(); viewModel.onClosedHandled() } }
     LaunchedEffect(pendingGamepadAction) {
         val action = pendingGamepadAction ?: return@LaunchedEffect
@@ -117,8 +102,6 @@ fun PhotoViewerScreen(
     }
     val photo = state.photo ?: run { onBack(); return }
 
-    // Pinch-zoom / drag for touch users; the same clamped transform the D-pad path drives.
-    // The centroid is unused: onGesture takes no focal point, the same as the D-pad zoom.
     val transformState = rememberTransformableState { _, zoomChange, panChange, _ ->
         viewModel.onGesture(zoomChange, panChange.x, panChange.y)
     }
@@ -128,7 +111,7 @@ fun PhotoViewerScreen(
             .fillMaxSize()
             .background(ViewerBg)
             .transformable(transformState)
-            // Plain tap toggles the controls — no ripple, the whole screen is the target.
+
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -150,9 +133,6 @@ fun PhotoViewerScreen(
                 ),
         )
 
-        // ── Auto-fading title card ──────────────────────────────────────────
-        // Centred title that appears on each new image, then disappears after a short delay
-        // (Title → delay → just the image → next image → Title …). Independent of the tap controls.
         var titleFlashVisible by remember { mutableStateOf(true) }
         LaunchedEffect(photo.id) {
             titleFlashVisible = true
@@ -178,14 +158,13 @@ fun PhotoViewerScreen(
             )
         }
 
-        // ── Minimal controls, hidden by default ─────────────────────────────
         if (state.controlsVisible && !state.wallpaperPreviewVisible) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
                     .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
-                    // Extra side padding clears the Back/Options corner buttons.
+
                     .padding(horizontal = 70.dp, vertical = 14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -206,13 +185,6 @@ fun PhotoViewerScreen(
                     .padding(horizontal = 24.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                // One footer, and it is the touch surface. Four large pills used to float over
-                // the photo saying Back, Options, Prev and Next -- the same four things this row
-                // already named, over the picture the screen exists to show.
-                //
-                // Prev and Next are two prompts rather than one "Prev / Next": a prompt naming
-                // two actions cannot be tapped (it has no single action to fire), and paging by
-                // touch is the whole reason those pills were added.
                 PfpControllerHints(
                     items = listOf(
                         ControllerPromptItem(GamepadAction.PREV_CATEGORY, "Prev"),
@@ -235,7 +207,6 @@ fun PhotoViewerScreen(
             }
         }
 
-        // ── Options menu — the shared themed context menu, like every other context menu ──
         if (state.showOptions) {
             PspContextMenuOverlay(
                 title = "Options",
@@ -251,7 +222,6 @@ fun PhotoViewerScreen(
             )
         }
 
-        // ── Wallpaper preview: the photo as it would look, with confirm/cancel ──
         if (state.wallpaperPreviewVisible) {
             Column(
                 modifier = Modifier
@@ -282,12 +252,10 @@ fun PhotoViewerScreen(
             }
         }
 
-        // ── Info dialog ──────────────────────────────────────────────────────
         if (state.infoVisible) {
             InfoDialog(photo = photo, onDismiss = { viewModel.handleGamepadAction(GamepadAction.BACK) })
         }
 
-        // ── Remove confirmation ──────────────────────────────────────────────
         if (state.confirmRemove) {
             PfpConfirmOverlay(
                 title = "Remove from library?",

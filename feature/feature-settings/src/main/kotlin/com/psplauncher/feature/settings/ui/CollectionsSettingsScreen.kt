@@ -48,19 +48,11 @@ import com.psplauncher.core.domain.model.GameCollection
 import com.psplauncher.core.ui.icons.CATEGORY_ICON_CATALOG
 import com.psplauncher.core.ui.icons.categoryIconFor
 
-/**
- * Collections' detail step and its dialogs. The list itself lives in [CategoryManagerScreen].
- *
- * Collections and Categories were two Settings entries, in two different sections, for what
- * reads as one idea: the groups the crossbar is made of. They are one screen now -- the rows
- * moved, the flows did not, and everything below still takes plain parameters, so the merged
- * screen drives them exactly as this file used to.
- */
 internal data class CollectionDialog(
     val title: String,
     val renameId: Long? = null,
     val initial: String = "",
-    var pendingName: String? = null,  // Temporarily holds name while a category is chosen
+    var pendingName: String? = null,
 )
 
 @Composable
@@ -146,22 +138,12 @@ internal fun CollectionCategoryPickerDialog(
     )
 }
 
-// Icon picker for a collection: a "Default (Memory Card)" option plus the shared category icon
-// catalog. Picking null resets to the default art. Mirrors the category icon picker.
 @Composable
 internal fun CollectionIconPickerDialog(
     selectedIconKey: String?,
     onPick: (String?) -> Unit,
     onCancel: () -> Unit,
 ) {
-    // A grid of fifty-odd icons, picked by eye. The list overlays would turn that into a long
-    // scroll of names, which is worse for the one job this has, so it keeps the grid and uses the
-    // shared card for the chrome -- and carries its own two-dimensional cursor, because a grid
-    // you can only escape from is not a picker.
-    //
-    // The column count is measured rather than assumed: the cells are adaptive, so the same
-    // arithmetic has to use whatever number the layout actually produced. One source of truth for
-    // "how many columns", used by both the grid and the cursor.
     val gridState = rememberLazyGridState()
     var cursor by remember { mutableIntStateOf(GRID_CURSOR_HEADER) }
     var columns by remember { mutableIntStateOf(1) }
@@ -175,8 +157,7 @@ internal fun CollectionIconPickerDialog(
             else -> cursor = gridCursorStep(cursor, columns, CATEGORY_ICON_CATALOG.size, action)
         }
     }
-    // Keep the focused icon on screen. The grid is taller than the card shows, so without this
-    // the cursor walks off the bottom and the user is moving something they cannot see.
+
     LaunchedEffect(cursor) {
         if (cursor >= 0) runCatching { gridState.animateScrollToItem(cursor) }
     }
@@ -201,8 +182,7 @@ internal fun CollectionIconPickerDialog(
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(320.dp)) {
             val cell = 56.dp
             val gap = 8.dp
-            // The same formula LazyVerticalGrid's Adaptive uses, so the cursor and the layout
-            // cannot disagree about where a row ends.
+
             val measured = ((maxWidth + gap) / (cell + gap)).toInt().coerceAtLeast(1)
             LaunchedEffect(measured) { columns = measured }
             LazyVerticalGrid(

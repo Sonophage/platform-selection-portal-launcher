@@ -5,13 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * Content-based region detection. Every detector reads the disc image bytes, never the filename —
- * the whole point is that "Parasite Eve II (USA) (Disc 1)" and "Parasite Eve II (Disc 2)" agree
- * on region because both .bin files say America.
- */
 class DiscRegionDetectorsTest {
-
     private fun head(text: String): ByteArray = text.encodeToByteArray()
 
     private fun head(vararg blocks: ByteArray): ByteArray {
@@ -24,11 +18,8 @@ class DiscRegionDetectorsTest {
         return out
     }
 
-    // ── PS1 ──────────────────────────────────────────────────────────────────
-
     @Test
     fun `psx license string america is NTSC-U`() {
-        // Simulated raw 2352-byte sector dump: license text lands ~0x24E0, not 2048-aligned.
         val padding = ByteArray(0x24E0)
         val bytes = head(padding, head("Licensed by Sony Computer Entertainment America"))
         assertEquals(GameRegion.NTSC_U, DiscRegionDetectors.detectPsx(bytes))
@@ -60,8 +51,6 @@ class DiscRegionDetectorsTest {
         assertNull(DiscRegionDetectors.detectPsx(head("this is not a playstation disc at all")))
     }
 
-    // ── PS2 ──────────────────────────────────────────────────────────────────
-
     @Test
     fun `ps2 region line is detected`() {
         assertEquals(GameRegion.NTSC_U, DiscRegionDetectors.detectPs2(head("REGION=NTSC-U")))
@@ -75,8 +64,6 @@ class DiscRegionDetectorsTest {
         assertEquals(GameRegion.NTSC_J, DiscRegionDetectors.detectPs2(head("SLPS_250.02")))
     }
 
-    // ── PSP ──────────────────────────────────────────────────────────────────
-
     @Test
     fun `psp product code prefix encodes region`() {
         assertEquals(GameRegion.NTSC_U, DiscRegionDetectors.detectPsp(head("ULUS-10345")))
@@ -84,8 +71,6 @@ class DiscRegionDetectorsTest {
         assertEquals(GameRegion.NTSC_J, DiscRegionDetectors.detectPsp(head("ULJM-05555")))
         assertNull(DiscRegionDetectors.detectPsp(head("nothing here")))
     }
-
-    // ── GameCube / Wii ───────────────────────────────────────────────────────
 
     private fun bootBin(id: String, regionField: Int): ByteArray {
         val bytes = ByteArray(0x60)
@@ -120,8 +105,6 @@ class DiscRegionDetectorsTest {
         assertNull(DiscRegionDetectors.detectBootBin(head("definitely not a boot.bin")))
     }
 
-    // ── Saturn / Dreamcast / Sega CD ─────────────────────────────────────────
-
     private fun ipBin(magic: String, regionOffset: Int, regionChar: Char): ByteArray {
         val bytes = ByteArray(0x40)
         magic.encodeToByteArray().copyInto(bytes, 0)
@@ -147,21 +130,16 @@ class DiscRegionDetectorsTest {
         assertNull(DiscRegionDetectors.detectIpBin(head("SEGA GENESIS ")))
     }
 
-    // ── Xbox 360 ─────────────────────────────────────────────────────────────
-
-    // Builds a minimal XEX2 header + optional headers with an Execution Info entry carrying the
-    // given game region bitfield. Layout per XexTool: count at 0x18, each optional header is
-    // size(4) type(4) data, size covers the whole entry including its 8-byte header.
     private fun xex(regionBits: Int): ByteArray {
-        val executionInfo = ByteArray(0x24)  // media id, version, base, title id, platform, tables, format, disc, region
+        val executionInfo = ByteArray(0x24)
         writeLe(executionInfo, 0x1C, regionBits)
         val headerSize = 8 + executionInfo.size
         val total = 0x1C + headerSize
         val bytes = ByteArray(total)
         "XEX2".encodeToByteArray().copyInto(bytes, 0)
-        writeLe(bytes, 0x18, 1)              // one optional header
-        writeLe(bytes, 0x1C, headerSize)     // optional header size (incl. 8-byte header)
-        writeLe(bytes, 0x20, 0x00000001)     // Execution Info type
+        writeLe(bytes, 0x18, 1)
+        writeLe(bytes, 0x1C, headerSize)
+        writeLe(bytes, 0x20, 0x00000001)
         executionInfo.copyInto(bytes, 0x24)
         return bytes
     }
@@ -178,7 +156,7 @@ class DiscRegionDetectorsTest {
         assertEquals(GameRegion.NTSC_U, DiscRegionDetectors.detectX360(xex(0x01)))
         assertEquals(GameRegion.NTSC_J, DiscRegionDetectors.detectX360(xex(0x02)))
         assertEquals(GameRegion.PAL, DiscRegionDetectors.detectX360(xex(0x04)))
-        // All-regions discs keep the same deterministic answer as their siblings.
+
         assertEquals(GameRegion.NTSC_U, DiscRegionDetectors.detectX360(xex(0x07)))
     }
 
@@ -186,8 +164,6 @@ class DiscRegionDetectorsTest {
     fun `x360 non-xex bytes are null`() {
         assertNull(DiscRegionDetectors.detectX360(head("this is a gdi file, not an xex")))
     }
-
-    // ── PS3 ──────────────────────────────────────────────────────────────────
 
     @Test
     fun `ps3 PARAM SFO title id prefix`() {

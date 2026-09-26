@@ -20,9 +20,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// Stable, namespaced identities for picker rows. Games and collections come from separate
-// tables with overlapping numeric IDs, so they MUST be namespaced — otherwise a game and a
-// collection that share an id collide, highlighting two rows at once and trapping the cursor.
 internal const val PICKER_COLLECTIONS_HEADER = "COLLECTIONS_HEADER"
 internal fun pickerPlatformId(platformId: String) = "platform_$platformId"
 internal fun pickerGameId(gameId: Long) = "game_$gameId"
@@ -35,7 +32,7 @@ data class GamePickerState(
     val selectedCollectionIds: Set<Long> = emptySet(),
     val platformExpandedStates: Map<String, Boolean> = emptyMap(),
     val isLoading: Boolean = false,
-    val selectedItemId: String? = null,  // Identity of selected item (platform/game/collection ID)
+    val selectedItemId: String? = null,
 )
 
 data class PlatformGameGroup(
@@ -53,7 +50,6 @@ class GamePickerViewModel @Inject constructor(
     private val collectionRepository: CollectionRepository,
     private val memoryCardRepository: MemoryCardRepository,
 ) : ViewModel() {
-
     private val _state = MutableStateFlow(GamePickerState(isLoading = true, selectedItemId = null))
     val state: StateFlow<GamePickerState> = _state.asStateFlow()
 
@@ -64,7 +60,6 @@ class GamePickerViewModel @Inject constructor(
     private fun loadData() {
         viewModelScope.launch {
             try {
-                // Combine memory cards and games streams to listen for updates
                 memoryCardRepository.observeEnabled().combine(gameRepository.observeAll()) { cards, allGames ->
                     Pair(cards, allGames)
                 }.collect { (cards, allGames) ->
@@ -75,8 +70,6 @@ class GamePickerViewModel @Inject constructor(
                             emptyList()
                         }
 
-                        // Group games by platform, excluding empty platforms. Real games only —
-                        // standard (unmarked) apps can't join gaming categories/collections.
                         val platformGroups = cards.mapNotNull { card ->
                             val platformGames = allGames.filter {
                                 it.platformId == card.platformId &&
@@ -93,14 +86,12 @@ class GamePickerViewModel @Inject constructor(
                             }
                         }
 
-                        // All user collections available to add
                         val allCollections = collections
 
                         val newExpandedStates = platformGroups.associate { group ->
                             group.platform.platformId to false
                         }
 
-                        // Initialize selectedItemId to first item if not already set
                         val newState = GamePickerState(
                             platformGroups = platformGroups,
                             pcShortcuts = allCollections,
@@ -184,9 +175,6 @@ class GamePickerViewModel @Inject constructor(
         return _state.value.selectedGameIds to _state.value.selectedCollectionIds
     }
 
-    // Resets the picker to a fresh state. The ViewModel is retained across open/close cycles,
-    // so this must run when the picker is cancelled or its selection confirmed — otherwise the
-    // previous checkmarks, cursor, and expanded groups carry over the next time it opens.
     fun clearSelection() {
         _state.update { state ->
             state.copy(
@@ -206,8 +194,6 @@ class GamePickerViewModel @Inject constructor(
                     name = name,
                     gameCount = 0,
                 )
-                // Note: This assumes collectionRepository has a method to create collections
-                // If not, this will need to be implemented
             } catch (e: Exception) {
                 Timber.e(e, "Error creating collection")
             }
@@ -217,17 +203,13 @@ class GamePickerViewModel @Inject constructor(
     fun moveSelection(delta: Int) {
         val state = _state.value
 
-        // Build a list of all selectable item IDs in order
         val itemIds = buildPickerItemIds(state)
         if (itemIds.isEmpty()) return
 
-        // Find current position
         val currentId = state.selectedItemId
         val currentIndex = if (currentId != null) itemIds.indexOf(currentId) else -1
 
-        // Calculate new position
         val newIndex = if (currentIndex < 0) {
-            // No selection yet, start at first item
             0
         } else {
             (currentIndex + delta).coerceIn(0, itemIds.size - 1)
@@ -242,10 +224,8 @@ class GamePickerViewModel @Inject constructor(
         val state = _state.value
         val selectedId = state.selectedItemId ?: return
 
-        // Determine what type of item was selected
         for (group in state.platformGroups) {
             if (pickerPlatformId(group.platform.platformId) == selectedId) {
-                // Platform headers are actionable in the picker.
                 val selectAll = !group.isAllSelected
                 togglePlatformAllSelection(group.platform.platformId, selectAll)
                 return
@@ -253,16 +233,13 @@ class GamePickerViewModel @Inject constructor(
 
             for (game in group.games) {
                 if (pickerGameId(game.id) == selectedId) {
-                    // Game selected
                     toggleGameSelection(game.id)
                     return
                 }
             }
         }
 
-        // Check collections
         if (selectedId == PICKER_COLLECTIONS_HEADER) {
-            // Header selected, no action
             return
         }
 
@@ -278,21 +255,15 @@ class GamePickerViewModel @Inject constructor(
         val state = _state.value
         val selectedId = state.selectedItemId ?: return
 
-        // If the selected item is a platform header, toggle its expanded state
         for (group in state.platformGroups) {
             if (pickerPlatformId(group.platform.platformId) == selectedId) {
-                // Platform headers can still expand/collapse in the picker.
                 togglePlatformExpanded(group.platform.platformId)
                 return
             }
         }
     }
-
 }
 
-// Ordered, namespaced list of every navigable picker row ID — the single source of truth for
-// cursor movement (ViewModel.moveSelection) and scroll positioning (GamePickerScreen). The IDs
-// here MUST match the per-row identities rendered by the screen (pickerPlatformId/GameId/etc.).
 internal fun buildPickerItemIds(state: GamePickerState): List<String> {
     val ids = mutableListOf<String>()
 

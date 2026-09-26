@@ -14,19 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * The gathering half of the launch ladder.
- *
- * [EmulatorLaunchResolverTest] pins the precedence itself; this pins that the three STORED rungs
- * actually reach it. They are what a caller assembling the ladder by hand leaves out, and one did:
- * the XMB's direct launch took the first available profile for the platform, which is rung four on
- * its own, so with direct launch on a game pinned through "Change Emulator" ran on something else.
- *
- * Every assertion here fails if a rung stops being read. That is the whole point of the file — the
- * precedence tests above it all pass while the values never arrive.
- */
 class GameLaunchResolverTest {
-
     private fun profile(id: String, packageName: String = id) = EmulatorProfile(
         id                   = id,
         name                 = id,
@@ -41,7 +29,6 @@ class GameLaunchResolverTest {
     private val card     = profile("card")
     private val fallback = profile("fallback")
 
-    /** Every profile is installed and supports the platform; only the stored rungs differ. */
     private fun resolver(
         cardEmulatorId: String? = null,
         platformDefault: String? = null,
@@ -68,8 +55,6 @@ class GameLaunchResolverTest {
 
     @Test
     fun `the game's own emulator decides the launch`() = runTest {
-        // Both lower rungs are set and point elsewhere, so a pass here cannot come from the
-        // resolver simply ignoring everything and landing on the pinned profile by luck.
         val resolved = resolver(cardEmulatorId = "card", platformDefault = "fallback")
             .resolve(game(override = "pinned"))
             .getOrThrow()
@@ -106,10 +91,6 @@ class GameLaunchResolverTest {
         assertEquals(LaunchSource.CATALOG_DEFAULT, resolved.source)
     }
 
-    /**
-     * The platform row a caller already holds is read instead of the dao's. Without this, passing
-     * one would be a silent no-op and every caller would be resolving off the database anyway.
-     */
     @Test
     fun `a platform row passed in is preferred over the stored one`() = runTest {
         val resolved = resolver(platformDefault = "fallback")

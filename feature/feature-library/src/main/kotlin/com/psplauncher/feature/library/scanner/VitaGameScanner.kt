@@ -16,18 +16,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Discovers installed PS Vita games from Vita3K's granted `ux0` folder (see [Vita3KLibrary]).
- *
- * Android Vita3K runs only INSTALLED titles under `ux0/app/<TITLE_ID>` — never loose `.vpk` files —
- * so the scan enumerates those folders. The folder name is the Title ID (the launch token); the
- * display name comes from `sce_sys/param.sfo` and the tile icon from `sce_sys/icon0.png`. Games are
- * upserted onto the `psvita` platform, keyed by launch token so re-scans converge.
- *
- * Moved here out of the achievements module, which is gone: everything below is library work
- * (enumerate installed titles, read their names and icons, upsert games). The only achievement
- * part was a trophy-set link, removed with the rest of achievement tracking.
- */
 @Singleton
 class VitaGameScanner @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -43,8 +31,6 @@ class VitaGameScanner @Inject constructor(
         val rootDocId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
             ?: return@withContext VitaScanResult(0, 0, 0, "That Vita3K folder link is invalid — re-grant it.")
 
-        // The grant may be ux0 itself or a parent that contains it (e.g. Roms/vita), so find the
-        // folder that actually holds app/.
         val ux0DocId = resolveUx0Base(treeUri, rootDocId)
             ?: return@withContext VitaScanResult(0, 0, 0, "Couldn't find ux0/app in the granted folder — pick your Vita3K ux0 folder (or the folder that contains it).")
         val appDocId = findChildDir(treeUri, ux0DocId, "app")
@@ -101,8 +87,6 @@ class VitaGameScanner @Inject constructor(
         VitaScanResult(added, updated, titleFolders.size, message)
     }
 
-    // Accepts a grant on ux0 itself OR on a parent that contains ux0 (e.g. Roms/vita): returns the
-    // doc id of the folder that holds app/.
     private fun resolveUx0Base(treeUri: Uri, rootDocId: String): String? {
         if (findChildDir(treeUri, rootDocId, "app") != null) return rootDocId
         val ux0 = findChildDir(treeUri, rootDocId, "ux0") ?: return null
@@ -132,7 +116,6 @@ class VitaGameScanner @Inject constructor(
         }
     }.getOrNull()
 
-    // Vita Title IDs are 4 uppercase letters + 5 digits (e.g. PCSB00098). Skip system/gate folders.
     private fun looksLikeTitleId(name: String): Boolean =
         name.length == 9 && name.take(4).all { it in 'A'..'Z' } && name.drop(4).all { it.isDigit() }
 

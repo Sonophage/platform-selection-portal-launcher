@@ -11,26 +11,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The Settings tree as the crossbar and the section rail present it: the crossbar's two root rows,
- * every section's screens in order, and route resolution for all of them.
- *
- * The crossbar used to own this tree — six section rows that drilled into a two-pane flyout. It is
- * one row now, and the rail inside the settings screens is where the tree lives, so the tests that
- * described the flyout describe the rail instead. What has not changed is the thing worth
- * guarding: a row the user can reach whose id no route resolves is a dead end that reports nothing.
- *
- * This lives in feature-xmb rather than beside the catalog in core-domain because the route table
- * it checks against is feature-settings', and this module is the one that can see both.
- */
 class SettingsHierarchyTest {
-
-    // ── Back out of a wizard excursion ───────────────────────────────────────
-
     @Test fun `only the wizard leaves a return address for Back`() {
-        // Make It Yours opens Theme, Sound, Boot and Layout and expects Back to come back. Every
-        // other screen keeps Back meaning "up to the Settings root" — a return address handed out
-        // more widely would turn the rail into a half-implemented back stack.
         assertEquals(
             XMBViewModel.INITIAL_SETUP_SCREEN_ID,
             XMBViewModel.returnAddressFor(XMBViewModel.INITIAL_SETUP_SCREEN_ID),
@@ -45,9 +27,6 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `both wizard routes are real screens, and the id list covers both`() {
-        // The pair that must agree: WIZARD_SCREEN_IDS drives BOTH the return address above and
-        // the "setup has been seen" stamp on close. A route added to one and not the other is a
-        // wizard that either never comes back or never stops offering itself on launch.
         XMBViewModel.WIZARD_SCREEN_IDS.forEach {
             assertTrue("$it has no route", it in SETTINGS_SCREEN_ROUTES)
         }
@@ -56,15 +35,6 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `only the re-run wizard route is in the catalog, which is what Skip depends on`() {
-        // Skip Setup is one callback on both routes, and onSettingsBack decides what it means by
-        // asking whether the current screen is a catalog entry:
-        //
-        //   settings_initial_setup       is one  -> Skip goes up to the Settings root
-        //   settings_initial_setup_first is not  -> Skip closes out to the launcher, and closing
-        //                                           is what stamps setup as seen
-        //
-        // That second line is the one that matters and the one nothing else states: a first run
-        // that skipped would otherwise land in Settings and offer itself again on next launch.
         assertEquals(
             null,
             settingsEntryFor(XMBViewModel.INITIAL_SETUP_FIRST_RUN_SCREEN_ID),
@@ -72,16 +42,7 @@ class SettingsHierarchyTest {
         assertTrue(settingsEntryFor(XMBViewModel.INITIAL_SETUP_SCREEN_ID) != null)
     }
 
-    // ── Crossbar root ────────────────────────────────────────────────────────
-
     @Test fun `the crossbar column is two rows, open settings and open Android's`() {
-        // The column used to be the six sections, each drilling into its own screens: three
-        // presses to reach Library Manager. The screens have carried the whole tree in their own
-        // rail since the rail was added, so the column was a second way to walk a tree that is
-        // already on screen once you arrive.
-        //
-        // There is no "and the column agrees with the rail" test any more, and that is the point
-        // of the change: there is only one owner of the tree left to disagree with.
         assertEquals(
             listOf(XMBViewModel.OPEN_SETTINGS_ITEM_ID, "settings_android_system"),
             XMBViewModel.SETTINGS_ROOT_ITEMS.map { it.id },
@@ -89,14 +50,9 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `the settings row opens the root, and the root is reachable and railless`() {
-        // This asserted the row opened SETTINGS_CATALOG.first() and that it was the rail's first
-        // screen. Both were true and neither is any more: the row opens the section list, and it
-        // kept passing after the change because it only ever asked the catalog about itself —
-        // never what the row actually does. A test decoupled from the behaviour it names.
         val opensId = SETTINGS_ROOT_SCREEN_ID
         assertTrue("The settings row opens $opensId, which has no route", opensId in SETTINGS_SCREEN_ROUTES)
-        // Deliberately outside the catalog: that is what gives the root an empty rail without a
-        // special case, and it is the one property the rest of the settings tree depends on.
+
         assertEquals(
             "The root must not be one of the catalog's screens",
             null,
@@ -106,8 +62,6 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `every section on the root list opens a real screen`() {
-        // The root is now the only way in, so a section whose first screen has no route is a dead
-        // row on the first page of Settings.
         SettingsSectionId.entries.forEach { section ->
             val opens = settingsEntriesIn(section).firstOrNull()?.id
             assertTrue("$section has no screen to open", opens != null)
@@ -123,16 +77,12 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `Android Settings is not a PFP screen route`() {
-        // It opens the device's own settings app through an intent. A route of the same name
-        // would make the select handler open a PFP screen instead, silently.
         assertFalse("settings_android_system" in SETTINGS_SCREEN_ROUTES)
     }
 
-    // ── Section contents ─────────────────────────────────────────────────────
-
     @Test fun `each section exposes its screens in the planned order`() {
         assertEquals(
-            // Windows is a card inside Library Manager, not a row beside it.
+
             listOf("settings_library", "settings_artwork", "settings_artwork_sources", "settings_app_visibility"),
             settingsEntriesIn(SettingsSectionId.LIBRARY).map { it.id },
         )
@@ -149,8 +99,7 @@ class SettingsHierarchyTest {
             ),
             settingsEntriesIn(SettingsSectionId.EMULATORS).map { it.id },
         )
-        // Appearance owns everything visual. Display used to hold eight unrelated groups, so its
-        // parts are now separate entry points into the same screen.
+
         assertEquals(
             listOf("settings_themes", "settings_appearance", "settings_layout", "settings_boot"),
             settingsEntriesIn(SettingsSectionId.APPEARANCE).map { it.id },
@@ -160,16 +109,13 @@ class SettingsHierarchyTest {
             settingsEntriesIn(SettingsSectionId.INTERFACE).map { it.id },
         )
         assertEquals(
-            // The wizard leads: it is the only screen here you open because something is NOT set up.
+
             listOf("settings_initial_setup", "settings_about", "settings_logs", "settings_backup", "settings_credits"),
             settingsEntriesIn(SettingsSectionId.SYSTEM).map { it.id },
         )
     }
 
     @Test fun `every screen the rail can reach resolves to a route`() {
-        // The rail is one section's screens now, and the shoulders are the only way to another
-        // section — so between them they are the ONLY way to reach most of these. A row here with
-        // no route is a dead end with no symptom.
         SettingsSectionId.entries.forEach { section ->
             settingsRailRows(settingsEntriesIn(section).first().id).forEach { row ->
                 assertTrue("No route for rail row ${row.id}", row.id in SETTINGS_SCREEN_ROUTES)
@@ -178,9 +124,6 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `every section the shoulders can reach resolves to a route`() {
-        // The other half of the same guarantee. settingsRailRows can only ever offer screens
-        // inside the section you are already in, so a section whose first screen has no route
-        // would be unreachable with nothing failing.
         SettingsSectionId.entries.forEach { section ->
             val from = settingsEntriesIn(section).first().id
             listOf(-1, +1).forEach { delta ->
@@ -191,8 +134,6 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `section ids never collide with screen routes`() {
-        // The rail draws a section row and its screens in one list. One id meaning both would
-        // make the rail highlight two rows as "where you are".
         SettingsSectionId.entries.forEach { section ->
             assertFalse("Section id must not be a screen route: ${section.id}", section.id in SETTINGS_SCREEN_ROUTES)
         }
@@ -205,11 +146,7 @@ class SettingsHierarchyTest {
         }
     }
 
-    // ── Migration compatibility ──────────────────────────────────────────────
-
     @Test fun `every legacy flat settings row remains a resolvable route`() {
-        // Direct callers (setup prompts, context menus, first-run wizard) still assign these ids
-        // to activeSettingsScreen — they must keep resolving in SettingsNavHost.
         listOf(
             "settings_library", "settings_import_pc", "settings_music", "settings_video",
             "settings_photo", "settings_categories", "settings_artwork",
@@ -222,8 +159,6 @@ class SettingsHierarchyTest {
         }
     }
 
-    // ── Hidden Games move ────────────────────────────────────────────────────
-
     @Test fun `Hidden Games is present under Library via its dedicated route`() {
         val libraryIds = settingsEntriesIn(SettingsSectionId.LIBRARY).map { it.id }
         assertTrue("Hidden Games missing from Library", libraryIds.contains("settings_app_visibility"))
@@ -235,8 +170,6 @@ class SettingsHierarchyTest {
         assertFalse(interfaceIds.contains("settings_app_visibility"))
     }
 
-    // ── Audio screen ─────────────────────────────────────────────────────────
-
     @Test fun `Sound is present under Interface via its own route`() {
         val interfaceIds = settingsEntriesIn(SettingsSectionId.INTERFACE).map { it.id }
         assertTrue("Sound missing from Interface", interfaceIds.contains("settings_audio"))
@@ -244,9 +177,6 @@ class SettingsHierarchyTest {
     }
 
     @Test fun `the Interface audio row is titled Sound with a menu-and-boot subtitle`() {
-        // Phase 3 of the seven-sound work (docs/plans/README.md C10): the screen is renamed Audio → Sound and now owns the
-        // boot sound too. The route id deliberately stays settings_audio — renaming it would
-        // break cursor restore and every focus key under it.
         val row = settingsEntriesIn(SettingsSectionId.INTERFACE).first { it.id == "settings_audio" }
         assertEquals("Sound", row.title)
         assertEquals("Menu & boot sounds", row.subtitle)

@@ -8,15 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * C16 task 2.2 — the tiered matcher at Tiers 1-3.
- *
- * Every test here is net-new: nothing in this repository resolved a game identity before, so the
- * evidence source is a hand-written fake rather than a mock, and it records what it was asked so a
- * test can assert that a stronger tier stopped the search before a weaker one ran.
- */
 class GameMatcherTest {
-
     private fun game(
         title: String = "Final Fantasy VI Advance",
         platformId: String = "gba",
@@ -79,8 +71,6 @@ class GameMatcherTest {
         title: String = "Final Fantasy VI Advance",
     ) = GameCandidate(provider = provider, providerGameId = id, title = title)
 
-    // ── Tier 1: saved provider id ─────────────────────────────────────────
-
     @Test
     fun `a saved provider id wins outright and consults no evidence source`() = runTest {
         val evidence = FakeEvidence(byRomHash = mapOf("ABCD1234" to candidate()))
@@ -101,15 +91,12 @@ class GameMatcherTest {
     fun `a saved id is never read across providers`() = runTest {
         val matcher = GameMatcher(FakeEvidence())
 
-        // A SteamGridDB id says nothing about IGDB.
         assertNull(matcher.resolve(game(steamGridDbId = 77L), MatchProvider.IGDB))
         assertEquals(
             "77",
             matcher.resolve(game(steamGridDbId = 77L), MatchProvider.STEAMGRIDDB)?.candidate?.providerGameId,
         )
     }
-
-    // ── Tier 2: content id ────────────────────────────────────────────────
 
     @Test
     fun `a ROM checksum resolves ScreenScraper when no id is saved`() = runTest {
@@ -137,8 +124,6 @@ class GameMatcherTest {
         assertEquals(listOf("title:Final Fantasy VI Advance"), evidence.asked)
     }
 
-    // The checksum tier still runs by default: `a ROM checksum resolves ScreenScraper when no id is saved`.
-
     @Test
     fun `a ROM checksum is not offered to a provider that cannot take one`() = runTest {
         val evidence = FakeEvidence(byRomHash = mapOf("ABCD1234" to candidate()))
@@ -161,7 +146,6 @@ class GameMatcherTest {
         )
         assertEquals(MatchTier.CONTENT_ID, steam?.tier)
 
-        // Same app id, different store: a cross-store id is not globally unique, so this is a miss.
         val gog = matcher.resolve(
             game(platformId = "windows", storefront = "GOG", storefrontGameId = "620"),
             MatchProvider.STEAMGRIDDB,
@@ -178,8 +162,6 @@ class GameMatcherTest {
 
         assertTrue(evidence.asked.none { it.startsWith("store:") })
     }
-
-    // ── Tier 3: unique exact normalized title ─────────────────────────────
 
     @Test
     fun `one exact normalized title hit resolves`() = runTest {
@@ -203,7 +185,6 @@ class GameMatcherTest {
             ),
         )
 
-        // No ranked picker exists (AD-4), so ambiguity is a miss, not a guess.
         assertNull(matcher.resolve(game(), MatchProvider.STEAMGRIDDB))
     }
 
@@ -216,11 +197,6 @@ class GameMatcherTest {
 
     @Test
     fun `searchable is the providers that actually have a title endpoint, not all of them`() {
-        // This used to assert every provider was searchable, which was true of the four that have
-        // a title endpoint and stopped being true the moment Steam joined: appdetails takes an app
-        // id and offers no search at all. The property worth pinning was never "all of them" — it
-        // is that the list is DERIVED from the capability table rather than written out, so a
-        // provider that cannot search is excluded automatically instead of being remembered.
         assertEquals(
             MatchProvider.entries.filter { ProviderCapabilities[it].supportsTitleSearch },
             ProviderCapabilities.searchable,
@@ -229,17 +205,12 @@ class GameMatcherTest {
 
     @Test
     fun `a provider with no title endpoint cannot reach the Change Match picker`() {
-        // The consequence that matters. Change Match exists to let the user choose between
-        // candidates; a provider that can only ever return the one game it was told about has
-        // nothing to offer it, and listing it would be a menu entry that never has a second row.
         assertFalse(MatchProvider.STEAM_STORE in ProviderCapabilities.searchable)
         assertFalse(ProviderCapabilities[MatchProvider.STEAM_STORE].supportsTitleSearch)
     }
 
     @Test
     fun `every provider is addressable somehow`() {
-        // The real invariant behind the old test: a provider nothing can address is a provider
-        // that can never be asked anything, which is a wiring mistake rather than a design choice.
         MatchProvider.entries.forEach { provider ->
             val c = ProviderCapabilities[provider]
             assertTrue(
@@ -258,7 +229,6 @@ class GameMatcherTest {
         }
     }
 
-    /** A Windows install has no ROM to hash, so its ScreenScraper identity can only come from its title. */
     @Test
     fun `ScreenScraper resolves a game with no ROM by its exact title`() = runTest {
         val evidence = FakeEvidence(
@@ -278,7 +248,6 @@ class GameMatcherTest {
         assertTrue("no ROM, so no checksum lookup", evidence.asked.none { it.startsWith("rom:") })
     }
 
-    /** The reported case: IGDB has Final Fantasy VI Advance, and the matcher must find it. */
     @Test
     fun `IGDB resolves the unique exact title among near misses`() = runTest {
         val evidence = FakeEvidence(
@@ -307,8 +276,6 @@ class GameMatcherTest {
         assertTrue(evidence.asked.contains("title:chrono trigger"))
     }
 
-    // ── The match key ─────────────────────────────────────────────────────
-
     @Test
     fun `match keys are provider-qualified so two providers ids never collide`() = runTest {
         val a = GameMatch(candidate(provider = MatchProvider.IGDB, id = "12"), MatchTier.SAVED_PROVIDER_ID)
@@ -317,8 +284,6 @@ class GameMatcherTest {
         assertEquals("IGDB:12", a.matchKey)
         assertTrue(a.matchKey != b.matchKey)
     }
-
-    // ── Title keying ──────────────────────────────────────────────────────
 
     @Test
     fun `title keying drops release tags punctuation and case`() {

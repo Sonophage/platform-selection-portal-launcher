@@ -60,22 +60,8 @@ import com.psplauncher.feature.appbar.appdrawer.AppDrawerHeader
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHintBar
 import com.psplauncher.feature.appbar.appdrawer.UninstallConfirmDialog
 
-// ── PSP-era grid App Drawer ───────────────────────────────────────────────────
-//
-// A full-width search field, a horizontal category tab row, and per-tab sections: the tab's own
-// apps as one sideways-scrolling row of large tiles above a LazyHorizontalGrid whose columns run
-// off to the right (see AppDrawerSection) — all over an accent-derived gradient (see
-// deriveStorefrontColors). The breadcrumb is gone and so is the 6-column vertical grid; that grid
-// survives only in the preserved storefront layout named below. The
-// controller hint pill is a permanent footer row below the grid that fades in/out via alpha, so
-// the slot's height is reserved whether or not the pill is showing and grid geometry never
-// shifts; the pre-redesign storefront layout (vertical rail + command bar) is preserved for the
-// future RSS Channels feature in the appbar/storefront package.
-
-// ── Entry point ─────────────────────────────────────────────────────────────────
-
 @OptIn(ExperimentalComposeUiApi::class)
-/** D-pad presses: any of them means the user has moved on from typing. */
+
 private val NAVIGATION_ACTIONS = setOf(
     GamepadAction.NAVIGATE_UP,
     GamepadAction.NAVIGATE_DOWN,
@@ -89,25 +75,17 @@ fun AppDrawerScreen(
     modifier: Modifier = Modifier,
     initialFilter: AppFilter = AppFilter.DEFAULT,
     pendingGamepadAction: GamepadAction? = null,
-    /**
-     * A character typed while the drawer is open, to be appended to its search.
-     *
-     * Start typing and you are searching, the same way the crossbar behaves — except the box is
-     * already on screen here, so the only thing missing was that nothing focused it.
-     */
+
     typedChar: String? = null,
     onTypedCharConsumed: () -> Unit = {},
     onGamepadActionConsumed: () -> Unit = {},
-    /** Idle-controller gate: when true (and no drawer overlay is open) the hint pill fades in. */
+
     showControllerHint: Boolean = false,
-    /** Any touch interaction inside the drawer — reported to the XMB input-source tracker, which
-     *  is what drives the contextual touch-navigation button. */
+
     onTouchInteraction: () -> Unit = {},
-    /** The Y menu's "Add to Cross Bar". The drawer knows which app; only the host knows which
-     *  column is open behind it, so the destination is decided out there. */
+
     onAddToCrossBar: (String) -> Unit = {},
-    /** Runs a tapped hint prompt. Routed back out to the XMB so a tap and a press take the same
-     *  path: the drawer receives its actions through [pendingGamepadAction] either way. */
+
     onPromptTapped: ((GamepadAction) -> Unit)? = null,
     viewModel: AppDrawerViewModel = hiltViewModel(),
 ) {
@@ -118,38 +96,23 @@ fun AppDrawerScreen(
 
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null) {
-            // searchActive counts as an overlay. It is a local `remember` rather than ViewModel
-            // state, which is why it was missing here: BACK while searching fell through to the
-            // plain-grid branch and closed the WHOLE drawer, losing your place in the grid. The
-            // only controller way to close search was a second X/Square, which is not advertised.
             val overlayOpen = state.menuApp != null || state.confirmUninstall != null || searchActive
             when {
-                // An inner drawer overlay (options menu / uninstall confirm) is up: BACK goes to
-                // the drawer ViewModel, which pops that overlay. XMBViewModel forwards every
-                // action — including BACK — to the drawer, so BACK here NEVER closes the drawer
-                // itself while an overlay is open.
-                // Search is drawer-local, so it is answered here rather than in the ViewModel.
                 searchActive && pendingGamepadAction == GamepadAction.BACK -> {
                     searchActive = false
                     viewModel.setSearchQuery("")
                     keyboard?.hide()
                 }
-                // MOVING PUTS THE KEYBOARD AWAY — "if i tap, or move the controller the keyboard
-                // should go away". A d-pad press while the IME is up is somebody who has finished
-                // typing and wants to pick something; leaving it up covers the grid they are now
-                // navigating. The action still lands, so the press that dismisses also moves.
+
                 searchActive && pendingGamepadAction in NAVIGATION_ACTIONS -> {
                     searchActive = false
                     keyboard?.hide()
                     viewModel.handleGamepadAction(pendingGamepadAction)
                 }
                 overlayOpen -> viewModel.handleGamepadAction(pendingGamepadAction)
-                // BACK on the plain grid closes the drawer (its only controller escape).
+
                 pendingGamepadAction == GamepadAction.BACK -> onBack()
                 pendingGamepadAction == GamepadAction.CHANGE_SORT -> {
-                    // X / Square — toggle search (App Drawer remap). Deliberately NOT routed
-                    // through onSearchToggle: that path reports touch input, and this is
-                    // controller input.
                     searchActive = !searchActive
                     if (!searchActive) viewModel.setSearchQuery("")
                 }
@@ -161,8 +124,7 @@ fun AppDrawerScreen(
 
     LaunchedEffect(typedChar) {
         val ch = typedChar ?: return@LaunchedEffect
-        // Opens the box if it is not open, and appends either way. The query is the ViewModel's,
-        // so a character typed before the first press is not lost between the two.
+
         searchActive = true
         viewModel.setSearchQuery(state.searchQuery + ch)
         onTypedCharConsumed()
@@ -185,13 +147,12 @@ fun AppDrawerScreen(
 
     AppDrawerContent(
         onPromptTapped = onPromptTapped,
-        // The grid measured the panel; the ViewModel's cursor has to step by the same number.
+
         onListRowsMeasured = viewModel::setSectionListRows,
         state = state,
         searchActive = searchActive,
         showControllerHint = showControllerHint,
-        // The back breadcrumb is a touch target; controller BACK closes the drawer at the XMB
-        // layer (never through this lambda), so reporting touch here is always accurate.
+
         onBack = {
             onTouchInteraction()
             onBack()
@@ -209,9 +170,7 @@ fun AppDrawerScreen(
         },
         onAppTapped = { index ->
             onTouchInteraction()
-            // A tap puts the keyboard away too, by the same reasoning as a d-pad press: the
-            // finger has left the text box and is on the grid. The tap still selects, so the
-            // press that dismisses is not a press that was swallowed.
+
             if (searchActive) {
                 searchActive = false
                 keyboard?.hide()
@@ -229,7 +188,7 @@ fun AppDrawerScreen(
             viewModel.onTouchBrowse(index)
         },
         onMenuAction = { action ->
-            // Intercepted before the ViewModel, because the destination is the host's to know.
+
             if (action == AppMenuAction.ADD_TO_CROSS_BAR) {
                 state.menuApp?.let { onAddToCrossBar(it.packageName) }
             }
@@ -243,10 +202,6 @@ fun AppDrawerScreen(
     )
 }
 
-// ── Main content layout ─────────────────────────────────────────────────────────
-
-// Internal (not private) so Robolectric Compose UI tests can render the content directly with a
-// synthesized state — the screen entry point needs a hiltViewModel.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun AppDrawerContent(
@@ -268,12 +223,9 @@ internal fun AppDrawerContent(
     onCancelUninstall: () -> Unit,
     onGrantUsageAccess: () -> Unit,
     modifier: Modifier = Modifier,
-    /** Runs a tapped hint prompt; null leaves the pill a legend (the previews pass nothing). */
+
     onPromptTapped: ((GamepadAction) -> Unit)? = null,
-    /**
-     * How many rows the compact list drew. Defaulted so the previews need not care, but the real
-     * caller MUST pass it — the cursor steps by this number and the grid lays out by it.
-     */
+
     onListRowsMeasured: (Int) -> Unit = {},
 ) {
     val searchFocus = remember { FocusRequester() }
@@ -294,20 +246,14 @@ internal fun AppDrawerContent(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // The same scrim Settings draws: theme-hued, solved for contrast, and translucent
-            // enough that the XMB wave still reads through. See storefrontColorsFor.
+
             .background(
                 Brush.verticalGradient(
                     listOf(sf.backgroundDeep, sf.backgroundMid),
                 )
             ),
     ) {
-        // The status strip is drawn over this screen by the shell, so the header starts below its
-        // band. The padding is on the content rather than the Box, so the screen's own background
-        // still runs under the strip -- the strip is a wash, not a filled bar, and a gap above the
-        // gradient would read as a black stripe across the top of the drawer.
         Column(modifier = Modifier.fillMaxSize().padding(top = StatusStripHeight)) {
-            // ── Header / breadcrumb bar ──────────────────────────────────
             AppDrawerHeader(
                 searchQuery = state.searchQuery,
                 searchActive = searchActive,
@@ -317,7 +263,7 @@ internal fun AppDrawerContent(
                 onSearchDone = onSearchDone,
                 colors = sf,
             )
-            // Thin accent divider under the header
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -325,7 +271,6 @@ internal fun AppDrawerContent(
                     .background(sf.chromeDivider),
             )
 
-            // ── Horizontal category tabs ────────────────────────────────
             AppDrawerCategoryTabs(
                 activeFilter = state.activeFilter,
                 filterCounts = state.filterCounts,
@@ -333,10 +278,6 @@ internal fun AppDrawerContent(
                 colors = sf,
             )
 
-            // ── Grid area ───────────────────────────────────────────────
-            // A plain Box now. This was BoxWithConstraints so the viewport height could be fed to
-            // adaptiveArtworkSize before the first tile composed; the shared card is a fixed 2:3
-            // and measures itself, so nothing here needs to know how tall the viewport is.
             Box(modifier = Modifier.weight(1f)) {
                 when {
                     state.isLoading -> {
@@ -346,10 +287,6 @@ internal fun AppDrawerContent(
                         )
                     }
 
-                    // The TAB's own apps, not visibleApps, which under every tab but All Apps
-                    // also carries the complement below the row. Zero here means this section is
-                    // empty in either view — on All Apps the complement is empty by definition,
-                    // so the two readings agree there.
                     state.sectionRowCount == 0 -> {
                         EmptyDrawerMessage(
                             filter = state.activeFilter,
@@ -378,26 +315,12 @@ internal fun AppDrawerContent(
                 }
             }
 
-            // ── Permanent footer: the hint pill, alpha-faded in/out. Alpha (not
-            // AnimatedVisibility) keeps the bar measured at its natural height in both states,
-            // so the slot never changes size and the grid never shifts.
-            //
-            // The pill DOES have clickables now, which makes a fully transparent bar a real
-            // hazard: it is still laid out at alpha 0 and would accept taps on a control nobody
-            // can see. So the dispatcher is withheld while it is invisible, which leaves the slot
-            // measured and the bar inert. This comment used to say there were no clickables to
-            // worry about; that was true and is the sort of note that stops being true quietly.
-            // The menu no longer takes the bar away — it rewrites it (see AppDrawerHintBar).
-            // The uninstall confirmation still does, because that dialog is a hard boundary with
-            // its own buttons and naming the drawer's keys over it would name the wrong ones.
             val hintAlpha by animateFloatAsState(
                 targetValue = if (showControllerHint && state.confirmUninstall == null) 1f else 0f,
                 animationSpec = tween(200),
                 label = "appDrawerHint",
             )
-            // The bar brings its own height and scrim, so the padded, centred slot the pill
-            // needed is gone with it. The alpha fade stays: the slot is still reserved, and the
-            // hints still disappear while the last input was touch.
+
             AppDrawerHintBar(
                 modifier = Modifier.alpha(hintAlpha),
                 menuOpen = state.menuApp != null,
@@ -405,13 +328,8 @@ internal fun AppDrawerContent(
             )
         }
 
-        // ── Overlays ──────────────────────────────────────────────────────
         state.menuApp?.let { app ->
-            // The app's one context menu, the same one the detail pages and the settings
-            // screens open. It was a 280dp panel centred on the screen with a 2dp corner and a
-            // 1dp border — the same job as the right-edge panel everywhere else, in a third set
-            // of metrics. The title is the app's label, which is what the old panel's header row
-            // carried, so nothing is lost by dropping that row.
+
             PspContextMenuOverlay(
                 title = app.label,
                 rows = state.menuActions.map {
@@ -433,8 +351,6 @@ internal fun AppDrawerContent(
         }
     }
 }
-
-// ── Empty state ─────────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyDrawerMessage(
@@ -490,8 +406,6 @@ private fun EmptyDrawerMessage(
     }
 }
 
-// ── Preview ─────────────────────────────────────────────────────────────────────
-
 @CombinedPreviews
 @Composable
 fun AppDrawerScreenPreview() {
@@ -500,10 +414,6 @@ fun AppDrawerScreenPreview() {
     }
 }
 
-// Accent sweep: the same content re-themed over the presets' real waves, to eyeball that the
-// drawer visibly changes hue and that text stays readable (Silver Mono / Golden Amber flip to
-// dark text). One plain parameterless @Preview per accent rather than @PreviewParameter —
-// parameterized previews are fragile across Studio/library-module combinations.
 @Preview(name = "Classic Blue", group = "App Drawer Accents")
 @Composable
 fun AppDrawerScreenPreviewClassicBlue() {
@@ -562,9 +472,7 @@ private fun AppDrawerPreviewContent() {
             isEmulator = false
         ),
     )
-    // Counted from the fixture rather than typed. The numbers used to be literals that had
-    // drifted away from the apps beside them, and a preview showing counts its own list
-    // contradicts is worse than one showing none.
+
     val mockCounts = AppFilter.entries.associateWith { filter -> mockApps.count(filter::matches) }
     val mockState = AppDrawerUiState(
         sectionApps = mockApps.filter(AppFilter.DEFAULT::matches),
@@ -576,7 +484,7 @@ private fun AppDrawerPreviewContent() {
     AppDrawerContent(
         state = mockState,
         searchActive = false,
-        // Preview shows the overlay hint pill so the design can be inspected without a device.
+
         showControllerHint = true,
         onBack = {},
         onSearchQueryChange = {},
@@ -595,7 +503,6 @@ private fun AppDrawerPreviewContent() {
     )
 }
 
-/** Rebuild the exact palette XmbColorScheme.resolve produces for [waveArgb] (white accent). */
 private fun accentPreviewColors(waveArgb: Long): PFPColors {
     val (top, bottom) = lightBackgroundAnchors(waveArgb)
     return PFPColors(

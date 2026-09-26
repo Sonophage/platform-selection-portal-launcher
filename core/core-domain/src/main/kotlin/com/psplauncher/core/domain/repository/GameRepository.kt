@@ -6,71 +6,43 @@ import com.psplauncher.core.domain.model.PlaySession
 import com.psplauncher.core.domain.model.RecentPlatform
 import kotlinx.coroutines.flow.Flow
 
-/**
- * Read/write access to the game library — the boundary between features and the data layer.
- *
- * The `games` table holds both real games (`content_type = GAME`) and Android app-shortcut rows
- * (`content_type = ANDROID_APP`); [observeGamesOnly] / [getAppEntry] distinguish them so app
- * shortcuts never aggregate into "All Games". Flows emit on every underlying change so the UI
- * stays reactive.
- */
 interface GameRepository {
     fun observeAll(): Flow<List<Game>>
-    // Real games only (content_type = GAME) — drives the "All Games" aggregate so app-style
-    // entries never appear there automatically.
+
     fun observeGamesOnly(): Flow<List<Game>>
-    // Multi-disc projection (docs/plans/README.md (C1)): one row per disc set —
-    // the primary — for the All Games surface. The unprojected [observeGamesOnly] stays available
-    // for per-disc achievement matching.
+
     fun observeAllGames(): Flow<List<Game>>
     fun observeFavorites(): Flow<List<Game>>
 
-    /** Games carrying one mark, for that shelf. */
     fun observeByPlayState(state: PlayState): Flow<List<Game>>
 
-    /** How many carry it, for whether that shelf is drawn at all. */
     fun observePlayStateCount(state: PlayState): Flow<Int>
 
-    /**
-     * Games added since the library started counting, newest first.
-     *
-     * Rows that predate the date_added column read 0 and are excluded, so an untouched library
-     * has an empty shelf here rather than every game on it.
-     */
     fun observeRecentlyAdded(): Flow<List<Game>>
 
     fun observeRecentlyAddedCount(): Flow<Int>
     fun observeByPlatform(platformId: String): Flow<List<Game>>
-    // Multi-disc projection: one row per disc set for a Memory Card's game list. The unprojected
-    // [observeByPlatform] stays available for scan baselines (existing-path resolution needs every
-    // disc row).
+
     fun observePlatformGames(platformId: String): Flow<List<Game>>
-    // One-shot snapshot of a platform's games — for import-time dedupe checks.
+
     suspend fun getByPlatform(platformId: String): List<Game>
-    /**
-     * The games most recently played, newest first, capped at [limit].
-     *
-     * Drives the Last Played section. A game that has never been played has a null last_played_at
-     * and is excluded by the query, which is what keeps a fresh library's section empty instead of
-     * full of games in arbitrary id order.
-     */
+
     fun observeRecentlyPlayed(limit: Int): Flow<List<Game>>
     fun observeRecentPlatforms(limit: Int): Flow<List<RecentPlatform>>
     suspend fun getById(id: Long): Game?
-    /** All rows in one multi-disc set, ordered with its projected primary first. */
+
     suspend fun getDiscSetMembers(discSetKey: String): List<Game>
     suspend fun getByPackageName(packageName: String): Game?
-    // The "open the app" row (no launcher shortcut id).
+
     suspend fun getAppEntry(packageName: String): Game?
-    // A specific harvested launcher-shortcut row (host package + shortcut id).
+
     suspend fun getLauncherShortcut(packageName: String, shortcutId: String): Game?
-    // A legacy INSTALL_SHORTCUT row, deduped by its captured launch intent uri.
+
     suspend fun getByIntentUri(intentUri: String): Game?
     suspend fun upsert(game: Game): Long
     suspend fun delete(id: Long)
     suspend fun setFavorite(id: Long, isFavorite: Boolean)
 
-    /** Marks the game Playing / Completed / Backlog, or clears it with null. */
     suspend fun setPlayState(id: Long, state: PlayState?)
     suspend fun updateFavoriteSortOrder(id: Long, order: Int)
     suspend fun updateNote(id: Long, note: String?)
@@ -79,39 +51,20 @@ interface GameRepository {
     suspend fun updateLogoArt(id: Long, uri: String?)
     suspend fun updateIconArt(id: Long, uri: String?)
     suspend fun setPreferredEmulator(id: Long, profileIdOrPackage: String?)
-    /** Bulk-clears every per-game emulator override on a platform (real game rows only). */
+
     suspend fun clearPreferredEmulatorForPlatform(platformId: String)
-    /** Selects the disc used when the logical multi-disc game is launched. */
+
     suspend fun setPreferredDisc(id: Long, discId: Long)
 
-    /** Takes the game off the Last Played shelf. Its recorded play time is kept — see GameDao. */
     suspend fun clearLastPlayed(id: Long)
     suspend fun recordPlaySession(session: PlaySession)
 
-    /**
-     * Stamps a game as opened at [playedAt] without touching the play counter.
-     *
-     * Separate from [recordPlaySession] because the two answer different questions and survive
-     * different things: the session is measured, and only exists if the launcher saw the emulator
-     * cover it and saw the user come back. This is the bare fact that the game was opened.
-     */
     suspend fun markOpened(id: Long, playedAt: Long)
     suspend fun getMissingRoms(): List<Game>
     suspend fun updateScrapedTitle(id: Long, scrapedTitle: String?)
 
-    /**
-     * Records the storefront a Windows game came from and its id there. Fill-only: a null
-     * argument leaves the stored value alone, so a later import that cannot determine the store
-     * never erases an identity an earlier one captured.
-     */
     suspend fun updateStorefrontIdentity(id: Long, storefront: String?, storefrontGameId: String?)
 
-    /**
-     * Attaches a launcher handle (package / pinned shortcut / captured intent) to an existing game.
-     *
-     * A targeted write rather than an upsert, so the row's play sessions and collection membership
-     * survive -- see [GameDao.attachLauncherHandle].
-     */
     suspend fun attachLauncherHandle(
         id: Long,
         packageName: String?,
@@ -119,34 +72,18 @@ interface GameRepository {
         launchIntentUri: String?,
     )
 
-    /**
-     * Records (or, with a null [providerGameId], forgets) the confirmed match for ONE provider.
-     *
-     * Exactly one of `ss_id` / `igdb_id` / `steam_grid_db_id` is written and the other
-     * three are left alone — provider ids are never crossed. Forgetting a match clears the id and
-     * nothing else: no artwork file and no metadata column is touched (C16 task 2.3).
-     *
-     * [provider] is a `MatchProvider` name.
-     */
     suspend fun updateProviderMatch(id: Long, provider: String, providerGameId: Long?)
 
-    /** Games claiming one (storefront, id) pair — the identity match for PC games. */
     suspend fun getByStorefront(storefront: String, storefrontGameId: String): List<Game>
-    // Pass null to clear the override and fall back to scrapedTitle / title.
+
     suspend fun updateUserTitleOverride(id: Long, override: String?)
-    // Display-mode tile columns (Artwork Studio apply path). updateBoxArt above is legacy
-    // naming for the BACKGROUND column; these hit the real tile columns.
+
     suspend fun updateBoxArtTile(id: Long, uri: String?)
     suspend fun updatePhysicalMediaArt(id: Long, uri: String?)
     suspend fun updateBox3dArt(id: Long, uri: String?)
-    // Per-game IconDisplayMode override (enum name). Pass null to follow the global setting.
-    // (Note: updateBoxArt above is legacy naming for the BACKGROUND/artwork_uri column, not the
-    // BOX_ART tile — the new tile columns are written by the scraper/importer, not through here.)
+
     suspend fun setIconDisplayMode(id: Long, mode: String?)
 
-    // Missing-ROM tracking. markSeen / markMissing take explicit path lists the reconciler has
-    // already diffed (never a whole-table sweep), so a bad or partial scan can't mass-flag the
-    // library. observeMissing drives the Missing bucket UI.
     fun observeMissing(): Flow<List<Game>>
     suspend fun markSeen(romPaths: List<String>, seenAt: Long)
     suspend fun markMissing(romPaths: List<String>)

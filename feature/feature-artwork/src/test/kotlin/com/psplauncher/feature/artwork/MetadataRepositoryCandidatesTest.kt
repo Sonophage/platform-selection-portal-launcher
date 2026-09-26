@@ -25,24 +25,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * C16 task 3.1 — `fetchForGame`'s provider steps extracted into a write-free `fetchCandidates`
- * at the existing "nothing found" seam (AD-12).
- *
- * Two promises are pinned: retrieval never touches a `games` column or an artwork file, and the
- * batch scraper's behaviour is unchanged by the split.
- */
 class MetadataRepositoryCandidatesTest {
-
     private val gameDao = mockk<GameDao>(relaxed = true)
     private val screenScraper = mockk<ScreenScraperApi>(relaxed = true)
     private val steamGridDb = mockk<SteamGridDbApi>(relaxed = true)
     private val igdbApi = mockk<IgdbApi>(relaxed = true)
     private val sgdbKeyProvider = mockk<SgdbApiKeyProvider>(relaxed = true)
     private val artworkStore = mockk<ArtworkStore>(relaxed = true)
-    // Stubbed rather than left relaxed: a relaxed RomIdentity hands back "" for its nullable
-    // String fields, and the COALESCE assertion below would then be pinning mockk's default
-    // instead of the repository's behaviour. Nothing here has a ROM to hash.
+
     private val romHasher = mockk<RomHasher> {
         coEvery { identify(any(), any()) } returns RomIdentity(crc32 = null, sizeBytes = null, fileName = null)
     }
@@ -63,14 +53,6 @@ class MetadataRepositoryCandidatesTest {
         ssMediaCacheDao = mockk(relaxed = true),
     )
 
-    /**
-     * A ScreenScraper hit carrying text and nothing else.
-     *
-     * These cases are about what the repository writes and does not write, not about any one
-     * provider; they used TheGamesDB only because it was the smallest thing to stub. With that
-     * provider gone, ScreenScraper is the one that still supplies a title and a description, so
-     * it stands in. `medias` stays empty so nothing tries to cache media URLs.
-     */
     private val ssHit = SsGameInfo(
         ssId = 7L,
         title = "Scraped Title",
@@ -145,7 +127,7 @@ class MetadataRepositoryCandidatesTest {
         assertEquals(ssHit, candidates.ssInfo)
         assertEquals("https://igdb/cover.jpg", candidates.igdbInfo?.artworkUrl)
         assertFalse(candidates.isEmpty)
-        // The only thing retrieval may ask of the games table is to READ the row.
+
         coVerify(exactly = 1) { gameDao.getById(1L) }
         confirmVerified(gameDao)
         confirmVerified(artworkStore)
@@ -154,17 +136,14 @@ class MetadataRepositoryCandidatesTest {
     @Test
     fun `fetchCandidates searches by the user's title override, not the raw title`() = runTest {
         givenGame(userTitleOverride = "Chrono Trigger")
-        // IGDB is the provider being asked by title, so it has to be reachable for the call to
-        // happen at all, and ScreenScraper has to come back empty or IGDB is skipped as
-        // unnecessary (it only runs when SS left artwork open).
+
         coEvery { igdbApi.hasCredentials() } returns true
         ssReturns(null)
 
         val candidates = repo.fetchCandidates(1L, "raw_rom_name", "snes", romPath = null)
 
         assertEquals("Chrono Trigger", candidates.bestTitle)
-        // Asserted against IGDB because it is now the provider that is asked BY TITLE:
-        // ScreenScraper is addressed by ROM hash or saved id and never sees the string.
+
         coVerify { igdbApi.fetchGameInfo("snes", "Chrono Trigger") }
     }
 
@@ -229,17 +208,14 @@ class MetadataRepositoryCandidatesTest {
                 boxArtUri = null,
                 physicalMediaUri = null,
                 box3dUri = null,
-                // The title deliberately does NOT ride this write. COALESCE would overwrite a
-                // name the library already shows, which is the rename this repository was
-                // changed to stop; it goes through the fill-only query asserted below instead.
+
                 scrapedTitle = null,
                 players = null,
                 ageRating = null,
                 franchise = null,
                 communityRating = null,
                 releaseDate = null,
-                // The provider's own id rides the write, which is the point of persisting it: a
-                // re-scrape fetches by id and skips matching entirely.
+
                 ssId = 7L,
                 igdbId = null,
                 steamGridDbId = null,
@@ -248,14 +224,6 @@ class MetadataRepositoryCandidatesTest {
         }
     }
 
-    /**
-     * The other half of the same contract.
-     *
-     * Asserting only that the title is absent from the COALESCE write would pass just as well if
-     * the scrape never persisted a title at all, which is the opposite bug: a game the scan knew
-     * only as a filename would stay unnamed forever. Both halves are pinned, in the same test
-     * class, because each one alone is satisfied by a broken implementation.
-     */
     @Test
     fun `a scrape fills the title through the fill-only write`() = runTest {
         givenGame()
@@ -271,9 +239,6 @@ class MetadataRepositoryCandidatesTest {
 
     @Test
     fun `a scrape does not touch the title of a game the user has named`() = runTest {
-        // user_title_override outranks scraped_title entirely, so filling the column would be
-        // dead data at best. The guard lives in MetadataRepository, not in the SQL, so the SQL's
-        // own "IS NULL" clause cannot be what catches this.
         givenGame(userTitleOverride = "The Name I Chose")
         ssReturns(ssHit)
 

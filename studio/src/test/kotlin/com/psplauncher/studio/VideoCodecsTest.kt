@@ -10,22 +10,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * Pins [VideoCodecs.accept]'s ladder: cheapest check first, and every rejection names its
- * reason with a [MotionLimits] string. The accept path runs against a REAL JCodec-encoded
- * MP4 — hand-built bytes can only test the rejections, because the last check is a genuine
- * header parse and frame decode.
- */
 class VideoCodecsTest {
-
     private fun tempDir(): File = createTempDirectory("studio-video-codecs").toFile()
 
     @Test
     fun `wrong extension is rejected with the unsupported message before any decode`() {
         val dir = tempDir()
         try {
-            // Even genuinely valid MP4 bytes under a .webm name are rejected — the Studio
-            // cannot produce the poster JCodec's demuxer can't read.
             val webm = File(dir, "clip.webm")
             MotionTestMedia.writeTestMp4(webm)
             val outcome = VideoCodecs.accept(webm)
@@ -58,9 +49,6 @@ class VideoCodecsTest {
     fun `a file over the size cap is rejected by the size check, not the decoder`() {
         val dir = tempDir()
         try {
-            // Sparse length, no data: proves the length check runs BEFORE the header is
-            // opened — the bytes inside are junk, so an UNDECODABLE answer would mean the
-            // ladder had reordered itself into doing work it must not.
             val big = File(dir, "big.mp4")
             RandomAccessFile(big, "rw").use { it.setLength(MotionLimits.MAX_BYTES + 1) }
             val outcome = VideoCodecs.accept(big)

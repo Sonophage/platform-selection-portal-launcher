@@ -29,38 +29,28 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.psplauncher.feature.library.scanner.cleanRomTitle
 
-/** Outcome of one full PC scan, with a ready-made settings/toast message. */
 data class PcScanReport(
     val setup: WindowsSetupState?,
     val exportsAdded: Int,
     val exportsSkipped: Int,
     val pinsReconciled: Int,
     val message: String,
-    /** `.pfpgame` entries that created a game (C18). */
+
     val restoredCreated: Int = 0,
-    /** `.pfpgame` entries that matched a game already in the library. */
+
     val restoredMatched: Int = 0,
-    /** `.pfpgame` entries skipped: launcher unavailable, ambiguous, or a pin not in the library. */
+
     val restoreSkipped: Int = 0,
-    /** `.pfpgame` files rejected as unreadable, or whose launch intent could not be trusted. */
+
     val untrustedExports: Int = 0,
-    /** Artwork names the `.pfpgame` entries claim for relink: (platform, kind, name lowercased) → game id. */
+
     val artworkClaims: Map<Triple<String, String, String>, Long> = emptyMap(),
-    /** Games whose artwork columns relink updated from those claims; null when relink did not run. */
+
     val artworkRelinkedGames: Int? = null,
 ) {
     val newGames: Int get() = exportsAdded + pinsReconciled + restoredCreated
 }
 
-/**
- * The one full "scan for PC games" pass, shared by every entry point (Library Manager's card
- * action AND the XMB card's "Scan This Console"): setup self-heal, the OS pin sweep (pins missed
- * or updated in place) and the `<windows>/import/` export drop-folder. Extracted from
- * LibraryManagerViewModel so the XMB path can't drift.
- *
- * It no longer reconciles local Steam emulator game folders: that path read the achievements
- * module, which this build does not have. Every other route into the PC library is unchanged.
- */
 @Singleton
 class PcGameScanner @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -71,13 +61,7 @@ class PcGameScanner @Inject constructor(
     private val artworkImportManager: ArtworkImportManager,
     private val artworkRecordDao: ArtworkRecordDao,
 ) {
-    /**
-     * @param overrideFolder a tree URI the user picked from the file manager. When set, exported
-     * games are read from THAT folder for this scan only; otherwise the scan reads the default
-     * `<ROM Root>/windows/import` drop-folders. A picked folder does not require a ROM root.
-     */
     suspend fun scan(overrideFolder: Uri? = null): PcScanReport {
-        // Self-heal first so a fresh setup creates <root>/windows/import before we look for it.
         val setup = runCatching { windowsLibrarySetup.ensure() }.getOrNull()
         if (overrideFolder == null && setup is WindowsSetupState.NoRomRoot) {
             return PcScanReport(
@@ -89,8 +73,6 @@ class PcGameScanner @Inject constructor(
         val pm = context.packageManager
         val launchers = installedLaunchers(pm)
 
-        // OS pin sweep: pins that arrived while PFP wasn't Home, or were UPDATED in place (no
-        // confirm fires), reconcile here.
         val pins = runCatching { pcShortcutImporter.reconcilePinnedShortcuts() }
             .onFailure { Timber.e(it, "Pin reconcile failed") }
             .getOrDefault(0)
@@ -106,8 +88,7 @@ class PcGameScanner @Inject constructor(
         val pfpExports = mutableListOf<PcExportFile>()
         for ((rootUri, importDocId) in importFolders) {
             romScanner.scanPcFolder(rootUri, importDocId).forEach { file ->
-                // PFP's own export files wait until every launcher file is in, so a game those files
-                // just recreated is matched instead of duplicated (C18 task X.4).
+
                 if (file.extension == PcGameExportCodec.EXTENSION) {
                     pfpExports += file
                     return@forEach
@@ -120,30 +101,19 @@ class PcGameScanner @Inject constructor(
                 if (existing == null) {
                     gameRepository.upsert(
                         Game(
-                            // Through the same cleaner the ROM side uses, which this path skipped.
-                            //
-                            // cleanRomTitle turns underscores into spaces, drops (USA)/[!] tags and
-                            // rewrites " - " to ": ". Every ROM row goes through it; no PC row did,
-                            // so a shortcut named "The Elder Scrolls V_ Skyrim Special Edition.lnk"
-                            // reached the crossbar with the underscore intact, sitting next to ROM
-                            // titles that had been cleaned. One cleaner, two callers, only one of
-                            // them using it.
+
                             title           = cleanRomTitle(file.title),
                             platformId      = WINDOWS_PLATFORM_ID,
                             packageName     = launch.packageName,
                             isManualEntry   = true,
                             contentType     = GameContentType.GAME,
                             launchIntentUri = intentUri,
-                            // The storefront is computed here anyway to build the intent — keeping
-                            // it is what lets a Steam or GOG game be matched by id instead of by
-                            // an imperfect filename (C16 task 0.5).
+
                             storefront       = launch.storefront,
                             storefrontGameId = launch.storefrontGameId,
                         ),
                     )
                 } else {
-                    // Fill-only: an already-imported game gains the identity without a re-scan,
-                    // and never loses one this pass could not determine.
                     gameRepository.updateStorefrontIdentity(
                         existing.id, launch.storefront, launch.storefrontGameId,
                     )
@@ -204,12 +174,6 @@ class PcGameScanner @Inject constructor(
         data class Done(val gamesLinked: Int) : ArtworkRelink
     }
 
-    /**
-     * Reconnects artwork by the names the `.pfpgame` entries claim (C18 task X.5), when any claim is
-     * still unfulfilled. The export files stay in the import folder and every scan reads them, so
-     * without that check each scan, including the XMB's Scan This Console, would walk the whole
-     * artwork library again after the artwork was already back.
-     */
     private suspend fun relinkClaimedArtwork(
         claims: Map<Triple<String, String, String>, Long>,
         identitySeeds: List<com.psplauncher.feature.artwork.portable.ArtworkIdentityIndex.Entry>,
@@ -221,7 +185,7 @@ class PcGameScanner @Inject constructor(
             .onFailure { Timber.e(it, "Relink after .pfpgame restore failed") }
         return when {
             result.isFailure -> ArtworkRelink.Failed
-            // No artwork folder linked, or its grant is gone: relink did nothing.
+
             result.getOrNull() == null -> ArtworkRelink.FolderNotLinked
             else -> ArtworkRelink.Done(result.getOrNull()!!.gamesLinked)
         }
@@ -233,17 +197,10 @@ class PcGameScanner @Inject constructor(
         val skipped: Int = 0,
         val untrusted: Int = 0,
         val claims: Map<Triple<String, String, String>, Long> = emptyMap(),
-        // Durable identity for the same artwork (task D.4b) — written into the library's identity
-        // index so the reconnection outlives this one import.
+
         val identitySeeds: List<com.psplauncher.feature.artwork.portable.ArtworkIdentityIndex.Entry> = emptyList(),
     )
 
-    /**
-     * Applies the `.pfpgame` files found by this scan (C18 task X.4). Each is decoded, its launch
-     * intent checked here where `PackageManager` is, and then [PcGameImportPlanner] decides: create a
-     * game, fill-only match one, or skip. Every entry that lands on a game contributes its artwork
-     * names as claims.
-     */
     private suspend fun restoreFromPfpExports(files: List<PcExportFile>, pm: PackageManager): PfpRestore {
         if (files.isEmpty()) return PfpRestore()
         val games = gameRepository.getByPlatform(WINDOWS_PLATFORM_ID).toMutableList()
@@ -287,12 +244,6 @@ class PcGameScanner @Inject constructor(
         return PfpRestore(created, matched, skipped, untrusted, claims.toMap(), claims.toIdentitySeeds())
     }
 
-    /**
-     * Writes a Fill decision one column at a time (task 1.2), so restoring a `.pfpgame` onto an
-     * existing game can never REPLACE-upsert its row and cascade-delete its play sessions,
-     * collection membership or provider links. [original] is the matched game before
-     * [PcGameImportPlanner.fill] filled it; only a column that actually changed is written.
-     */
     private suspend fun applyFill(original: Game, filled: Game) {
         val id = filled.id
         if (filled.scrapedTitle != original.scrapedTitle) {
@@ -315,11 +266,6 @@ class PcGameScanner @Inject constructor(
         }
     }
 
-    /**
-     * The Android half of trusting a `.pfpgame` launch intent: the file is on shared storage, so the
-     * launcher must be installed and verified, and the intent must parse and survive
-     * [ShortcutIntentSanitizer]. Only the sanitized form is ever stored. Nothing is launched here.
-     */
     private fun checkLaunch(export: PcGameExport, pm: PackageManager): LaunchCheck {
         val installed = runCatching { pm.getApplicationInfo(export.launcherPackage, 0) }.isSuccess
         val verified = installed && PcLauncherCatalog.isVerifiedPcLauncher(export.launcherPackage, pm)
@@ -332,17 +278,11 @@ class PcGameScanner @Inject constructor(
         )
     }
 
-    /** The launcher export files in the import folders, and the launch intent URIs the scan would build from them. */
     data class LauncherExports(
         val files: List<PcExportFile>,
         val intentUris: Set<String>,
     )
 
-    /**
-     * What the scan would import from the default `<ROM Root>/windows/import` folders, without
-     * importing it. Export Manual Games uses it to leave out the games those files already bring
-     * back (C18 task X.3). Built by the same [buildPcLaunch] the scan uses, so the two cannot drift.
-     */
     suspend fun launcherExports(): LauncherExports {
         val pm = context.packageManager
         val launchers = installedLaunchers(pm)
@@ -355,7 +295,6 @@ class PcGameScanner @Inject constructor(
         return LauncherExports(files, intentUris)
     }
 
-    /** The installed package of each PC launcher the export files can be launched through, or null. */
     private data class InstalledLaunchers(
         val gameNative: String?,
         val gameHub: String?,
@@ -366,18 +305,12 @@ class PcGameScanner @Inject constructor(
         fun installed(vararg pkgs: String) = pkgs.firstOrNull { runCatching { pm.getApplicationInfo(it, 0) }.isSuccess }
         return InstalledLaunchers(
             gameNative = installed("app.gamenative"),
-            // Fingerprint-verified family lookup — covers every side-by-side spoof variant without
-            // mistaking the genuine AnTuTu/PUBG/Genshin apps for a launcher.
+
             gameHub = PcLauncherCatalog.installedGameHubFamilyPackages(pm).firstOrNull(),
             winlator = installed("com.winlator", "com.winlator.cmod"),
         )
     }
 
-    /**
-     * One resolved PC launch: how to start the game, and — for store exports — which storefront
-     * it came from and its id there. That identity used to be a local val discarded once the
-     * intent was built; it is carried out now so the imported row can keep it (C16 task 0.5).
-     */
     private data class PcLaunch(
         val intent: Intent,
         val launcherName: String,
@@ -386,9 +319,6 @@ class PcGameScanner @Inject constructor(
         val storefrontGameId: String? = null,
     )
 
-    // Chooses the launcher + builds the launch intent for one export file. Prefers GameNative (it
-    // handles every store); a .steam file falls back to a GameHub-family launcher; a .desktop file
-    // uses Winlator's package launch + a shortcut_path extra.
     private fun buildPcLaunch(
         file: PcExportFile,
         pm: PackageManager,
@@ -404,7 +334,7 @@ class PcGameScanner @Inject constructor(
                 putExtra("shortcut_path", path)
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             } ?: return null
-            // A .desktop shortcut is a path into a Wine prefix — it names no storefront.
+
             return PcLaunch(intent, "Winlator", pkg)
         }
 
@@ -417,7 +347,7 @@ class PcGameScanner @Inject constructor(
             val intent = PcLauncherAdapters.forType(PcLauncherType.GAMENATIVE)?.buildLaunchIntent(pkg, id, source) ?: return null
             return PcLaunch(intent, "GameNative", pkg, storefront, storefrontId)
         }
-        // Only Steam titles are launchable by the GameHub family; other stores need GameNative.
+
         if (file.extension == "steam" && gameHubPkg != null) {
             val type = if (gameHubPkg == "gamehub.lite") PcLauncherType.GAMEHUB_LITE else PcLauncherType.BANNERHUB_V6
             val name = if (gameHubPkg == "gamehub.lite") "GameHub Lite" else "BannerHub"
@@ -427,9 +357,6 @@ class PcGameScanner @Inject constructor(
         return null
     }
 
-    // Title-level dedupe within the Windows card: the same game can arrive with different launch
-    // handles (shortcut id via pin, intent URI via export scan), so handle-keyed lookups alone
-    // can't converge re-imports.
     private suspend fun findWindowsGame(packageName: String, title: String): Game? {
         val key = WindowsGameKeys.normalizeTitle(title)
         return gameRepository.getByPlatform(WINDOWS_PLATFORM_ID).firstOrNull {

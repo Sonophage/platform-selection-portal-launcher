@@ -54,19 +54,11 @@ import com.psplauncher.feature.xmb.viewmodel.XMBItemType
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
-// Resolved per theme rather than fixed white: on a pale scheme the selected row was the
-// brightest thing on an already bright wallpaper. See PFPTheme.
 private val PrimaryText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+
 private val SecondaryText: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val CoverPlaceholder = Color(0xFF1B1B27)
 
-/**
- * Fullscreen, searchable "Settings-style" browser for the Music and Playlist root items. Stateless:
- * renders [state] and forwards intents. Controller input is handled in the ViewModel (the search
- * field is touch-driven); the list also accepts touch.
- */
 @Composable
 fun MusicBrowserScreen(
     state: MusicBrowserState,
@@ -76,9 +68,7 @@ fun MusicBrowserScreen(
     onBack: () -> Unit,
     onSortTapped: () -> Unit = {},
     onOptionsTapped: () -> Unit = {},
-    // Show the touch header pills only when the last input was touch (AUTO), matching the XMB's
-    // contextual App Drawer button. Controller users rely on the prompt bar below, which names
-    // the actions and lets the shared resolver draw whichever buttons their pad binds them to.
+
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -93,8 +83,7 @@ fun MusicBrowserScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // Semi-transparent scrim so the XMB wave/wallpaper background stays visible behind the
-            // menu (the XMB foreground itself is hidden by XMBShell while this is open).
+
             .background(
                 Brush.verticalGradient(
                     0f to pfpColors.backgroundTop.copy(alpha = 0.72f),
@@ -103,9 +92,6 @@ fun MusicBrowserScreen(
             ),
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 24.dp)) {
-            // Header: breadcrumb (matching the detail menus — ◀ + title + trail, tap = back, no
-            // press highlight, always visible), with touch pills for the X (sort) and Y (options)
-            // actions on the right.
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -131,13 +117,10 @@ fun MusicBrowserScreen(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                // The Sort and Options pills used to live here. They said the same two things the
-                // footer already says, twice the size, in a second place -- see the footer below.
             }
 
             Spacer(Modifier.height(14.dp))
 
-            // Always-visible search bar.
             OutlinedTextField(
                 value = state.query,
                 onValueChange = onQueryChange,
@@ -171,21 +154,11 @@ fun MusicBrowserScreen(
             }
 
             Spacer(Modifier.height(8.dp))
-            // One footer, and it is the touch surface too.
-            //
-            // This screen used to carry big Sort and Options pills in its header saying exactly
-            // what two of these prompts say. Two controls for one action, one of them large
-            // enough to crowd the header -- and a touch user had no reason to think the small
-            // legend at the bottom was pressable, because it was not.
-            //
-            // It is now. The prompts fire the same actions through the same dispatcher the pad
-            // uses, so there is one place each action lives and one look for all of them.
+
             PfpHintBar(
                 items = listOfNotNull(
                     ControllerPromptItem(GamepadAction.SELECT, "Open"),
-                    // Sort is a no-op on playlist and group views — the ViewModel ignores it
-                    // there — so the prompt goes rather than promising something. The label
-                    // carries the current mode, which is what the pill was for.
+
                     state.sortLabel?.let { ControllerPromptItem(GamepadAction.CHANGE_SORT, it) },
                     ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"),
                     ControllerPromptItem(GamepadAction.BACK, "Back"),
@@ -254,7 +227,6 @@ private fun BrowserRow(
 @Composable
 private fun BrowserLeading(row: XMBItem) {
     when {
-        // Action rows (Create Playlist / Add Tracks) — a plus glyph.
         row.type == XMBItemType.STANDARD || row.type == XMBItemType.EMPTY -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(44.dp)) {
                 if (row.type == XMBItemType.STANDARD) {
@@ -268,7 +240,6 @@ private fun BrowserLeading(row: XMBItem) {
             }
         }
         else -> {
-            // Track row: album cover, or a framed music-note fallback.
             if (row.coverUri != null) {
                 AsyncImage(
                     model = row.coverUri,

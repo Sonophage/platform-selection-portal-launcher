@@ -18,26 +18,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * A media rescan must not throw away what the user did.
- *
- * All three media scanners replace a whole folder or library: DELETE, then INSERT rows rebuilt
- * from the filesystem. The filesystem does not know what has been played, so every column that
- * belongs to the USER rather than to the file is destroyed by a routine rescan unless the replace
- * puts it back.
- *
- * This is not hypothetical for video. `videos.last_watched_at` and `resume_position_ms` shipped
- * this way: Recently Watched emptied itself and every part-watched film restarted from zero after
- * a library rescan, with nothing on screen to explain it. Music and books were given their own
- * recency columns in the same change and would have inherited the identical fault.
- *
- * The scanners all carry `prior?.id` forward, so identity survives a scan and the stamp can be
- * matched back onto it. That is the assumption this file exists to keep true.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class RescanKeepsRecencyTest {
-
     private lateinit var db: PFPDatabase
 
     @Before
@@ -51,7 +34,6 @@ class RescanKeepsRecencyTest {
     @After
     fun tearDown() = db.close()
 
-    // Rows as a scanner builds them: straight off the filesystem, with no idea of recency.
     private fun track(id: String, folderId: String) =
         MusicTrackEntity(id = id, folderId = folderId, uri = "file:///m/$id.flac", displayName = id)
 
@@ -70,7 +52,6 @@ class RescanKeepsRecencyTest {
         dao.replaceForFolder("f1", listOf(track("t1", "f1"), track("t2", "f1")))
         dao.markPlayed("t1", 5_000L)
 
-        // The same scan again: identical rows, none of them carrying a stamp.
         dao.replaceForFolder("f1", listOf(track("t1", "f1"), track("t2", "f1")))
 
         assertEquals(
@@ -98,8 +79,6 @@ class RescanKeepsRecencyTest {
 
     @Test
     fun `rescanning a video library keeps the watch stamp AND the resume position`() = runTest {
-        // The resume position is the one that was already being lost in a shipped build, and it
-        // is the more painful half: it is where you were in a two-hour film.
         val dao = db.videoDao()
         db.videoLibraryDao().upsert(
             VideoLibraryEntity(id = "l1", displayName = "Video", treeUri = "file:///v", createdAt = 0, updatedAt = 0),
@@ -117,9 +96,6 @@ class RescanKeepsRecencyTest {
 
     @Test
     fun `a row that has gone from disk does not come back`() = runTest {
-        // The preservation must not turn a replace into a merge. A track deleted from the folder
-        // is gone, stamp or no stamp — otherwise the shelf would resurrect files that no longer
-        // exist and pressing A would fail.
         val dao = db.musicTrackDao()
         db.musicFolderDao().upsert(
             MusicFolderEntity(id = "f1", displayName = "Music", treeUri = "file:///m", createdAt = 0, updatedAt = 0),

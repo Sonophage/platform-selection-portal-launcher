@@ -13,13 +13,8 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 
-/**
- * The shared existing-path seam: the platform's library rows fold into one path set, and a read
- * failure throws instead of silently degrading to an empty set (which could duplicate known games).
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ExistingRomPathResolverTest {
-
     private lateinit var gameRepository: GameRepository
     private lateinit var resolver: ExistingRomPathResolver
 

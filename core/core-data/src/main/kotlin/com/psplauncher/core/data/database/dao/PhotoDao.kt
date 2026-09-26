@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PhotoDao {
-
     @Query("SELECT * FROM photos ORDER BY display_name COLLATE NOCASE ASC")
     fun observeAll(): Flow<List<PhotoEntity>>
 
@@ -29,7 +28,6 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE id = :id")
     suspend fun getById(id: String): PhotoEntity?
 
-    // How many rows still reference a cached thumbnail — 0 means its file can be deleted.
     @Query("SELECT COUNT(*) FROM photos WHERE thumbnail_uri = :uri")
     suspend fun countReferencingThumbnail(uri: String): Int
 
@@ -42,24 +40,12 @@ interface PhotoDao {
     @Query("DELETE FROM photos WHERE id = :id")
     suspend fun deleteById(id: String)
 
-    // Replaces a single library's photos atomically; other libraries are never touched.
     @Transaction
     suspend fun replaceForLibrary(libraryId: String, photos: List<PhotoEntity>) {
         deleteForLibrary(libraryId)
         if (photos.isNotEmpty()) insertAll(photos)
     }
 
-    /**
-     * The newest thumbnails in this library, newest first — for the XMB's card art grids.
-     *
-     * A LIMIT query returning only the URIs, not the rows. The grids need four per card and the
-     * media columns slice one pool across their rows, so this is tens of strings; streaming every
-     * track or photo to read one column off each would be thousands of rows for a handful of
-     * thumbnails.
-     *
-     * Newest is highest id, the same proxy the games grid uses: these tables have no added-at
-     * column either, and rows are inserted in scan order.
-     */
     @Query(
         """
         SELECT thumbnail_uri FROM photos

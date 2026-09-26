@@ -34,12 +34,6 @@ import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.themekit.XmbLayoutAdjust
 import kotlin.math.roundToInt
 
-/**
- * Live "Adjust XMB Layout" editor chrome, drawn OVER the real XMB (which reflects [draft] in real
- * time). Two control paths, per the design: D-pad / shoulder buttons drive it on a controller (the
- * hints line), and the touch controls here work with no controller — a Sliders toggle reveals a
- * three-axis panel, plus Reset / Cancel / Save.
- */
 @Composable
 fun XmbLayoutAdjustOverlay(
     draft: XmbLayoutAdjust,
@@ -54,8 +48,6 @@ fun XmbLayoutAdjustOverlay(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-        // Consuming scrim: keeps the editor modal so taps above the panel never fall through to
-        // the XMB rows behind it (the cross stays fully visible, only faintly dimmed).
         Box(
             Modifier
                 .fillMaxSize()
@@ -63,7 +55,7 @@ fun XmbLayoutAdjustOverlay(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) { /* swallow */ },
+                ) {  },
         )
         Column(
             modifier = Modifier
@@ -79,7 +71,7 @@ fun XmbLayoutAdjustOverlay(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            // Live read-out of the three axes.
+
             Text(
                 text = "Scale ${"%.2f".format(draft.scale)}x    " +
                     "Horizontal ${(draft.barLeftFraction * 100).roundToInt()}%    " +
@@ -87,11 +79,10 @@ fun XmbLayoutAdjustOverlay(
                 color = Color(0xFFB9C6DC),
                 fontSize = 13.sp,
             )
-            // Controller hints (the other half of "both" control modes).
+
             PfpControllerHints(
                 items = listOf(
-                    // The whole D-pad moves the bar; four direction glyphs in a row would
-                    // read as four separate prompts.
+
                     ControllerPromptItem.fixed(ControllerIcon.DPAD_ALL, "Move"),
                     ControllerPromptItem(
                         listOf(GamepadAction.PREV_CATEGORY, GamepadAction.NEXT_CATEGORY),
@@ -119,7 +110,7 @@ fun XmbLayoutAdjustOverlay(
                     Text(if (slidersVisible) "Hide Sliders" else "Sliders")
                 }
                 OutlinedButton(onClick = onReset) { Text("Reset") }
-                Box(Modifier.width(1.dp)) // spacer flex
+                Box(Modifier.width(1.dp))
                 OutlinedButton(onClick = onCancel) { Text("Cancel") }
                 Button(
                     onClick = onSave,

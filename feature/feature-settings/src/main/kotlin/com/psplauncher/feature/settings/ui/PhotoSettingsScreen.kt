@@ -25,11 +25,6 @@ import com.psplauncher.feature.settings.viewmodel.PhotoSettingsUiState
 import com.psplauncher.feature.settings.viewmodel.PhotoSettingsViewModel
 import com.psplauncher.feature.settings.viewmodel.RootFolderRow
 
-/**
- * Stateful entry point: owns the ViewModel, collects its state, and wires the folder pickers. Kept
- * deliberately thin so the previewable UI lives in [PhotoSettingsContent]. This is the template for
- * previewing any ViewModel-driven screen — see [com.psplauncher.core.ui.preview.PfpPreview].
- */
 @Composable
 fun PhotoSettingsScreen(
     onBack: () -> Unit,
@@ -38,8 +33,6 @@ fun PhotoSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Pickers: one for adding a root, one pre-pointed at the root being re-linked (re-granting
-    // after a restore/reinstall lands on the exact same folder in one tap).
     val addRootPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> uri?.let { viewModel.addRoot(it) } }
@@ -67,10 +60,6 @@ fun PhotoSettingsScreen(
     )
 }
 
-/**
- * Stateless UI: everything the screen draws, driven purely by [state] and callbacks. No ViewModel,
- * no Hilt — so it renders in `@Preview` with a hand-built [PhotoSettingsUiState].
- */
 @Composable
 fun PhotoSettingsContent(
     state: PhotoSettingsUiState,

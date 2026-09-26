@@ -12,15 +12,11 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CachingMatchEvidenceTest {
-
-    /** Records every lookup that reached the provider and answers with [answer], or [failure]. */
     private class CountingEvidence : MatchEvidenceSource {
         val asked = mutableListOf<String>()
         var answer: List<GameCandidate> = emptyList()
         var failure: Exception? = null
 
-        // When set, a title search waits here and swallows its own cancellation, as some provider
-        // clients do.
         var gate: CompletableDeferred<Unit>? = null
 
         override suspend fun candidateByRomHash(
@@ -61,7 +57,7 @@ class CachingMatchEvidenceTest {
         val cached = CachingMatchEvidence(provider, TitleSearchStore.None)
 
         repeat(3) { cached.searchByTitle(MatchProvider.SCREENSCRAPER, "Tactics Ogre", "windows") }
-        // Case and spacing alone do not make a new search.
+
         cached.searchByTitle(MatchProvider.SCREENSCRAPER, "  tactics   OGRE ", "windows")
 
         assertEquals(1, provider.asked.size)
@@ -137,7 +133,7 @@ class CachingMatchEvidenceTest {
         runCurrent()
         val waiting = async { cached.searchByTitle(MatchProvider.SCREENSCRAPER, "Tactics Ogre", "windows") }
         runCurrent()
-        provider.gate = null   // the waiting caller's own request answers at once
+        provider.gate = null
         asking.cancel()
 
         assertEquals(listOf(reborn), waiting.await())
@@ -166,9 +162,6 @@ class CachingMatchEvidenceTest {
         assertEquals(2, provider.asked.size)
     }
 
-    // ── Kept between opens (task M.5, AD-21) ─────────────────────────────────
-
-    /** An in-memory [TitleSearchStore] that records what was written. */
     private class FakeStore : TitleSearchStore {
         val entries = mutableMapOf<Triple<MatchProvider, String, String>, StoredTitleSearch>()
 
@@ -198,7 +191,7 @@ class CachingMatchEvidenceTest {
 
         assertEquals(listOf(reborn), answer)
         assertTrue(nextOpen.asked.isEmpty())
-        // Hits are kept for seven days, under the normalized query.
+
         assertEquals(1_000_000L + 7 * day, store.entries.getValue(Triple(MatchProvider.SCREENSCRAPER, "tactics ogre", "psp")).expiresAtMillis)
     }
 

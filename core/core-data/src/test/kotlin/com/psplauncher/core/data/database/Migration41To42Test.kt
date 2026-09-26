@@ -10,26 +10,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/**
- * v42 — artwork multi-media. The migration must be purely additive: every existing asset keeps
- * its bytes, its provenance and its slot, arriving at `sort_order = 0`, while the rebuilt unique
- * index starts allowing a second and third asset of the multi-asset kinds.
- *
- * Validated at 43 rather than 42: Room only ever exports the schema of the version the database
- * currently declares, and 41→42→43 landed together, so no 42.json exists to validate against.
- * Both migrations run here; the assertions are all about what 41→42 does.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration41To42Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
     @Test
     fun `every existing asset survives at sort order zero with its provenance intact`() {
         helper.createDatabase(41).use { db ->
-            // One asset of several types, including a user-pinned one.
+
             insertV41Record(db, gameId = 1, type = "ICON", name = "Crash", userAssigned = 1, locked = 1)
             insertV41Record(db, gameId = 1, type = "SCREENSHOT", name = "Crash")
             insertV41Record(db, gameId = 1, type = "VIDEO", name = "Crash")
@@ -81,8 +71,7 @@ class Migration41To42Test {
         }
 
         helper.runMigrationsAndValidate(43, MIGRATIONS).use { db ->
-            // The unique index still rides position 0, so a REPLACE-style write collides exactly
-            // as it did before and a second icon at the same position is rejected.
+
             assertFailsWith<Throwable> {
                 insertRecord(db, gameId = 1, type = "ICON", name = "Crash", sortOrder = 0)
             }

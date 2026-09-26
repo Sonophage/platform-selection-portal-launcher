@@ -4,19 +4,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The SAF-path companion suppressor: a .cue hides the .bin files it lists and a Dreamcast .gdi
- * hides its track files, so Memory Card SAF scans never make companion files game rows.
- * See docs/plans/README.md (C1).
- */
 class DiscCompanionSuppressorTest {
-
     private val suppressor = DiscCompanionSuppressor()
 
     private fun file(path: String) =
         ScannedDiscFile(rawPath = path, name = path.substringAfterLast('/').substringAfterLast('\\'))
 
-    // A fake reader that serves a fixed sheet per file name.
     private fun reader(sheets: Map<String, List<String>>): DiscCompanionSuppressor.SheetReader =
         DiscCompanionSuppressor.SheetReader { f -> sheets[f.name] }
 
@@ -118,7 +111,6 @@ class DiscCompanionSuppressorTest {
 
     @Test
     fun `windows-style paths suppress companions`() {
-        // Desktop ROM folders use backslash paths — same suppression, other separator.
         val files = listOf(
             file("D:\\Roms\\psx\\Game.cue"),
             file("D:\\Roms\\psx\\Game (Track 1).bin"),

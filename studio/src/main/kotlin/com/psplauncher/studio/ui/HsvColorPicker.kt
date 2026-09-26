@@ -21,14 +21,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
-/**
- * Dependency-free HSV picker: a saturation/value square plus a vertical hue strip, drawn
- * with plain gradients (no experimental widgets — see the CMP 1.6.11 stability note in
- * StudioApp). Emits packed opaque ARGB.
- *
- * The HSV working state lives here so grey/black picks don't lose their hue; external
- * changes (hex field, preset swatch) re-sync it.
- */
 @Composable
 fun HsvColorPicker(
     argb: Int,
@@ -38,7 +30,6 @@ fun HsvColorPicker(
     var hsv by remember { mutableStateOf(argbToHsv(argb)) }
     var lastEmitted by remember { mutableStateOf(argb) }
     if (argb != lastEmitted) {
-        // The hex field or a swatch changed the color under us — resync.
         hsv = argbToHsv(argb)
         lastEmitted = argb
     }
@@ -51,7 +42,6 @@ fun HsvColorPicker(
     }
 
     Row(modifier) {
-        // ── Saturation/value square ──
         val squareSize = 168.dp
         Canvas(
             Modifier
@@ -66,11 +56,10 @@ fun HsvColorPicker(
                     }
                 },
         ) {
-            // White → pure hue horizontally, then transparent → black vertically on top.
             val hueColor = Color(hsvToArgb(hsv[0], 1f, 1f))
             drawRect(Brush.horizontalGradient(listOf(Color.White, hueColor)))
             drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
-            // Thumb at (saturation, 1 - value).
+
             val thumb = Offset(hsv[1] * size.width, (1f - hsv[2]) * size.height)
             drawCircle(Color.Black, radius = 7f, center = thumb, style = Stroke(width = 3f))
             drawCircle(Color.White, radius = 5f, center = thumb, style = Stroke(width = 2f))
@@ -78,7 +67,6 @@ fun HsvColorPicker(
 
         Spacer(Modifier.width(10.dp))
 
-        // ── Hue strip ──
         Canvas(
             Modifier
                 .width(22.dp)

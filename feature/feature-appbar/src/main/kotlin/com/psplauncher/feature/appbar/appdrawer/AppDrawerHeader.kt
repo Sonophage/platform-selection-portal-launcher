@@ -12,24 +12,6 @@ import androidx.compose.ui.unit.dp
 import com.psplauncher.core.ui.components.PfpSearchField
 import com.psplauncher.core.ui.theme.StorefrontColors
 
-// ── Header ────────────────────────────────────────────────────────────────────
-//
-// One search field, the width of the screen. Nothing else.
-//
-// It was `‹ Android › Recently Used` on the left, a 220dp box in the middle and a magnifier
-// labelled "Search" on the right — four things saying two, and both of them said twice:
-//
-//  * the category tabs directly below this row already name the active filter AND underline it,
-//    so the breadcrumb's tail was a second copy of the one thing that cannot be missed;
-//  * the magnifier and the word "Search" sat beside a box whose own placeholder reads "Search",
-//    and the bottom bar names the button that opens it.
-//
-// Back went with them. It was the arrow and the word "Android", neither of which is where B goes,
-// and B is on the bar at the bottom of every screen now.
-//
-// The field itself is core-ui's [PfpSearchField] — this row is the drawer's placement of it, and
-// the box, the caret rule and the magnifier are the app's, shared with the installed-app picker.
-
 private val HEADER_HEIGHT = 56.dp
 
 @Composable

@@ -82,13 +82,7 @@ fun BackupSettingsScreen(
                     )
                 }
             SettingsValueRow(label = "ROM Files",           value = "✗  (not included)")
-            // This row used to read "Settings & API Keys ✓", which was the one claim on this
-            // screen the code contradicts. A key is sealed with a Keystore key belonging to this
-            // INSTALL; the ciphertext travels in the archive, but a restore that cannot decrypt it
-            // drops it on purpose rather than feed the API a dead string (BackupManager's
-            // ENCRYPTED_CREDENTIAL_KEYS). So the keys come back across an update, and do not come
-            // back after an uninstall or onto another device — which is exactly when someone is
-            // reading this list.
+
             SettingsValueRow(label = "API Keys",            value = "✗  (re-enter after a reinstall)")
 
             SettingsGroup("Restore")

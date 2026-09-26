@@ -3,14 +3,13 @@ package com.psplauncher.feature.launcher
 import timber.log.Timber
 
 data class RetroArchCore(
-    val name: String,           // human-readable label derived from filename
-    val fileName: String,       // e.g. "nestopia_libretro_android.so"
+    val name: String,
+    val fileName: String,
     val absolutePath: String,
     val platformIds: List<String>,
 )
 
 object RetroArchCoreScanner {
-
     val RETROARCH_PACKAGES = listOf(
         "com.retroarch.aarch64",
         "com.retroarch.ra64",
@@ -24,15 +23,6 @@ object RetroArchCoreScanner {
         val platformIds: List<String>,
     )
 
-    /**
-     * One recommended core per system, matching RetroArch's Core Downloader names.
-     *
-     * This is a *reference* table, not a source of profiles. It once was the latter: when the cores
-     * folder was unlinked every entry here became a launchable profile marked available, which is
-     * how users ended up defaulted onto cores they had never downloaded. Profiles now come only from
-     * a real inventory ([coresFor]); these names survive to label a core path ([labelForPath]) and
-     * to tell a user which core to install for a system ([recommendedCoreNameFor]).
-     */
     private val RECOMMENDED_CORES = listOf(
         RecommendedCore("mesen_libretro_android.so",            "Mesen (NES)",              listOf("nes", "fam")),
         RecommendedCore("snes9x_libretro_android.so",           "Snes9x (SNES)",            listOf("snes")),
@@ -55,7 +45,6 @@ object RetroArchCoreScanner {
         RecommendedCore("vice_x64_libretro_android.so",         "VICE x64 (C64)",           listOf("c64")),
     )
 
-    // Core filename prefix (strip _libretro_android.so) → platform IDs
     private val CORE_PLATFORM_MAP: Map<String, List<String>> = mapOf(
         "nestopia"                    to listOf("nes", "fam"),
         "mesen"                       to listOf("nes", "fam"),
@@ -115,13 +104,6 @@ object RetroArchCoreScanner {
         "flycast"                     to listOf("dreamcast", "dc", "naomi", "atomiswave"),
     )
 
-    /**
-     * Human-readable label for a core [corePath] value, e.g.
-     * `/data/data/com.retroarch.aarch64/cores/mednafen_psx_hw_libretro_android.so` →
-     * "Beetle PSX HW". Curated names win (matching Core Downloader's labels); an unrecognized
-     * `*_libretro*.so` file falls back to a name derived from its file name, and anything else
-     * returns the path unchanged.
-     */
     fun labelForPath(corePath: String): String {
         val fileName = corePath.substringAfterLast('/')
         if (fileName.isBlank()) return corePath
@@ -135,23 +117,6 @@ object RetroArchCoreScanner {
         return fileName
     }
 
-    /**
-     * Profiles for the cores actually present in [installedCoreFiles], for an installed RetroArch
-     * [packageName]. Entries with no [CORE_PLATFORM_MAP] entry are skipped — PFP would not know
-     * which console to offer them for.
-     *
-     * The set is the authority and an empty set yields no profiles. There is deliberately no
-     * fallback: PFP previously answered "unknown" by offering [RECOMMENDED_CORES] wholesale, so a
-     * user with two cores installed was shown nineteen, and any console lacking a standalone
-     * emulator defaulted onto a core that was never on the device — RetroArch launched, failed to
-     * load it, and showed a black screen. Offering nothing is recoverable (the user links their
-     * cores folder); offering fiction is not, because it looks like it worked.
-     *
-     * [RetroArchCore.absolutePath] points at RetroArch's internal core path — PFP only names the
-     * core in the LIBRETRO extra; RetroArch opens it itself.
-     */
-    // /data/data/<pkg> is the OTHER app's private path — RetroArch's own core directory, which
-    // this front end only names. getFilesDir() would resolve to us and be wrong.
     @Suppress("SdCardPath")
     fun coresFor(packageName: String, installedCoreFiles: Set<String>): List<RetroArchCore> {
         val internalDir = "/data/data/$packageName/cores"
@@ -174,11 +139,6 @@ object RetroArchCoreScanner {
         return cores
     }
 
-    /**
-     * The core RetroArch's Core Downloader offers for [platformId], e.g. "Beetle PSX HW" for `psx`.
-     * Used to turn "no emulator for this console" into an actionable instruction, which is the job
-     * the fabricated profiles' `notes` field used to do badly.
-     */
     fun recommendedCoreNameFor(platformId: String): String? =
         RECOMMENDED_CORES.firstOrNull { platformId in it.platformIds }?.name
 }

@@ -5,14 +5,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Unit coverage for the pure scrub/fling step math (see [consumeWholeSteps] / [flingBonusSteps]). */
 class XmbNavGesturesTest {
-
     private val stepPx = 64f
     private val flingPx = 420f
     private val backCommitPx = 72f
-
-    // ── Live scrubbing: whole steps per accumulated travel ─────────────────────
 
     @Test fun `travel below one step yields nothing`() {
         assertEquals(0, consumeWholeSteps(30f, stepPx))
@@ -21,20 +17,18 @@ class XmbNavGesturesTest {
 
     @Test fun `each step distance crossed yields one step, remainder carries`() {
         assertEquals(1, consumeWholeSteps(64f, stepPx))
-        assertEquals(1, consumeWholeSteps(120f, stepPx))   // 1 step + 56px remainder
-        assertEquals(-2, consumeWholeSteps(-130f, stepPx)) // opposite direction
+        assertEquals(1, consumeWholeSteps(120f, stepPx))
+        assertEquals(-2, consumeWholeSteps(-130f, stepPx))
     }
 
     @Test fun `long continuous slide yields many steps`() {
-        // A 5-row drag scrubs 5 steps — the "smooth slide" behaviour (no per-gesture cap).
         assertEquals(5, consumeWholeSteps(5 * stepPx, stepPx))
     }
 
     @Test fun `remainder pattern ticks continuously across events`() {
-        // Simulate incremental drag deltas the way the detector consumes them.
         var acc = 0f
         var steps = 0
-        listOf(40f, 40f, 40f, 40f).forEach { d ->   // 160px total = 2 steps + 32 remainder
+        listOf(40f, 40f, 40f, 40f).forEach { d ->
             acc += d
             val whole = consumeWholeSteps(acc, stepPx)
             steps += whole
@@ -44,31 +38,23 @@ class XmbNavGesturesTest {
         assertEquals(32f, acc)
     }
 
-    // ── Release fling bonus ─────────────────────────────────────────────────────
-
     @Test fun `slow release grants no bonus`() {
         assertEquals(0, flingBonusSteps(200f, flingPx))
         assertEquals(0, flingBonusSteps(-300f, flingPx))
     }
 
     @Test fun `a fling grows with speed instead of stopping at two`() {
-        // The bonus used to cap at 2, which made touch fine for nudging and unusable for
-        // travelling: one step is 64dp of finger travel, so a 147-game list was ~74 hard flicks.
         assertEquals(3, flingBonusSteps(-800f, flingPx))
         assertEquals(5, flingBonusSteps(-1500f, flingPx))
         assertTrue(flingBonusSteps(-3000f, flingPx) > flingBonusSteps(-1500f, flingPx))
     }
 
     @Test fun `it is still bounded, so a flick can never become a free scroll`() {
-        // The list must always land on a row. Whatever the velocity tracker reports — including
-        // the absurd values a fast lift can produce — the bonus stays a small whole number.
         assertEquals(12, flingBonusSteps(-99_999f, flingPx))
         assertEquals(-12, flingBonusSteps(99_999f, flingPx))
     }
 
     @Test fun `a release just past the threshold is worth one step, not zero`() {
-        // The threshold has to be a real boundary: crossing it must do something, or the first
-        // bit of the range is dead.
         assertEquals(1, flingBonusSteps(-(flingPx + 1f), flingPx))
         assertEquals(-1, flingBonusSteps(flingPx + 1f, flingPx))
     }
@@ -78,10 +64,8 @@ class XmbNavGesturesTest {
         assertEquals(-5, flingBonusSteps(1500f, flingPx))
     }
 
-    // ── Swipe-back commit (drilled in) ──────────────────────────────────────────
-
     @Test fun `a long enough leftward drag backs out`() {
-        assertTrue(commitsSwipeBack(-72f, backCommitPx))     // exactly at the threshold
+        assertTrue(commitsSwipeBack(-72f, backCommitPx))
         assertTrue(commitsSwipeBack(-300f, backCommitPx))
     }
 

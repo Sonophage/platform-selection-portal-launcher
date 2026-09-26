@@ -40,12 +40,8 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
-// ── Screen model ────────────────────────────────────────────────────────────────
-
-// Focus key for the "Add Console" row so focus returns to it after the add flow.
 const val ADD_CONSOLE_FOCUS_KEY = "add_console"
 
-// Platform whose library is built from installed apps (picker) rather than a ROM folder.
 private const val PSVITA_PLATFORM_ID = "psvita"
 
 private const val INVALID_GAME_ID_MESSAGE =
@@ -53,12 +49,8 @@ private const val INVALID_GAME_ID_MESSAGE =
 
 enum class LibraryStep { LIST, PICK_PLATFORM, PICK_EMULATOR, SCAN_PROMPT, CARD_DETAIL, IMPORT_PC }
 
-// Focus key for the "Import PC Games" row so focus returns to it from the import section.
 const val IMPORT_PC_FOCUS_KEY = "import_pc_games"
 
-// One supported PC launcher with its install state, for the Import PC Games section.
-// packageName is the actually-installed package (a launcher may have several); canAddById is true
-// when PFP knows this launcher's launch-intent contract.
 data class PcLauncherRow(
     val type: PcLauncherType,
     val name: String,
@@ -67,10 +59,7 @@ data class PcLauncherRow(
     val canAddById: Boolean,
 )
 
-// One PC game already captured from a launcher (via pin/INSTALL_SHORTCUT), importable into the
-// Windows Games card. gameId references the existing games row.
 data class PcGameRow(val gameId: Long, val title: String, val launcherName: String)
-
 
 data class LibraryCardRow(
     val platformId: String,
@@ -93,7 +82,6 @@ data class LibraryManagerUiState(
     val step: LibraryStep = LibraryStep.LIST,
     val cards: List<LibraryCardRow> = emptyList(),
 
-    // Add Console flow scratch
     val platformOptions: List<PlatformOption> = emptyList(),
     val emulatorOptions: List<EmulatorOption> = emptyList(),
     val pendingPlatformId: String? = null,
@@ -101,29 +89,24 @@ data class LibraryManagerUiState(
     val pendingDirectory: String? = null,
     val pendingEmulatorId: String? = null,
 
-    // Card detail (edit) target
     val detailPlatformId: String? = null,
-    // Apps in the Android library (managed from its detail screen, not scanned).
+
     val androidApps: List<LibraryAppRow> = emptyList(),
 
-    // ROM Root Access: managed root folders (one SAF grant each; consoles scan subfolders).
     val romRoots: List<RootFolderRow> = emptyList(),
 
-    // Import PC Games section
     val pcLaunchers: List<PcLauncherRow> = emptyList(),
     val pcGames: List<PcGameRow> = emptyList(),
-    // Display name of the granted Vita3K ux0 folder (null = not set).
+
     val vita3KFolderLabel: String? = null,
-    // True when PFP is the active Home app (unlocks auto-import of published game shortcuts).
+
     val isHomeLauncher: Boolean = false,
 
-    // UI signals
-    // Set when the screen should launch the folder picker to set up the ES-DE ROM structure.
     val awaitingRomRootSetup: Boolean = false,
     val renameTargetPlatformId: String? = null,
     val scanningPlatformIds: Set<String> = emptySet(),
     val message: String? = null,
-    // Row to restore focus to when returning to the LIST from a child screen.
+
     val returnFocusKey: String? = null,
 ) {
     val detailCard: LibraryCardRow? get() = cards.firstOrNull { it.platformId == detailPlatformId }
@@ -147,24 +130,12 @@ class LibraryManagerViewModel @Inject constructor(
     private val romRootScanRunner: RomRootScanRunner,
     private val pcGameExporter: com.psplauncher.feature.settings.pc.PcGameExporter,
 ) : ViewModel() {
-
     private val _scratch = MutableStateFlow(LibraryManagerUiState())
 
-    // Drives the "convert detected games?" multi-select picker after a PC scan; the same controller
-    // and dialog serve the XMB Windows card (see XMBViewModel).
-
     init {
-        // Reactive, not one-shot: roots granted anywhere (the first-run wizard, a restore) show
-        // up here immediately — this ViewModel is activity-scoped and outlives any single open.
-        // distinctUntilChanged matters: the backing DataStore is app-wide, so without it every
-        // unrelated preference write would re-run the persisted-grant binder scan.
         viewModelScope.launch {
             romRootRepository.roots.distinctUntilChanged().collect { refreshRomRoots() }
         }
-        // The Android card is NOT created here any more. It was, from this init block, which
-        // made it undeletable: removing it and reopening this screen brought it back. It is a
-        // flag-guarded one-shot in DatabaseInitializer now, beside the other one-shots, so a
-        // delete sticks and Add Console is the way back.
     }
 
     val uiState: StateFlow<LibraryManagerUiState> = combine(
@@ -181,7 +152,7 @@ class LibraryManagerViewModel @Inject constructor(
                 RomRootRepository.rawPathOfTree(uri)?.substringAfterLast('/')
                     ?: Uri.decode(uri).substringAfterLast('/').substringAfterLast(':')
             },
-            // Each root shows the consoles homed under it (matched by the card's directory).
+
             romRoots = scratch.romRoots.map { root ->
                 val rootRaw = RomRootRepository.rawPathOfTree(root.treeUri)?.trimEnd('/')
                 val homed = if (rootRaw == null) emptyList() else cards.mapNotNull { card ->
@@ -206,9 +177,7 @@ class LibraryManagerViewModel @Inject constructor(
             androidApps = games.filter { it.platformId == ANDROID_PLATFORM_ID }
                 .map { LibraryAppRow(it.id, it.displayTitle) }
                 .sortedBy { it.label.lowercase() },
-            // PC games captured from a supported launcher (pin / INSTALL_SHORTCUT) — they carry a
-            // launchable reference (shortcut id or stored intent) back into the source app.
-            // Entries already living in the Windows Games card are done; only strays show here.
+
             pcGames = games.mapNotNull { g ->
                 val launcher = PcLauncherCatalog.forPackage(g.packageName) ?: return@mapNotNull null
                 if (g.shortcutId == null && g.launchIntentUri == null) return@mapNotNull null
@@ -218,7 +187,6 @@ class LibraryManagerViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryManagerUiState())
 
-    /** Remove an app from the Android library (deletes its entry, like removing a game). */
     fun removeApp(gameId: Long) {
         viewModelScope.launch {
             gameRepository.delete(gameId)
@@ -226,15 +194,11 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    // ── Navigation ──────────────────────────────────────────────────────────────
-
-    // Returns true if the back press was consumed internally (sub-screen → list).
     fun onBack(): Boolean {
         val current = _scratch.value
         val step = current.step
         if (step == LibraryStep.LIST) return false
-        // The Import screen returns to the Windows Memory Card detail, not the Library root:
-        // it is reached from that card, and dropping two levels on one Back would lose the place.
+
         if (step == LibraryStep.IMPORT_PC) {
            _scratch.update {
                 it.copy(
@@ -260,10 +224,6 @@ class LibraryManagerViewModel @Inject constructor(
     }
 
     private fun resetToList() {
-        // Copy-with-clear, never a fresh state: display fields (cards, romRoots, message, scan
-        // progress — and whatever gets added next) survive by DEFAULT; only the transient
-        // sub-screen scratch is reset. A fresh-state rebuild silently wipes any field someone
-        // forgets to carry over (romRoots was the live instance of that bug).
         _scratch.update {
             it.copy(
                 step = LibraryStep.LIST,
@@ -285,16 +245,10 @@ class LibraryManagerViewModel @Inject constructor(
 
     fun dismissMessage() = _scratch.update { it.copy(message = null) }
 
-    // ── Add Console flow ──────────────────────────────────────────────────────────
-
     fun startAddConsole() {
         viewModelScope.launch {
             val options = memoryCardRepository.unconfiguredPlatforms()
-                // Android must stay selectable here: it is the only way back when the auto-created
-                // card is removed. Windows must NOT be — LibraryManagerScreen hides the Windows
-                // card from the Consoles list, so an added one would be an entry the user can
-                // never open. (The emulator-assignment exclusion is a separate rule that lives
-                // in EmulatorAssignmentViewModel; the two stay independent on purpose.)
+
                 .filter { it.id != WINDOWS_PLATFORM_ID }
                 .map { PlatformOption(it.id, it.name, it.shortName) }
             if (options.isEmpty()) {
@@ -316,9 +270,6 @@ class LibraryManagerViewModel @Inject constructor(
     }
 
     fun onPlatformChosen(option: PlatformOption) {
-        // Android libraries are built from installed apps, not a scanned ROM folder. Create the
-        // card straight away (no directory / emulator) — the user then adds apps from the
-        // Android card in Games via "Find Games" (the installed-app picker).
         if (option.id == ANDROID_PLATFORM_ID) {
             viewModelScope.launch {
                 memoryCardRepository.addCard(
@@ -334,11 +285,7 @@ class LibraryManagerViewModel @Inject constructor(
             }
             return
         }
-        // Console folders come from the ROM Root — the subfolder already recognized as this
-        // platform under a granted root, else the platform's ES-DE folder name under the first
-        // root. No per-console folder picker: one root grant covers every console, so a user
-        // without a root is pointed at ROM Root Access instead. Android skips all of this
-        // (no ROM root needed), which is why the gate lives here and not in startAddConsole().
+
         viewModelScope.launch {
             val roots = romRootRepository.getAll()
             if (roots.isEmpty()) {
@@ -360,8 +307,7 @@ class LibraryManagerViewModel @Inject constructor(
             }
             val rootRaw = RomRootRepository.rawPathOfTree(chosenRoot)
             val directory = rootRaw?.let { "${it.trimEnd('/')}/$folderName" }
-            // Windows games launch through PC launchers, not an emulator profile — skip the
-            // emulator step entirely, straight to the scan prompt.
+
             if (option.id == WINDOWS_PLATFORM_ID) {
                 _scratch.update {
                     it.copy(
@@ -402,15 +348,9 @@ class LibraryManagerViewModel @Inject constructor(
                 romDirectory = s.pendingDirectory,
                 emulatorId = s.pendingEmulatorId,
             )
-            // No per-card SAF grant: root-managed consoles scan and launch through the ROM
-            // root's recursive grant (ScanSourceResolver, inside LibraryScanner, maps the card
-            // to its subfolder under every granted root).
+
             resetToList()
             if (scanNow) {
-                // Windows uses the PC import scan (setup self-heal, launcher exports, emu
-                // folders) — the generic ROM directory walk would find nothing to import.
-                // Other consoles scan through the ROM roots (ScanSourceResolver, inside LibraryScanner, maps the card
-                // to its subfolder under every granted root).
                 if (platformId == WINDOWS_PLATFORM_ID) scanPcGamesFolder()
                 else scanConsole(platformId)
             }
@@ -428,8 +368,6 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    // ── Card detail (edit) ────────────────────────────────────────────────────────
-
     fun openCardDetail(platformId: String) {
         _scratch.update {
             it.copy(
@@ -438,8 +376,7 @@ class LibraryManagerViewModel @Inject constructor(
                 returnFocusKey = platformId
             )
         }
-        // Opening the Windows card self-heals its setup: assigns <ROM Root>/windows (creating it
-        // and the import/ drop-folder when the grant permits) if no directory is set yet.
+
         if (platformId == WINDOWS_PLATFORM_ID) {
             viewModelScope.launch { runCatching { windowsLibrarySetup.ensure() } }
         }
@@ -483,8 +420,6 @@ class LibraryManagerViewModel @Inject constructor(
         viewModelScope.launch { memoryCardRepository.setEmulator(platformId, option.id) }
     }
 
-    // ── Supported scan extensions ───────────────────────────────────────────────
-
     fun addExtension(platformId: String, ext: String) {
         val clean = ext.trim().lowercase().removePrefix(".").filter { it.isLetterOrDigit() }
         if (clean.isBlank()) return
@@ -509,15 +444,6 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    // ── Scanning ────────────────────────────────────────────────────────────────
-
-    /**
-     * Scans one console's folders for new ROMs. With [removeMissing] the same directory walk
-     * also deletes entries whose ROM file has vanished ([ScanResult.Complete.presentRomPaths]),
-     * so removal costs no second pass. Removal is skipped when any source errors or reports no
-     * survey (e.g. an unmounted SD card must not wipe that console's games).
-     */
-    /** Scans Vita3K's granted ux0/app for installed titles onto the PS Vita card. */
     fun scanVitaGames() {
         if (PSVITA_PLATFORM_ID in _scratch.value.scanningPlatformIds) return
         viewModelScope.launch {
@@ -537,24 +463,14 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    /** Grants (and persists) the Vita3K ux0 folder, then scans it. */
     fun setVita3KFolder(uri: Uri?) {
         if (uri == null) return
         viewModelScope.launch {
-            vita3KLibrary.setUx0Folder(uri)   // persists the SAF read grant
+            vita3KLibrary.setUx0Folder(uri)
             scanVitaGames()
         }
     }
 
-    /**
-     * Scrape only this card's games that are missing artwork.
-     *
-     * Through the worker rather than straight into ArtworkRepository, which is how the XMB's card
-     * context menu does the same job. The worker's unique-work KEEP policy is the reason: the
-     * ScreenScraper account this is written against allows ONE thread, so a per-card scrape
-     * launched while the library-wide one from Settings > Artwork is running would have two passes
-     * competing for it. Enqueuing both through one unique name makes that impossible.
-     */
     fun scrapeArtwork(platformId: String) {
         MetadataScrapeWorker.enqueue(
             context,
@@ -565,7 +481,7 @@ class LibraryManagerViewModel @Inject constructor(
 
     fun scanConsole(platformId: String, removeMissing: Boolean = false) {
         if (platformId in _scratch.value.scanningPlatformIds) return
-        // PS Vita has no ROM folder: it scans Vita3K's granted ux0/app installed titles instead.
+
         if (platformId == PSVITA_PLATFORM_ID) {
             scanVitaGames(); return
         }
@@ -593,11 +509,6 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    // ── ROM Root Access (managed root folders) ────────────────────────────────────
-    //
-    // The ROM roots live here now (moved in from the old Folder Access screen): add / remove /
-    // re-link, with live grant status. Re-linking a root restores every console under it at once.
-
     fun refreshRomRoots() {
         viewModelScope.launch {
             val persisted = SafGrants.persistedReadUris(context.contentResolver)
@@ -614,13 +525,8 @@ class LibraryManagerViewModel @Inject constructor(
 
     fun addRomRoot(uri: Uri) {
         viewModelScope.launch {
-            // Read+write: the windows library auto-creates <root>/windows and its import/
-            // drop-folder; older read-only roots degrade to find-only (WindowsLibrarySetup).
             romRootRepository.persist(uri, writable = true)
-            // The roots flow collector picks up the change and refreshes the rows. Auto-detect
-            // immediately discovers supported ES-DE folders, creates cards, and scans them; there
-            // is no separate manual auto-detect action because a newly-added root is otherwise
-            // not useful until this pass runs.
+
             romRootRepository.add(uri.toString())
             scanRomRoot()
         }
@@ -651,21 +557,13 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    // ── Import PC Games ───────────────────────────────────────────────────────────
-    //
-    // PFP is a frontend for PC launchers (Winlator, BannerHub, GameHub Lite, GameNative), never
-    // the PC runtime. This section shows which supported launchers are installed and lets the
-    // user pull already-captured games (arrived via pin / INSTALL_SHORTCUT) into a collection
-    // named after the launcher. Direct per-launcher scanning is layered on via adapters.
     fun openImportPcGames() {
-        // Entering the PC flow is PC intent — make sure the card and its folders exist.
         viewModelScope.launch {
             runCatching { windowsLibrarySetup.ensure() }
         }
         val pm = context.packageManager
         val launchers = PcLauncherCatalog.entries.map { def ->
-            // Fingerprint-verified: GameHub-family variants ship under genuine AnTuTu/PUBG/Genshin
-            // package names, so a package match alone would flag the real apps as launchers.
+
             val installedPkg = PcLauncherCatalog.verifiedInstalledPackage(def, pm)
             PcLauncherRow(
                 type = def.type,
@@ -685,15 +583,12 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    /** Re-reads the Home-app status (after returning from the role/settings request). */
     fun refreshHomeStatus() {
         _scratch.update { it.copy(isHomeLauncher = launcherShortcutRepository.isDefaultLauncher()) }
     }
 
-    /** Intent that lets the user make PFP the Home app (role request on Q+, else Home settings). */
     fun homeRoleIntent(): Intent = launcherShortcutRepository.homeRoleRequestIntent()
 
-    /** Builds and starts a launcher's game intent immediately, to verify the id before saving. */
     fun testLaunchPcGame(row: PcLauncherRow, id: String, source: String?) {
         val pkg = row.packageName ?: return
         val intent = PcLauncherAdapters.forType(row.type, context.packageManager)
@@ -710,11 +605,6 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Adds a PC game by id: builds the launch intent, stores it, and files it in the Windows card.
-     * The name is required — launchers keep their local libraries private, so PFP cannot resolve
-     * a title from the id; the user copies the id from the game's page where its name is visible.
-     */
     fun addPcGameById(row: PcLauncherRow, id: String, title: String?, source: String?) {
         val pkg = row.packageName ?: return
         val displayName = title?.trim().orEmpty()
@@ -756,14 +646,6 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Runs the shared full PC scan (setup self-heal, OS pin sweep, exported-game imports, emu
-     * folder reconcile) — the same pass the XMB card's "Scan This Console" uses.
-     *
-     * When [folder] is non-null (the user picked one from the file manager), exported games are
-     * read from THAT folder for this scan only; otherwise the scan falls back to the default
-     * `<ROM Root>/windows/import` drop-folders.
-     */
     fun scanPcGamesFolder(folder: Uri? = null) {
         viewModelScope.launch {
             if (folder != null) romRootRepository.persist(folder)
@@ -776,15 +658,9 @@ class LibraryManagerViewModel @Inject constructor(
             }
             if (report.newGames > 0) ensureWindowsCard()
             _scratch.update { it.copy(message = report.message) }
-
         }
     }
 
-    /**
-     * Export Manual Games (C18): writes a `.pfpgame` file into `<ROM Root>/windows/import` for every
-     * PC game a fresh install could not bring back on its own, and for every pin with artwork, so
-     * Scan Import Folder can restore them and reconnect their artwork by name.
-     */
     fun exportManualPcGames() {
         viewModelScope.launch {
             val report = runCatching { pcGameExporter.export() }
@@ -794,21 +670,11 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-
-    // ── Windows Games card helpers ────────────────────────────────────────────
-    //
-    // Every PC import lands directly in the Windows Games Memory Card — a virtual card (no ROM
-    // directory) created on first import. Per-launcher collections are no longer created.
-
     private suspend fun ensureWindowsCard() {
-        // Card + <ROM Root>/windows (+ import/) creation and directory assignment in one place.
         windowsLibrarySetup.ensure()
         memoryCardRepository.recountGames(WINDOWS_PLATFORM_ID)
     }
 
-    // Title-level dedupe within the Windows card: the same game can arrive with different launch
-    // handles (shortcut id via harvest, intent URI via folder scan), so handle-keyed lookups alone
-    // can't converge re-imports.
     private suspend fun findWindowsGame(packageName: String, title: String): Game? {
         val key = normalizePcTitle(title)
         return gameRepository.getByPlatform(WINDOWS_PLATFORM_ID).firstOrNull {
@@ -819,7 +685,6 @@ class LibraryManagerViewModel @Inject constructor(
     private fun normalizePcTitle(title: String): String =
         title.lowercase().filter { it.isLetterOrDigit() }
 
-    /** Moves one captured PC game (pin / INSTALL_SHORTCUT stray) into the Windows Games card. */
     fun importPcGame(row: PcGameRow) {
         viewModelScope.launch {
             runCatching {
@@ -838,7 +703,6 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    /** Moves every captured PC game into the Windows Games card. */
     fun importAllPcGames() {
         val rows = uiState.value.pcGames
         if (rows.isEmpty()) return
@@ -861,11 +725,6 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    // ── ES-DE folder setup (create the directory structure) ──────────────────────
-    //
-    // Lets the user point at any (empty) folder and have PFP create the full ES-DE system-folder
-    // set inside it (gba/, snes/, psx/, …). The picked folder also becomes the ROM Root, so after
-    // copying games in the user just taps Auto-Detect. Requires a write grant on the folder.
     fun requestRomFolderSetup() {
         _scratch.update { it.copy(awaitingRomRootSetup = true) }
     }
@@ -874,11 +733,9 @@ class LibraryManagerViewModel @Inject constructor(
         _scratch.update { it.copy(awaitingRomRootSetup = false) }
         if (uri == null) return
         viewModelScope.launch {
-            // Read+write: we must create folders now and read them when scanning later.
             romRootRepository.persist(uri, writable = true)
             romRootRepository.add(uri.toString())
 
-            // One ES-DE folder per supported platform (skip the app-based Android library).
             val names = memoryCardRepository.availablePlatformCatalog()
                 .map { folderHintResolver.esDeFolderName(it.id) }
                 .filter { it.isNotBlank() && it != "android" }
@@ -896,18 +753,10 @@ class LibraryManagerViewModel @Inject constructor(
         }
     }
 
-    // ── Single-scan autoload from the ES-DE ROM root ─────────────────────────────
-    //
-    // Walks the granted ROM root's top-level subfolders, maps each to a platform by its ES-DE
-    // folder name, auto-creates a Memory Card for any system that doesn't have one yet, then
-    // scans every detected console — the whole library set up from one action. Folders that
-    // don't map to a supported platform are skipped. The scan loop lives in [RomRootScanRunner]
-    // so the first-run wizard's ROM-root pick triggers the exact same pass without duplicating it.
     fun scanRomRoot() {
         viewModelScope.launch {
             val report = romRootScanRunner.scan()
             _scratch.update { it.copy(message = report.message) }
         }
     }
-
 }

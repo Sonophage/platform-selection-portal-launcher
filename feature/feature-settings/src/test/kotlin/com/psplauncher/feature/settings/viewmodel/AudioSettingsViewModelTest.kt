@@ -37,36 +37,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * The Interface ▸ Sound screen's contract (docs/plans/README.md (C10) Phase 2c): seven
- * rows — the six menu sounds plus Boot Sound — with Boot Sound behaving like any other row
- * (label, Preview, Use Default, reset), while its Preview uses the dedicated boot player rather
- * than [MenuSound] (Display ▸ Boot Sequence remains the full-presentation preview).
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class AudioSettingsViewModelTest {
-
     private val dispatcher = StandardTestDispatcher()
 
-    /**
-     * Main is UNCONFINED — sharing [dispatcher]'s scheduler, so `runTest(dispatcher)` and
-     * `advanceUntilIdle()` still drive everything — and that is load-bearing, not a style choice.
-     *
-     * DataStore runs each queued update on the CALLER's dispatcher
-     * (`DataStoreImpl.handleUpdate`: `withContext(update.callerContext + coroutineContext)`,
-     * caller context first, so its dispatcher wins). A `viewModelScope` write therefore drags
-     * whatever Main is into DataStore's write actor. With a StandardTestDispatcher, a write that
-     * is still in flight when the test body ends parks a continuation on a scheduler that
-     * `resetMain()` leaves undriven forever — and because that actor is strictly serial, the
-     * process-global `pfpDataStore` wedges for the rest of the JVM. The next `@Before` then
-     * blocks in `runBlocking` with no timeout, which is what made this whole module unrunnable.
-     * (Whether a given write loses that race is timing, so subsets of this class could pass while
-     * the full class hung.)
-     *
-     * Unconfined dispatches inline instead of queueing, so the continuation resumes on whatever
-     * thread completes the write and nothing is ever stranded.
-     */
     private val mainDispatcher = UnconfinedTestDispatcher(dispatcher.scheduler)
 
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -77,9 +52,7 @@ class AudioSettingsViewModelTest {
 
     @Before fun setUp() {
         Dispatchers.setMain(mainDispatcher)
-        // Bounded on purpose. This runBlocking is the one unbounded, uncancellable wait in the
-        // class, so a wedged DataStore actor used to stall the suite silently and forever rather
-        // than failing. If it ever wedges again, one test fails loudly in five seconds.
+
         runBlocking { withTimeout(5_000) { context.pfpDataStore.edit { it.clear() } } }
         File(context.filesDir, UiMediaStore.UI_MEDIA_DIR).deleteRecursively()
         MediaDisplayNames.clearCache()
@@ -98,18 +71,10 @@ class AudioSettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    /** stateIn(WhileSubscribed) only computes with a live collector. */
     private fun kotlinx.coroutines.test.TestScope.collectUiState() {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect {} }
     }
 
-    /**
-     * Real-time wait, mirroring DisplaySettingsViewModelWallpaperTest: DataStore writes and the
-     * uiState pipeline's flowOn(Dispatchers.IO) complete on REAL threads, which
-     * advanceUntilIdle() cannot drive. Alternating a real sleep (lets those threads progress)
-     * with advanceUntilIdle() (drains whatever they queued on the scheduler) is the only honest
-     * way to observe their effects.
-     */
     private fun kotlinx.coroutines.test.TestScope.eventually(
         what: String,
         timeoutMs: Long = 5_000,
@@ -125,7 +90,6 @@ class AudioSettingsViewModelTest {
         }
     }
 
-    /** Drops a file straight into `ui-media/` — assignments() is the directory. */
     private fun seedAssignment(slot: UiMediaSlot, ext: String = "wav") {
         val dir = File(context.filesDir, UiMediaStore.UI_MEDIA_DIR)
         dir.mkdirs()
@@ -141,14 +105,8 @@ class AudioSettingsViewModelTest {
     private fun mediaFile(slot: UiMediaSlot, ext: String) =
         File(File(context.filesDir, UiMediaStore.UI_MEDIA_DIR), "${slot.key}.$ext")
 
-    // ── the roster ───────────────────────────────────────────────────────────
-
     @Test fun `the Sound screen lists the eight menu sounds then the three presentation tracks`() =
         runTest(dispatcher) {
-            // Order is the screen's reading order, not an implementation detail: the eight ticks
-            // you hear constantly, then the three that only sound at a boundary. The list is
-            // derived from ofKind(SOUND), so the three movement rows arriving here is the split
-            // reaching the screen without anyone wiring it.
             assertEquals(
                 listOf(
                     "sound_scroll", "sound_select", "sound_system_browse",
@@ -159,8 +117,6 @@ class AudioSettingsViewModelTest {
                 AudioSettingsViewModel.SOUND_SLOTS.map { it.key },
             )
         }
-
-    // ── Boot Sound as an ordinary row ────────────────────────────────────────
 
     @Test fun `an assigned boot audio row gets its name and the use-default affordance`() =
         runTest(dispatcher) {
@@ -194,8 +150,7 @@ class AudioSettingsViewModelTest {
         runTest(dispatcher) {
             vm.preview(UiMediaSlot.BOOT_AUDIO)
             advanceUntilIdle()
-            // Bundled default (no custom assignment): the previewer gets null and resolves the
-            // resource URI itself.
+
             verify(exactly = 1) { bootPreviewer.play(UiMediaSlot.BOOT_AUDIO, null) }
             verify(exactly = 0) { menuSound.play(any(), any()) }
         }
@@ -224,20 +179,14 @@ class AudioSettingsViewModelTest {
             }
             val labels = vm.uiState.value.soundLabels
 
-            // Every other row has a bundled sample behind it.
             assertEquals(UI_MEDIA_DEFAULT_LABEL, labels[UiMediaSlot.SOUND_SCROLL])
             assertEquals(UI_MEDIA_DEFAULT_LABEL, labels[UiMediaSlot.BOOT_AUDIO])
             assertEquals(UI_MEDIA_DEFAULT_LABEL, labels[UiMediaSlot.GAMEBOOT_AUDIO])
-            // The disc's opener does not: unassigned means silence, and saying "Default" there
-            // would promise a sound that no reset could ever produce.
+
             assertEquals(NO_SOUND_LABEL, labels[UiMediaSlot.LAUNCH_DISC_AUDIO])
         }
 
     @Test fun `the ceremony rows preview their own slot, not boot audio`() = runTest(dispatcher) {
-        // preview() reaches the previewer through an overload whose slot parameter DEFAULTS to
-        // BOOT_AUDIO, and an unassigned row passes null for the path — so a call that let the
-        // default stand would audition the opening chime under both of these labels while the
-        // launch actually played something else. Named per slot because that is what went wrong.
         vm.preview(UiMediaSlot.LAUNCH_DISC_AUDIO)
         vm.preview(UiMediaSlot.GAMEBOOT_AUDIO)
         advanceUntilIdle()
@@ -257,13 +206,9 @@ class AudioSettingsViewModelTest {
         }
 
     @Test fun `tearing the screen down stops any running boot preview`() = runTest(dispatcher) {
-        // onCleared() delegates here (it is protected, so the test drives the public seam);
-        // the override is a one-liner covered by review.
         vm.stopBootPreview()
         verify(exactly = 1) { bootPreviewer.stop() }
     }
-
-    // ── reset semantics ──────────────────────────────────────────────────────
 
     @Test fun `confirmReset clears the seven sounds including boot audio and never touches video media`() =
         runTest(dispatcher) {
@@ -284,8 +229,6 @@ class AudioSettingsViewModelTest {
                     !mediaFile(UiMediaSlot.BOOT_AUDIO, "wav").isFile
             }
 
-            // The negatives are as load-bearing as the positives, and time can't prove a
-            // negative — assert them only after the deletions have observably landed.
             assertTrue(mediaFile(UiMediaSlot.BOOT_VIDEO, "mp4").isFile, "reset must never touch the boot video")
             assertTrue(mediaFile(UiMediaSlot.GAMEBOOT_VIDEO, "mp4").isFile, "reset must never touch GameBoot media")
         }
@@ -300,11 +243,7 @@ class AudioSettingsViewModelTest {
         }
     }
 
-    // ── the wired sounds (Phase 4) ───────────────────────────────────────────
-
     @Test fun `a rejected import surfaces the reason and plays the error sound`() = runTest(dispatcher) {
-        // Registered as .mp4 while the bytes are a WAV: the resolver reports video/mp4, which the
-        // sound gate refuses before anything is copied.
         val uri = Uri.parse("content://test/rejected.mp4")
         org.robolectric.Shadows.shadowOf(context.contentResolver)
             .registerInputStream(uri, java.io.ByteArrayInputStream(ByteArray(64)))
@@ -312,8 +251,6 @@ class AudioSettingsViewModelTest {
         collectUiState()
         vm.onSoundPicked(uri)
 
-        // The import runs the gate on Dispatchers.IO — wait for the message channel, which is
-        // set AFTER the error sound plays, so the verify below can never race.
         eventually("the rejection dialog surfaces") { vm.uiState.value.message != null }
 
         assertNotNull(vm.uiState.value.message, "the rejection dialog must surface")

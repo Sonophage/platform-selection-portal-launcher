@@ -23,15 +23,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The gate's whole job is that a launch is never lost: switched off means no wait at all, a
- * presentation times out and proceeds if it stalls, and a second request while one is on screen is
- * dropped rather than queued. All are pinned here; the overlay itself is Compose + ExoPlayer and is
- * verified on device.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameBootGateTest {
-
     private class Harness(val scope: TestScope, enabled: Boolean, customVideo: String? = null) {
         val prefs: GameBootPreferences = mockk(relaxed = true) {
             every { gameBootEnabledFlow } returns flowOf(enabled)
@@ -48,15 +41,6 @@ class GameBootGateTest {
         val gate = GameBootGate(context, prefs, store, player, scope)
     }
 
-    /**
-     * awaitPresentation reads the media paths through withContext(Dispatchers.IO), which real
-     * threads cannot be driven by the test scheduler — so assertions after it must poll with a
-     * real sleep in between (same pattern as AudioSettingsViewModelTest.eventually).
-     *
-     * runCurrent(), not advanceUntilIdle(): advancing virtual time also fires the gate's 8 s
-     * watchdog, which CLEARS the presentation — the request would appear and vanish inside one
-     * advance. runCurrent only drains tasks at the current virtual time.
-     */
     private fun TestScope.eventually(what: String, timeoutMs: Long = 5_000, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (!condition()) {
@@ -87,20 +71,14 @@ class GameBootGateTest {
         eventually("the presentation request is raised") { h.gate.active.value != null }
 
         val request = assertNotNull(h.gate.active.value, "The overlay should have been asked to present")
-        // With no custom clip the request must carry the built-in sound — the overlay never
-        // grows a fallback branch.
+
         assertTrue(
             request.audioPath?.startsWith("android.resource://com.test/") == true,
             "No custom clip must resolve the built-in audio, got: ${request.audioPath}",
         )
-        // The audio is gate-owned — the draw-only overlay can never release the player mid-clip
-        // — but it no longer starts with the first frame. It is scheduled against the disc's
-        // exit, so the cue lands as the disc leaves rather than being spent under the fade-in and
-        // the spin. Nothing has played yet at this point.
+
         verify(exactly = 0) { h.player.play(any<String>(), any(), any()) }
 
-        // advanceTimeBy, not advanceUntilIdle: the file's own note explains that advancing to
-        // idle also fires the gate's 8 s watchdog and tears the presentation down.
         advanceTimeBy(com.psplauncher.core.ui.components.DiscCeremony.DiscOutStartMs.toLong() + 1)
         runCurrent()
         verify(exactly = 1) { h.player.play(any<String>(), any(), any()) }
@@ -109,11 +87,6 @@ class GameBootGateTest {
         h.gate.onPresentationFinished()
         advanceUntilIdle()
 
-        // Releasing the launch and taking the overlay down are two signals, not one. The disc
-        // presentation releases the launch the moment it starts spinning and then stays on screen
-        // for another second while the emulator loads under it, so a finish that also cleared the
-        // request would pull the overlay off mid-animation. This asserted the opposite when
-        // finishing was the only signal there was.
         assertTrue(awaiting.isCompleted, "The launch must be released by onPresentationFinished")
         assertNotNull(
             h.gate.active.value,
@@ -133,7 +106,7 @@ class GameBootGateTest {
 
         val request = assertNotNull(h.gate.active.value)
         assertTrue(request.videoPath == "/data/ui-media/gameboot_video.mp4")
-        // Scoring someone's clip with the built-in sound is never what they meant.
+
         assertNull(request.audioPath, "A custom clip must keep its own audio track")
         verify(exactly = 0) { h.player.play(any<String>(), any(), any()) }
 
@@ -150,11 +123,9 @@ class GameBootGateTest {
         eventually("the presentation request is raised") { h.gate.active.value != null }
         assertTrue(awaiting.isActive)
 
-        // Nothing ever calls onPresentationFinished — the watchdog has to do it.
         advanceTimeBy(GameBootGate.TIMEOUT_MS + 1)
         advanceUntilIdle()
 
-        // Completed, NOT failed: a timeout must not propagate as an exception into the launch.
         assertTrue(awaiting.isCompleted)
         awaiting.await()
         assertNull(h.gate.active.value)
@@ -168,12 +139,8 @@ class GameBootGateTest {
         eventually("the presentation request is raised") { h.gate.active.value != null }
         val firstRequest = h.gate.active.value
 
-        // Mashing Confirm: the second launch must not wait behind, or replace, the first.
         launch { h.gate.awaitPresentation("Spyro") }
-        // runCurrent, not advanceUntilIdle: advancing virtual time would fire the FIRST
-        // request's 8 s watchdog, clearing it — and then the second request, no longer seeing
-        // one on screen, would legitimately start. The drop-while-active rule needs the first
-        // request to still be alive.
+
         testScheduler.runCurrent()
 
         assertTrue(h.gate.active.value === firstRequest, "The on-screen presentation must not change")

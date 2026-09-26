@@ -14,7 +14,6 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** What a run did, for the line the settings screen shows afterwards. */
 data class VideoPosterResult(val matched: Int, val skipped: Int, val failed: Int) {
     fun message(): String = when {
         matched == 0 && failed == 0 && skipped == 0 -> "No videos to match"
@@ -24,17 +23,6 @@ data class VideoPosterResult(val matched: Int, val skipped: Int, val failed: Int
     }
 }
 
-/**
- * Gives each film in the video library its poster.
- *
- * The match is title + year off the filename, which MovieFileName already extracts for the
- * display name — so the thing that makes the list readable is the same thing that makes it
- * matchable, and there is one parser rather than two that could disagree about where a title ends.
- *
- * Posters are written beside the scanner's frame grabs in their own directory and recorded in
- * videos.poster_uri, NOT in thumbnail_uri: the scanner owns that column and rewrites it, so a
- * poster stored there would vanish on the next rescan and take the frame grab with it.
- */
 @Singleton
 class VideoPosterFetcher @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -43,16 +31,8 @@ class VideoPosterFetcher @Inject constructor(
     private val http: HttpClient,
     private val keyProvider: TmdbApiKeyProvider,
 ) {
-
     private val posterDir: File get() = File(context.filesDir, "video_posters").apply { mkdirs() }
 
-    /**
-     * Matches every video that has no poster yet, or all of them when [refreshExisting].
-     *
-     * A film that cannot be matched is left exactly as it was, with its frame grab, and counted
-     * as failed rather than retried or blanked — an unmatched film is a film with worse art, not
-     * a broken row.
-     */
     suspend fun run(refreshExisting: Boolean = false): VideoPosterResult = withContext(Dispatchers.IO) {
         if (!keyProvider.hasKey()) return@withContext VideoPosterResult(0, 0, 0)
 
@@ -76,8 +56,6 @@ class VideoPosterFetcher @Inject constructor(
                 continue
             }
 
-            // Downloaded through the shared helper so the bytes are size-capped and magic-byte
-            // checked before anything is committed — a CDN error page never lands at a poster path.
             val temp = ArtworkTempIO.downloadToTemp(http, context.cacheDir, ArtworkKind.BACKGROUND, url)
             if (temp == null) {
                 failed++
@@ -101,7 +79,6 @@ class VideoPosterFetcher @Inject constructor(
         VideoPosterResult(matched, skipped, failed)
     }
 
-    /** Drops every matched poster, returning the library to its frame grabs. */
     suspend fun clearAll() = withContext(Dispatchers.IO) {
         videoRepository.getAllVideos().forEach { video ->
             if (!video.posterUri.isNullOrBlank()) videoRepository.setPosterUri(video.id, null)

@@ -9,7 +9,6 @@ import androidx.room.Transaction
 import com.psplauncher.core.data.database.entity.VideoEntity
 import kotlinx.coroutines.flow.Flow
 
-/** One row's watch state, read back before a scan replaces it. See [VideoDao.replaceForLibrary]. */
 data class VideoWatchStamp(
     val id: String,
     @ColumnInfo(name = "last_watched_at") val lastWatchedAt: Long?,
@@ -19,7 +18,6 @@ data class VideoWatchStamp(
 
 @Dao
 interface VideoDao {
-
     @Query(
         """
         SELECT * FROM videos
@@ -49,7 +47,6 @@ interface VideoDao {
     )
     fun observeFavorites(): Flow<List<VideoEntity>>
 
-    // Most-recently-watched first; only videos that have actually been played (have a timestamp).
     @Query(
         """
         SELECT * FROM videos
@@ -66,8 +63,6 @@ interface VideoDao {
     @Query("SELECT COUNT(*) FROM videos WHERE library_id = :libraryId")
     suspend fun countForLibrary(libraryId: String): Int
 
-    // How many rows still reference a cached thumbnail (generated or custom) — 0 means its file
-    // can be deleted.
     @Query("SELECT COUNT(*) FROM videos WHERE thumbnail_uri = :uri OR custom_thumbnail_uri = :uri")
     suspend fun countReferencingThumbnail(uri: String): Int
 
@@ -95,7 +90,6 @@ interface VideoDao {
     @Query("UPDATE videos SET is_favorite = :favorite WHERE id = :id")
     suspend fun setFavorite(id: String, favorite: Boolean)
 
-    // Replaces a single library's videos atomically; other libraries are never touched.
     @Transaction
     @Query(
         "SELECT id, last_watched_at, resume_position_ms, poster_uri FROM videos " +
@@ -104,18 +98,6 @@ interface VideoDao {
     )
     suspend fun watchStampsForLibrary(libraryId: String): List<VideoWatchStamp>
 
-    /**
-     * Replaces a single library's videos atomically; other libraries are never touched.
-     *
-     * Watch state survives the replace. This deletes and re-inserts from a scan that reads only
-     * the filesystem, so before this guard a rescan silently cleared both last_watched_at and
-     * resume_position_ms — Recently Watched emptied itself and every part-watched film went back
-     * to the start, with nothing on screen to say why. Found while giving music and books the
-     * same column; the fault was already here.
-     *
-     * Restored by id, which VideoScanner keeps stable by carrying `prior?.id` forward. A row the
-     * scan supplies its own values for keeps them.
-     */
     @Transaction
     suspend fun replaceForLibrary(libraryId: String, videos: List<VideoEntity>) {
         val stamps = watchStampsForLibrary(libraryId).associateBy { it.id }
@@ -126,36 +108,22 @@ interface VideoDao {
                 v.copy(
                     lastWatchedAt = v.lastWatchedAt ?: prior.lastWatchedAt,
                     resumePositionMs = if (v.resumePositionMs > 0) v.resumePositionMs else prior.resumePositionMs,
-                    // The scanner never supplies one, so this is always the stored value coming
-                    // back. Without it a rescan silently unmatches every film.
+
                     posterUri = v.posterUri ?: prior.posterUri,
                 )
             },
         )
     }
 
-    /** Every video, for the poster matcher to walk. A one-shot read, not a flow. */
     @Query("SELECT * FROM videos")
     suspend fun getAllOnce(): List<VideoEntity>
 
     @Query("UPDATE videos SET poster_uri = :posterUri WHERE id = :id")
     suspend fun setPosterUri(id: String, posterUri: String?)
 
-    /** Drops the video off the recents shelf. Resume position is left alone — see clearLastWatched. */
     @Query("UPDATE videos SET last_watched_at = NULL WHERE id = :id")
     suspend fun clearLastWatched(id: String)
 
-    /**
-     * The newest thumbnails in this library, newest first — for the XMB's card art grids.
-     *
-     * A LIMIT query returning only the URIs, not the rows. The grids need four per card and the
-     * media columns slice one pool across their rows, so this is tens of strings; streaming every
-     * track or photo to read one column off each would be thousands of rows for a handful of
-     * thumbnails.
-     *
-     * Newest is highest id, the same proxy the games grid uses: these tables have no added-at
-     * column either, and rows are inserted in scan order.
-     */
     @Query(
         """
         SELECT COALESCE(custom_thumbnail_uri, poster_uri, thumbnail_uri) FROM videos

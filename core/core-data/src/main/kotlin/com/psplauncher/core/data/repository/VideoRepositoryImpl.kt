@@ -33,7 +33,6 @@ class VideoRepositoryImpl @Inject constructor(
     private val videoDao: VideoDao,
     private val playlistDao: VideoPlaylistDao,
 ) : VideoRepository {
-
     override fun observeLibraries(): Flow<List<VideoLibrary>> =
         libraryDao.observeAll().map { list -> list.map { it.toDomain() } }
 
@@ -76,11 +75,8 @@ class VideoRepositoryImpl @Inject constructor(
         libraryDao.setArtwork(id, artworkUri, System.currentTimeMillis())
 
     override suspend fun removeLibrary(id: String) {
-        // Capture thumbnail uris (generated + custom) before the rows go, so their cached files
-        // can be forgotten too.
         val thumbs = videoDao.getForLibrary(id).flatMap { listOfNotNull(it.thumbnailUri, it.customThumbnailUri) }
-        // Videos cascade-delete via the foreign key, but delete explicitly too so behaviour is
-        // identical whether or not foreign keys are enforced on the connection.
+
         videoDao.deleteForLibrary(id)
         libraryDao.delete(id)
         deleteOrphanedThumbnails(thumbs) { videoDao.countReferencingThumbnail(it) > 0 }
@@ -127,8 +123,6 @@ class VideoRepositoryImpl @Inject constructor(
         deleteOrphanedThumbnails(thumbs) { videoDao.countReferencingThumbnail(it) > 0 }
     }
 
-    // ── Favorites & recently watched ────────────────────────────────────────────
-
     override fun observeFavorites(): Flow<List<Video>> =
         videoDao.observeFavorites().map { list -> list.map { it.toDomain() } }
 
@@ -138,18 +132,11 @@ class VideoRepositoryImpl @Inject constructor(
     override suspend fun setFavorite(id: String, favorite: Boolean) =
         videoDao.setFavorite(id, favorite)
 
-
     override suspend fun clearLastWatched(id: String) = videoDao.clearLastWatched(id)
-
-
 
     override suspend fun getAllVideos(): List<Video> = videoDao.getAllOnce().map { it.toDomain() }
 
-
-
     override suspend fun setPosterUri(id: String, posterUri: String?) = videoDao.setPosterUri(id, posterUri)
-
-    // ── Playlists ───────────────────────────────────────────────────────────────
 
     override fun observePlaylists(): Flow<List<VideoPlaylist>> =
         playlistDao.observeAllWithCounts().map { rows ->

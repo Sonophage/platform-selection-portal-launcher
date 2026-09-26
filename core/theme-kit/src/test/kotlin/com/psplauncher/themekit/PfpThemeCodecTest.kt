@@ -9,7 +9,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class PfpThemeCodecTest {
-
     private val manifest = PfpThemeManifest(
         name = "Classy Pink",
         accentColor = "#FF72B1",
@@ -90,13 +89,11 @@ class PfpThemeCodecTest {
 
     @Test
     fun `drops icon entries with unregistered keys on read and write`() {
-        // Write path: unknown keys in the map are silently skipped.
         val written = PfpThemeCodec.write(
             PfpThemeBundle(manifest, null, null, icons = mapOf("not_a_slot" to ThemeImage(ByteArray(8), "png"))),
         )
         assertEquals(emptyMap(), assertNotNull(PfpThemeCodec.read(written)).icons)
 
-        // Read path: a hostile bundle can't smuggle traversal or unexpected names.
         val hostile = ByteArrayOutputStream().also { baos ->
             ZipOutputStream(baos).use { z ->
                 java.util.zip.ZipInputStream(PfpThemeCodec.write(PfpThemeBundle(manifest, null, null)).inputStream()).use { src ->
@@ -122,7 +119,7 @@ class PfpThemeCodecTest {
     @Test
     fun `ignores unknown zip entries for forward compatibility`() {
         val base = PfpThemeCodec.write(PfpThemeBundle(manifest, null, null))
-        // Re-zip with an extra entry a future schema might add.
+
         val withExtra = ByteArrayOutputStream().also { baos ->
             ZipOutputStream(baos).use { z ->
                 java.util.zip.ZipInputStream(base.inputStream()).use { src ->

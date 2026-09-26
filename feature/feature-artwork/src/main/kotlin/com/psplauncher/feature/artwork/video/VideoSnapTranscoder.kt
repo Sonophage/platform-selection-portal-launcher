@@ -20,40 +20,12 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Converts a full gameplay video into an ICON1-sized snap: first [MAX_SNAP_MS] only, video
- * scaled to [SNAP_HEIGHT_PX] tall (aspect preserved), audio stripped (ICON1 is mute by
- * design), H.264. Used when ScreenScraper has no `video-normalized` snap for a game but does
- * have the raw video — the converted snap is what gets stored, never the full download.
- *
- * SNAP_HEIGHT_PX is 160 rather than a literal 80: hardware H.264 encoders commonly refuse
- * frames below ~96 px, and 160 is exactly 2× the 80 dp tile so it stays sharp on the
- * device's ~2.3x density while remaining a tiny file.
- */
 @Singleton
-// media3's transcoding surface is marked @UnstableApi, which lint reports once per usage — this
-// file alone accounted for 44 of this project's lint errors, enough to bury the two that were real
-// crashes.
-//
-// @Suppress, not @OptIn and not @UnstableApi. Three attempts, and the difference matters:
-//
-//  - `@OptIn(UnstableApi::class)` compiles and silences NOTHING. UnstableApi is a lint marker and
-//    is not annotated @RequiresOptIn, and Kotlin says so in a warning.
-//  - `@UnstableApi` on this class satisfies lint here and PROPAGATES: every place that injects a
-//    VideoSnapTranscoder then becomes an unstable-API usage of its own, which turned 44 errors in
-//    one file into errors in four others.
-//
-// A lint suppression is local. It says this file knows what it is calling, and nothing outside it
-// has to know anything.
+
 @Suppress("UnsafeOptInUsageError")
 class VideoSnapTranscoder @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    /**
-     * Transcodes [input] into [output]. Returns true on success; on failure [output] is
-     * deleted and false returned ([input] is left for the caller to dispose either way).
-     * Transformer requires a Looper thread — everything runs via the main handler.
-     */
     suspend fun transcode(input: File, output: File): Boolean =
         suspendCancellableCoroutine { cont ->
             val mainHandler = Handler(Looper.getMainLooper())
@@ -96,11 +68,6 @@ class VideoSnapTranscoder @Inject constructor(
             }
         }
 
-    /**
-     * Like [transcode], but first crops the frame to the normalized rect [l,t,r,b] (0..1,
-     * top-left origin) before scaling — the Studio's "Adjust Crop / Position" for ICON1 snaps.
-     * The GL Crop effect takes NDC bounds (-1..1, y up), so the rect is converted accordingly.
-     */
     suspend fun transcodeCropped(
         input: File, output: File, l: Float, t: Float, r: Float, b: Float,
     ): Boolean = suspendCancellableCoroutine { cont ->

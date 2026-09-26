@@ -12,16 +12,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Scrape-as-you-go access to a game's ScreenScraper media list: cached lists load instantly,
- * anything else triggers ONE live `jeuInfos` right here — no "scrape the game first" chore.
- * A successful live lookup pays forward: the medias land in ss_media_cache, a fresh ssId match
- * is persisted on the game row, and missing text metadata is filled (COALESCE — never
- * overwrites), so the next open is a pure cache hit and the scraper skips this game's call too.
- *
- * Serialized by a single mutex: concurrent callers (rapid tab switches) queue instead of
- * burning duplicate API calls; the second caller re-checks the cache the first one just wrote.
- */
 @Singleton
 class SsMediaCatalog @Inject constructor(
     private val screenScraper: ScreenScraperApi,
@@ -31,14 +21,6 @@ class SsMediaCatalog @Inject constructor(
 ) {
     private val inFlight = Mutex()
 
-    /**
-     * The game's full SS media list, from cache or one live lookup. Null = no match/SS off.
-     *
-     * [matchedSsId] browses a game the Studio's matcher resolved by TITLE. That game's medias are
-     * fetched and cached, but its id is never written to the game row: a title match is not an
-     * identity, and persisting it would turn a guess into Tier 1 evidence. Only the ROM-identity
-     * lookup below — or a Change Match the user confirms — sets `ss_id`.
-     */
     suspend fun mediasFor(gameId: Long, matchedSsId: Long? = null): List<SsCachedMedia>? = inFlight.withLock {
         withContext(Dispatchers.IO) {
             val game = gameDao.getById(gameId) ?: return@withContext null
@@ -59,15 +41,12 @@ class SsMediaCatalog @Inject constructor(
                 return@withContext info.medias
             }
 
-            // Old links: straight from cache.
             game.ssId?.let { id ->
                 ssMediaCacheDao.get(id)?.let { row ->
                     SsMediaSelection.decode(row.mediasJson)?.let { return@withContext it }
                 }
             }
 
-            // New links: one live lookup. Known id fetches directly; otherwise match by ROM
-            // identity (the hasher caps oversized ROMs itself, so this can't stall on a 4 GB iso).
             if (!screenScraper.isEnabled()) return@withContext null
             val rom = if (game.ssId == null) romHasher.identify(game.romPath, game.romUri) else null
             val info = screenScraper.fetchGameInfo(game.platformId, rom, game.ssId).info
@@ -79,8 +58,7 @@ class SsMediaCatalog @Inject constructor(
                     SsMediaCacheEntity(matchedId, SsMediaSelection.encode(info.medias), System.currentTimeMillis())
                 )
             }
-            // The lookup doubles as a mini-scrape: persist the match id and fill-missing text
-            // metadata so this game never needs the jeuInfos call again anywhere.
+
             gameDao.updateMetadata(
                 id = gameId,
                 description = info.description,
@@ -96,8 +74,7 @@ class SsMediaCatalog @Inject constructor(
                 ssId = matchedId,
                 romCrc32 = rom?.crc32,
             )
-            // Fill-only, like the main scrape: this lookup may name a game that has no name yet,
-            // but it must never rename one (see GameDao.fillScrapedTitleIfMissing).
+
             if (game.userTitleOverride == null) {
                 info.title?.let { gameDao.fillScrapedTitleIfMissing(gameId, it) }
             }

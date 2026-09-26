@@ -39,7 +39,6 @@ import com.psplauncher.studio.io.PtfConversion
 import com.psplauncher.themekit.PfpThemeManifest
 import com.psplauncher.themekit.PfpThemeSource
 
-/** Theme tab: name, accent, icon color, wave style, wallpaper, motion, provenance. */
 @Composable
 fun InspectorPanel(
     state: StudioState,
@@ -125,10 +124,7 @@ fun InspectorPanel(
                 onValid = { viewModel.setTextColor(TextColorChoice.Custom(it)) },
             )
             ExpandablePicker(argb = customArgb, onChange = { viewModel.setTextColor(TextColorChoice.Custom(it)) })
-            // The preview renders this colour AS PICKED. The launcher may lightness-clamp it at
-            // apply time when it fails 4.5:1 on the real backdrop — the contrast engine that
-            // decides is Android-side today, so the desktop preview cannot show the adjusted
-            // colour yet. See docs/plans/text-legibility-font-color-plan.md.
+
             HintText("Preview shows this colour as picked; the launcher may adjust it for contrast.")
         }
 
@@ -140,8 +136,7 @@ fun InspectorPanel(
             PfpThemeManifest.WAVE_STATIC to "Static",
             PfpThemeManifest.WAVE_REDUCED to "Reduced",
         )
-        // Plain toggle buttons instead of experimental M3 SegmentedButton — its selection
-        // animation is a node-chain crash suspect on CMP 1.6.11 desktop.
+
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             styles.forEach { (value, label) ->
                 val selected = state.waveStyle == value
@@ -192,9 +187,6 @@ fun InspectorPanel(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (state.motionFile != null) {
-            // The still IS the video's poster: whenever playback is frozen on device — battery
-            // saver, a game launching, or a Static wave style — the launcher shows it instead.
-            // Without the hint, authors read the frozen poster as the video being broken.
             HintText("The still wallpaper above is the video's poster — it shows whenever playback is frozen (battery saver, a game, or a Static wave).")
         }
         if (state.motionFile != null && state.wallpaperPng == null) {
@@ -248,13 +240,11 @@ fun SectionLabel(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall)
 }
 
-/** Non-blocking legibility hint — advice, never a gate. */
 @Composable
 private fun HintText(text: String) {
     Text(text, fontSize = 11.sp, color = MaterialTheme.colorScheme.tertiary)
 }
 
-/** "Pick…" toggle that expands the HSV picker under a hex field. */
 @Composable
 private fun ExpandablePicker(argb: Int, onChange: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
@@ -268,7 +258,6 @@ private fun ExpandablePicker(argb: Int, onChange: (Int) -> Unit) {
 
 @Composable
 private fun SwatchGrid(selected: Int, onPick: (Int) -> Unit) {
-    // 12 presets, two rows of 6.
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PRESET_ACCENTS.chunked(6).forEach { rowSwatches ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -291,7 +280,6 @@ private fun SwatchGrid(selected: Int, onPick: (Int) -> Unit) {
     }
 }
 
-/** `#RRGGBB` field that only commits parseable values but lets the user type freely. */
 @Composable
 private fun HexField(label: String, argb: Int, onValid: (Int) -> Unit) {
     var text by remember(argb) { mutableStateOf(PtfConversion.toHexRgb(argb)) }

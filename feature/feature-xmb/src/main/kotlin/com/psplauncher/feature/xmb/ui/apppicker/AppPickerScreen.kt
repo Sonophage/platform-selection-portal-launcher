@@ -61,29 +61,6 @@ import com.psplauncher.feature.xmb.viewmodel.pendingRemovals
 import com.psplauncher.feature.xmb.viewmodel.visibleApps
 import kotlinx.coroutines.flow.distinctUntilChanged
 
-// ── Installed-app picker (grid) ───────────────────────────────────────────────
-//
-// The shared picker for the Android library ("Find Games" / "Add Android Apps") and the
-// Video / Music / Photo "Add Apps" flows. It is the app's own chrome, and it is built out of the
-// app's chrome: core-ui's [PfpSearchField] for the header and [PfpHintBar] for the footer, the
-// same two the App Drawer draws.
-//
-// It used to draw neither. It had a 56dp header of its own — a ‹ back arrow, the title, a live
-// "N Selected" count and a second magnifier button labelled "Search" beside a box that already
-// said Search — and an INLINE prompt row for a footer, which was a fourth look at the bar every
-// other screen had settled on. The title and the count moved to the bar's centre slot, and the
-// rest went: B and the search key are named on the bar now, on this screen as on every other.
-//
-// It is also drawn UNDER the global status strip rather than over it. The picker fills the screen,
-// but filling the screen is not the same as owning it: you are still inside the launcher here, the
-// same as in the drawer or Settings, so the clock, the battery and the notification corner stay.
-// That is [XMBUiState.chromeOverlay]'s half of the partition, and the top padding below is what
-// keeps this screen's own content clear of the strip drawn on top of it.
-//
-// Stateless: driven entirely by [AppPickerState] plus callbacks, so the XMB shell wires it
-// exactly like every other overlay. Focus and selection are independent layers — the check
-// badge survives the cursor moving away (doc §7's most-repeated requirement).
-
 @Composable
 fun AppPickerScreen(
     state: AppPickerState,
@@ -97,10 +74,7 @@ fun AppPickerScreen(
     onConfirmRemoval: () -> Unit,
     onCancelRemoval: () -> Unit,
     modifier: Modifier = Modifier,
-    /**
-     * How many columns the grid measured. The cursor steps by this, so it must be the same number
-     * the grid laid out with — see PICKER_GRID_COLUMNS.
-     */
+
     onColumnsMeasured: (Int) -> Unit = {},
 ) {
     val sf = deriveStorefrontColors()
@@ -109,13 +83,9 @@ fun AppPickerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // No whole-background dismiss tap: with a grid and a search field it is an easy
-            // accidental cancel. Back and the bar's B are the exits.
+
             .background(Brush.verticalGradient(listOf(sf.backgroundDeep, sf.backgroundMid))),
     ) {
-        // The strip is drawn over this screen by the shell, not by this screen. Reserving its
-        // height here is the same thing AppDrawerScreen and the detail pages do, and it is why
-        // the header below can never end up underneath the clock.
         Column(modifier = Modifier.fillMaxSize().padding(top = StatusStripHeight)) {
             AppPickerHeader(
                 state = state,
@@ -125,9 +95,6 @@ fun AppPickerScreen(
                 colors = sf,
             )
 
-            // BoxWithConstraints puts the viewport height in composition scope, so the adaptive
-            // artwork size is resolved BEFORE the first tile composes — tiles render at their
-            // final size on frame one, no resize jump.
             BoxWithConstraints(modifier = Modifier.weight(1f)) {
                 val artworkSize = pickerAdaptiveArtworkSize(maxHeight)
                 if (visible.isEmpty()) {
@@ -151,11 +118,6 @@ fun AppPickerScreen(
                 }
             }
 
-            // ── Permanent footer: the shared bottom bar (never fades) ──────
-            //
-            // Always drawn, so grid geometry never depends on whether prompts are showing.
-            // Tapping a prompt runs the same callback the pad press runs — the bar knows the
-            // action, and this screen already holds the callback for each one.
             AppPickerHintBar(
                 title = state.title,
                 selectedCount = state.selected.size,
@@ -177,8 +139,6 @@ fun AppPickerScreen(
             )
         }
 
-        // Removal confirmation — centered panel over the grid, raised by the ViewModel
-        // (confirmingRemovals) so controller SELECT and the touch buttons hit one path.
         if (state.confirmingRemovals) {
             RemovalConfirmPanel(
                 labels = state.apps
@@ -193,12 +153,6 @@ fun AppPickerScreen(
     }
 }
 
-// ── Header: one search field, the width of the screen ─────────────────────────
-//
-// The App Drawer's header in a second place. The field, the caret rule and the magnifier are
-// core-ui's [PfpSearchField]; what is left here is the picker's placement of it and the focus
-// handshake, which belongs to whoever owns the FocusRequester.
-
 private val HEADER_HEIGHT = 56.dp
 
 @Composable
@@ -212,8 +166,6 @@ private fun AppPickerHeader(
     val searchFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
-    // Two-frame focus idiom (AppDrawerScreen): the field must be composed before the
-    // FocusRequester can grab it.
     LaunchedEffect(state.searchActive) {
         if (state.searchActive) {
             withFrameNanos {}
@@ -245,8 +197,6 @@ private fun AppPickerHeader(
     }
 }
 
-// ── Grid ──────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun AppPickerGrid(
     state: AppPickerState,
@@ -255,21 +205,17 @@ private fun AppPickerGrid(
     onTileTapped: (Int) -> Unit,
     onTouchBrowse: (Int) -> Unit,
     colors: StorefrontColors,
-    /** Reported up so the cursor steps by the row the grid actually drew. */
+
     onColumnsMeasured: (Int) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
 
-    // Scroll-into-view, clamped. Keyed on visible.size too, so a list that shrank under a
-    // stationary cursor re-clamps (doc §16) instead of leaving the LazyColumn off the end.
     LaunchedEffect(state.focusedIndex, state.usingTouch, visible.size) {
         if (!state.usingTouch && visible.isNotEmpty()) {
             gridState.animateScrollToItem(state.focusedIndex.coerceIn(0, visible.lastIndex))
         }
     }
 
-    // Touch reconciliation, same shape as AppDrawerGrid: drag-start parks the hidden cursor;
-    // scroll-settle parks it on the tile nearest the viewport centre.
     var fingerScrolled by remember { mutableStateOf(false) }
     LaunchedEffect(gridState) {
         gridState.interactionSource.interactions.collect { interaction ->
@@ -296,15 +242,7 @@ private fun AppPickerGrid(
             }
     }
 
-    // The grid measures itself and divides by what a tile wants.
-    //
-    // It was Fixed(PICKER_GRID_COLUMNS), which spread the same seven tiles across whatever width
-    // it was given: on the 821dp handheld a tile is 99.6dp, on a 1067dp tablet the SAME seven
-    // came out 134.7dp. Tile size is the user's through the scale slider; how many fit is this
-    // division. The artwork inside already adapts by height (pickerAdaptiveArtworkSize), so this
-    // is the other axis finally doing the same thing.
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // maxWidth is the whole box; the grid's own horizontal contentPadding comes off first.
         val gridWidth = maxWidth - PICKER_GRID_SIDE_PADDING * 2
         val columns = ((gridWidth + PICKER_TILE_GAP) / (PICKER_TILE_TARGET_WIDTH + PICKER_TILE_GAP))
             .toInt()
@@ -332,56 +270,25 @@ private fun AppPickerGrid(
     }
 }
 
-// ── Tile: focus chrome (drawer-faithful) + independent selection check badge ──
-
 private val TILE_BORDER = 1.dp
-// Chrome room around the artwork: outer border + 2dp gap + inner hairline on each side.
-internal val FRAME_ROOM = 8.dp
 
-// ── Adaptive row sizing ──────────────────────────────────────────────────────
-//
-// This used to mirror AppDrawerGridItem.adaptiveArtworkSize, and that tile is gone: the App
-// Drawer draws the shared PfpMediaCard at a fixed 2:3 now, so nothing adapts there and the sizing
-// it needed went with it. The picker still shrinks its own artwork, because the picker still has
-// the problem the drawer stopped having — a square icon grid that must fit three rows on a short
-// viewport. Self-contained now, mirroring nothing.
-//
-// The picker guarantees three full rows are visible with nothing clipped: on a short viewport
-// the artwork shrinks from its 72dp resting size toward the 48dp floor so a row always fits
-// three times between the header and the footer. Tall viewports never inflate past 72dp.
-//
-// It measures the room it is actually given, so the status strip's reserved height and the bar's
-// height are already subtracted by the time this runs — there is no second copy of either number
-// here to drift from the originals.
+internal val FRAME_ROOM = 8.dp
 
 internal val MIN_ARTWORK_SIZE = 48.dp
 internal val MAX_ARTWORK_SIZE = 72.dp
 
 internal fun pickerAdaptiveArtworkSize(viewportHeight: Dp, rows: Int = 3): Dp {
-    // Frame room + label spacer + a 2-line 11sp label block + the tile's vertical padding.
     val tileFixedHeight = FRAME_ROOM + 6.dp + 30.dp + 8.dp
     val rowHeight = (viewportHeight - 28.dp - 14.dp * (rows - 1)) / rows
     return (rowHeight - tileFixedHeight).coerceIn(MIN_ARTWORK_SIZE, MAX_ARTWORK_SIZE)
 }
-/**
- * The width a picker tile wants, from which the column count is derived.
- *
- * What the old fixed seven PRODUCED on the reference handheld: 821dp of panel less the grid's two
- * 32dp gutters is 757dp, and seven columns with six 10dp gaps leaves (757 - 60) / 7 = 99.57dp.
- *
- * **99 and not 100.** The count is a truncating division, so rounding up past what a tile
- * measures costs a whole column: (757 + 10) / (100 + 10) = 6.97, and the handheld would quietly
- * drop to six. The same arithmetic caught the same mistake on the search grid.
- */
+
 private val PICKER_TILE_TARGET_WIDTH = 99.dp
 
-/** The gap between tiles, named because the column arithmetic subtracts it. */
 private val PICKER_TILE_GAP = 10.dp
 
-/** The grid's own side gutters, named for the same reason. */
 private val PICKER_GRID_SIDE_PADDING = 32.dp
 
-/** Bounds on the derived count. Below three it is a list; past a dozen a tile is a stamp. */
 private const val PICKER_GRID_MIN_COLUMNS = 3
 private const val PICKER_GRID_MAX_COLUMNS = 12
 
@@ -411,13 +318,10 @@ private fun AppPickerTile(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clickable(onClick = onClick)   // whole tile is the touch target — never just the badge
+            .clickable(onClick = onClick)
             .padding(vertical = 4.dp),
     ) {
         Box(modifier = Modifier.size(artworkSize + FRAME_ROOM)) {
-            // ── Focus layer: alpha-driven only — no scale, no bounce, no elevation, so tile
-            // geometry never shifts. (The geometry came from AppDrawerGridItem, which no longer
-            // exists; it lives on here and nowhere else.) ──
             Box(
                 Modifier
                     .matchParentSize()
@@ -434,8 +338,7 @@ private fun AppPickerTile(
                     .padding(2.dp)
                     .border(TILE_BORDER, colors.tileSelectedInner.copy(alpha = focus)),
             )
-            // ── Selection layer: persistent low-alpha tint so a checked tile reads from
-            // across the grid, independent of the cursor. ──
+
             Box(
                 Modifier
                     .matchParentSize()
@@ -453,7 +356,7 @@ private fun AppPickerTile(
             } else {
                 Spacer(Modifier.size(artworkSize))
             }
-            // Check badge — upper-right, independent of focus; survives the cursor leaving.
+
             PfpCheckBadge(
                 fill = colors.tileSelectedEdge,
                 markColor = colors.backgroundDeep,
@@ -476,17 +379,6 @@ private fun AppPickerTile(
     }
 }
 
-// ── Removal confirmation panel (hand-built scrim + panel) ──
-//
-// This is the last hand-built confirm in the app. UninstallConfirmDialog used to be the
-// other one and is now on core-ui's PfpConfirmOverlay; this one is not, because its cursor
-// is XMBViewModel's confirmFocusedOption rather than the overlay's own.
-//
-// A hard input boundary: while it is up, dpad LEFT/RIGHT step the highlight between Cancel
-// and Remove, SELECT activates the highlighted option, and BACK cancels — routed through
-// XMBViewModel (confirmFocusedOption), never the grid behind the scrim.
-
-/** One modal button row. Focus chrome is alpha/border only — geometry never shifts. */
 @Composable
 private fun ConfirmOption(
     label: String,

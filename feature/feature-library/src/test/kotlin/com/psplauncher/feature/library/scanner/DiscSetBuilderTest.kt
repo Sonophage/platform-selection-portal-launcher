@@ -9,14 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Set building over a scan pass: tagged discs group into one set with disc 1 primary, an .m3u
- * beside them takes over as primary, unreadable/unresolvable playlists create nothing, folders
- * keep same-named games apart, and tag-less games stay untouched.
- * See docs/plans/README.md (C1) (DiscSetBuilderTest).
- */
 class DiscSetBuilderTest {
-
     private val builder = DiscSetBuilder()
 
     private fun game(path: String, platformId: String = "psx"): Game {
@@ -103,7 +96,6 @@ class DiscSetBuilderTest {
 
         val assigned = builder.assign(games) { null }
 
-        // The tagged discs form a set on their own; the m3u joins nothing (no tag, nothing read).
         val discs = assigned.filter { it.romPath.orEmpty().endsWith(".cue") }
         assertEquals(1, discs.map { it.discSetKey }.distinct().size)
         assertNull(assigned.single { it.romPath.orEmpty().endsWith(".m3u") }.discSetKey)
@@ -156,9 +148,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `windows-style paths group discs into one set`() {
-        // Live-data finding: desktop ROM folders use backslash paths and one folder per disc
-        // (D:\Emulators\Roms\psx\Parasite Eve II (USA) (Disc 1)\…cue). The folder suffix is the
-        // disc tag, so it must not split the set — disc 1 and disc 2 belong to one game.
         val games = listOf(
             game("D:\\Emulators\\Roms\\psx\\Parasite Eve II (USA) (Disc 1)\\Parasite Eve II (USA) (Disc 1).cue"),
             game("D:\\Emulators\\Roms\\psx\\Parasite Eve II (USA) (Disc 2)\\Parasite Eve II (USA) (Disc 2).cue"),
@@ -177,7 +166,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `per-disc subfolders with forward slashes group into one set`() {
-        // The same one-folder-per-disc layout on POSIX-style paths.
         val games = listOf(
             game("/roms/psx/Parasite Eve II (USA) (Disc 1)/Parasite Eve II (USA) (Disc 1).cue"),
             game("/roms/psx/Parasite Eve II (USA) (Disc 2)/Parasite Eve II (USA) (Disc 2).cue"),
@@ -196,10 +184,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `region tag on one disc's folder only does not split the set`() {
-        // Live-data finding (the handheld): Disc 1's folder carries (USA) while Disc 2's does not
-        // (/storage/…/psx/Parasite Eve II (USA) (Disc 1)/ next to /storage/…/psx/Parasite Eve II
-        // (Disc 2)/). Folder names are cleaned like titles — disc tag stripped, region tags removed
-        // — so an inconsistent region tag between sibling disc folders cannot split the set.
         val games = listOf(
             game("/storage/408C-3861/Emulation/roms/psx/Parasite Eve II (USA) (Disc 1)/Parasite Eve II (USA) (Disc 1).cue"),
             game("/storage/408C-3861/Emulation/roms/psx/Parasite Eve II (Disc 2)/Parasite Eve II (Disc 2).cue"),
@@ -218,8 +202,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `dumps in structurally different folders still do not merge`() {
-        // Folder cleaning strips parenthesized/bracketed tags (region, revision, disc) but leaves
-        // real folder names alone — NA/ vs EU/ are two dumps, not one set.
         val games = listOf(
             game("/roms/psx/NA/Final Fantasy VII (Disc 1)/Final Fantasy VII (Disc 1).cue"),
             game("/roms/psx/NA/Final Fantasy VII (Disc 2)/Final Fantasy VII (Disc 2).cue"),
@@ -235,10 +217,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `an m3u beside per-disc subfolders unifies them into one set with the m3u primary`() {
-        // Live-data layout (ES-DE): one folder per disc, .m3u sitting beside them in the parent
-        // (D:\Emulators\Roms\psx\Parasite Eve II (USA).m3u next to the (Disc 1)/(Disc 2) folders).
-        // The disc-tagged folders already form one set on their own; the m3u adopts them and
-        // takes over as primary.
         val games = listOf(
             game("D:\\Emulators\\Roms\\psx\\Parasite Eve II (USA) (Disc 1)\\Parasite Eve II (USA) (Disc 1).cue"),
             game("D:\\Emulators\\Roms\\psx\\Parasite Eve II (USA) (Disc 2)\\Parasite Eve II (USA) (Disc 2).cue"),
@@ -256,7 +234,7 @@ class DiscSetBuilderTest {
         val primary = assigned.single { it.isDiscPrimary }
         assertEquals("D:\\Emulators\\Roms\\psx\\Parasite Eve II (USA).m3u", primary.romPath)
         assertNull(primary.discNumber)
-        // The discs keep their tag numbers but the m3u becomes the set's primary.
+
         assertEquals(1, assigned.single { it.romPath.orEmpty().contains("(Disc 1)") }.discNumber)
         assertEquals(2, assigned.single { it.romPath.orEmpty().contains("(Disc 2)") }.discNumber)
         assertTrue(assigned.filter { it.romPath.orEmpty().endsWith(".cue") }.none { it.isDiscPrimary })
@@ -264,8 +242,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `an m3u beside per-disc subfolders unifies them with forward-slash paths too`() {
-        // Same layout on POSIX-style paths: the cross-folder fallback must not depend on the
-        // separator, only on the basename.
         val games = listOf(
             game("/roms/psx/Final Fantasy VII (Disc 1)/Final Fantasy VII (Disc 1).cue"),
             game("/roms/psx/Final Fantasy VII (Disc 2)/Final Fantasy VII (Disc 2).cue"),
@@ -283,8 +259,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `same detected region unifies discs even when folder region tags disagree`() {
-        // Live-data finding (the handheld): Disc 1's folder carries (USA), Disc 2's does not, but
-        // both .bin images are NTSC-U. The detected region — never the filename — decides.
         val games = listOf(
             game("/storage/408C-3861/Emulation/roms/psx/Parasite Eve II (USA) (Disc 1)/Parasite Eve II (USA) (Disc 1).cue")
                 .copy(region = GameRegion.NTSC_U),
@@ -302,8 +276,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `detected region from the reader drives unification and is persisted on the rows`() {
-        // The reader (the content-based detector) fills region for games that carry none; the
-        // same NTSC-U answer then keeps the mismatched-folder pair in one set.
         val games = listOf(
             game("/roms/psx/Parasite Eve II (USA) (Disc 1)/Parasite Eve II (USA) (Disc 1).cue"),
             game("/roms/psx/Parasite Eve II (Disc 2)/Parasite Eve II (Disc 2).cue"),
@@ -317,8 +289,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `conflicting detected regions split sibling disc folders into two sets`() {
-        // Genuinely different dumps (NTSC-U vs PAL) stay separate — the region-split only fires
-        // when every member carries a known region.
         val games = listOf(
             game("/roms/psx/Final Fantasy VII (USA) (Disc 1)/Final Fantasy VII (Disc 1).cue")
                 .copy(region = GameRegion.NTSC_U),
@@ -338,8 +308,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `a disc with unknown region keeps the group merged`() {
-        // One disc unreadable or in a compressed container (region null) must not break the set —
-        // unknown only ever falls back to merging.
         val games = listOf(
             game("/roms/psx/Final Fantasy VII (Disc 1)/Final Fantasy VII (Disc 1).cue")
                 .copy(region = GameRegion.NTSC_U),
@@ -354,8 +322,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `reconcile persists a newly detected region`() {
-        // Rows scanned before region detection existed carry null; reconcile re-reads the image,
-        // detects NTSC-U, and returns both rows so the caller upserts the region.
         val disc1 = setGame("/roms/psx/Final Fantasy VII (Disc 1).cue", "psx\u0001/roms/psx\u0001Final Fantasy VII", 1, true)
         val disc2 = setGame("/roms/psx/Final Fantasy VII (Disc 2).cue", "psx\u0001/roms/psx\u0001Final Fantasy VII", 2, false)
 
@@ -375,9 +341,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `reconcile joins a newly added disc into an existing m3u set`() {
-        // Incremental scan (plan follow-up): the m3u and discs 1-2 were scanned earlier and carry
-        // the m3u's set key; disc 3 just arrived (its stored key is the pre-fix per-folder form).
-        // Reconcile must re-derive the union and pull disc 3 into the m3u's set.
         val m3uKey = "psx\u0001/roms/psx\u0001Final Fantasy VII"
         val existing = listOf(
             setGame("/roms/psx/Final Fantasy VII.m3u", m3uKey, null, true),
@@ -409,8 +372,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `reconcile flips the primary to a newly added lower disc`() {
-        // No m3u: the first scan found disc 2 (primary of the folder's set); disc 1 arrives later.
-        // The union's lowest disc number must win the primary, flipping the existing row.
         val key = "psx\u0001/roms/psx\u0001Final Fantasy VII"
         val disc2 = setGame("/roms/psx/Final Fantasy VII (Disc 2).cue", key, 2, true)
         val disc1 = setGame("/roms/psx/Final Fantasy VII (Disc 1).cue", key, 1, true)
@@ -445,9 +406,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `reconcile adopts existing discs into a newly added m3u set`() {
-        // The reverse direction: discs 1-2 were scanned as their own per-folder sets, then the user
-        // adds an m3u beside the folders. Single-pass assign for the lone m3u resolves nothing, so
-        // reconcile must pull the existing discs into the m3u's set and make the m3u primary.
         val m3u = setGame("/roms/psx/Final Fantasy VII.m3u", null, null, false)
         val disc1 = setGame(
             "/roms/psx/Final Fantasy VII (Disc 1)/Final Fantasy VII (Disc 1).cue",
@@ -505,14 +463,6 @@ class DiscSetBuilderTest {
         assertEquals(1, assigned.mapNotNull { it.discSetKey }.distinct().size)
     }
 
-    // ── region read memoisation ──────────────────────────────────────────────────
-    // derive calls regionOf from two places: the region-split step and the row-enrichment step.
-    // Reading a disc head costs up to 256 KB per game, so the batch memoises by path — but the memo
-    // must hold a NULL answer too. A map keyed by nullness cannot tell "cached, undetectable" from
-    // "not cached", so every disc whose region cannot be read is re-read once per call site,
-    // for exactly the population where detection is already failing.
-
-    /** A [DiscSetBuilder.RegionReader] that records how often each path was actually read. */
     private class CountingRegionReader(
         private val answer: (Game) -> GameRegion? = { null },
     ) : DiscSetBuilder.RegionReader {
@@ -548,7 +498,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `a detected region is read once per path`() {
-        // Guard on the working path: a non-null answer already memoises, and must keep doing so.
         val disc1 = "/roms/psx/Parasite Eve II (USA) (Disc 1)/Parasite Eve II (USA) (Disc 1).cue"
         val disc2 = "/roms/psx/Parasite Eve II (Disc 2)/Parasite Eve II (Disc 2).cue"
         val reader = CountingRegionReader { GameRegion.NTSC_U }
@@ -561,8 +510,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `a region split does not re-read the images it splits on`() {
-        // The split step consults regionOf twice — once to collect the regions, once to build the
-        // per-region key. Both must come from the memo.
         val usa1 = "/roms/psx/Final Fantasy VII (USA) (Disc 1)/Final Fantasy VII (Disc 1).cue"
         val usa2 = "/roms/psx/Final Fantasy VII (USA) (Disc 2)/Final Fantasy VII (Disc 2).cue"
         val eu1 = "/roms/psx/Final Fantasy VII (Europe) (Disc 1)/Final Fantasy VII (Disc 1).cue"
@@ -582,8 +529,6 @@ class DiscSetBuilderTest {
 
     @Test
     fun `a stored region survives an undetectable read and is not re-read`() {
-        // The `?: game.region` fallback is what stops a transient read failure wiping a known
-        // region. Memoising a null must not defeat it.
         val path = "/roms/psx/Final Fantasy VII (Disc 1)/Final Fantasy VII (Disc 1).cue"
         val stored = game(path).copy(region = GameRegion.NTSC_U)
         val reader = CountingRegionReader { null }

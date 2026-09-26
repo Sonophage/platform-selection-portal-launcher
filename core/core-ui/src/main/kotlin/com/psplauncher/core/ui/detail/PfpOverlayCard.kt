@@ -33,28 +33,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// ── The shape every in-window dialog takes ────────────────────────────────────
-//
-// Three overlays had drawn this same scrim and card independently before it was extracted, and a
-// fourth was about to. That is the point at which the copies start disagreeing about a corner
-// radius or which taps are swallowed.
-//
-// Why any of them exist at all: a Material3 AlertDialog renders into its own platform Window, so
-// while it is up the Activity's dispatchKeyEvent never runs -- and that is where this app's whole
-// gamepad pipeline lives. Measured on a tablet: with a dialog open, A did nothing, B did nothing,
-// the D-pad did nothing, and the system Back key dismissed only the soft keyboard. On a handheld
-// that hides the navigation bar, that is a trap with no controller exit.
-
-/** Widest the card grows before its text starts wrapping for the sake of it. */
 private val CARD_MAX_WIDTH: Dp = 520.dp
 private val CARD_MIN_WIDTH: Dp = 320.dp
 
-/**
- * A dimmed full-screen scrim with a centred card, drawn inside the launcher's own window.
- *
- * [onScrimTap] is the cancelling action, never the confirming one: a stray tap outside a prompt
- * must not be able to perform it. Taps inside the card are swallowed so they do not fall through.
- */
 @Composable
 fun PfpOverlayCard(
     onScrimTap: () -> Unit,
@@ -65,8 +46,7 @@ fun PfpOverlayCard(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xCC000000))
-            // The soft keyboard covers the bottom of the screen. Padding here rather than in each
-            // overlay means a card that grows a text field later cannot forget it.
+
             .imePadding()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -75,17 +55,6 @@ fun PfpOverlayCard(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        // The card follows the text, because the text already follows the theme.
-        //
-        // This was a fixed dark `0xF21A1A22`, and on a pale scheme it produced the one genuinely
-        // unreadable thing in the app: `DetailTextPrimary` resolves through `ensureReadable` and
-        // returns BLACK on a light theme, so every overlay title in the app rendered black on a
-        // near-black card while the body text beside it stayed white. Seen on the Silver theme,
-        // on the launch-recovery sheet, on the device.
-        //
-        // The rule is the one `StorefrontColors` already applies to its own glass surfaces, whose
-        // comment names this exact failure: when the text flips to the black family, the surface
-        // under it has to flip too, or only half the pair moved.
         val lightCard = DetailTextPrimary.luminance() < 0.5f
         Column(
             modifier = Modifier
@@ -109,7 +78,6 @@ fun PfpOverlayCard(
     }
 }
 
-/** The card's heading. Separate so every overlay's title is the same size and weight. */
 @Composable
 fun PfpOverlayTitle(text: String) {
     Text(
@@ -121,12 +89,6 @@ fun PfpOverlayTitle(text: String) {
     )
 }
 
-/**
- * A message with one way out, drawn in the launcher's own window.
- *
- * The read-only end of the family: "here is what happened, press A". The caller's ViewModel
- * already answers A and B for these -- they were simply unreachable behind a dialog window.
- */
 @Composable
 fun PfpMessageOverlay(
     title: String,
@@ -134,7 +96,7 @@ fun PfpMessageOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     dismissLabel: String = "Close",
-    /** True when the cursor is on the button. A one-button prompt normally leaves this true. */
+
     dismissFocused: Boolean = true,
 ) {
     PfpOverlayCard(onScrimTap = onDismiss, modifier = modifier) {

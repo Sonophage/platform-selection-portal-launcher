@@ -6,16 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The home screen's drill-out ladder, pinned as pure state.
- *
- * Three inputs unwind it — gamepad BACK, the touch Back (left-edge pull / leftward swipe) and
- * D-pad LEFT — and they used to share nothing but a hand-copied `when`. `XMBViewModel.backOutOfDrill`
- * is now the only place that acts on it, and [XMBUiState.drillOutStep] the only place that chooses;
- * these tests pin the choice, which is the half that carries the precedence.
- */
 class DrillOutLadderTest {
-
     private val root = XMBUiState()
 
     @Test fun `the category root has no level to leave`() {
@@ -24,7 +15,6 @@ class DrillOutLadderTest {
     }
 
     @Test fun `isInSubItem is exactly 'there is a rung to climb'`() {
-        // One representative of each rung — the invariant that used to be two hand-written lists.
         val drilled = listOf(
             root.copy(musicNav = MusicNav.AllMusic),
             root.copy(videoNav = VideoNav.Library("lib", "Movies")),
@@ -51,7 +41,7 @@ class DrillOutLadderTest {
             DrillOutStep.VIDEO_PLAYLIST,
             root.copy(videoNav = VideoNav.Playlist(1L, "Mix")).drillOutStep,
         )
-        // Recently Watched / Favorites / Playlists live under Collections and return there first.
+
         assertEquals(
             DrillOutStep.VIDEO_COLLECTION_CHILD,
             root.copy(videoNav = VideoNav.RecentlyWatched).drillOutStep,
@@ -67,9 +57,6 @@ class DrillOutLadderTest {
         assertEquals(DrillOutStep.PHOTO, root.copy(photoNav = PhotoNav.Albums).drillOutStep)
     }
 
-    // The Settings rung is gone: the column is one row that opens the settings screens, so there
-    // is no section flyout left to climb out of. Music is now the highest rung, and this still
-    // asserts what the removed test did -- that the ladder is ordered, not "whatever is set".
     @Test fun `a media sub-view outranks a games folder left open behind it`() {
         val state = root.copy(musicNav = MusicNav.AllMusic, selectedPlatformId = "psp")
         assertEquals(DrillOutStep.MUSIC, state.drillOutStep)

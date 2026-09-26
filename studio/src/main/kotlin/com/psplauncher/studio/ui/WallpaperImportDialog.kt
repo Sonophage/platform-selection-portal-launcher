@@ -26,10 +26,6 @@ import androidx.compose.ui.unit.sp
 import com.psplauncher.studio.PendingWallpaper
 import com.psplauncher.studio.WallpaperPreset
 
-/**
- * Crop/scale step of wallpaper import: pick a target size (PSP-native for imports, 16:9 for
- * modern handhelds, or leave the image untouched) before it lands in the theme.
- */
 @Composable
 fun WallpaperImportDialog(
     pending: PendingWallpaper,

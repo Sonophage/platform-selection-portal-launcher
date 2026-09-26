@@ -35,8 +35,6 @@ fun VideoSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Pickers: one for adding a root, one pre-pointed at the root being re-linked (re-granting
-    // after a restore/reinstall lands on the exact same folder in one tap).
     val addRootPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> uri?.let { viewModel.addRoot(it) } }
@@ -132,11 +130,6 @@ fun VideoSettingsContent(
                 )
             }
 
-            // ── Posters ───────────────────────────────────────────────────────
-            //
-            // The scanner's thumbnail is a frame grabbed out of the file, which for a film is
-            // usually a dark still of nothing. TMDB matches on the title and year the filename
-            // already carries (see MovieFileName) and gives each one its poster.
             SettingsGroup("Posters")
 
             SettingsTextFieldRow(
@@ -193,10 +186,7 @@ fun VideoSettingsContent(
         }
     }
 
-    // ── Default player picker: PSPLauncher / System Default / an installed app ──
     if (state.showPlayerPicker) {
-        // The rows and the values they set, as one list: the overlay reports an index, and an
-        // index into two lists that were built separately is how a picker sets the wrong thing.
         val choices = buildList {
             add("PSPLauncher" to "builtin")
             add("System Default" to "ask")

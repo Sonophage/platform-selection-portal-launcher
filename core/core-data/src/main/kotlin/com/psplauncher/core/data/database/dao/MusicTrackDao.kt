@@ -9,7 +9,6 @@ import androidx.room.Transaction
 import com.psplauncher.core.data.database.entity.MusicTrackEntity
 import kotlinx.coroutines.flow.Flow
 
-/** One row's recency, read back before a scan replaces it. See [MusicTrackDao.replaceForFolder]. */
 data class TrackPlayStamp(
     val id: String,
     @ColumnInfo(name = "last_played_at") val lastPlayedAt: Long?,
@@ -17,8 +16,6 @@ data class TrackPlayStamp(
 
 @Dao
 interface MusicTrackDao {
-
-    // Library-wide ordering: artist, then album, then title/displayName for a stable, musical sort.
     @Query(
         """
         SELECT * FROM music_tracks
@@ -60,17 +57,6 @@ interface MusicTrackDao {
     )
     suspend fun playStampsForFolder(folderId: String): List<TrackPlayStamp>
 
-    /**
-     * Replaces a single folder's tracks atomically; other folders are never touched.
-     *
-     * last_played_at survives the replace. This method deletes and re-inserts, and the scanner
-     * builds its rows from the filesystem, which knows nothing about what has been played — so
-     * without this the recents shelf would quietly empty itself every time a music folder was
-     * rescanned, with nothing on screen to say why. The stamp is the user's, not the scan's.
-     *
-     * Restored by id, which both scanners keep stable across scans by carrying `prior?.id`
-     * forward; a row the scan supplies a stamp for keeps its own.
-     */
     @Transaction
     suspend fun replaceForFolder(folderId: String, tracks: List<MusicTrackEntity>) {
         val stamps = playStampsForFolder(folderId).associate { it.id to it.lastPlayedAt }
@@ -80,11 +66,9 @@ interface MusicTrackDao {
         )
     }
 
-    /** Stamps a track as played now. Called when playback actually starts, not when it is queued. */
     @Query("UPDATE music_tracks SET last_played_at = :playedAt WHERE id = :id")
     suspend fun markPlayed(id: String, playedAt: Long)
 
-    /** Drops the track off the recents shelf without touching anything else about it. */
     @Query("UPDATE music_tracks SET last_played_at = NULL WHERE id = :id")
     suspend fun clearLastPlayed(id: String)
 
@@ -94,17 +78,6 @@ interface MusicTrackDao {
     )
     fun observeRecentlyPlayed(limit: Int): Flow<List<MusicTrackEntity>>
 
-    /**
-     * The newest album covers in this library, newest first — for the XMB's card art grids.
-     *
-     * A LIMIT query returning only the URIs, not the rows. The grids need four per card and the
-     * media columns slice one pool across their rows, so this is tens of strings; streaming every
-     * track or photo to read one column off each would be thousands of rows for a handful of
-     * thumbnails.
-     *
-     * Newest is highest id, the same proxy the games grid uses: these tables have no added-at
-     * column either, and rows are inserted in scan order.
-     */
     @Query(
         """
         SELECT art_uri FROM music_tracks

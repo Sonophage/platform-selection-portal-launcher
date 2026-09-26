@@ -10,16 +10,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Pins the bundled-default seam (docs/plans/README.md (C10)): every playable event
- * falls back to a bundled sample, Navigation's three events share one slot and one sample, boot
- * audio's default resolves to a URI ExoPlayer can open, and the presentation rule that a custom
- * boot video keeps its own audio track unless the user explicitly assigned a boot sound.
- */
 class UiMediaDefaultsTest {
-
-    // ── the plan's drift test: events → surviving slots → bundled defaults ───
-
     @Test fun `every menu sound resolves to a slot that still exists with a bundled default`() {
         for (sound in MenuSound.entries) {
             val slot = sound.slot
@@ -35,17 +26,12 @@ class UiMediaDefaultsTest {
     }
 
     @Test fun `the three movement events each have their own slot`() {
-        // Separately ASSIGNABLE is the point. They were one slot, so a user who wanted a
-        // different note when something opens could not have one.
         assertEquals(UiMediaSlot.SOUND_SCROLL, MenuSound.SCROLL.slot)
         assertEquals(UiMediaSlot.SOUND_SELECT, MenuSound.SELECT.slot)
         assertEquals(UiMediaSlot.SOUND_SYSTEM_BROWSE, MenuSound.SYSTEM_BROWSE.slot)
     }
 
     @Test fun `but all three still sound the same out of the box`() {
-        // The split is code; the sounds are an ear's job. Until someone assigns one of the two
-        // new rows the app must sound exactly as it did, or the split becomes a regression for
-        // everyone who did not ask for it.
         val cursor = UiMediaSlot.SOUND_SCROLL.bundledDefaultRes()
         assertNotNull(cursor, "the movement default must exist")
         assertEquals(cursor, UiMediaSlot.SOUND_SELECT.bundledDefaultRes())
@@ -60,8 +46,6 @@ class UiMediaDefaultsTest {
         assertEquals(UiMediaSlot.SOUND_NOTIFICATION, MenuSound.NOTIFICATION.slot)
     }
 
-    // ── per-slot bundled defaults ─────────────────────────────────────────────
-
     @Test fun `sound slots and boot audio map to the seven bundled samples`() {
         assertEquals(R.raw.sfx_cursor, UiMediaSlot.SOUND_SCROLL.bundledDefaultRes())
         assertEquals(R.raw.sfx_back, UiMediaSlot.SOUND_BACK.bundledDefaultRes())
@@ -73,22 +57,17 @@ class UiMediaDefaultsTest {
     }
 
     @Test fun `the gameboot sound slot defaults to the sample the sequence is timed to`() {
-        // GAMEBOOT_AUDIO's default and gameBootDefaultAudioUri must name the SAME sample: the
-        // built-in sequence's timeline is beat-matched to sfx_launch, so a row that auditioned
-        // one sound while the sequence played another would be a lie you could hear.
         assertEquals(R.raw.sfx_launch, UiMediaSlot.GAMEBOOT_AUDIO.bundledDefaultRes())
         assertEquals(
             gameBootDefaultAudioUri("com.psplauncher.launcher"),
             UiMediaSlot.GAMEBOOT_AUDIO.bundledDefaultUri("com.psplauncher.launcher"),
         )
-        // The clip stays what it always was: nothing bundled, and none should be added.
+
         assertNull(UiMediaSlot.GAMEBOOT_VIDEO.bundledDefaultRes())
         assertNull(UiMediaSlot.GAMEBOOT_VIDEO.bundledDefaultUri("com.psplauncher.launcher"))
     }
 
     @Test fun `the launch disc opener ships silent`() {
-        // The switch to an assignable cue must not put a sound into a ceremony that never had
-        // one: no bundled sample means the disc opens exactly as it did before the slot existed.
         assertNull(UiMediaSlot.LAUNCH_DISC_AUDIO.bundledDefaultRes())
         assertNull(UiMediaSlot.LAUNCH_DISC_AUDIO.bundledDefaultUri("com.psplauncher.launcher"))
     }
@@ -107,7 +86,6 @@ class UiMediaDefaultsTest {
     }
 
     @Test fun `bundled default resolves to an android resource uri`() {
-        // The numeric resource-id form: ExoPlayer's RawResourceDataSource opens it directly.
         val uri = assertNotNull(UiMediaSlot.BOOT_AUDIO.bundledDefaultUri("com.psplauncher.launcher"))
         assertTrue(
             uri.startsWith("android.resource://com.psplauncher.launcher/"),
@@ -116,16 +94,12 @@ class UiMediaDefaultsTest {
         assertNull(UiMediaSlot.BOOT_VIDEO.bundledDefaultUri("com.psplauncher.launcher"))
     }
 
-    // ── boot presentation resolution ─────────────────────────────────────────
-
     @Test fun `custom boot audio always wins over both the bundled default and the clip`() {
         assertEquals("/custom.wav", resolveBootAudio("/video.mp4", "/custom.wav", "/bundled"))
         assertEquals("/custom.wav", resolveBootAudio(null, "/custom.wav", "/bundled"))
     }
 
     @Test fun `custom video with no custom boot audio keeps its own track`() {
-        // Do NOT fall back to the bundled chime here: every custom boot video would play muted
-        // under the PFP opening. Silence means the clip's own audio.
         assertNull(resolveBootAudio("/video.mp4", null, "/bundled"))
     }
 
@@ -133,12 +107,7 @@ class UiMediaDefaultsTest {
         assertEquals("/bundled", resolveBootAudio(null, null, "/bundled"))
     }
 
-    // ── GameBoot presentation resolution ─────────────────────────────────────
-
     @Test fun `a custom gameboot clip keeps its own track`() {
-        // Do NOT play anything under someone's clip: it would score their video with audio they
-        // never asked for. Null means "the clip's own track" — and it wins over an assigned
-        // GameBoot sound too, because replacing the presentation replaces all of it.
         assertNull(resolveGameBootAudio("/video.mp4", null, "/bundled"))
         assertNull(resolveGameBootAudio("/video.mp4", "/mine.mp3", "/bundled"))
     }
@@ -148,7 +117,6 @@ class UiMediaDefaultsTest {
     }
 
     @Test fun `an assigned gameboot sound wins over the bundled one`() {
-        // The case the slot came back for: keep the built-in disc, change what it sounds like.
         assertEquals("/mine.mp3", resolveGameBootAudio(null, "/mine.mp3", "/bundled"))
     }
 }

@@ -6,19 +6,7 @@ import com.psplauncher.feature.artwork.api.SteamAppDetails
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * `ProviderCapabilities` declares which providers return text. `MetadataApply.presetsFrom` decides
- * which ones the Update Metadata screen can actually offer. Those are two answers to one question
- * and only one of them was ever checked.
- *
- * They drifted the moment Steam was wired in: the capability table already said
- * `suppliesMetadata = true`, presetsFrom still built from ScreenScraper alone, and the screen
- * answered "No source recognised this game" about a game Steam had just returned a full store
- * record for. Nothing failed — not a test, not a log line. It was found by pressing the button.
- */
 class MetadataPresetCoverageTest {
-
-    /** One filled candidate set per provider that claims to supply metadata. */
     private fun candidatesAnsweredBy(provider: MatchProvider): MetadataCandidates {
         val base = MetadataCandidates(
             gameEntity = null,
@@ -57,8 +45,7 @@ class MetadataPresetCoverageTest {
                     description = "Winter is coming.",
                 ),
             )
-            // A provider that claims suppliesMetadata but has no arm here will fail the test
-            // below with its own name, which is the point.
+
             else -> base
         }
     }
@@ -80,8 +67,6 @@ class MetadataPresetCoverageTest {
 
     @Test
     fun `a provider that supplies no text is never offered a preset`() {
-        // The other direction. SteamGridDB and IGDB are artwork-only, and an empty preset row in
-        // the picker is a source the user can select that then changes nothing.
         val artworkOnly = MatchProvider.entries - ProviderCapabilities.metadataProviders.toSet()
         val offered = artworkOnly.filter { provider ->
             MetadataApply.presetsFrom(candidatesAnsweredBy(provider))
@@ -93,8 +78,6 @@ class MetadataPresetCoverageTest {
 
     @Test
     fun `Steam's preset carries the fields its store record actually has`() {
-        // Not a field count: the point is that the description and the developer — the two the
-        // Windows library is missing and the reason this provider exists — come through.
         val preset = MetadataApply.presetsFrom(candidatesAnsweredBy(MatchProvider.STEAM_STORE))
             .single { it.provider == MatchProvider.STEAM_STORE }
 

@@ -14,7 +14,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** One launcher shortcut published by a host app (e.g. a GameHub PC, a Winlator container). */
 data class HarvestedShortcut(
     val hostPackage: String,
     val shortcutId: String,
@@ -24,18 +23,11 @@ data class HarvestedShortcut(
 
 sealed interface ShortcutHarvestResult {
     data class Success(val shortcuts: List<HarvestedShortcut>) : ShortcutHarvestResult
-    // LauncherApps.getShortcuts() only works for the active Home app.
+
     object NotDefaultLauncher : ShortcutHarvestResult
     data class Error(val message: String) : ShortcutHarvestResult
 }
 
-/**
- * Reads per-game launcher shortcuts published by other apps via [LauncherApps], and launches them.
- *
- * This is the supported way to surface another app's individual items (GameHub/Moonlight PCs,
- * Lime3DS recent games, etc.) inside PFP. It requires PFP to be the **active default launcher** —
- * the OS rejects [LauncherApps.getShortcuts] from a non-home app with a SecurityException.
- */
 @Singleton
 class LauncherShortcutRepository @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -43,10 +35,6 @@ class LauncherShortcutRepository @Inject constructor(
     private val launcherApps =
         context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
 
-    // No SDK check: RoleManager arrived in Q and this app's minSdk IS Q, so the guard was a
-    // condition that could not be false guarding a branch that could not run. The resolveActivity
-    // fallback stays — it is reached when the device has no HOME role, which is a real device and
-    // not an old one.
     fun isDefaultLauncher(): Boolean = runCatching {
         val rm = context.getSystemService(RoleManager::class.java)
         if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) {
@@ -56,11 +44,6 @@ class LauncherShortcutRepository @Inject constructor(
         context.packageManager.resolveActivity(home, 0)?.activityInfo?.packageName == context.packageName
     }.getOrDefault(false)
 
-    /**
-     * Intent that lets the user make PFP the Home app: the system role request (`ROLE_HOME`),
-     * falling back to the Home settings screen where the role is not available. Being Home is what
-     * unlocks [harvest] and modern pin-shortcut capture — it is optional.
-     */
     fun homeRoleRequestIntent(): Intent {
         val rm = context.getSystemService(RoleManager::class.java)
         if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) {

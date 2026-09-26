@@ -6,27 +6,20 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Resolves disc-based game formats where multiple files represent one game.
-//
-// .cue + .bin(s) → disc game; folder hint picks platform (psx/saturn/pcengine),
-//                  falls back to "psx" since .cue is most common for PS1
-// .bin alone      → folder hint picks platform, falls back to "megadrive"
-// .chd / .img     → flagged for caller to resolve via folder hint or user input
 @Singleton
 class DiscImageResolver @Inject constructor(
     private val folderHintResolver: PlatformFolderHintResolver,
 ) {
-
     data class ResolvedDisc(
         val launchFile: File,
         val platformId: String,
-        val suppressedFiles: Set<File>, // companion files that must not be counted separately
+        val suppressedFiles: Set<File>,
     )
 
     data class FolderResolution(
         val resolvedDiscs: List<ResolvedDisc>,
-        val suppressedPaths: Set<String>,       // absolute paths — scanner skips these
-        val requiresUserAssignment: List<File>, // .chd/.img with no context
+        val suppressedPaths: Set<String>,
+        val requiresUserAssignment: List<File>,
     )
 
     fun resolveFolder(folder: File): FolderResolution {
@@ -47,7 +40,6 @@ class DiscImageResolver @Inject constructor(
             val chdFiles = siblings.filter { it.extension.lowercase() == "chd" }
             val imgFiles = siblings.filter { it.extension.lowercase() == "img" }
 
-            // ── .cue + .bin → disc game; platform from folder hint ────────
             for (cueFile in cueFiles) {
                 val companionBins = findCompanionBins(cueFile, binFiles)
                 val platformId = folderHintResolver.detectFromPath(cueFile.absolutePath) ?: "psx"
@@ -60,7 +52,6 @@ class DiscImageResolver @Inject constructor(
                     )
                 )
 
-                // All companion .bin files are suppressed — they are not games
                 companionBins.forEach { suppressedPaths.add(it.absolutePath) }
 
                 Timber.d(
@@ -69,10 +60,6 @@ class DiscImageResolver @Inject constructor(
                 )
             }
 
-            // ── Dreamcast .gdi → referenced track files suppressed ────────
-            // A .gdi references trackNN.bin/.raw files that are parts of one disc, never games in
-            // their own right. Suppressed by content (the sheet's track list), so a user-edited
-            // extension list that includes bin/raw still produces one row per .gdi.
             for (gdiFile in siblings.filter { it.extension.lowercase() == "gdi" }) {
                 val trackNames = gdiSheetTrackNames(readLinesOrEmpty(gdiFile))
                 val trackFiles = siblings.filter { it.name.lowercase() in trackNames }
@@ -82,14 +69,13 @@ class DiscImageResolver @Inject constructor(
                 }
             }
 
-            // ── Orphan .bin (no sibling .cue) → Mega Drive ──────────────
             val claimedBins = resolvedDiscs
                 .flatMap { it.suppressedFiles }
                 .map { it.absolutePath }
                 .toSet()
 
             for (binFile in binFiles) {
-                if (binFile.absolutePath in claimedBins) continue // already handled above
+                if (binFile.absolutePath in claimedBins) continue
 
                 val hasCueSibling = cueFiles.any { cue ->
                     cue.parentFile?.absolutePath == binFile.parentFile?.absolutePath
@@ -108,15 +94,11 @@ class DiscImageResolver @Inject constructor(
                 }
             }
 
-            // ── .chd → platform unknown, needs user assignment ────────────
-            // .chd is a compressed disc format used by PS1, PS2, Saturn, GC, Wii
-            // We cannot reliably detect platform without reading the disc header
             for (chdFile in chdFiles) {
                 requiresAssignment.add(chdFile)
                 Timber.d(".chd flagged for user platform assignment: ${chdFile.name}")
             }
 
-            // ── .img alone → platform unknown ────────────────────────────
             for (imgFile in imgFiles) {
                 requiresAssignment.add(imgFile)
                 Timber.d(".img flagged for user platform assignment: ${imgFile.name}")
@@ -130,19 +112,12 @@ class DiscImageResolver @Inject constructor(
         )
     }
 
-    /**
-     * Finds .bin files that belong to a given .cue by reading the CUE sheet's
-     * FILE references. Falls back to name-matching if the CUE is unreadable.
-     */
     private fun findCompanionBins(cueFile: File, candidates: List<File>): List<File> {
         val referencedNames = parseCueFileReferences(cueFile)
 
         return if (referencedNames.isNotEmpty()) {
-            // Authoritative: use what the .cue sheet declares (names are normalised lowercase)
             candidates.filter { it.name.lowercase() in referencedNames }
         } else {
-            // Fallback: same directory, same base name, different track suffix
-            // e.g. "Game (Track 1).bin", "Game (Track 2).bin" → all belong to "Game.cue"
             val cueBaseName = cueFile.nameWithoutExtension.lowercase()
             candidates.filter { bin ->
                 bin.parentFile?.absolutePath == cueFile.parentFile?.absolutePath &&
@@ -155,10 +130,6 @@ class DiscImageResolver @Inject constructor(
         }
     }
 
-    /**
-     * Reads the CUE sheet and extracts all FILE references (shared [cueSheetReferences] parser).
-     * CUE format: FILE "filename.bin" BINARY
-     */
     private fun parseCueFileReferences(cueFile: File): Set<String> {
         return try {
             cueSheetReferences(cueFile.readLines())

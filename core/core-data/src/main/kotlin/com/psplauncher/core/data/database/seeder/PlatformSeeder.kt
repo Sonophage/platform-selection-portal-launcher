@@ -6,9 +6,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Seeds built-in platform definitions on first launch.
-// Uses INSERT OR IGNORE so re-runs are safe and never overwrite user customizations.
-// Platform IDs follow EmulationStation DE canonical folder names where practical.
 @Singleton
 class PlatformSeeder @Inject constructor(
     private val platformDao: PlatformDao,
@@ -19,10 +16,8 @@ class PlatformSeeder @Inject constructor(
     }
 
     companion object {
-        // Public so the shared artwork dimension policy can be proven to cover every seeded platform.
         val DEFAULT_PLATFORMS = listOf(
 
-            // ── Sony ───────────────────────────────────────────────────────
             PlatformEntity(
                 id            = "psx",
                 name          = "PlayStation",
@@ -64,7 +59,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "vpk",
             ),
 
-            // ── Nintendo ───────────────────────────────────────────────────
             PlatformEntity(
                 id            = "nes",
                 name          = "Nintendo Entertainment System",
@@ -170,7 +164,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "vb,vboy,zip",
             ),
 
-            // ── Sega ───────────────────────────────────────────────────────
             PlatformEntity(
                 id            = "megadrive",
                 name          = "Sega Mega Drive / Genesis",
@@ -228,7 +221,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "32x,bin,md,zip",
             ),
 
-            // ── Atari ──────────────────────────────────────────────────────
             PlatformEntity(
                 id            = "atari2600",
                 name          = "Atari 2600",
@@ -262,7 +254,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "lnx,lyx,zip",
             ),
 
-            // ── NEC ────────────────────────────────────────────────────────
             PlatformEntity(
                 id            = "pcengine",
                 name          = "PC Engine / TurboGrafx-16",
@@ -272,7 +263,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "pce,sgx,cue,chd,m3u,zip",
             ),
 
-            // ── SNK ────────────────────────────────────────────────────────
             PlatformEntity(
                 id            = "neogeo",
                 name          = "Neo Geo",
@@ -290,7 +280,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "ngp,ngc,npc,zip",
             ),
 
-            // ── Bandai ─────────────────────────────────────────────────────
             PlatformEntity(
                 id            = "wonderswan",
                 name          = "WonderSwan",
@@ -308,7 +297,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "wsc,bin,zip",
             ),
 
-            // ── Commodore ──────────────────────────────────────────────────
             PlatformEntity(
                 id            = "c64",
                 name          = "Commodore 64",
@@ -318,7 +306,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "d64,g64,t64,tap,prg,crt,d81,zip",
             ),
 
-            // ── Arcade ─────────────────────────────────────────────────────
             PlatformEntity(
                 id            = "mame",
                 name          = "Arcade (MAME)",
@@ -328,7 +315,6 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "zip,7z,neo",
             ),
 
-            // ── Capcom Play System — split out from generic Arcade/MAME ─────
             PlatformEntity(
                 id            = "cps1",
                 name          = "Capcom Play System",
@@ -354,12 +340,11 @@ class PlatformSeeder @Inject constructor(
                 romExtensions = "zip,7z,chd",
             ),
 
-            // ── Microsoft ──────────────────────────────────────────────────
             PlatformEntity(
                 id            = "xbox",
                 name          = "Xbox",
                 shortName     = "Xbox",
-                // No dedicated original-Xbox art yet; shares the Xbox 360 icon.
+
                 iconRes       = "ic_platform_xbox360",
                 accentColor   = 0xFF107C10L,
                 romExtensions = "iso,xiso",
@@ -375,7 +360,6 @@ class PlatformSeeder @Inject constructor(
                 preferredEmulatorPackage = "emu.x360.mobile",
             ),
 
-            // ── Windows / Android ──────────────────────────────────────────
             PlatformEntity(
                 id            = "windows",
                 name          = "Windows Games",

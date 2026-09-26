@@ -10,7 +10,7 @@ import com.psplauncher.core.domain.model.Platform
 @Entity(tableName = "platforms")
 data class PlatformEntity(
     @PrimaryKey
-    val id: String,                         // e.g. "ps2", "gba" — never auto-generated
+    val id: String,
 
     val name: String,
 
@@ -32,7 +32,6 @@ data class PlatformEntity(
     @ColumnInfo(name = "preferred_emulator_package")
     val preferredEmulatorPackage: String? = null,
 
-    // Comma-separated — kept simple, TypeConverter not needed for display only
     @ColumnInfo(name = "rom_extensions")
     val romExtensions: String = "",
 )

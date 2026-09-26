@@ -14,34 +14,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
-/**
- * Converts a user-picked official PSP theme (`.ptf`) into this launcher's theme values:
- * wallpaper + derived accent color (docs/ptf-import-plan.md). Icons stay ours.
- *
- * The converted theme is saved into the [PfpThemeStore] library (so it can be re-applied
- * or removed later) and applied immediately.
- *
- * Personal-use conversion: reads the user's own file via SAF, extracts only the wallpaper
- * and a color derived from it. Nothing is redistributed.
- */
 @Singleton
 class PtfThemeImporter @Inject constructor(
     @ApplicationContext private val context: Context,
     private val store: PfpThemeStore,
 ) {
-
     sealed interface Result {
-        /** Imported, saved to the library, and applied. */
         data class Success(val themeName: String, val accentArgb: Long?) : Result
 
-        /** The file is a CXMB `.ctf` — a full flash0 replacement we deliberately don't support. */
         data object CxmbNotSupported : Result
 
         data class Failed(val reason: String) : Result
     }
 
     suspend fun import(uri: Uri): Result = withContext(Dispatchers.IO) {
-        // Capped read: a mispicked multi-GB file fails fast instead of OOMing the app.
         val bytes = runCatching {
             context.contentResolver.openInputStream(uri)?.use { with(SafeMedia) { it.readCapped() } }
         }.getOrNull() ?: return@withContext Result.Failed("Could not read the file (or it is too large)")
@@ -52,9 +38,6 @@ class PtfThemeImporter @Inject constructor(
             PtfParser.Kind.OFFICIAL_PTF -> Unit
         }
 
-        // parse() is bounds-checked now (see ByteCursor), but it runs on bytes chosen by whoever
-        // handed the user the file, and this call sits behind a plain viewModelScope launch — an
-        // escaping throwable would take the app down rather than fail the import.
         val theme = runCatching { PtfParser.parse(bytes) }
             .onFailure { Timber.w(it, "PTF parse threw on a malformed theme") }
             .getOrNull()
@@ -85,7 +68,6 @@ class PtfThemeImporter @Inject constructor(
         Result.Success(themeName = name, accentArgb = accent)
     }
 
-    /** Removes the imported accent so the preset color scheme applies again. */
     suspend fun clearAccentOverride() {
         context.pfpDataStore.edit { it.remove(KEY_ACCENT_OVERRIDE) }
     }

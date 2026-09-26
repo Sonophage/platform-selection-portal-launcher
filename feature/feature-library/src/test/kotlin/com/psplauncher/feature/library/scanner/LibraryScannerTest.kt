@@ -24,12 +24,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
 
-/**
- * Verification obligations from docs/adr/0001-library-scanner-owns-rom-survey.md.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryScannerTest {
-
     private lateinit var gameRepository: GameRepository
     private lateinit var memoryCardRepository: MemoryCardRepository
     private lateinit var reconciler: LibraryReconciler
@@ -67,9 +63,9 @@ class LibraryScannerTest {
         memoryCardRepository = mockk(relaxed = true)
         reconciler = mockk(relaxed = true)
         scanSourceResolver = mockk(relaxed = true)
-        // The real builder: the reconciliation under test derives over existing + new rows.
+
         discSetBuilder = DiscSetBuilder()
-        // The readers are context-backed (SAF URIs) — mocked; the builder's caller seams stay real.
+
         m3uPlaylistReader = mockk(relaxed = true)
         discRegionReader = mockk(relaxed = true)
 
@@ -80,8 +76,6 @@ class LibraryScannerTest {
             LibraryReconciler.Result(markedSeen = 0, markedMissing = 0, skipped = false)
     }
 
-    // A TestDispatcher needs a live TestScheduler from the runTest coroutine, so the scanner is
-    // built per-test (inside runTest) rather than in setUp().
     private fun TestScope.scannerFor(
         gameRepository: GameRepository = this@LibraryScannerTest.gameRepository,
     ) = LibraryScanner(
@@ -90,8 +84,7 @@ class LibraryScannerTest {
         scanSourceResolver,
         ExistingRomPathResolver(gameRepository),
         reconciler,
-        // Real reconciler over the real builder + mocked reader, so the integration test drives
-        // the actual union derivation while playlist reads stay context-free.
+
         DiscSetReconciler(discSetBuilder, m3uPlaylistReader, discRegionReader, gameRepository),
         ioDispatcher = StandardTestDispatcher(testScheduler),
         menuSound = io.mockk.mockk(relaxed = true),
@@ -252,9 +245,6 @@ class LibraryScannerTest {
 
     @Test
     fun `a later scan adding disc 3 re-derives the existing m3u set`() = runTest {
-        // Incremental rescan (plan follow-up): the m3u and discs 1-2 are already in the library
-        // with the m3u's set key; disc 3 arrives with the single-pass stale enrichment (its own
-        // folder set). The scanner must re-derive the union and upsert the corrected disc 3.
         val scanner = scannerFor()
         val m3uKey = "psx\u0001/roms/psx\u0001Final Fantasy VII"
         val existing = listOf(

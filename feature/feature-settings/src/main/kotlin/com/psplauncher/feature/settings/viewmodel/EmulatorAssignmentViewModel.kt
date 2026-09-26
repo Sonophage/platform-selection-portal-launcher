@@ -23,51 +23,41 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Platforms whose "games" launch through packages/PC launchers, never an emulator profile. */
 private val NON_EMULATOR_PLATFORMS = setOf("android", "windows")
 
 private const val MEMORY_CARD_SUFFIX = " Memory Card"
 
-// ── Screen models ─────────────────────────────────────────────────────────────
-
-/** One selectable emulator inside a platform's assignment detail. */
 data class PlatformEmulatorCandidate(
     val profile: EmulatorProfile,
-    /** True when this is the catalog's first pick (standalone before RetroArch cores). */
+
     val isRecommended: Boolean,
-    /** True when this is the emulator games currently resolve to. */
+
     val isDefault: Boolean,
 )
 
-/**
- * One platform row on the assignment screen: what its games resolve to today, how many games it
- * covers, and how many of those carry a per-game override (the classic "why does only THIS game
- * launch wrong" — overrides are invisible from the platform level until they are counted).
- */
 data class PlatformAssignRow(
     val platformId: String,
     val platformName: String,
     val gameCount: Int,
     val overrideCount: Int,
-    /** The memory-card level's stored emulator id/package, if any (the user-set console default). */
+
     val storedDefaultId: String? = null,
-    /** Display name of [storedDefaultId] even when that profile is no longer installed. */
+
     val storedDefaultName: String? = null,
-    /** Platform record's preferred emulator, if any (usually null — set by restore/seed). */
+
     val platformDefaultId: String? = null,
-    /** The emulator games would launch with (full ladder, no per-game override), if resolvable. */
+
     val resolvedProfile: EmulatorProfile? = null,
     val resolvedCoreName: String? = null,
-    /** True when the resolved RetroArch profile maps no core for this platform. */
+
     val isMissingCore: Boolean = false,
-    /** Which ladder level decided [resolvedProfile]; null when nothing resolved. */
+
     val source: LaunchSource? = null,
-    /** Installed emulators that can run this platform, preference-ordered. */
+
     val candidates: List<PlatformEmulatorCandidate> = emptyList(),
 ) {
     val resolvedProfileName: String? get() = resolvedProfile?.name
 
-    /** True when the default currently resolves automatically (no stored card/platform choice). */
     val isAutomatic: Boolean get() = source == LaunchSource.CATALOG_DEFAULT
 
     val defaultDisplayName: String?
@@ -79,7 +69,7 @@ data class PlatformAssignRow(
 data class EmulatorAssignmentUiState(
     val platforms: List<PlatformAssignRow> = emptyList(),
     val detailPlatformId: String? = null,
-    /** Row to restore focus to when returning from a platform's detail. */
+
     val returnFocusKey: String? = null,
     val confirmClearPlatformId: String? = null,
     val message: String? = null,
@@ -96,13 +86,10 @@ class EmulatorAssignmentViewModel @Inject constructor(
     private val profileRepository: EmulatorProfileRepository,
     private val autoCoreMemory: AutoCoreMemory,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(EmulatorAssignmentUiState())
     val uiState: StateFlow<EmulatorAssignmentUiState> = _uiState.asStateFlow()
 
     init {
-        // Reactive like the rest of Settings: cards/games/platforms/profile-set changes anywhere
-        // (a restore, an auto-config pass, a Game Detail override pick) re-derive the rows.
         viewModelScope.launch {
             combine(
                 memoryCardRepository.observeAll(),
@@ -117,8 +104,6 @@ class EmulatorAssignmentViewModel @Inject constructor(
         }
     }
 
-    // ── Navigation ─────────────────────────────────────────────────────────────
-
     fun openDetail(platformId: String) = _uiState.update {
         it.copy(detailPlatformId = platformId, returnFocusKey = platformId, confirmClearPlatformId = null, message = null)
     }
@@ -127,7 +112,6 @@ class EmulatorAssignmentViewModel @Inject constructor(
         it.copy(detailPlatformId = null, confirmClearPlatformId = null)
     }
 
-    /** Returns true when the back press was consumed (detail → list). */
     fun onBack(): Boolean {
         if (_uiState.value.detailPlatformId == null) return false
         closeDetail()
@@ -135,13 +119,6 @@ class EmulatorAssignmentViewModel @Inject constructor(
     }
 
     fun dismissMessage() = _uiState.update { it.copy(message = null) }
-
-    // ── Default assignment ────────────────────────────────────────────────────
-    //
-    // Writing the memory-card emulator is the per-system default PFP already edits everywhere
-    // else (Library Manager's console Emulator row): it wins over the platform record's
-    // preferred package and over the catalog fallback, so "set default" here takes effect for
-    // every game on the console that has no per-game override.
 
     fun selectDefault(platformId: String, profileId: String) {
         val row = _uiState.value.platforms.firstOrNull { it.platformId == platformId } ?: return
@@ -155,7 +132,6 @@ class EmulatorAssignmentViewModel @Inject constructor(
         }
     }
 
-    /** Clears the stored console default so games follow the automatic (catalog) pick again. */
     fun useAutomaticDefault(platformId: String) {
         val row = _uiState.value.platforms.firstOrNull { it.platformId == platformId } ?: return
         viewModelScope.launch {
@@ -165,9 +141,6 @@ class EmulatorAssignmentViewModel @Inject constructor(
             }
         }
     }
-
-    // ── Per-game override bulk clear ──────────────────────────────────────────
-    // Destructive to user configuration, so it is always confirmed and scoped to ONE platform.
 
     fun requestClearOverrides() {
         val platformId = _uiState.value.detailPlatformId ?: return
@@ -191,19 +164,14 @@ class EmulatorAssignmentViewModel @Inject constructor(
         }
     }
 
-    // ── Row derivation ────────────────────────────────────────────────────────
-
     private suspend fun buildRows(
         cards: List<MemoryCard>,
         platforms: List<com.psplauncher.core.data.database.entity.PlatformEntity>,
         games: List<com.psplauncher.core.domain.model.Game>,
         allProfiles: List<EmulatorProfile>,
     ): List<PlatformAssignRow> {
-        // The console's remembered RetroArch core per platform, read once for the whole pass.
         val rememberedCores = autoCoreMemory.rememberedIds()
-        // The pool the ladder resolves against must match Game Detail exactly, so the attribution
-        // here can never disagree with a launch. profiles flow still supplies names for stored
-        // defaults whose profile is currently uninstalled.
+
         val installed = profileRepository.getInstalledProfiles()
         val namesById = allProfiles.associate { it.id to it.name }
         val namesByPackage = allProfiles.associate { it.packageName to it.name }
@@ -223,8 +191,7 @@ class EmulatorAssignmentViewModel @Inject constructor(
 
                 val installedForPlatform =
                     installed.filter { it.isAvailable && it.supportsPlatform(platformId) }
-                // Same stabilization as a launch: the console's remembered core leads the core
-                // tier, so this screen can never disagree with what actually launches.
+
                 val platformProfiles =
                     installedForPlatform.byLaunchPreference().stabilizeCore(rememberedCores[platformId])
                 val stored = card?.emulatorId?.takeIf { it.isNotBlank() }

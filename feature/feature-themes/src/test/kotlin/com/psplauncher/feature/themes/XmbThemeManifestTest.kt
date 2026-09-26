@@ -4,13 +4,9 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.*
 import org.junit.Test
 
-// encodeDefaults is on so the snake_case key assertions below see every field even when it holds
-// its default value — kotlinx.serialization omits default-valued fields otherwise, which made the
-// all-defaults wave_color/accent_color/text_color/has_background assertions fail.
 private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
 class XmbThemeManifestTest {
-
     @Test
     fun `round-trip serialization preserves all fields`() {
         val original = XmbThemeManifest(
@@ -99,7 +95,6 @@ class XmbThemeManifestTest {
 }
 
 class ParseHexColorTest {
-
     @Test
     fun `6-char hex with hash parses as opaque ARGB`() {
         assertEquals(0xFF0055AAL, parseHexColor("#0055AA"))

@@ -12,7 +12,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ImageCodecsTest {
-
     @Test
     fun `bmp image pixels survive the png round trip`() {
         val bmp = BmpImage(4, 2, intArrayOf(
@@ -52,7 +51,7 @@ class ImageCodecsTest {
             val kept = assertNotNull(ImageCodecs.normalizeIconPng(smallFile, sizePx = 256))
             val keptImage = assertNotNull(ImageIO.read(kept.inputStream()))
             assertEquals(64, keptImage.width)
-            // JPEG/RGB sources re-encode with an alpha channel so silhouettes stay tintable.
+
             assertTrue(keptImage.colorModel.hasAlpha())
 
             val junk = File(dir, "junk.png").apply { writeBytes(ByteArray(16) { 9 }) }

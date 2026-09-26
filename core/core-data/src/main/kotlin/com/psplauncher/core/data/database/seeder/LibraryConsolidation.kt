@@ -22,10 +22,6 @@ private val KEY_LIBRARY_CONSOLIDATED_V22 = booleanPreferencesKey("library_consol
 
 private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
 
-// GameHub-family spoof packages: these are the genuine package names of real apps (AnTuTu, PUBG
-// Mobile, Genshin Impact, CrossFire) that GameHub Lite / BannerHub variants masquerade as. Rows
-// under them are only re-homed when the *installed* app's label proves it's actually a launcher —
-// SQL migration can't do that check, so it happens here.
 private val SPOOF_PACKAGES = setOf(
     "com.antutu.ABenchMark",
     "com.antutu.benchmark.full",
@@ -35,27 +31,11 @@ private val SPOOF_PACKAGES = setOf(
     "com.tencent.tmgp.cf",
 )
 
-// Auto-created import collections (named after the source launcher). Removed when every member
-// migrated to the Windows card; a collection the user added other items to survives.
 private val LAUNCHER_COLLECTION_NAMES = setOf(
     "Winlator", "GameHub Lite", "BannerHub", "GameNative", "GameHub",
 )
 private const val PC_COLLECTION_ICON = "ic_desktop"
 
-/**
- * One-shot follow-up to [PFPDatabase.MIGRATION_21_22][com.psplauncher.core.data.database.PFPDatabase]:
- * the parts of the Windows-card consolidation that need application logic (label checks,
- * best-row scoring) rather than SQL. Idempotent and guarded by a DataStore flag; nothing here
- * deletes user data except exact-duplicate rows whose every attribute is preserved on the survivor.
- *
- *  1. Re-home spoof-package PC entries once the installed app's label confirms a GameHub-family
- *     launcher (see [SPOOF_PACKAGES]).
- *  2. Merge duplicate Windows games — same package + same normalized title — created by the old
- *     per-path dedupe keys (shortcut id vs intent URI never saw each other).
- *  3. Ensure the Windows Games Memory Card exists (enabled, virtual — no ROM directory) when any
- *     Windows games exist.
- *  4. Remove auto-created launcher collections whose members all live in the Windows card now.
- */
 @Singleton
 class LibraryConsolidation @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -78,14 +58,12 @@ class LibraryConsolidation @Inject constructor(
         Timber.i("Library consolidation (v22) complete")
     }
 
-    // ── 1. Spoof-package re-home ──────────────────────────────────────────────
-
     private suspend fun rehomeSpoofPackageEntries() {
         val pm = context.packageManager
         val launcherSpoofs = SPOOF_PACKAGES.filter { pkg ->
             val label = runCatching {
                 pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
-            }.getOrNull() ?: return@filter false   // not installed — leave its rows untouched
+            }.getOrNull() ?: return@filter false
             label.contains("gamehub", ignoreCase = true) ||
                 label.contains("bannerhub", ignoreCase = true) ||
                 label.contains("banner hub", ignoreCase = true)
@@ -107,8 +85,6 @@ class LibraryConsolidation @Inject constructor(
         }
         if (rehomed > 0) Timber.i("Re-homed $rehomed spoof-package PC entr(ies) to Windows")
     }
-
-    // ── 2. Duplicate merge ────────────────────────────────────────────────────
 
     private suspend fun mergeDuplicateWindowsGames() {
         val games = gameDao.getByPlatformOnce(WINDOWS_PLATFORM_ID)
@@ -135,9 +111,7 @@ class LibraryConsolidation @Inject constructor(
         if (merged > 0) Timber.i("Merged $merged duplicate Windows game row(s)")
     }
 
-    /** Moves everything worth keeping from [loser] onto [survivor] before the loser is deleted. */
     private suspend fun mergeInto(survivor: GameEntity, loser: GameEntity) {
-        // Union of attributes: keep the survivor's value when set, adopt the loser's otherwise.
         val enriched = survivor.copy(
             launchShortcutId  = survivor.launchShortcutId ?: loser.launchShortcutId,
             launchIntentUri   = survivor.launchIntentUri ?: loser.launchIntentUri,
@@ -155,7 +129,6 @@ class LibraryConsolidation @Inject constructor(
         )
         if (enriched != survivor) gameDao.update(enriched)
 
-        // Collection memberships follow the survivor (composite-PK IGNORE makes re-adds no-ops).
         for (collectionId in collectionDao.getCollectionIdsForGame(loser.id)) {
             collectionDao.addGame(
                 com.psplauncher.core.data.database.entity.CollectionGameEntity(
@@ -166,8 +139,6 @@ class LibraryConsolidation @Inject constructor(
             )
         }
     }
-
-    // ── 3. Windows Memory Card ────────────────────────────────────────────────
 
     private suspend fun ensureWindowsCard() {
         val count = gameDao.getByPlatformOnce(WINDOWS_PLATFORM_ID)
@@ -190,8 +161,6 @@ class LibraryConsolidation @Inject constructor(
         Timber.i("Windows Memory Card created ($count games)")
     }
 
-    // ── 4. Launcher-collection cleanup ────────────────────────────────────────
-
     private suspend fun removeMigratedLauncherCollections() {
         var removed = 0
         for (collection in collectionDao.getAll()) {
@@ -205,19 +174,16 @@ class LibraryConsolidation @Inject constructor(
                 gameDao.getById(id)?.platformId == WINDOWS_PLATFORM_ID
             }
             if (allWindows) {
-                collectionDao.delete(collection.id)   // junction rows cascade; games survive
+                collectionDao.delete(collection.id)
                 removed++
             }
         }
         if (removed > 0) Timber.i("Removed $removed migrated launcher collection(s)")
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private fun displayTitleOf(g: GameEntity): String =
         g.userTitleOverride ?: g.scrapedTitle ?: g.title
 
-    // Case/punctuation-insensitive comparison key: "S.T.A.L.K.E.R. 2" == "STALKER 2".
     private fun normalizeTitle(title: String): String =
         title.lowercase().filter { it.isLetterOrDigit() }
 }

@@ -14,7 +14,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RescanTriggerBusTest {
-    // Relaxed mock: discover() is suspend, returning a data class — relaxed auto-answers it.
     private val discoveryScanner = mockk<RomRootDiscoveryScanner>(relaxed = true)
 
     private val outcome = PlatformScanOutcome(
@@ -87,8 +86,6 @@ class RescanTriggerBusTest {
         coVerify(exactly = 1) { scanner.scanAllEnabled(true) }
     }
 
-    // ── Clock-driven resume throttle (A3) ──────────────────────────────────
-
     @Test
     fun `resume inside throttle window is skipped`() = runTest {
         val scanner = mockk<LibraryScanner>(relaxed = true)
@@ -100,7 +97,6 @@ class RescanTriggerBusTest {
         advanceUntilIdle()
         coVerify(exactly = 1) { scanner.scanAllEnabled(true) }
 
-        // 4 minutes later — still inside the 5-minute throttle.
         now += RescanTriggerBus.RESUME_THROTTLE_MS - 60_000
         bus.submit(RescanTrigger.AppResumed)
         advanceUntilIdle()
@@ -118,7 +114,6 @@ class RescanTriggerBusTest {
         advanceUntilIdle()
         coVerify(exactly = 1) { scanner.scanAllEnabled(true) }
 
-        // Cross the boundary: a resume at/after first + RESUME_THROTTLE_MS runs again.
         now += RescanTriggerBus.RESUME_THROTTLE_MS
         bus.submit(RescanTrigger.AppResumed)
         advanceUntilIdle()
@@ -132,25 +127,22 @@ class RescanTriggerBusTest {
             delay(10_000)
             listOf(outcome)
         }
-        // TestScheduler is itself a CoroutineContext, so it can back the scope directly.
+
         val busScope = kotlinx.coroutines.CoroutineScope(testScheduler)
         val bus = RescanTriggerBus(scanner, discoveryScanner, busScope)
 
         bus.submit(RescanTrigger.AppResumed)
         advanceTimeBy(1_000)
-        // The scan started and is suspended mid-flight (the 10 s scan delay hasn't elapsed).
+
         coVerify(exactly = 1) { scanner.scanAllEnabled(true) }
 
         busScope.cancel()
         advanceUntilIdle()
-        // The scan coroutine was cancelled with the scope, and a later trigger can neither crash
-        // (launch on a cancelled scope is a no-op) nor start a new scan.
+
         bus.submit(RescanTrigger.AppResumed)
         advanceUntilIdle()
         coVerify(exactly = 1) { scanner.scanAllEnabled(true) }
     }
-
-    // ── Console discovery ahead of the incremental scan ───────────────────
 
     @Test
     fun `discovery runs before the incremental scan on every trigger`() = runTest {

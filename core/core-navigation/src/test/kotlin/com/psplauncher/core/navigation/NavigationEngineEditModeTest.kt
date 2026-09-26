@@ -5,12 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Spec §5: component-owned edit mode. Confirm enters edit mode, directional input is delegated
- * to the component, and Back ALWAYS exits edit mode before any screen navigation.
- */
 class NavigationEngineEditModeTest {
-
     private fun node(
         key: String,
         onSelect: (() -> Unit)? = null,
@@ -66,7 +61,7 @@ class NavigationEngineEditModeTest {
 
         engine.dispatch(NavigationCommand.Direction(NavigationDirection.UP))
         engine.dispatch(NavigationCommand.Direction(NavigationDirection.RIGHT))
-        // While editing, the underlying list focus must NOT have moved.
+
         assertEquals("slider", engine.focusedKey)
         assertEquals(listOf(NavigationDirection.UP, NavigationDirection.RIGHT), received)
     }
@@ -112,7 +107,7 @@ class NavigationEngineEditModeTest {
         engine.markReady()
         engine.setFocused("slider")
         engine.dispatch(NavigationCommand.Confirm)
-        // Handler declines the direction → engine falls through to normal traversal.
+
         assertEquals("a", engine.dispatch(NavigationCommand.Direction(NavigationDirection.UP)))
     }
 
@@ -135,7 +130,7 @@ class NavigationEngineEditModeTest {
         engine.dispatch(NavigationCommand.Confirm)
         assertTrue(engine.isEditing)
 
-        engine.setFocused("a")  // UI reports focus moved away (touch)
+        engine.setFocused("a")
         assertFalse(engine.isEditing)
         assertEquals(1, exits)
     }

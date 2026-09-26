@@ -6,7 +6,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class XmbSortTest {
-
     private fun game(id: Long, title: String, lastPlayed: Long? = null) =
         Game(id = id, title = title, platformId = "ps", lastPlayedAt = lastPlayed)
 
@@ -21,8 +20,6 @@ class XmbSortTest {
         id = id, folderId = "f", uri = "content://$id", displayName = id,
         title = title, artist = artist, album = album, trackNumber = trackNo, lastModified = modified,
     )
-
-    // ── Games ───────────────────────────────────────────────────────────────────
 
     @Test
     fun `game TITLE sorts case-insensitively by display title`() {
@@ -55,12 +52,10 @@ class XmbSortTest {
         assertEquals(listOf("Alpha", "Beta"), games.gameSorted(XmbSortMode.ARTIST).map { it.title })
     }
 
-    // ── Music ───────────────────────────────────────────────────────────────────
-
     @Test
     fun `track TITLE uses real title then file name`() {
         val tracks = listOf(track("z.mp3", title = "Apple"), track("a.mp3", title = null))
-        // "Apple" vs displayName "a.mp3" -> "Apple" > "a.mp3" alphabetically? compare lowercase.
+
         val sorted = tracks.trackSorted(XmbSortMode.TITLE).map { it.displayTitle }
         assertEquals(listOf("a.mp3", "Apple"), sorted)
     }
@@ -74,7 +69,7 @@ class XmbSortTest {
             track("4", title = "Song", artist = "ABBA"),
         )
         val sorted = tracks.trackSorted(XmbSortMode.ARTIST).map { it.id }
-        // ABBA, then Beatles(Abbey Road before Help), then null-artist last.
+
         assertEquals(listOf("4", "2", "1", "3"), sorted)
     }
 

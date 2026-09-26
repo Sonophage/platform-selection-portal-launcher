@@ -36,8 +36,6 @@ fun MusicSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Pickers: one for adding a root, one pre-pointed at the root being re-linked (re-granting
-    // after a restore/reinstall lands on the exact same folder in one tap).
     val addRootPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> uri?.let { viewModel.addRoot(it) } }
@@ -137,7 +135,6 @@ fun MusicSettingsContent(
         }
     }
 
-    // ── Default player picker: PSPLauncher / System Default / an installed app ──
     if (state.showPlayerPicker) {
         val choices: List<Pair<String, String?>> = buildList {
             add("PSPLauncher" to MusicIntentResolver.BUILTIN)

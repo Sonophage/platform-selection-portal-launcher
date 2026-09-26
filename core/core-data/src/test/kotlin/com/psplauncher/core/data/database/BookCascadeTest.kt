@@ -12,20 +12,9 @@ import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Books hang off a library by foreign key, so removing a library has to take its books with it.
- * Get that wrong and deleting a library leaves rows the list still renders and nothing can open.
- *
- * This runs against a live in-memory database rather than the migration helper on purpose. In the
- * migration test, `runMigrationsAndValidate` compares the result against the exported schema and
- * fires before any assertion of mine, so a cascade test there cannot fail on its own terms. Here
- * the only thing standing between the delete and the assertion is the foreign key itself. Room's
- * generated `onOpen` turns `PRAGMA foreign_keys` on, as [GameUpsertCascadeTest] documents.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class BookCascadeTest {
-
     private val db = Room.inMemoryDatabaseBuilder(
         ApplicationProvider.getApplicationContext(),
         PFPDatabase::class.java,

@@ -7,40 +7,24 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * C16 tasks 6.2 and 6.6 — which kinds get a live crop preview, and in which chrome.
- *
- * The resolver is pure so it pins here without Compose or Robolectric; the drawing itself is
- * covered by the device check, since a bitmap blit has nothing a unit test can assert on.
- */
 class StudioCropPreviewTest {
-
-    // ── The six kinds with a slot to preview into ─────────────────────────────
-
     @Test
     fun `ICON0 and box art wear the framed PSP tile`() {
         assertEquals(CropPreviewChrome.PSP_TILE, cropPreviewChromeFor(ArtworkKind.ICON))
         assertEquals(CropPreviewChrome.PSP_TILE, cropPreviewChromeFor(ArtworkKind.BOX_ART))
     }
 
-    // ICON1 is the XMB icon slot in motion, so it wears the slot's chrome; VIDEO plays in the Game
-    // Details media strip, which draws no frame at all (task 6.6).
     @Test
     fun `the video kinds preview in the chrome of the slot they play in`() {
         assertEquals(CropPreviewChrome.PSP_TILE, cropPreviewChromeFor(ArtworkKind.ICON1))
         assertEquals(CropPreviewChrome.FRAMELESS, cropPreviewChromeFor(ArtworkKind.VIDEO))
     }
 
-    // 3D boxes and physical media are transparent silhouettes, not opaque rectangles: the real
-    // tile (NaturalAspectArtIcon, framed only for the box-art uri) draws no frame, so neither
-    // does the preview. A frame here would invent a rectangle the tile never shows.
     @Test
     fun `3D box and physical media are frameless`() {
         assertEquals(CropPreviewChrome.FRAMELESS, cropPreviewChromeFor(ArtworkKind.BOX_3D))
         assertEquals(CropPreviewChrome.FRAMELESS, cropPreviewChromeFor(ArtworkKind.PHYSICAL_MEDIA))
     }
-
-    // ── Everything else gets no inset ─────────────────────────────────────────
 
     @Test
     fun `kinds with no tile representation show no preview`() {
@@ -56,11 +40,6 @@ class StudioCropPreviewTest {
             assertNull("$kind must not preview a tile it never renders", cropPreviewChromeFor(kind))
         }
     }
-
-    // `cropPreviewChromeFor` is an else-less `when` over ArtworkKind returning a non-Unit type,
-    // so a new kind that falls through is a COMPILE error. There was a test here asserting that
-    // by calling it once per entry and asserting nothing; it could only fail if the module did
-    // not build, which every other test in this file already covers.
 
     @Test
     fun `exactly six kinds preview`() {
@@ -78,16 +57,12 @@ class StudioCropPreviewTest {
         )
     }
 
-    // The two video kinds are exactly the two the ViewModel crops as video (isVideoKind), so the
-    // playing inset can never be offered for a kind that has no clip behind it.
     @Test
     fun `both video-cropped kinds preview`() {
         listOf(ArtworkKind.ICON1, ArtworkKind.VIDEO).forEach { kind ->
             assertNotNull("$kind is cropped as video and must preview", cropPreviewChromeFor(kind))
         }
     }
-
-    // ── Captions travel with the chrome ───────────────────────────────────────
 
     @Test
     fun `every previewing kind has a caption and no other kind does`() {

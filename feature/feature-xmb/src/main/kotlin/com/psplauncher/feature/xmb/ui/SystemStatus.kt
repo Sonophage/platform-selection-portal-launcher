@@ -27,23 +27,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.getSystemService
 import timber.log.Timber
 
-/**
- * Live device connectivity/hardware state for the XMB status strip. Every field is derived from a
- * lifecycle-scoped system callback (no polling): the monitor registers listeners when it enters
- * composition and tears them all down on dispose.
- *
- * A `null` signal level means "not present" and the strip hides that icon entirely — no cellular
- * modem/SIM hides Signal, no connected Wi-Fi hides Wi-Fi, Bluetooth off hides Bluetooth, no
- * controller hides the pad. Levels are 0..4.
- *
- * Security note: this reads only non-sensitive connection *presence* and *signal level*. It adds no
- * new permissions — connectivity/telephony signal level, Bluetooth adapter on/off, and the input
- * device list are all readable without runtime-granted permissions.
- */
 data class SystemStatus(
     val bluetoothOn: Boolean = false,
-    val wifiLevel: Int? = null,       // null = not connected (hidden); 0..4 = strength
-    val cellularLevel: Int? = null,   // null = no modem/SIM (hidden); 0..4 = strength
+    val wifiLevel: Int? = null,
+    val cellularLevel: Int? = null,
     val controllerConnected: Boolean = false,
 )
 
@@ -54,7 +41,6 @@ fun rememberSystemStatus(): SystemStatus {
     val context = LocalContext.current
     var status by remember { mutableStateOf(SystemStatus()) }
 
-    // ── Bluetooth on/off ──────────────────────────────────────────────────────
     DisposableEffect(Unit) {
         val adapter = context.getSystemService<BluetoothManager>()?.adapter
         fun push() { status = status.copy(bluetoothOn = adapter?.isEnabled == true) }
@@ -62,12 +48,11 @@ fun rememberSystemStatus(): SystemStatus {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) = push()
         }
-        // ACTION_STATE_CHANGED is a protected system broadcast; receiving it needs no permission.
+
         context.registerReceiver(receiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
         onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
 
-    // ── Wi-Fi connected + strength ────────────────────────────────────────────
     DisposableEffect(Unit) {
         val cm = context.getSystemService<ConnectivityManager>()
         if (cm == null) {
@@ -91,16 +76,14 @@ fun rememberSystemStatus(): SystemStatus {
         }
     }
 
-    // ── Cellular presence + signal strength ───────────────────────────────────
     DisposableEffect(Unit) {
         val tm = context.getSystemService<TelephonyManager>()
         val hasModem = tm != null && tm.phoneType != TelephonyManager.PHONE_TYPE_NONE
-        // No modem or no ready SIM ⇒ there is no cellular service on this device: hide Signal.
+
         if (tm == null || !hasModem || tm.simState != TelephonyManager.SIM_STATE_READY) {
             status = status.copy(cellularLevel = null)
             onDispose { }
         } else {
-            // Start at 0 bars (searching) until the first callback; getLevel() needs no permission.
             status = status.copy(cellularLevel = 0)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val callback = object : TelephonyCallback(), TelephonyCallback.SignalStrengthsListener {
@@ -127,7 +110,6 @@ fun rememberSystemStatus(): SystemStatus {
         }
     }
 
-    // ── Game controller connected ─────────────────────────────────────────────
     DisposableEffect(Unit) {
         val im = context.getSystemService<InputManager>()
         fun push() { status = status.copy(controllerConnected = anyControllerConnected()) }
@@ -144,12 +126,6 @@ fun rememberSystemStatus(): SystemStatus {
     return status
 }
 
-// ── Pure helpers ──────────────────────────────────────────────────────────────
-
-/**
- * Maps a Wi-Fi RSSI in dBm to a 0..4 bar level. [NetworkCapabilities.SIGNAL_STRENGTH_UNSPECIFIED]
- * (the device didn't report a value) is treated as full, since we already know the link is up.
- */
 fun wifiLevelFromDbm(dbm: Int): Int = when {
     dbm == NetworkCapabilities.SIGNAL_STRENGTH_UNSPECIFIED -> SIGNAL_MAX_LEVEL
     dbm >= -55 -> 4
@@ -159,7 +135,6 @@ fun wifiLevelFromDbm(dbm: Int): Int = when {
     else       -> 0
 }
 
-// A physical (non-virtual) device that reports gamepad or joystick sources counts as a controller.
 private fun anyControllerConnected(): Boolean =
     runCatching {
         InputDevice.getDeviceIds().any { id ->

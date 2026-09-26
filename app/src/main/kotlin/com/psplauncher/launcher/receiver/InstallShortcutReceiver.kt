@@ -13,18 +13,7 @@ import android.os.Build
 import com.psplauncher.core.common.security.ShortcutIntentSanitizer
 import timber.log.Timber
 
-/**
- * Captures the legacy `com.android.launcher.action.INSTALL_SHORTCUT` broadcast.
- *
- * Apps like BannerHub and older Winlator builds still create game shortcuts by sending this
- * broadcast. The broadcast is unauthenticated — any app can send it — so PFP does NOT add the
- * shortcut silently. Instead it hardens the supplied intent ([ShortcutIntentSanitizer]) and posts a
- * confirmation notification; only when the user taps "Add" does [ShortcutConfirmReceiver] (which is
- * NOT exported) actually create the library entry. This prevents both confused-deputy abuse and
- * silent library poisoning.
- */
 class InstallShortcutReceiver : BroadcastReceiver() {
-
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_INSTALL_SHORTCUT) return
 
@@ -57,8 +46,6 @@ class InstallShortcutReceiver : BroadcastReceiver() {
         postConfirmation(context, name, intentUri, hostPackage, hostLabel)
     }
 
-    // Posts an Add / Ignore notification. The add only happens via ShortcutConfirmReceiver, which is
-    // not exported, so the confirmation can't be forged by the sending app.
     private fun postConfirmation(
         context: Context,
         name: String,

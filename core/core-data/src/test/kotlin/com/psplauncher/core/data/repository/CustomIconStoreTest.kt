@@ -27,17 +27,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Behaviour of the user's per-slot custom icon storage: `filesDir/custom-icons/<slotKey>.<ext>`
- * is the source of truth, mirroring how PfpThemeStore handles `theme-icons/`. Guards the
- * extension-swap rule (a slot holds ONE file — a new pick with a different extension must
- * remove the old file) and the Coil eviction on GIF replacement (path-keyed cache otherwise
- * keeps playing the old animation forever).
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class CustomIconStoreTest {
-
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     private class RecordingEvictor : CustomIconCacheEvictor {
@@ -52,15 +44,11 @@ class CustomIconStoreTest {
 
     @Before
     fun setUp() {
-        // The prefs DataStore and the icon dir persist within the test JVM; wipe both so each
-        // case starts empty.
         runBlocking { context.pfpDataStore.edit { it.clear() } }
         File(context.filesDir, CustomIconStore.CUSTOM_ICONS_DIR).deleteRecursively()
         evictor = RecordingEvictor()
         store = CustomIconStore(context, evictor)
     }
-
-    // ── import ────────────────────────────────────────────────────────────────
 
     @Test
     fun `import writes a slot-keyed file and bumps the stamp`() = runTest {
@@ -84,8 +72,6 @@ class CustomIconStoreTest {
 
     @Test
     fun `re-importing with a different extension removes the old file and evicts`() = runTest {
-        // First pick: PNG. Second pick: GIF (PNG bytes are fine — the gate probes dimensions,
-        // not container structure). The slot must end up holding exactly one file.
         store.import("catbar_music", register(pngBytes()), "image/png")
         evictor.evicted.clear()
 
@@ -125,12 +111,10 @@ class CustomIconStoreTest {
         assertTrue(iconDir().listFiles().isNullOrEmpty())
     }
 
-    // ── load ──────────────────────────────────────────────────────────────────
-
     @Test
     fun `load skips unknown keys and unknown extensions`() = runTest {
         store.import("catbar_games", register(pngBytes()), "image/png")
-        // Hostile/foreign files that could only arrive outside the store's own writes.
+
         iconFile("not_a_slot", "png").writeBytes(pngBytes())
         iconFile("catbar_music", "mp4").writeBytes(pngBytes())
 
@@ -138,8 +122,6 @@ class CustomIconStoreTest {
 
         assertEquals(setOf("catbar_games"), loaded.keys, "unknown slot keys and extensions are skipped, not crashed on")
     }
-
-    // ── clear ─────────────────────────────────────────────────────────────────
 
     @Test
     fun `clear removes the slot file`() = runTest {
@@ -153,9 +135,6 @@ class CustomIconStoreTest {
         assertNotNull(loaded["catbar_games"], "clear is per-slot — other slots untouched")
     }
 
-    // The overlay greys its Reset control and explains itself off these two returns: this tier
-    // holds only user picks, so a slot the user never picked has nothing to clear even when an
-    // icon is plainly on screen (the applied theme's, or the built-in).
     @Test
     fun `clear reports false when the slot has no user pick`() = runTest {
         assertFalse(store.clear("catbar_games"), "no pick stored — nothing was removed")
@@ -178,8 +157,6 @@ class CustomIconStoreTest {
         assertFalse(store.clearAll(), "no picks stored — nothing was cleared")
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
-
     private fun pngBytes(width: Int = 64, height: Int = 64): ByteArray {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
@@ -198,8 +175,6 @@ class CustomIconStoreTest {
         context.pfpDataStore.data.first()[longPreferencesKey("custom_icons_stamp")]
 
     private companion object {
-        // Mirror CustomIconLimits.MAX_BYTES by its string contract so the oversized test stays
-        // honest about which cap it is exercising.
         const val CustomIconLimits_BYTES = 8L * 1024 * 1024
     }
 }

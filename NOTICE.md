@@ -17,12 +17,22 @@ file exists anywhere in this repository's history.
 Under default copyright that means all rights are reserved by the authors. The great majority of
 this code is not mine:
 
-| Author | Commits | Lines (sampled) |
-|---|---:|---:|
-| JohnnyC96 | 321 | 28,342 |
-| JohnnyCollado | 175 | 9,698 |
-| Sonophage | 19 | 3,182 |
-| Johanna | 6 | — |
+| Author | Commits |
+|---|---:|
+| Sonophage | 384 |
+| JohnnyC96 | 321 |
+| JohnnyCollado | 175 |
+| Johanna | 6 |
+
+Those numbers are derived, not remembered. The table above said 19 for Sonophage for long enough
+to be wrong by a factor of twenty. Re-derive it rather than trusting it:
+
+```sh
+git shortlog -sn --all
+```
+
+Commit counts are not a measure of who holds copyright in which lines; they are only enough to
+show that a large part of this tree is other people's work.
 
 So **this file deliberately grants nothing and claims nothing.** Adding an open-source licence here
 would purport to license work I do not hold the copyright on, which would be void and misleading.

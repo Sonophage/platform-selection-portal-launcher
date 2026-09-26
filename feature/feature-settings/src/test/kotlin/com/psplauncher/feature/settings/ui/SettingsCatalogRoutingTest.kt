@@ -10,19 +10,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The settings catalog and the nav host's route table are a pair: the catalog says what the
- * section rail offers, the route table says what `SettingsNavHost` can actually open. An entry
- * in one and not the other is a rail row that does nothing when you confirm it, and nothing
- * about that failure would name the catalog as the cause.
- *
- * The route table is deliberately the LARGER set — deep links, the wizard's first-run variant,
- * and Library Manager's pre-opened cards are all routes you reach from elsewhere and never from
- * a sibling list. So the direction that matters is one-way, and it is asserted as such rather
- * than as equality.
- */
 class SettingsCatalogRoutingTest {
-
     @Test
     fun `every screen the rail offers can actually be opened`() {
         val unroutable = SETTINGS_CATALOG.map { it.id }.filterNot { it in SETTINGS_SCREEN_ROUTES }
@@ -48,8 +36,6 @@ class SettingsCatalogRoutingTest {
 
     @Test
     fun `a section id is never also a screen id`() {
-        // The crossbar's select handler routes a section id to the flyout and anything else to
-        // activeSettingsScreen. One string doing both would pick a branch by accident.
         val sectionIds = SettingsSectionId.entries.map { it.id }.toSet()
         assertEquals(
             emptySet(),
@@ -59,13 +45,10 @@ class SettingsCatalogRoutingTest {
 
     @Test
     fun `a route outside the catalog has no section, so it gets no rail`() {
-        // The wizard's first-run variant is reachable and deliberately absent from the catalog:
-        // it has no siblings to move between, and a rail there would offer a way out of a screen
-        // that is meant to be finished.
         assertTrue("settings_initial_setup_first" in SETTINGS_SCREEN_ROUTES)
         assertNull(settingsSectionFor("settings_initial_setup_first"))
         assertNull(settingsSectionFor("settings_import_pc"))
-        // ...while an ordinary screen does get one.
+
         assertNotNull(settingsSectionFor("settings_artwork"))
     }
 }

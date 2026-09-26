@@ -19,13 +19,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 
-/**
- * C21 task 1.2 — a `.pfpgame` Fill must never REPLACE-upsert the matched game (D4): it writes only
- * the columns [PcGameImportPlanner.fill] actually changed, through the repository's targeted
- * methods.
- */
 class PcGameScannerTest {
-
     private val context = mockk<Context>(relaxed = true)
     private val windowsLibrarySetup = mockk<WindowsLibrarySetup>(relaxed = true)
     private val pcShortcutImporter = mockk<PcShortcutImporter>(relaxed = true)
@@ -52,8 +46,6 @@ class PcGameScannerTest {
         coEvery { pcShortcutImporter.reconcilePinnedShortcuts() } returns 0
     }
 
-    // A pin entry needs no launch-intent check, so it exercises the Fill path without the
-    // PackageManager plumbing checkLaunch would otherwise need.
     private fun pinExportFile(export: PcGameExport) = PcExportFile(
         title = export.title,
         extension = PcGameExportCodec.EXTENSION,
@@ -70,15 +62,15 @@ class PcGameScannerTest {
             platformId = "windows",
             packageName = "banner.hub",
             shortcutId = "game_620",
-            ssId = 111L, // already confirmed — must not be touched
+            ssId = 111L,
         )
         val export = PcGameExport(
             title = "Portal 2",
             launcherPackage = "banner.hub",
             shortcutId = "game_620",
-            ssId = 425726L, // ignored: existing.ssId already set
-            igdbId = 66L,   // missing on existing: must be filled
-            userTitleOverride = "Portal 2 (Co-op)", // missing on existing: must be filled
+            ssId = 425726L,
+            igdbId = 66L,
+            userTitleOverride = "Portal 2 (Co-op)",
             storefront = "STEAM",
             storefrontGameId = "620",
         )
@@ -92,7 +84,7 @@ class PcGameScannerTest {
         coVerify(exactly = 1) { gameRepository.updateUserTitleOverride(7L, "Portal 2 (Co-op)") }
         coVerify(exactly = 1) { gameRepository.updateStorefrontIdentity(7L, "STEAM", "620") }
         coVerify(exactly = 1) { gameRepository.updateProviderMatch(7L, "IGDB", 66L) }
-        // Already-set columns are left alone.
+
         coVerify(exactly = 0) { gameRepository.updateScrapedTitle(any(), any()) }
         coVerify(exactly = 0) { gameRepository.updateProviderMatch(7L, "SCREENSCRAPER", any()) }
     }

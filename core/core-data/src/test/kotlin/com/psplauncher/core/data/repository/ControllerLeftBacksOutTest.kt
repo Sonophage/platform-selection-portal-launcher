@@ -19,16 +19,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The `controller_left_backs_out` preference: default, round-trip, and reset.
- *
- * The default matters more than usual here — it is ON, and it is read by an absent key rather than
- * written at install, so every existing install must come up with LEFT already backing out.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class ControllerLeftBacksOutTest {
-
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val key = booleanPreferencesKey("controller_left_backs_out")
     private lateinit var repository: ControllerLayoutRepository

@@ -15,19 +15,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * A scrape may NAME a game but never RENAME one.
- *
- * `updateMetadata` takes the opposite side for every other column (`COALESCE(:new, old)` — the
- * incoming value wins), which is right for a description and wrong for a title: it let a Change
- * Match, or any later re-scrape, silently rewrite what the library calls a game. The title now
- * only changes through a path the user drove, so the automatic scrape writes it through
- * [GameDao.fillScrapedTitleIfMissing] instead.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class GameDaoTitleWriteTest {
-
     private lateinit var db: PFPDatabase
     private lateinit var dao: GameDao
 
@@ -99,7 +89,7 @@ class GameDaoTitleWriteTest {
         dao.fillScrapedTitleIfMissing(id, "Sonic the Hedgehog")
 
         val game = dao.getById(id)!!.toDomain()
-        // The column may be filled — it was empty — but it is not what the library shows.
+
         assertEquals("My Sonic", game.displayTitle)
     }
 
@@ -115,7 +105,6 @@ class GameDaoTitleWriteTest {
     fun `the user-driven path can still overwrite the title outright`() = runTest {
         val id = newGame(scrapedTitle = "Sonic the Hedgehog")
 
-        // What the metadata preview's chosen fields go through — deliberately NOT fill-only.
         dao.updateScrapedTitle(id, "Sonic The Hedgehog (Rev A)")
 
         assertEquals("Sonic The Hedgehog (Rev A)", dao.getById(id)?.scrapedTitle)

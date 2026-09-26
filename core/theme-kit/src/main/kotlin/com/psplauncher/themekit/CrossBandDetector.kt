@@ -3,20 +3,7 @@ package com.psplauncher.themekit
 import kotlin.math.max
 import kotlin.math.sqrt
 
-/**
- * Finds the dark horizontal band many PSP-style wallpapers bake in where the XMB crossbar
- * sits, so an imported theme's crossbar can land on the art automatically — the same
- * measurement that was done by hand to tune [XmbLayoutSpec.DEFAULT] against the
- * Evangelion capture, as an algorithm.
- *
- * Approach: a per-row mean-luminance profile, smoothed; a qualifying band is a sustained
- * run of rows meaningfully darker than the surrounding region in the upper half of the
- * image, with a real top edge (so night skies that are simply dark from row 0 don't
- * match). Deliberately conservative: null (no confident band) is the correct answer for
- * most photos — the Studio only prefills, never auto-applies.
- */
 object CrossBandDetector {
-
     private const val SEARCH_TOP = 0.03f
     private const val SEARCH_BOTTOM = 0.55f
     private const val FLAT_STDDEV = 0.02f
@@ -25,16 +12,11 @@ object CrossBandDetector {
     private const val MIN_RUN_FRACTION = 0.06f
     private const val MAX_RUN_FRACTION = 0.35f
 
-    /**
-     * Returns the band's TOP edge as a fraction of image height (coerced into the
-     * codec's safe crossbar range), or null when no confident band exists.
-     */
     fun detectBarTopFraction(image: BmpImage, maxColumnSamples: Int = 256): Float? {
         val width = image.width
         val height = image.height
         if (width < 32 || height < 32) return null
 
-        // Per-row mean luminance (Rec.601), stride-sampled columns.
         val columnStride = max(1, width / maxColumnSamples)
         val profile = FloatArray(height) { row ->
             var sum = 0f
@@ -49,7 +31,6 @@ object CrossBandDetector {
             sum / count
         }
 
-        // Centered moving average, window ~1.5% of height.
         val window = max(3, height / 64)
         val smoothed = FloatArray(height) { row ->
             val from = max(0, row - window / 2)
@@ -72,9 +53,8 @@ object CrossBandDetector {
             variance += d * d
         }
         val stddev = sqrt(variance / (regionEnd - regionStart))
-        if (stddev < FLAT_STDDEV) return null // uniform wallpaper — nothing to align to
+        if (stddev < FLAT_STDDEV) return null
 
-        // Collect maximal consecutive runs of "dark" rows.
         val darkThreshold = mean - max(0.08f, 0.35f * stddev)
         val minRun = (height * MIN_RUN_FRACTION).toInt()
         val maxRun = (height * MAX_RUN_FRACTION).toInt()
@@ -86,7 +66,7 @@ object CrossBandDetector {
             val dark = r < regionEnd && smoothed[r] < darkThreshold
             if (dark && runStart < 0) runStart = r
             if (!dark && runStart >= 0) {
-                val runEnd = r // exclusive
+                val runEnd = r
                 score(smoothed, runStart, runEnd, mean, minRun, maxRun)?.let { s ->
                     if (s > bestScore) { bestScore = s; bestStart = runStart }
                 }
@@ -99,7 +79,6 @@ object CrossBandDetector {
             .coerceIn(XmbLayoutSpecCodec.BAR_TOP_MIN, XmbLayoutSpecCodec.BAR_TOP_MAX)
     }
 
-    /** Confidence score for one dark run, or null when it doesn't qualify as a band. */
     private fun score(
         smoothed: FloatArray,
         start: Int,
@@ -109,7 +88,7 @@ object CrossBandDetector {
         maxRun: Int,
     ): Float? {
         val length = end - start
-        if (length < minRun || length > maxRun) return null // a line or half the image, not a band
+        if (length < minRun || length > maxRun) return null
 
         var inside = 0f
         for (r in start until end) inside += smoothed[r]
@@ -117,7 +96,6 @@ object CrossBandDetector {
         val depth = regionMean - inside
         if (depth < MIN_DEPTH) return null
 
-        // Real bands have a bright edge just above; dark-from-the-top skies don't.
         val edgeRows = max(3, length / 2)
         val edgeFrom = start - edgeRows
         if (edgeFrom < 0) return null
@@ -129,7 +107,6 @@ object CrossBandDetector {
         return depth * sqrt(length.toFloat())
     }
 
-    /** Rec.601 luma of an ARGB pixel, 0..1. */
     internal fun luminance(argb: Int): Float {
         val r = (argb shr 16 and 0xFF) / 255f
         val g = (argb shr 8 and 0xFF) / 255f

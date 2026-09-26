@@ -13,23 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Correcting the Network column's name on a database seeded while it was called "Online".
- *
- * `BUILT_IN_CATEGORIES` has said "Network" for a while, but `reconcileBuiltInCategories` adds
- * built-ins with INSERT OR IGNORE and deliberately never writes a name, because a name is
- * user-editable. So an established install keeps whatever it was seeded with, and the correction
- * has to be a targeted one-shot.
- *
- * The reason this needs a test rather than a glance is the blast radius of getting it slightly
- * wrong. The obvious implementation -- sync every built-in's name from the definition -- would
- * also rewrite the Game column, which on the owner's device he has renamed to "Emulation". A fix
- * for a cosmetic stale label is not allowed to silently undo a rename the user made on purpose,
- * and "it only touched the row it was asked to" is exactly the property that is invisible until
- * someone loses their name.
- */
 class StaleNetworkNameTest {
-
     private class FakeCategories(seed: List<CategoryEntity>) {
         val rows = seed.associateBy { it.id }.toMutableMap()
         val dao: CategoryDao = mockk(relaxed = true)
@@ -51,7 +35,6 @@ class StaleNetworkNameTest {
         id = id, name = name, iconKey = "ic_$id", type = CategoryType.BUILT_IN.name, position = 0,
     )
 
-    /** The name the bar's one definition currently gives the Network column. */
     private val liveNetworkName =
         BUILT_IN_CATEGORIES.first { it.id == CategoryRepositoryImpl.NETWORK_CATEGORY_ID }.name
 
@@ -78,7 +61,6 @@ class StaleNetworkNameTest {
 
         CategoryRepositoryImpl(fake.dao).renameStaleOnlineColumn()
 
-        // The one row it was asked about changed; nothing else did.
         assertEquals(liveNetworkName, fake.nameOf(CategoryRepositoryImpl.NETWORK_CATEGORY_ID))
         assertEquals("Emulation", fake.nameOf(BuiltInCategory.GAMES))
         assertEquals("Library", fake.nameOf(BuiltInCategory.LIBRARY))

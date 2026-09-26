@@ -6,9 +6,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.MemoryCard
 
-// One row per user-configured console. platformId is the primary key — a platform can
-// have at most one Memory Card, which keeps Game.platform_id as the join with no schema
-// change to the games table.
 @Serializable
 @Entity(tableName = "memory_cards")
 data class MemoryCardEntity(
@@ -26,14 +23,12 @@ data class MemoryCardEntity(
     @ColumnInfo(name = "sort_order")
     val sortOrder: Int = 0,
 
-    // Persisted SAF tree URI; null for legacy raw-path cards.
     @ColumnInfo(name = "tree_uri")
     val treeUri: String? = null,
 
     @ColumnInfo(name = "rom_directory")
     val romDirectory: String? = null,
 
-    // Comma-separated, lowercase, no leading dots — e.g. "iso,cso,pbp"
     @ColumnInfo(name = "supported_extensions")
     val supportedExtensions: String = "",
 

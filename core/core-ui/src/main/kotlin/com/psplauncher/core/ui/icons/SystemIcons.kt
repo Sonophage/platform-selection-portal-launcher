@@ -3,17 +3,6 @@ package com.psplauncher.core.ui.icons
 import androidx.annotation.DrawableRes
 import com.psplauncher.core.ui.R
 
-/**
- * Maps a platform id to its bundled per-console icon (the xmb-menu-es-de set), falling back to
- * the generic [R.drawable.sysicon_default] for platforms with no dedicated art.
- *
- * This is a static `when` rather than a `Resources.getIdentifier("sysicon_$id", ...)` lookup on
- * purpose. A name-based lookup is invisible to R8, so every drawable here would look unreferenced
- * and be stripped by resource shrinking — which is why the project used to have to disable
- * `android.r8.optimizedResourceShrinking`. Naming each id keeps the shrinker correct by default.
- *
- * Keep this in sync with `core-ui/src/main/res/drawable-nodpi/sysicon_*.png`.
- */
 @DrawableRes
 fun systemIconRes(platformId: String?): Int = when (platformId?.lowercase()) {
     "allgames" -> R.drawable.sysicon_allgames
@@ -59,7 +48,7 @@ fun systemIconRes(platformId: String?): Int = when (platformId?.lowercase()) {
     "wonderswan" -> R.drawable.sysicon_wonderswan
     "wonderswancolor" -> R.drawable.sysicon_wonderswancolor
     "x360" -> R.drawable.sysicon_x360
-    // No dedicated original-Xbox art yet; borrows the Xbox 360 icon until some is approved.
+
     "xbox" -> R.drawable.sysicon_x360
     else -> R.drawable.sysicon_default
 }

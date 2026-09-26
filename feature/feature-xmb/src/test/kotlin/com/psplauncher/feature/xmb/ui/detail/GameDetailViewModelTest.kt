@@ -43,7 +43,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameDetailViewModelTest {
-
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var context: Context
@@ -105,18 +104,16 @@ class GameDetailViewModelTest {
         intentResolver    = mockk(relaxed = true)
         artworkRepository = mockk(relaxed = true)
         artworkAccent     = mockk(relaxed = true)
-        // Default: the game's art has no hue to find, so the page keeps the user's theme. A test
-        // that cares about the colour says so.
+
         coEvery { artworkAccent.of(*anyVararg()) } returns null
         artworkStore      = mockk(relaxed = true)
         artworkRecordDao  = mockk(relaxed = true)
-        // No portable-library records unless a test adds one (a relaxed mock would invent a record).
+
         coEvery { artworkRecordDao.get(any(), any()) } returns null
         launchDispatcher  = mockk(relaxed = true)
         menuSound         = mockk(relaxed = true)
         pcGameExporter    = mockk(relaxed = true)
-        // Explicit (not relaxed): a sealed-interface return can't be auto-mocked, and the
-        // default launch path for these tests is a successful hand-off.
+
         coEvery { launchDispatcher.launch(any(), any(), any()) } returns
             com.psplauncher.feature.launcher.LaunchDispatchResult.Accepted
 
@@ -124,11 +121,7 @@ class GameDetailViewModelTest {
         coEvery { platformDao.getById("psx") }    returns fakePlatform
         coEvery { memoryCardRepository.getById("psx") } returns null
         every { profileRepository.getInstalledProfiles() }         returns emptyList()
-        // TWO READS THAT MUST AGREE. In production getProfilesForPlatform IS getInstalledProfiles
-        // filtered to the console and ordered by launch preference, so the stub derives it the
-        // same way instead of being set independently. Stubbing them apart is how a test ends up
-        // with an emulator installed and no emulator for its platform — a state the app cannot be
-        // in, which fails tests that are testing something else entirely.
+
         coEvery { profileRepository.getProfilesForPlatform(any()) } answers {
             val platformId = firstArg<String>()
             profileRepository.getInstalledProfiles()
@@ -153,27 +146,15 @@ class GameDetailViewModelTest {
             menuSound         = menuSound,
             launcherShortcutRepository = mockk(relaxed = true),
             launchDispatcher  = launchDispatcher,
-            // The REAL resolver over the same mocks. Every ladder test below drives the actual
-            // precedence rather than a stub of it, which is the only reason they still mean
-            // anything now that the gathering moved out of this class.
+
             launchResolver    = com.psplauncher.feature.launcher.GameLaunchResolver(
                 profileRepository, memoryCardRepository, platformDao,
             ),
             pcGameExporter    = pcGameExporter,
         )
 
-    // ── The page's colour comes from the game's artwork ───────────────────
-
     @Test
     fun `the game's art accent reaches the state`() = runTest {
-        // NOTE what this does and does not cover. It covers that the wiring exists: the page asks
-        // for the game's colour and the answer lands in the state. It does NOT cover the ORDER of
-        // the ask, which is where the real bug was -- resolveArtAccent is launched, and under any
-        // test dispatcher a launched coroutine is serialised after the coroutine that launched it,
-        // so the state always carries the game by the time the answer arrives. Moving the launch
-        // back to its original place leaves every test in this file green and the device wrong.
-        // That ordering is verified on hardware, and the reason it matters is written where the
-        // launch is.
         coEvery { artworkAccent.of(*anyVararg()) } returns 0xFF1455D9L
 
         viewModel.loadGame(1L)
@@ -184,8 +165,6 @@ class GameDetailViewModelTest {
 
     @Test
     fun `art with no hue leaves the page on the user's theme`() = runTest {
-        // Null is not a failure: a greyscale box shot has no dominant hue, and the page must fall
-        // back to the user's scheme rather than to some default colour of its own.
         coEvery { artworkAccent.of(*anyVararg()) } returns null
 
         viewModel.loadGame(1L)
@@ -201,8 +180,6 @@ class GameDetailViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(0xFF1455D9L, viewModel.uiState.value.artAccentArgb)
 
-        // A red game opening over a blue one must not wear blue chrome for even one frame, so the
-        // accent is cleared at the top of the load rather than overwritten at the end of it.
         coEvery { gameRepository.getById(2L) } returns windowsGame
         coEvery { platformDao.getById("windows") } returns null
         coEvery { artworkAccent.of(*anyVararg()) } coAnswers {
@@ -218,8 +195,6 @@ class GameDetailViewModelTest {
 
         assertEquals(0xFFE03B4FL, viewModel.uiState.value.artAccentArgb)
     }
-
-    // ── Export Game (C18 task X.7) ────────────────────────────────────────
 
     private val windowsGame = Game(
         id              = 2L,
@@ -270,15 +245,9 @@ class GameDetailViewModelTest {
     @After
     fun tearDown() { Dispatchers.resetMain() }
 
-    // A launch Intent as a mock, not a real android.content.Intent: the ViewModel logs
-    // intent.toUri(...) on the success path, and that real Android method throws "not mocked" in a
-    // plain JVM unit test. Stubbing toUri lets the launch flow run while keeping reference identity
-    // (mockk uses identity equals) so assertEquals on the emitted intent still holds.
     private fun fakeLaunchIntent(): android.content.Intent = mockk(relaxed = true) {
         every { toUri(any()) } returns "intent://fake"
     }
-
-    // ── loadGame ──────────────────────────────────────────────────────────
 
     @Test
     fun `loadGame populates game and platform in state`() = runTest {
@@ -308,8 +277,6 @@ class GameDetailViewModelTest {
         }
     }
 
-    // ── media strip ───────────────────────────────────────────────────────
-
     @Test
     fun `loadGame shows every stored video and screenshot in the strip`() = runTest {
         coEvery { artworkStore.findAll(1L, com.psplauncher.feature.artwork.store.ArtworkKind.VIDEO) } returns
@@ -329,7 +296,7 @@ class GameDetailViewModelTest {
                 state.detailMedia.map { it.uri },
             )
             assertEquals(listOf(true, true, false, false, false, false), state.detailMedia.map { it.isVideo })
-            // The player still opens on the first video, not on a later one.
+
             assertEquals("vid0", state.videoUri)
             cancelAndIgnoreRemainingEvents()
         }
@@ -353,8 +320,6 @@ class GameDetailViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    // ── multi-disc picker ────────────────────────────────────────────────
 
     @Test
     fun `loadGame exposes disc members and selects the primary by default`() = runTest {
@@ -499,8 +464,6 @@ class GameDetailViewModelTest {
         coVerify { intentResolver.resolve(disc2, match { it.id == "duckstation" }) }
     }
 
-    // ── resolved-launch attribution (B4) ─────────────────────────────────
-
     @Test
     fun `loadGame reports the catalog source when nothing is configured`() = runTest {
         val duckstation = com.psplauncher.core.domain.model.EmulatorProfile(
@@ -567,7 +530,7 @@ class GameDetailViewModelTest {
 
         viewModel.loadGame(1L)
         testDispatcher.scheduler.advanceUntilIdle()
-        // The DB now carries the override the pick just wrote.
+
         coEvery { gameRepository.getById(1L) } returns fakeGame.copy(emulatorPackage = "duckstation")
         viewModel.confirmEmulatorPick("duckstation")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -580,8 +543,6 @@ class GameDetailViewModelTest {
         )
         assertTrue(state.actionMessage!!.contains("Emulator set to DuckStation"))
     }
-
-    // ── toggleFavorite ────────────────────────────────────────────────────
 
     @Test
     fun `toggleFavorite calls repository and flips isFavorite in state`() = runTest {
@@ -599,8 +560,6 @@ class GameDetailViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    // ── note editing ──────────────────────────────────────────────────────
 
     @Test
     fun `startEditNote sets isEditingNote true`() = runTest {
@@ -662,8 +621,6 @@ class GameDetailViewModelTest {
         }
     }
 
-    // ── launch ────────────────────────────────────────────────────────────
-
     @Test
     fun `launch sets launchError when no emulator is installed`() = runTest {
         viewModel.loadGame(1L)
@@ -697,20 +654,9 @@ class GameDetailViewModelTest {
         viewModel.launch()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // The resolved intent goes through the shared LaunchDispatcher (B1), which performs
-        // startActivity and records the outcome.
         coVerify(exactly = 1) { launchDispatcher.launch(any(), any(), fakeIntent) }
     }
 
-    // `launch resolves to the console's remembered retroarch core` was here. The stabilisation it
-    // asserted is no longer this class's to do — the ordered pool comes from
-    // EmulatorProfileRepository.getProfilesForPlatform, which is mocked here, so the test would
-    // have been asserting on its own stub. It is covered where the behaviour now lives:
-    // EmulatorProfileRepositoryTest `getProfilesForPlatform leads with the console's remembered
-    // core`, over EmulatorLaunchPreferenceTest's nine cases for the ordering itself.
-
-    // The guard has to hold even when launching would otherwise fully succeed — otherwise the test
-    // passes for the wrong reason (no emulator installed) and the real regression slips through.
     @Test
     fun `launch refuses a missing game even when an emulator is available`() = runTest {
         val missingGame = fakeGame.copy(isMissing = true)
@@ -731,7 +677,7 @@ class GameDetailViewModelTest {
 
         viewModel.launch()
         testDispatcher.scheduler.advanceUntilIdle()
-        // Refused before the launch funnel: the resolver must never be asked for an intent.
+
         coVerify(exactly = 0) { intentResolver.resolve(any(), any()) }
         coVerify(exactly = 0) { launchDispatcher.launch(any(), any(), any()) }
 
@@ -743,12 +689,6 @@ class GameDetailViewModelTest {
         }
     }
 
-    // ── launch sound: a game boot is never scored by the menu launch chime ────────────
-
-    // GameBoot off means a silent launch — no animation, no sound. The menu launch chime is the
-    // same bundled sfx_launch sample GameBoot's sequence is timed to, so letting it through when
-    // the toggle is off made "off" sound exactly like "on". The ViewModel owns the decision for
-    // manual Play, so the chime must never fire here — the select sound stands in.
     @Test
     fun `launch never plays the menu launch chime even with GameBoot off`() = runTest {
         val fakeProfile = com.psplauncher.core.domain.model.EmulatorProfile(
@@ -772,8 +712,6 @@ class GameDetailViewModelTest {
         verify(exactly = 1) { menuSound.play(com.psplauncher.core.ui.sound.MenuSound.SELECT, any()) }
     }
 
-    // The auto-fire path hands sound responsibility to the XMB confirm entirely, so Game Detail
-    // itself must stay silent on it.
     @Test
     fun `direct-launch auto-fire plays no menu sound`() = runTest {
         val fakeProfile = com.psplauncher.core.domain.model.EmulatorProfile(
@@ -806,7 +744,7 @@ class GameDetailViewModelTest {
             supportedPlatformIds = listOf("psx"),
         )
         val fakeIntent = fakeLaunchIntent()
-        // isMissing back to false is exactly what markSeen does when the file reappears.
+
         coEvery { gameRepository.getById(1L) }                    returns fakeGame.copy(isMissing = false)
         every { profileRepository.getInstalledProfiles() }        returns listOf(fakeProfile)
         coEvery { profileRepository.getProfilesForPlatform("psx") } returns listOf(fakeProfile)
@@ -1031,8 +969,6 @@ class GameDetailViewModelTest {
         }
     }
 
-    // ── Launch recovery sheet (B1) ───────────────────────────────────────
-
     @Test
     fun `requestLaunchHelp raises the recovery sheet through the dispatcher`() = runTest {
         viewModel.loadGame(1L)
@@ -1061,8 +997,6 @@ class GameDetailViewModelTest {
 
         coVerify(exactly = 0) { launchDispatcher.requestRecovery(any(), any(), any()) }
     }
-
-    // ── artwork ───────────────────────────────────────────────────────────
 
     @Test
     fun `prepareForOpen clears stale closed state before reopening same game`() = runTest {
@@ -1096,10 +1030,6 @@ class GameDetailViewModelTest {
         viewModel.fetchArtwork()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // The scraper overwrites fixed-path files, so this game's refs must be evicted from
-        // the image cache — but ONLY evicted. clearCache() is the library-wide destructive
-        // reset (deletes stored files and every game's artwork refs); calling it here was the
-        // bug that wiped all artwork on refresh.
         verify { artworkRepository.evictFromImageCache(any()) }
         coVerify(exactly = 0) { artworkRepository.clearCache() }
 
@@ -1128,8 +1058,6 @@ class GameDetailViewModelTest {
         }
     }
 
-    // ── Metadata presets — Current vs Incoming (C16 task 3.2) ─────────────
-
     private val metadataCurrent = mapOf<MetadataField, Any?>(
         MetadataField.DESCRIPTION to "A classic platformer.",
         MetadataField.DEVELOPER to null,
@@ -1145,8 +1073,7 @@ class GameDetailViewModelTest {
         coEvery { artworkRepository.fetchMetadataPreview(1L) } returns MetadataPreview(metadataCurrent, presets)
         viewModel.loadGame(1L)
         testDispatcher.scheduler.advanceUntilIdle()
-        // The overlay is opened from the page's own graph, so the page has to have reported
-        // readiness first — the same order the screen runs in.
+
         viewModel.onPageLaidOut()
         viewModel.activateAction(DetailAction.METADATA)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -1159,7 +1086,7 @@ class GameDetailViewModelTest {
         val preview = viewModel.uiState.value.metadataPreview!!
         assertFalse(preview.loading)
         assertEquals(MatchProvider.SCREENSCRAPER, preview.preset?.provider)
-        // Non-destructive by default: only the empty Developer would be written.
+
         assertEquals(MetadataApplyPolicy.FILL_MISSING_ONLY, preview.policy)
         assertEquals(setOf(MetadataField.DEVELOPER), preview.willWrite)
         assertEquals(preview.applyIndex, preview.focus)
@@ -1194,14 +1121,12 @@ class GameDetailViewModelTest {
     fun `no provider metadata keeps the preview open and explains it until dismissed`() = runTest {
         openLoadedPreview(presets = emptyList())
 
-        // The overlay the user opened says why it is empty; vanishing on its own read as a crash.
         val preview = viewModel.uiState.value.metadataPreview!!
         assertFalse(preview.loading)
         assertTrue(preview.nothingFound)
         assertFalse(preview.failed)
         assertNull(viewModel.uiState.value.actionMessage)
 
-        // Policy input has nothing to act on; Select dismisses, like the panel's only button.
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_LEFT)
         assertEquals(MetadataApplyPolicy.FILL_MISSING_ONLY, viewModel.uiState.value.metadataPreview?.policy)
         viewModel.handleGamepadAction(GamepadAction.SELECT)
@@ -1248,9 +1173,9 @@ class GameDetailViewModelTest {
         coEvery { artworkRepository.applyMetadata(any(), any(), any(), any()) } returns
             setOf(MetadataField.DESCRIPTION, MetadataField.DEVELOPER)
 
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_LEFT)   // Fill Missing Only → Replace All
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_LEFT)
         assertEquals(MetadataApplyPolicy.REPLACE_ALL, viewModel.uiState.value.metadataPreview?.policy)
-        viewModel.handleGamepadAction(GamepadAction.SELECT)          // focus starts on Apply
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify {
@@ -1281,8 +1206,6 @@ class GameDetailViewModelTest {
     fun `the metadata overlay takes controller input once its rows arrive`() = runTest {
         openLoadedPreview()
 
-        // Retrieval is asynchronous: the overlay opens before it has any row, so the cursor can
-        // only be anywhere once the rows have been handed to the engine.
         assertTrue(GameDetailKeys.METADATA_APPLY in viewModel.focusableNodeKeys())
         assertEquals(GameDetailKeys.METADATA_APPLY, viewModel.uiState.value.navFocusKey)
 
@@ -1298,14 +1221,14 @@ class GameDetailViewModelTest {
     fun `switching source re-ticks its changes and toggling a row chooses fields`() = runTest {
         openLoadedPreview()
 
-        viewModel.handleGamepadAction(GamepadAction.NEXT_CATEGORY)   // ScreenScraper → TheGamesDB
+        viewModel.handleGamepadAction(GamepadAction.NEXT_CATEGORY)
         var preview = viewModel.uiState.value.metadataPreview!!
         assertEquals(MatchProvider.IGDB, preview.preset?.provider)
         assertEquals(setOf(MetadataField.DESCRIPTION), preview.chosen)
         assertEquals(preview.applyIndex, preview.focus)
 
-        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_UP)     // the Description row
-        viewModel.handleGamepadAction(GamepadAction.SELECT)          // untick it
+        viewModel.handleGamepadAction(GamepadAction.NAVIGATE_UP)
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
 
         preview = viewModel.uiState.value.metadataPreview!!
         assertEquals(MetadataApplyPolicy.CHOOSE_FIELDS, preview.policy)
@@ -1313,9 +1236,6 @@ class GameDetailViewModelTest {
         assertTrue(preview.willWrite.isEmpty())
     }
 
-    // ── Navigation (unified engine) ───────────────────────────────────────
-
-    /** Load the game and report the page's first laid-out graph, ready for controller input. */
     private fun loadedAndLaidOut() {
         viewModel.loadGame(1L)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -1324,15 +1244,12 @@ class GameDetailViewModelTest {
 
     @Test
     fun `input before the game loads is dropped and never replayed`() = runTest {
-        // Nothing is loaded yet: the page has no graph, so the engine ignores the press outright.
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
         assertNull(viewModel.uiState.value.navFocusKey)
 
         viewModel.loadGame(1L)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // The dropped press did not accumulate: the cursor starts on Play, where the design says
-        // it starts, and the next press is the one that moves it.
         assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_LEFT)
         assertEquals(GameDetailKeys.OPTIONS, viewModel.uiState.value.navFocusKey)
@@ -1357,14 +1274,12 @@ class GameDetailViewModelTest {
             viewModel.uiState.value.navFocusKey,
         )
 
-        // Back closes the overlay before it can close the page.…
         viewModel.handleGamepadAction(GamepadAction.BACK)
         assertFalse(viewModel.uiState.value.showOptions)
         assertFalse(viewModel.uiState.value.closed)
-        // …and the page is back on the exact node it was interrupted on.
+
         assertEquals(GameDetailKeys.OPTIONS, viewModel.uiState.value.navFocusKey)
 
-        // A second Back, with nothing open, leaves Game Detail.
         viewModel.handleGamepadAction(GamepadAction.BACK)
         assertTrue(viewModel.uiState.value.closed)
     }
@@ -1372,13 +1287,11 @@ class GameDetailViewModelTest {
     @Test
     fun `a page action cannot fire through the Options overlay`() = runTest {
         loadedAndLaidOut()
-        // Page cursor parked on Play. If a page node fired through the overlay, the game would
-        // launch as well as the favorite toggling — which is the loudest possible version of this
-        // bug, and the reason Play is the node this test parks on.
+
         assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
 
         viewModel.handleGamepadAction(GamepadAction.OPEN_CONTEXT_MENU)
-        viewModel.handleGamepadAction(GamepadAction.SELECT)   // the first option: Favorite
+        viewModel.handleGamepadAction(GamepadAction.SELECT)
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.game?.isFavorite == true)
@@ -1399,15 +1312,13 @@ class GameDetailViewModelTest {
         assertTrue(GameDetailKeys.disc(2L) in viewModel.focusableNodeKeys())
         assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
 
-        // Play is the footer's third button, so the disc row hands back its own nearest member —
-        // its last, with two discs. The engine's nearest-index rule, not an accident.
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
         assertEquals(GameDetailKeys.disc(2L), viewModel.uiState.value.navFocusKey)
 
         viewModel.handleGamepadAction(GamepadAction.SELECT)
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(2L, viewModel.uiState.value.selectedDiscId)
-        // Confirming a disc never throws the cursor somewhere unrelated.
+
         assertEquals(GameDetailKeys.disc(2L), viewModel.uiState.value.navFocusKey)
     }
 
@@ -1433,13 +1344,9 @@ class GameDetailViewModelTest {
 
         loadedAndLaidOut()
 
-        // Manual is a row of the Details dropdown now, and a row without a manual is left out
-        // rather than drawn disabled: a menu has no fixed shape to protect.
         assertFalse(DetailQuickAction.MANUAL in viewModel.uiState.value.visibleDetailRows)
         assertFalse(viewModel.uiState.value.hasManual)
 
-        // And the dropdown's own node graph has no row for it either, so neither a controller
-        // nor a tap can reach the action that would have to explain itself.
         viewModel.openDetailsMenu()
         testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(viewModel.uiState.value.showDetailsMenu)
@@ -1451,7 +1358,6 @@ class GameDetailViewModelTest {
 
     @Test
     fun `a manual only in the portable library is enabled and opens`() = runTest {
-        // Not scraped into the internal store; linked from {platform}/manuals by its artwork record.
         coEvery { artworkStore.find(1L, com.psplauncher.feature.artwork.store.ArtworkKind.MANUAL) } returns null
         coEvery {
             artworkRecordDao.get(1L, com.psplauncher.feature.artwork.store.ArtworkKind.MANUAL.name)
@@ -1480,7 +1386,6 @@ class GameDetailViewModelTest {
             viewModel.uiState.value.navFocusKey,
         )
 
-        // The two menus never stack: choosing Options closes this one as it opens that one.
         viewModel.onDetailsRowTapped(DetailQuickAction.OPTIONS)
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -1502,7 +1407,7 @@ class GameDetailViewModelTest {
         viewModel.handleGamepadAction(GamepadAction.BACK)
         assertFalse(viewModel.uiState.value.showDetailsMenu)
         assertFalse(viewModel.uiState.value.closed)
-        // The page gets its own cursor back, on the node it was interrupted on.
+
         assertEquals(GameDetailKeys.LAUNCH, viewModel.uiState.value.navFocusKey)
 
         viewModel.handleGamepadAction(GamepadAction.BACK)
@@ -1517,16 +1422,9 @@ class GameDetailViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(GameDetailKeys.FAVORITE, viewModel.uiState.value.navFocusKey)
-        // Touch hides the controller cursor without losing the logical node.
+
         assertFalse(viewModel.uiState.value.cursorVisible)
     }
-
-    // ── Emulator override ─────────────────────────────────────────────────────
-    //
-    // The picker could SET a per-game override and never clear one. That pins a game to
-    // PER_GAME_OVERRIDE, the top rung of the resolver ladder, so fixing the console's default
-    // later never reaches it. The XMB's context menu always had the escape hatch
-    // (`choice.takeIf { it != "default" }`); this page did not.
 
     private fun installPsxProfile() = com.psplauncher.core.domain.model.EmulatorProfile(
         id = "duckstation",
@@ -1547,7 +1445,7 @@ class GameDetailViewModelTest {
         val options = viewModel.uiState.value.emulatorPickerOptions
         assertEquals(DEFAULT_EMULATOR_SENTINEL, options.first().id)
         assertEquals("Use system default", options.first().name)
-        // ...and the real emulators are still there behind it.
+
         assertTrue(options.any { it.id == "duckstation" })
     }
 
@@ -1561,8 +1459,6 @@ class GameDetailViewModelTest {
         viewModel.confirmEmulatorPick(DEFAULT_EMULATOR_SENTINEL)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // null is what clears it. Writing the sentinel as a package name would pin the game to an
-        // emulator called "default" that does not exist.
         coVerify { gameRepository.setPreferredEmulator(1L, null) }
         coVerify(exactly = 0) { gameRepository.setPreferredEmulator(1L, DEFAULT_EMULATOR_SENTINEL) }
     }
@@ -1582,8 +1478,6 @@ class GameDetailViewModelTest {
 
     @Test
     fun `with no override the cursor starts on the clear row, which is the truth`() = runTest {
-        // fakeGame carries no emulatorPackage, so "system default" IS the current state and the
-        // highlight must say so rather than pointing at an emulator that was never chosen.
         installPsxProfile()
         loadedAndLaidOut()
 
@@ -1593,15 +1487,6 @@ class GameDetailViewModelTest {
         assertEquals(0, viewModel.uiState.value.emulatorPickerIndex)
     }
 
-    // ── The remove confirmation ───────────────────────────────────────────────
-    //
-    // It was a Material3 AlertDialog, which renders into its own platform Window: while it held
-    // focus, MainActivity.dispatchKeyEvent never ran, so the gamepad pipeline never saw a press.
-    // Verified on device -- BUTTON_A, BUTTON_B and the D-pad all did nothing and touch was the
-    // only way out, while the footer promised "A Enter / B Back". The ViewModel also intercepted
-    // confirmRemove before the engine, which made the CONFIRM_REMOVE / CONFIRM_CANCEL nodes dead
-    // code AND wired Confirm straight to the destructive choice.
-
     @Test
     fun `the remove prompt opens on Cancel, not on Remove`() = runTest {
         loadedAndLaidOut()
@@ -1609,7 +1494,7 @@ class GameDetailViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.confirmRemove)
-        // A destructive prompt must never open with the cursor on the destructive choice.
+
         assertEquals(GameDetailKeys.CONFIRM_CANCEL, viewModel.uiState.value.navFocusKey)
     }
 
@@ -1619,10 +1504,6 @@ class GameDetailViewModelTest {
         viewModel.activateAction(DetailAction.REMOVE)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // DOWN reaches Remove. The two are top-level sibling nodes, and top-level siblings move
-        // on the vertical axis in this engine -- a node's `children` are the LEFT/RIGHT axis. The
-        // overlay is drawn as a stacked pair for exactly that reason. Under the old intercept
-        // every direction was swallowed, so no axis worked at all.
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
         assertEquals(GameDetailKeys.CONFIRM_REMOVE, viewModel.uiState.value.navFocusKey)
 

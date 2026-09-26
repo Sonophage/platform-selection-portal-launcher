@@ -7,31 +7,9 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The built-in categories were defined twice and had already drifted.
- *
- * `CategoryRepositoryImpl.BUILT_IN_CATEGORIES` called itself the single source of truth and gained
- * a Library row. `XMBViewModel.FALLBACK_CATEGORIES` was a byte-for-byte copy of the other seven and
- * never did. That was not only a cold-start difference:
- *
- *  * `canonicalXmbCategories` derives its set of built-in ids from the crossbar's copy, so Library
- *    missed the built-in branch, fell through to the custom-category path, and lost the canonical
- *    icon every other built-in is guaranteed.
- *  * `observeCategoryBar` does `categories.ifEmpty { FALLBACK_CATEGORIES }`, so on an empty read
- *    the Library section disappeared from the bar entirely.
- *
- * The sting: `canonicalXmbCategories` exists BECAUSE the bar and the repository drifted apart once
- * before. The merge rule was guarded; the two lists it merged were not.
- *
- * The fix was not to test that two copies agree. It was to have one list, in core-domain, which
- * both sides now read. These tests hold that line.
- */
 class CategoryBarFallbackTest {
-
     @Test
     fun `the crossbar's fallback IS the canonical list, not a copy of it`() {
-        // Identity, not equality. A future edit that reintroduces a hand-written duplicate here
-        // would still pass an equality check on the day it was written, and drift afterwards.
         assertSame(BUILT_IN_CATEGORIES, XMBViewModel.FALLBACK_CATEGORIES)
     }
 
@@ -42,13 +20,6 @@ class CategoryBarFallbackTest {
 
     @Test
     fun `a stored built-in keeps its canonical icon instead of the database's`() {
-        // THE consequence of the drift, stated as the property it broke.
-        //
-        // canonicalXmbCategories reads its builtInIds from this list. A category present in the
-        // database but missing from the list is not recognised as built-in, so it falls through to
-        // customCategories and is passed through VERBATIM -- keeping whatever icon key the row
-        // happens to carry instead of the canonical one every built-in is guaranteed. Library was
-        // in exactly that position.
         val storedWithJunkIcon = BUILT_IN_CATEGORIES.map { it.copy(iconKey = "ic_WRONG") }
 
         val merged = canonicalXmbCategories(storedWithJunkIcon, XMBViewModel.FALLBACK_CATEGORIES)
@@ -62,8 +33,6 @@ class CategoryBarFallbackTest {
 
     @Test
     fun `an unrecognised category really would keep the database's icon`() {
-        // The control for the test above. Without it, that assertion would pass against a merge
-        // that simply overwrote every icon regardless of whether the id was recognised.
         val stranger = BUILT_IN_CATEGORIES.first().copy(id = "not_a_builtin", iconKey = "ic_WRONG")
 
         val merged = canonicalXmbCategories(listOf(stranger), XMBViewModel.FALLBACK_CATEGORIES)
@@ -81,15 +50,6 @@ class CategoryBarFallbackTest {
 
     @Test
     fun `the defaults are an ORDER, not a set of reserved numbers`() {
-        // This used to assert that Library sat past every other built-in, so an older database
-        // could gain it without colliding with a position one of its rows already held. That rule
-        // made the default order unchangeable: every column added after the first release had to
-        // go on the end, whatever the bar should actually read like.
-        //
-        // Collisions are handled where they happen instead — reconcileBuiltInCategories appends a
-        // NEW built-in past whatever the database already holds and ignores the constant's number,
-        // because on an established install that number is the fresh-install order and the user
-        // has arranged their own. So the only thing left to assert here is what the order IS.
         assertEquals(
             listOf(
                 BuiltInCategory.RECENTLY_PLAYED,
@@ -117,20 +77,6 @@ class CategoryBarFallbackTest {
         )
     }
 
-    /**
-     * Last Played, then Shelves, then Game — in that order and with nothing between them.
-     *
-     * This used to assert that Last Played sat immediately left of GAME, and its comment gave the
-     * reason: a gap would let a future built-in land between them. One now has, deliberately —
-     * Shelves was placed there on 2026-09-24 ("make it the first item out of Recent").
-     *
-     * THE COST IS REAL AND IS THE REASON THIS TEST STILL EXISTS. Last Played has no caticon and is
-     * the screen the launcher opens on, so "one step left of Game" was its only route for a
-     * controller. It is two steps now, through Shelves, whenever Shelves has anything in it —
-     * and one step again whenever it does not, because an empty Shelves is not drawn and not
-     * stepped onto. The chain is what has to stay unbroken: anything landing between these three
-     * puts a column the user did not ask for in front of the one they live on.
-     */
     @Test
     fun `Last Played, then Shelves, then Game, with nothing between them`() {
         val recent = BUILT_IN_CATEGORIES.first { it.id == BuiltInCategory.RECENTLY_PLAYED }
@@ -142,8 +88,6 @@ class CategoryBarFallbackTest {
 
     @Test
     fun `no two built-ins share a position`() {
-        // The failure the rules above exist to prevent. A duplicate would make the bar's order
-        // depend on list order alone, which nothing else in the app promises to preserve.
         val positions = BUILT_IN_CATEGORIES.map { it.position }
         assertEquals("two built-ins share a position", positions.size, positions.toSet().size)
     }

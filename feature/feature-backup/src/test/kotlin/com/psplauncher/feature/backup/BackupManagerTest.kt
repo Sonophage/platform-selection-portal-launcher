@@ -33,7 +33,6 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 class BackupManagerTest {
-
     @get:Rule val tempFolder = TemporaryFolder()
 
     private lateinit var context: Context
@@ -53,15 +52,11 @@ class BackupManagerTest {
         backupDao      = mockk(relaxed = true)
         backupFolderRepository = mockk(relaxed = true)
 
-        // android.net.Uri isn't available in plain JVM unit tests — mock its factory so the
-        // restore tests (which take a Uri) and the export stub can run.
         mockkStatic(Uri::class)
         every { Uri.fromFile(any()) } returns mockk(relaxed = true)
 
-        // A backup folder is configured (the SAF export is stubbed via ExportingBackupManager).
         coEvery { backupFolderRepository.get() } returns "content://backup/tree"
 
-        // filesDir backs the v2 asset bundling / restore staging; cacheDir backs the temp ZIP.
         every { context.filesDir } returns tempFolder.newFolder("filesDir_default")
         every { context.cacheDir } returns tempFolder.newFolder("cache")
 
@@ -73,13 +68,10 @@ class BackupManagerTest {
         unmockkAll()
     }
 
-    // Test double: exports the built ZIP into a real temp dir instead of a SAF tree, so the tests
-    // can read the resulting file back. Records the last exported file.
     private open inner class ExportingBackupManager :
         BackupManager(
             context, gameDao, categoryDao, playSessionDao, backupDao, backupFolderRepository,
-            // Added to BackupManager's constructor after this test was written; relaxed mocks
-            // because none of them participates in the export paths exercised here.
+
             mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true),
         ) {
         var lastExported: File? = null
@@ -92,8 +84,6 @@ class BackupManagerTest {
         override suspend fun readSettingsSnapshot(): SettingsSnapshot = SettingsSnapshot()
         override suspend fun restoreSettingsSnapshot(snapshot: SettingsSnapshot) = Unit
     }
-
-    // ── createBackup ────────────────────────────────────────────────────
 
     @Test
     fun `createBackup returns Success and exported file exists`() = runTest {
@@ -158,8 +148,6 @@ class BackupManagerTest {
         assertEquals("secret-api-key", snapshot.entries["sgdb_api_key"])
         assertEquals("false", snapshot.entries["display_show_boot"])
     }
-
-    // ── restoreBackup ───────────────────────────────────────────────────
 
     @Test
     fun `restoreBackup returns Failure when URI cannot be opened`() = runTest {
@@ -266,8 +254,6 @@ class BackupManagerTest {
         assertEquals(expected.absolutePath.replace('\\', '/'), hero.replace('\\', '/'))
         assertTrue("Bundled art should have been extracted", expected.exists())
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────
 
     private fun fakeGame(id: Long = 1L) = GameEntity(
         id = id, title = "Test Game $id", platformId = "psx", romPath = null,

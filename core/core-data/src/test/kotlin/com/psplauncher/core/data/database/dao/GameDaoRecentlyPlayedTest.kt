@@ -15,24 +15,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * The query behind the Last Played section.
- *
- * It had no coverage at all and no callers either, right up until the section was built on it, so
- * every clause in it was a claim nobody had checked. Each one is a way the shelf could be quietly
- * wrong rather than visibly broken:
- *
- *  - the ORDER BY is the section's entire meaning; reversed, it is a list of what you played
- *    longest ago, and it still looks like a working list;
- *  - the null filter is what keeps a fresh library's shelf empty instead of full of games in
- *    arbitrary id order, which would read as "you played all of these";
- *  - the is_missing filter keeps a game whose file has gone away off a shelf whose whole promise
- *    is that pressing A resumes what you were doing.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class GameDaoRecentlyPlayedTest {
-
     private lateinit var db: PFPDatabase
     private lateinit var dao: GameDao
 
@@ -103,8 +88,6 @@ class GameDaoRecentlyPlayedTest {
 
         val recent = dao.observeRecentlyPlayed(limit = 10).first()
 
-        // Guard on the guard: the control row has to be there, or "Never Played is absent" is
-        // also true of a query that returns nothing at all.
         assertEquals("the played game must be on the shelf", listOf("Played Once"), recent.map { it.title })
     }
 

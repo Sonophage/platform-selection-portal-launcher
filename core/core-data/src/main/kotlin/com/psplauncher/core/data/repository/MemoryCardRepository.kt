@@ -14,9 +14,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Single source of truth for the user's manually configured console libraries.
-// Nothing here runs automatically — every card is created, edited and scanned in
-// response to an explicit user action in the Library Manager or a context menu.
 @Singleton
 class MemoryCardRepository @Inject constructor(
     private val memoryCardDao: MemoryCardDao,
@@ -34,19 +31,14 @@ class MemoryCardRepository @Inject constructor(
     suspend fun getById(platformId: String): MemoryCard? =
         memoryCardDao.getById(platformId)?.toDomain()
 
-    // The catalog of platform definitions the user can pick from when adding a console.
     suspend fun availablePlatformCatalog(): List<Platform> =
         platformDao.observeAll().first().map { it.toDomain() }
 
-    // Platforms that don't already have a card — used by the Add Console picker so a
-    // platform can never be added twice (one card per platform).
     suspend fun unconfiguredPlatforms(): List<Platform> {
         val configured = memoryCardDao.getAll().map { it.platformId }.toSet()
         return availablePlatformCatalog().filter { it.id !in configured }
     }
 
-    // Creates a card for a platform. Default extensions come from the platform catalog
-    // but can be overridden by the caller.
     suspend fun addCard(
         platformId: String,
         displayName: String,
@@ -75,8 +67,6 @@ class MemoryCardRepository @Inject constructor(
         return card
     }
 
-    // Removing a card also removes that platform's games from the library. ROM files on
-    // disk are never touched.
     suspend fun remove(platformId: String) {
         gameDao.deleteByPlatform(platformId)
         memoryCardDao.delete(platformId)
@@ -95,16 +85,12 @@ class MemoryCardRepository @Inject constructor(
     suspend fun setRomDirectory(platformId: String, dir: String?) =
         memoryCardDao.setRomDirectory(platformId, dir)
 
-    // Points a card at a SAF-granted folder: stores the persisted tree URI (scan/launch source of
-    // truth) plus the derived raw path (display / {rom_path} fallback). No storage permission needed.
     suspend fun setSafFolder(platformId: String, treeUri: String, derivedPath: String?) =
         memoryCardDao.setSafFolder(platformId, treeUri, derivedPath)
 
     suspend fun setEmulator(platformId: String, emulatorId: String?) =
         memoryCardDao.setEmulator(platformId, emulatorId)
 
-    // Overwrites the card's scan extensions. Entries are normalized to the stored form
-    // (lowercase, no leading dot, trimmed, de-duplicated) so scanning matches reliably.
     suspend fun setExtensions(platformId: String, extensions: List<String>) {
         val normalized = extensions
             .map { it.trim().lowercase().removePrefix(".") }
@@ -114,8 +100,6 @@ class MemoryCardRepository @Inject constructor(
         Timber.i("Memory Card $platformId extensions set: $normalized")
     }
 
-    // Recomputes the persisted game count from the actual games table (real games only —
-    // standard app rows on a platform don't show on its card).
     suspend fun recountGames(platformId: String) {
         memoryCardDao.updateGameCount(platformId, gameDao.countGamesByPlatform(platformId))
     }
@@ -124,9 +108,6 @@ class MemoryCardRepository @Inject constructor(
         memoryCardDao.updateScanResult(platformId, scannedAt, gameDao.countGamesByPlatform(platformId))
     }
 
-    // Swaps sort_order with the adjacent card in the given direction (within the full
-    // ordered list). Pinned grouping is preserved because the list is already ordered
-    // pinned-first. Returns true when a move happened.
     suspend fun move(platformId: String, up: Boolean): Boolean {
         val ordered = memoryCardDao.getAll()
         val index = ordered.indexOfFirst { it.platformId == platformId }
@@ -136,7 +117,7 @@ class MemoryCardRepository @Inject constructor(
 
         val current = ordered[index]
         val target  = ordered[targetIndex]
-        // Only reorder within the same pinned group to keep pinned cards on top.
+
         if (current.pinned != target.pinned) return false
 
         memoryCardDao.setSortOrder(current.platformId, target.sortOrder)

@@ -14,23 +14,9 @@ import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Settles task 1.1 (docs/plans/artwork-revisions-merge-fixes-plan.md §3): does
- * `GameDao.upsert`'s `@Insert(onConflict = REPLACE)` cascade-delete a game's children when it
- * replaces an existing row?
- *
- * Room's generated `onOpen` runs `PRAGMA foreign_keys = ON` unconditionally, including for this
- * Robolectric in-memory database (`PFPDatabase_Impl.onOpen`, generated). Per SQLite's REPLACE
- * conflict-resolution semantics, a REPLACE that deletes a conflicting row fires that row's foreign
- * key actions once `foreign_keys` is on, regardless of `recursive_triggers` (that pragma only gates
- * DELETE *triggers*, not FK actions). `play_sessions` and `collection_games` both declare
- * `ON DELETE CASCADE` against `games.id`. So an upsert that replaces an existing game id is expected
- * to delete its play sessions and collection membership before the replacement row is inserted.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class GameUpsertCascadeTest {
-
     private val db = Room.inMemoryDatabaseBuilder(
         ApplicationProvider.getApplicationContext(),
         PFPDatabase::class.java,
@@ -66,24 +52,12 @@ class GameUpsertCascadeTest {
         val collectionId = collectionDao.insert(CollectionEntity(name = "Favorites"))
         collectionDao.addGame(CollectionGameEntity(collectionId, gameId))
 
-        // A Fill-style REPLACE upsert on the same id, as PcGameScanner's Fill path issues today.
         gameDao.upsert(game("Portal 2").copy(id = gameId, title = "Portal 2 (rescraped)"))
 
         assertEquals(0, playSessionDao.getAll().size)
         assertEquals(0, collectionDao.getGameIdsInCollection(collectionId).size)
     }
 
-    /**
-     * ...and the mirror of that fact: the write PcShortcutImporter actually uses.
-     *
-     * Pin reconcile runs at every app start, and it used to attach a launcher handle to a matched
-     * row with the same REPLACE upsert asserted above -- so pressing "Add to home" inside a wrapper
-     * deleted that game's playtime and its collection membership. `attachLauncherHandle` writes the
-     * three columns in place instead.
-     *
-     * This test is the guard; the one above is the reason it exists. If someone ever swaps this
-     * call back to `upsert` because it is shorter, this goes red and the one above stays green.
-     */
     @Test
     fun `attaching a launcher handle keeps the game's play sessions and collections`() = runTest {
         val gameId = gameDao.upsert(game("Portal 2"))
@@ -101,7 +75,6 @@ class GameUpsertCascadeTest {
         assertEquals(1, playSessionDao.getAll().size)
         assertEquals(1, collectionDao.getGameIdsInCollection(collectionId).size)
 
-        // And it actually wrote the handle, rather than being a no-op that trivially preserves them.
         val after = gameDao.getById(gameId)!!
         assertEquals("com.winlator", after.packageName)
         assertEquals("shortcut-42", after.launchShortcutId)

@@ -19,8 +19,7 @@ Android home screen as a single front end for ROM emulation, Android games, PC-l
 
 > This document is the **user manual**. It walks you from install to daily use, feature by
 > feature. Building the project from source is covered last, in
-> **[For Developers](#7-for-developers)**. For a deep architectural tour of the codebase, see
-> **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+> **[For Developers](#7-for-developers)**.
 
 ---
 
@@ -1014,4 +1013,5 @@ issue and it will be addressed promptly.
 
 ## 9. License
 
-See [LICENSE](LICENSE).
+There is no `LICENSE` file, deliberately. Most of this code is not the maintainer's to license.
+See [NOTICE.md](NOTICE.md).

@@ -56,15 +56,6 @@ import com.psplauncher.core.ui.theme.solveScrimColor
 import com.psplauncher.feature.settings.viewmodel.DisplaySettingsUiState
 import com.psplauncher.feature.settings.viewmodel.DisplaySettingsViewModel
 
-/**
- * Which part of this screen to show. Display had grown into eight groups covering wallpaper, XMB
- * layout, boot animations, screen orientation, touch input, thermal behaviour and whether Confirm
- * launches a game — it was where a setting went when it had no obvious home, which is why nothing
- * could be found in it.
- *
- * The screen is unchanged; each entry point renders only its own groups. Same idea as
- * [EmulatorSettingsSection], and null still renders everything.
- */
 enum class DisplaySection { APPEARANCE, LAYOUT, BOOT, INPUT, PERFORMANCE }
 
 @Composable
@@ -80,26 +71,16 @@ fun DisplaySettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Font-colour picker state. Held here rather than in the ViewModel for the same reason the
-    // Themes screen holds its icon picker locally: nothing is persisted until Apply.
     var fontPickerOpen by remember { mutableStateOf(false) }
     var pickerHue by remember { mutableFloatStateOf(0f) }
     var pickerSat by remember { mutableFloatStateOf(0f) }
     var pickerVal by remember { mutableFloatStateOf(1f) }
     var pickerChannel by remember { mutableIntStateOf(0) }
-    // Biblically Accurate PSP XMB confirmation: the highlighted option while it is open, null when closed.
-    var pspConfirmFocus by remember { mutableStateOf<Int?>(null) }
-    // The "Hidden Items" manager moved to Settings ▸ Library ▸ Hidden Games
-    // (settings_app_visibility) — see docs/plans/README.md (Settings hierarchy).
 
-    // Which media row the cursor is on right now — the north/west face-button shortcuts act on
-    // it. Every other row clears it (a media row clears itself when it loses focus; the toggles
-    // beside them clear it on gain, which covers the gain-before-loss ordering), so the shortcuts
-    // are inert everywhere else on this screen.
+    var pspConfirmFocus by remember { mutableStateOf<Int?>(null) }
+
     var focusedSlot by remember { mutableStateOf<UiMediaSlot?>(null) }
 
-    // Restoring focus after the picker or a reset removes the row's inline action — without this
-    // the navigation fallback lands somewhere else entirely. Same machinery as the Sound screen.
     var focusTargetSlot by remember { mutableStateOf<UiMediaSlot?>(null) }
     var focusRequestToken by remember { mutableIntStateOf(0) }
     var importWasActive by remember { mutableStateOf(false) }
@@ -113,14 +94,12 @@ fun DisplaySettingsScreen(
         ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let { viewModel.onWallpaperPicked(it) } }
 
-    // ONE picker for every boot/GameBoot media row; the pending slot lives on the ViewModel.
     val uiMediaPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
             viewModel.onUiMediaPicked(uri)
         } else {
-            // Cancellation does not change import state, so restore immediately.
             focusTargetSlot?.let(::requestMediaFocus)
         }
     }
@@ -131,8 +110,6 @@ fun DisplaySettingsScreen(
         uiMediaPicker.launch(viewModel.uiMediaPickerMime(slot))
     }
 
-    // A rejected import leaves the assignment set unchanged, so "importing went false" is the
-    // reliable completion signal rather than waiting for the row's value to differ.
     LaunchedEffect(state.wallpaperImporting) {
         if (state.wallpaperImporting) {
             importWasActive = true
@@ -143,13 +120,8 @@ fun DisplaySettingsScreen(
     }
 
     fun launchWallpaperPicker() {
-        // The wallpaper import shares the importing flag with the media rows, so clear any
-        // pending media focus target first: otherwise finishing a wallpaper import would drag
-        // the cursor back to whichever media row was picked last.
         focusTargetSlot = null
-        // ONE picker, not two: the user's mental model is "my background". Still images land on
-        // the existing still path; MP4/WebM/GIF route to the motion importer (onWallpaperPicked
-        // branches on MIME).
+
         wallpaperPicker.launch(
             arrayOf(
                 "image/png", "image/jpeg", "image/webp",
@@ -159,8 +131,7 @@ fun DisplaySettingsScreen(
     }
 
     SettingsPageScaffold(
-        // The header names the entry point, not the file. Five rows open this one screen, and a
-        // breadcrumb reading "Display" for the row you picked called Layout is its own small lie.
+
         subtitle = when (section) {
             DisplaySection.APPEARANCE  -> "Wallpaper & Text"
             DisplaySection.LAYOUT      -> "Layout"
@@ -171,14 +142,12 @@ fun DisplaySettingsScreen(
         },
         onBack   = onBack,
         modifier = modifier,
-        // Empty, not SettingsDefaultHelperItems: SettingsHelperFooter already falls back with
-        // `items.ifEmpty { SettingsDefaultHelperItems }`, so restating the default here would be
-        // a second copy of the same rule. Same expression the Sound screen uses.
+
         helperFooterItems = focusedSlot?.let { slot ->
             MediaRowShortcuts.promptsFor(state.xyLayout, isAssigned = slot.isAssignedIn(state))
         } ?: emptyList(),
         onInterceptAction = { action ->
-            // The PSP layout confirmation is a hard input boundary: nothing behind it sees a press.
+
             pspConfirmFocus?.let { focused ->
                 when (action) {
                     GamepadAction.NAVIGATE_LEFT, GamepadAction.NAVIGATE_RIGHT ->
@@ -192,21 +161,17 @@ fun DisplaySettingsScreen(
                 }
                 return@SettingsPageScaffold true
             }
-            // Fullscreen wallpaper preview swallows Confirm/Back — either dismisses it, same
-            // as tapping, and the focused row underneath can never be activated through it.
+
             if (state.wallpaperPreviewVisible) {
                 if (action == GamepadAction.SELECT || action == GamepadAction.BACK) {
                     viewModel.hideWallpaperPreview()
                 }
                 return@SettingsPageScaffold true
             }
-            // North resets the focused media row, west previews it — the same physical buttons
-            // doing the same jobs as on the Sound screen. Only consumed over a media row.
+
             val slot = focusedSlot ?: return@SettingsPageScaffold false
             when {
                 MediaRowShortcuts.isNorthFace(action, state.xyLayout) && slot.isAssignedIn(state) -> {
-                    // Advertised only while the row has a custom assignment, so this is consumed
-                    // only when it has real work to do. Restore focus after the action vanishes.
                     requestMediaFocus(slot)
                     viewModel.clearUiMedia(slot)
                     true
@@ -226,8 +191,6 @@ fun DisplaySettingsScreen(
         val focusRegistry = LocalSettingsFocusRegistry.current
         LaunchedEffect(focusRequestToken) {
             if (focusRequestToken > 0) {
-                // Wait until the removed inline action has left composition and the scaffold has
-                // finished its own focus-recovery pass.
                 withFrameNanos { }
                 withFrameNanos { }
                 focusTargetSlot?.let { slot ->
@@ -246,10 +209,6 @@ fun DisplaySettingsScreen(
             if (section == null || section == DisplaySection.APPEARANCE) {
                 SettingsGroup("Appearance")
 
-                // Setting a wallpaper automatically replaces the wave; resetting it brings
-                // the wave back. No separate mode toggle needed.
-
-                // ── Wallpaper controls ────────────────────────────────────────
                 if (state.wallpaperImporting) {
                     LinearProgressIndicator(
                         modifier = Modifier
@@ -280,8 +239,6 @@ fun DisplaySettingsScreen(
                     }
                 }
 
-                // Only offered when there IS a wallpaper: with no wallpaper the wave is already
-                // the background and this would be a switch that does nothing.
                 if (state.customWallpaperPath != null) {
                     SettingsToggleRow(
                         label    = "Wave Over Wallpaper",
@@ -291,14 +248,6 @@ fun DisplaySettingsScreen(
                     )
                 }
 
-                // ── Wave Style — relevant when no wallpaper is set, AND when a wallpaper is set
-                // but the wave is being kept over it. That second case is new: the row used to be
-                // hidden the moment a wallpaper existed, which with Wave Over Wallpaper on would
-                // have left a visible wave whose style could not be reached. When a MOTION
-                // wallpaper is set the same cycle shows as "Background Motion" (one setting
-                // governs "how lively is my background" regardless of which background is active —
-                // both write KEY_WAVE_STYLE, so a user who set Static for the wave gets a still
-                // poster the moment they pick a video).
                 if (state.customWallpaperPath == null || state.waveOverWallpaper) {
                     SettingsPickerRow(
                         label    = "Wave Style",
@@ -315,8 +264,6 @@ fun DisplaySettingsScreen(
                     )
                 }
 
-                // Icon legibility is an appearance choice, NOT gated on a wallpaper being set —
-                // it matters most over a wallpaper, but still applies over the wave.
                 SettingsPickerRow(
                     label    = "Icon Legibility",
                     sublabel = "How XMB icons separate from the background",
@@ -327,10 +274,7 @@ fun DisplaySettingsScreen(
 
                 SettingsToggleRow(
                     label    = "Apps On The Recent Shelf",
-                    // Says what it costs, because the answer is not obvious until it has already
-                    // happened: the shelf is the screen the launcher opens on, and the most
-                    // recently used thing on a device full of apps is often one opened for ten
-                    // seconds — which pushes the game you were playing off your own home screen.
+
                     sublabel = "Show recently used apps beside games, music, books and video. " +
                         "Needs usage access; without it no app has a last-used time and none appear",
                     checked  = state.recentsIncludeApps,
@@ -351,8 +295,6 @@ fun DisplaySettingsScreen(
                     onToggle = { viewModel.setFadeByDistance(it) },
                 )
 
-                // Default on: the shadow is subtle and helper text over bright wallpaper reads far
-                // better with it. Users on static dark wallpapers can turn it off.
                 SettingsToggleRow(
                     label    = "Text Shadow",
                     sublabel = "Drop shadow behind row helper text — keeps it readable over bright wallpaper regions",
@@ -360,9 +302,6 @@ fun DisplaySettingsScreen(
                     onToggle = { viewModel.setTextShadow(it) },
                 )
 
-                // ── Font Colour ──────────────────────────────────────────────────
-                // Deliberately next to Text Shadow: the two answer the same question (how does text
-                // survive the wallpaper), and AUTO reads the shadow toggle as "may I use a shadow?".
                 SettingsValueRow(
                     label    = "Font Colour",
                     sublabel = "Colour for labels and body text across the interface",
@@ -402,7 +341,6 @@ fun DisplaySettingsScreen(
                     selectedIndex = TextLegibilityStyle.entries.indexOf(state.textLegibility),
                     onPick   = { viewModel.setTextLegibility(TextLegibilityStyle.entries[it]) },
                 )
-
             }
             if (section == null || section == DisplaySection.LAYOUT) {
                 SettingsGroup("XMB Layout")
@@ -412,8 +350,7 @@ fun DisplaySettingsScreen(
                         "foldable, tablet) keeps its own tuning.",
                     color    = SettingsSubtext,
                     fontSize = 12.sp,
-                    // Same helper-text shadow as the row family — this paragraph sits directly
-                    // over the translucent backdrop too.
+
                     style    = androidx.compose.ui.text.TextStyle(shadow = SettingsTextShadow),
                     modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp),
                 )
@@ -424,8 +361,6 @@ fun DisplaySettingsScreen(
                     onClick  = onOpenXmbLayoutAdjust,
                 )
 
-                // Greyed out while this screen size's saved layout IS the preset; any change saved from
-                // the editor above, a reset to default included, brings it back.
                 SettingsRow(
                     label    = "Biblically Accurate PSP XMB",
                     sublabel = if (state.pspLayoutApplied) {
@@ -442,7 +377,6 @@ fun DisplaySettingsScreen(
                     sublabel = "Replace any icon with your own image or GIF — live over the XMB",
                     onClick  = onOpenCustomIcons,
                 )
-
             }
             if (section == null || section == DisplaySection.BOOT) {
                 SettingsGroup("Boot Sequence")
@@ -463,10 +397,6 @@ fun DisplaySettingsScreen(
                     onToggle = { viewModel.setShowBootOnResume(it) },
                 )
 
-                // ONE field, the same shape as GameBoot below and as every row on the Sound screen:
-                // the boot sequence is the built-in logo animation until a clip replaces the whole
-                // thing. Boot SOUND is deliberately not here — it is the seventh row of
-                // Interface ▸ Sound, which owns every sound in the app.
                 MediaAssignmentRow(
                     label    = "Boot Video",
                     focusKey = "display_${UiMediaSlot.BOOT_VIDEO.key}",
@@ -480,10 +410,6 @@ fun DisplaySettingsScreen(
                     onFocusChanged = { focusedSlot = if (it) UiMediaSlot.BOOT_VIDEO else null },
                 )
 
-                // The two switches below are one animation behind two names, and saying so here
-                // is the whole point of this group heading. A user who turned GameBoot off found
-                // that films still spun a disc and games launched in silence, with nothing on
-                // either row connecting the two.
                 SettingsGroup("Launch Disc  ·  two switches, one animation")
 
                 SettingsToggleRow(
@@ -511,8 +437,6 @@ fun DisplaySettingsScreen(
                     onToggle = { viewModel.setGameBootEnabled(it) },
                 )
 
-                // The field only means anything while GameBoot is on — replacing or previewing a
-                // presentation that never plays is a row that lies about what it does.
                 if (state.gameBootEnabled) {
                     MediaAssignmentRow(
                         label    = "GameBoot Video",
@@ -527,27 +451,16 @@ fun DisplaySettingsScreen(
                         onFocusChanged = { focusedSlot = if (it) UiMediaSlot.GAMEBOOT_VIDEO else null },
                     )
                 }
-
             }
             if (section == null || section == DisplaySection.LAYOUT) {
                 SettingsGroup("Orientation")
 
-                // Informational, with nothing behind it: there is no runtime control, and
-                // requestedOrientation is set nowhere in the app. The manifest is the whole lever.
-                //
-                // It said "Landscape (fixed)" until 2026-09-24 and that stopped being true the
-                // moment the manifest went to screenOrientation="user". A settings row is a claim
-                // about the app, and one nothing enforces goes stale silently.
                 SettingsValueRow(
                     label    = "Screen Orientation",
                     sublabel = "Follows the device — the XMB is drawn for landscape, so a portrait " +
                         "device will letterbox it",
                     value    = "Android auto-rotate",
                 )
-
-                // (The old "Icon Style" option lived here — replaced by Artwork ▸ Game Icon
-                // Display, which offers the same cartridge look via Physical Media mode.)
-
             }
             if (section == null || section == DisplaySection.INPUT) {
                 SettingsGroup("Interface")
@@ -579,8 +492,7 @@ fun DisplaySettingsScreen(
 
                 SettingsSliderRow(
                     label     = "Hint Delay",
-                    // The range and its ends come from the policy rather than being spelled out
-                    // here, because prose that names numbers is the copy that goes stale first.
+
                     sublabel  = "Always shown at ${formatHintDelay(ControllerHintPolicy.MIN_DELAY_SECONDS)}, " +
                         "or hide until a pause of up to ${formatHintDelay(ControllerHintPolicy.MAX_DELAY_SECONDS)}",
                     value     = state.contextMenuHintDelaySeconds,
@@ -590,7 +502,6 @@ fun DisplaySettingsScreen(
                     enabled  = state.contextMenuHintEnabled,
                     valueFormatter = { formatHintDelay(it) },
                 )
-
             }
             if (section == null || section == DisplaySection.PERFORMANCE) {
                 SettingsGroup("Performance")
@@ -609,10 +520,6 @@ fun DisplaySettingsScreen(
                     onToggle = { viewModel.setRespectBatterySaver(it) },
                 )
 
-                // (The old "Sound" group lived here — Menu Sounds moved to Settings ▸ Interface ▸
-                // Audio, which owns the same `sound_menu_enabled` pref plus the per-event sound
-                // assignments. No duplicate row may remain.)
-
                 SettingsGroup("Games")
 
                 SettingsToggleRow(
@@ -621,7 +528,6 @@ fun DisplaySettingsScreen(
                     checked  = state.directLaunch,
                     onToggle = { viewModel.setDirectLaunch(it) },
                 )
-
             }
         }
     }
@@ -636,11 +542,6 @@ fun DisplaySettingsScreen(
             val posterPath = state.customWallpaperPath
             val motionPath = state.motionWallpaperPath
             if (motionPath != null && posterPath != null) {
-                // A preview that shows a frozen frame of a video is a bug report waiting to
-                // happen — the full-screen preview PLAYS the motion file. The Settings overlay
-                // covers the shell, so the shell's own motion decision doesn't apply here; this
-                // preview plays unconditionally while visible (it lives and dies with this
-                // screen, and dismissing it disposes the player).
                 MotionWallpaperBackground(
                     posterPath = posterPath,
                     motionPath = motionPath,
@@ -659,8 +560,6 @@ fun DisplaySettingsScreen(
     }
 
     if (fontPickerOpen) {
-        // The strip's two anchors are the real painted backdrop — the solved settings scrim over a
-        // worst-case bright wallpaper — so the ratios shown are the ratios the user will get.
         val pfp = LocalPFPColors.current
         val anchors = remember(pfp.backgroundTop, pfp.backgroundBottom) {
             composite(solveScrimColor(pfp.backgroundTop, 0.72f).copy(alpha = 0.72f), Color.White) to
@@ -699,8 +598,6 @@ fun DisplaySettingsScreen(
         )
     }
 
-    // Three actions, matching the decision: transient dismiss, a permanent opt-out of the clamp,
-    // and a permanent opt-out of the notice (adjustment carries on).
     if (state.textContrastNotice != null) {
         SettingsActionsOverlay(
             title = "Font colour adjusted",
@@ -726,12 +623,6 @@ fun DisplaySettingsScreen(
 private const val PSP_CONFIRM_CANCEL = 0
 private const val PSP_CONFIRM_APPLY = 1
 
-/**
- * Confirmation for Biblically Accurate PSP XMB. The screen's interceptor drives it: LEFT/RIGHT step
- * between Cancel and Apply, SELECT activates, BACK cancels. Hand-built rather than an AlertDialog,
- * whose window receives key events before the pad layer does; App Picker's RemovalConfirmPanel is
- * the same shape. Opens on Cancel, so a stray double press never replaces a tuned layout.
- */
 @Composable
 private fun PspLayoutConfirmPanel(focusedOption: Int, onCancel: () -> Unit, onApply: () -> Unit) {
     Box(
@@ -747,7 +638,7 @@ private fun PspLayoutConfirmPanel(focusedOption: Int, onCancel: () -> Unit, onAp
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xF2101018))
                 .border(1.dp, SettingsDivider, RoundedCornerShape(8.dp))
-                // A tap on the panel itself must not fall through to the scrim's cancel.
+
                 .clickable(enabled = false) {}
                 .padding(20.dp),
         ) {
@@ -772,7 +663,6 @@ private fun PspLayoutConfirmPanel(focusedOption: Int, onCancel: () -> Unit, onAp
     }
 }
 
-/** One option button. Focus is fill and border only, so the row never shifts as the highlight moves. */
 @Composable
 private fun PspConfirmOption(label: String, focused: Boolean, onClick: () -> Unit) {
     Box(
@@ -788,18 +678,11 @@ private fun PspConfirmOption(label: String, focused: Boolean, onClick: () -> Uni
 }
 
 private fun formatHintDelay(seconds: Float): String = when {
-    // Zero is not "0s of inactivity", it is the auto-hide being off, and the slider's own value
-    // label is the only place that says so.
     seconds <= 0f -> "Always"
     seconds % 1f == 0f -> "${seconds.toInt()}s"
     else -> "${seconds}s"
 }
 
-/**
- * Whether [this] media row currently has a custom assignment — what gates the reset shortcut and
- * its prompt. A local extension rather than a state field so the two media rows on this screen
- * cannot answer it differently from the rows themselves.
- */
 private fun UiMediaSlot.isAssignedIn(state: DisplaySettingsUiState): Boolean = when (this) {
     UiMediaSlot.BOOT_VIDEO -> state.bootVideoAssigned
     UiMediaSlot.GAMEBOOT_VIDEO -> state.gameBootVideoAssigned

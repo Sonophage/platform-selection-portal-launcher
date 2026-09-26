@@ -10,7 +10,6 @@ import com.psplauncher.core.data.database.entity.VideoPlaylistEntity
 import com.psplauncher.core.data.database.entity.VideoPlaylistItemEntity
 import kotlinx.coroutines.flow.Flow
 
-// Playlist + its current video count, so the playlist list renders without N queries.
 data class VideoPlaylistWithCount(
     @Embedded val playlist: VideoPlaylistEntity,
     val video_count: Int,
@@ -18,7 +17,6 @@ data class VideoPlaylistWithCount(
 
 @Dao
 interface VideoPlaylistDao {
-
     @Query(
         """
         SELECT p.*, (
@@ -33,8 +31,6 @@ interface VideoPlaylistDao {
     @Query("SELECT * FROM video_playlists WHERE id = :id")
     suspend fun getById(id: Long): VideoPlaylistEntity?
 
-    // A playlist's videos in manual order. INNER JOIN drops orphaned rows (a video a re-scan
-    // removed) automatically.
     @Query(
         """
         SELECT v.* FROM videos v
@@ -66,7 +62,6 @@ interface VideoPlaylistDao {
     @Query("DELETE FROM video_playlists WHERE id = :id")
     suspend fun delete(id: Long)
 
-    // Re-adding an existing membership is a no-op (composite PK + IGNORE).
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addVideo(join: VideoPlaylistItemEntity)
 

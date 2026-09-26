@@ -6,8 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
-// Wraps XMBShellContainer and intercepts the Settings long-press to show the debug menu.
-// This file only exists in the debug source set — release builds use XMBShellContainer directly.
 @Composable
 fun DebugAwareXMBHost(
     xmbShellContainer: @Composable (onSettingsLongPress: () -> Unit) -> Unit,

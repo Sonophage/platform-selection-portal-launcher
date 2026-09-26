@@ -27,8 +27,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class MusicSettingsUiState(
-    // Every configured root, with its live SAF-grant status (same rows as Library Manager's
-    // ROM Root Access — a music library can span internal storage plus an SD card).
+
     val roots: List<RootFolderRow> = emptyList(),
     val defaultPlayer: String? = null,
     val availablePlayers: List<MusicPlayerApp> = emptyList(),
@@ -46,11 +45,6 @@ data class MusicSettingsUiState(
         }
 }
 
-/**
- * Multi-root Music settings, mirroring Library Manager's ROM Root Access: several root folders per
- * section (each a persisted SAF grant whose subfolders become libraries), a rescan that reconciles
- * the library rows with the configured roots and scans each root, and the default player.
- */
 @HiltViewModel
 class MusicSettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -59,15 +53,12 @@ class MusicSettingsViewModel @Inject constructor(
     private val intentResolver: MusicIntentResolver,
     private val mediaRootRepository: MediaRootRepository,
 ) : ViewModel() {
-
     private val notifier = BackgroundTaskNotifier(context)
     private val _ui = MutableStateFlow(MusicSettingsUiState())
     val uiState: StateFlow<MusicSettingsUiState> = _ui
 
     init {
         viewModelScope.launch {
-            // distinctUntilChanged: the backing DataStore is app-wide; without it every unrelated
-            // preference write would re-run the persisted-grant snapshot below.
             mediaRootRepository.roots(MediaRootKind.MUSIC).distinctUntilChanged().collect { roots ->
                 val persisted = SafGrants.persistedReadUris(context.contentResolver)
                 _ui.update {
@@ -88,7 +79,6 @@ class MusicSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Grants (and persists) a new root, adds it to the list, and rescans. */
     fun addRoot(treeUri: Uri) {
         viewModelScope.launch {
             mediaRootRepository.persist(treeUri)
@@ -97,7 +87,6 @@ class MusicSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Removes a root; its library row is dropped on the next rescan. */
     fun removeRoot(treeUri: String) {
         viewModelScope.launch {
             mediaRootRepository.remove(MediaRootKind.MUSIC, treeUri)
@@ -105,7 +94,6 @@ class MusicSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Replaces one root's URI (re-link after a lost grant, or picking a different folder). */
     fun relinkRoot(oldTreeUri: String, newUri: Uri) {
         viewModelScope.launch {
             mediaRootRepository.persist(newUri)
@@ -114,10 +102,6 @@ class MusicSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Reconciles the library rows with the configured roots (dropping rows whose root is gone)
-     * and scans every root incrementally.
-     */
     fun rescan() {
         viewModelScope.launch {
             val roots = mediaRootRepository.getAll(MediaRootKind.MUSIC)
@@ -127,7 +111,6 @@ class MusicSettingsViewModel @Inject constructor(
             }
             _ui.update { it.copy(scanning = true, scanMessage = "Scanning…") }
 
-            // Roots removed in the wizard or here take their library rows with them.
             musicRepository.getFolders()
                 .filter { it.treeUri !in roots }
                 .forEach { musicRepository.removeFolder(it.id) }
@@ -159,14 +142,11 @@ class MusicSettingsViewModel @Inject constructor(
         }
     }
 
-    // ── Default player ──────────────────────────────────────────────────────────
-
     fun openPlayerPicker() =
         _ui.update { it.copy(showPlayerPicker = true, availablePlayers = intentResolver.availablePlayers()) }
 
     fun dismissPlayerPicker() = _ui.update { it.copy(showPlayerPicker = false) }
 
-    /** [value] = [MusicIntentResolver.BUILTIN] (PFP), null (system default), or a package name. */
     fun chooseDefaultPlayer(value: String?) {
         _ui.update { it.copy(showPlayerPicker = false) }
         viewModelScope.launch { musicRepository.setDefaultPlayerPackage(value) }
@@ -174,7 +154,6 @@ class MusicSettingsViewModel @Inject constructor(
 
     fun dismissMessage() = _ui.update { it.copy(scanMessage = null) }
 
-    // Ensures one MusicFolder exists for [root] — other roots keep their own rows (multi-root model).
     private suspend fun syncFolderForRoot(root: String): MusicFolder {
         val existing = musicRepository.getFolders().firstOrNull { it.treeUri == root }
         val folder = existing ?: musicRepository.addFolder(displayName(root), root)

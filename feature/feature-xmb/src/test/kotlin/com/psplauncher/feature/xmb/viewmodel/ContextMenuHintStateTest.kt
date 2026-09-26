@@ -9,31 +9,20 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Pins [shouldShowContextMenuHint] — the gate the idle-timer loop consults. Pure, no coroutine
- * or time dependency: the loop passes in the elapsed idle ms.
- */
 class ContextMenuHintStateTest {
-
     private val gameItem = XMBItem(id = "g1", title = "Game", gameId = 1L)
 
-    /**
-     * Any non-negative idle time satisfies the default delay, which is zero. The tests used to
-     * pass XMBViewModel.IDLE_HINT_DELAY_MS, a 2_500L constant that mirrored the old default and
-     * had already stopped feeding the gate; the gate reads the configured delay off the state.
-     */
     private val IDLE_MS = 0L
 
-    /** A state where the hint is eligible: controller last used, root, game focused, no overlay, idle. */
     private fun eligibleState(idleMs: Long = IDLE_MS) = XMBUiState(
         categories = listOf(Category(BuiltInCategory.GAMES, "Games", "games", type = CategoryType.BUILT_IN, position = 0)),
         selectedCategoryIndex = 0,
         currentItems = listOf(gameItem),
         selectedItemIndex = 0,
-        lastInputWasTouch = false, // controller last used → hint is eligible
+        lastInputWasTouch = false,
         touchNavButtonMode = TouchNavButtonMode.AUTO,
-        showBootSequence = false, // boot overlay is a blocking overlay — must be past it
-    ).let { it.copy(showContextMenuHint = false) } // hint field itself is irrelevant to the gate
+        showBootSequence = false,
+    ).let { it.copy(showContextMenuHint = false) }
 
     @Test
     fun `shows hint when idle long enough over a context-menu item after controller input`() {
@@ -42,10 +31,6 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `an empty home shelf still shows the pill, because X is how you leave it`() {
-        // The regression this exists to stop. Filtering the home shelf to a medium with nothing
-        // in it removes the focused item, which removes both the context menu and any sort — so
-        // a gate that asked only those two hid the pill at the exact moment the user needed to
-        // be told that X is what puts the shelf back. The press always worked; nothing said so.
         val emptyHome = XMBUiState(
             categories = listOf(
                 Category(
@@ -73,9 +58,6 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `still shows after touch input, because the prompts can be tapped`() {
-        // This asserted the opposite while the pill was a legend. The prompts are controls now,
-        // and the touch gate hid them from the only people who would tap them -- and touching one
-        // set the flag that hid it, so it could not be used twice.
         val s = eligibleState().copy(lastInputWasTouch = true)
         assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
     }
@@ -91,10 +73,6 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `hints do not auto-hide at the default delay of zero`() {
-        // The flicker guard. Both markTouchInput and onUserInteraction clear the hint flags on
-        // every input, which was right while the hints waited for a pause. At a zero delay the
-        // poller puts them straight back within IDLE_HINT_POLL_MS, so the eager hide would blink
-        // the bar on every single button press. This property is what makes it conditional.
         assertFalse(eligibleState().hintsAutoHide)
     }
 
@@ -106,24 +84,18 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `recomputing raises the flag on the spot rather than waiting for the poller`() {
-        // The device showed the bar missing for up to one poll tick after every press, because
-        // the flags were a timer's output and only the timer could raise them.
         val s = eligibleState().copy(showContextMenuHint = false)
         assertTrue(s.withHintsShownNow().showContextMenuHint)
     }
 
     @Test
     fun `recomputing is idempotent, because no gate reads a hint flag`() {
-        // If a gate ever consulted one of these flags, recomputing would latch or oscillate.
         val once = eligibleState().withHintsShownNow()
         assertEquals(once, once.withHintsShownNow())
     }
 
     @Test
     fun `recomputing lowers a flag whose gate no longer holds`() {
-        // The example used to be an open context menu, which no longer lowers anything: the pill
-        // shows over the rail now. A detail screen is a gate that still holds, and what is being
-        // tested is the recompute, not which gate it happens to be.
         val stale = eligibleState().copy(
             showContextMenuHint = true,
             activeGameId = 1L,
@@ -133,8 +105,6 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `the setting still switches the hints off entirely`() {
-        // Display ▸ Button Hints. The delay became a preference rather than a fixed pause; this
-        // is the gate that has to keep working, or the setting is decoration.
         val s = eligibleState().copy(contextMenuHintEnabled = false)
         assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
@@ -148,23 +118,18 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `does not show when a blocking overlay is up`() {
-        val s = eligibleState().copy(activeGameId = 1L) // detail screen = blocking overlay
+        val s = eligibleState().copy(activeGameId = 1L)
         assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
     fun `shows over the context rail, which is the one overlay it survives`() {
-        // It used to be hidden here, and that was right while the menu was a panel covering the
-        // corner the pill sits in. The rail leaves that corner empty, and the owner's call is
-        // that the hints stay: "the header and hints still show on top of the context screen".
         val s = eligibleState().copy(activeContextMenu = XMBContextMenu("X", emptyList()))
         assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
     fun `a context menu on top of a REAL blocking overlay still hides it`() {
-        // overlayKeepsChrome, not "a menu is open": a menu left standing while a detail screen opens
-        // must not drag the pill back onto a screen that has its own controls.
         val s = eligibleState().copy(
             activeContextMenu = XMBContextMenu("X", emptyList()),
             activeGameId = 1L,
@@ -181,17 +146,12 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `shows while drilled into a sub-item`() {
-        // Previously suppressed. Drilled-in rows (the game flyout, a library's files) have
-        // context menus and sort, so this is where the affordance is least discoverable.
-        val s = eligibleState().copy(selectedPlatformId = "psp") // drilled into a memory card
+        val s = eligibleState().copy(selectedPlatformId = "psp")
         assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
-    // ── Sort half of the pill ───────────────────────────────────────────────
-
     @Test
     fun `an unsortable root list offers no sort prompt`() {
-        // The Games memory-card root: no platform or collection drilled into.
         assertFalse(eligibleState().canSortCurrentList)
     }
 
@@ -203,7 +163,6 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `a sortable list shows the pill even when the focused item has no context menu`() {
-        // Only the Sort half is drawn; the pill is still worth showing.
         val plain = XMBItem(id = "x", title = "Plain", type = XMBItemType.STANDARD)
         val s = eligibleState().copy(currentItems = listOf(plain), selectedPlatformId = "psp")
         assertFalse(s.focusedItemHasContextMenu)
@@ -248,14 +207,11 @@ class ContextMenuHintStateTest {
         assertTrue(shouldShowContextMenuHint(fiveSeconds, 5_000))
     }
 
-    // ── App Drawer hint branch ────────────────────────────────────────────
-
-    /** A state where the drawer hint is eligible: drawer open, controller last used, idle. */
     private fun drawerEligibleState() = XMBUiState(
         activeAppDrawerFilter = "ALL",
         lastInputWasTouch = false,
         showBootSequence = false,
-    ).let { it.copy(showAppDrawerHint = false) } // hint field itself is irrelevant to the gate
+    ).let { it.copy(showAppDrawerHint = false) }
 
     @Test
     fun `drawer hint shows when idle long enough with a controller while the drawer is open`() {
@@ -271,8 +227,6 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `drawer hint never shows while the drawer is closed`() {
-        // eligibleState() has no activeAppDrawerFilter, so it exercises the closed-drawer side of
-        // the gate while remaining fully eligible for the XMB pill gate (a focused game item).
         val s = eligibleState()
         assertFalse(shouldShowAppDrawerHint(s, IDLE_MS))
         assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
@@ -280,7 +234,6 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `drawer hint still shows after touch input`() {
-        // Same reversal as the XMB pill: the drawer's prompts are tappable controls now.
         val s = drawerEligibleState().copy(lastInputWasTouch = true)
         assertTrue(shouldShowAppDrawerHint(s, IDLE_MS))
     }
@@ -311,8 +264,6 @@ class ContextMenuHintStateTest {
         assertFalse(shouldShowContextMenuHint(open, IDLE_MS))
     }
 
-    // ── Settings helper-footer hint branch ─────────────────────────────────
-
     private fun settingsEligibleState(screenId: String = "settings_audio") = XMBUiState(
         activeSettingsScreen = screenId,
         lastInputWasTouch = false,
@@ -341,9 +292,6 @@ class ContextMenuHintStateTest {
         )
     }
 
-    // The gate used to be `activeSettingsScreen == "settings_audio"`, which left every other
-    // screen with a reserved footer band that could never fill in. Display supplies its own
-    // media-row prompts, so it is the concrete regression guard.
     @Test
     fun `settings hint shows on the Display screen too`() {
         assertTrue(

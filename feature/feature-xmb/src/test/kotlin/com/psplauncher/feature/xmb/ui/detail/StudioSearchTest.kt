@@ -11,9 +11,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StudioSearchTest {
-
-    // ── Normalization (task 1.1) ──────────────────────────────────────────────
-
     @Test
     fun `whitespace, case and punctuation collapse to one key`() {
         assertEquals("final fantasy vii", StudioQuery.normalize("Final Fantasy VII"))
@@ -35,7 +32,6 @@ class StudioSearchTest {
         assertFalse(StudioQuery.sameQuery("Jak & Daxter", "Jak Daxter"))
     }
 
-    // A query made only of tags still deserves its own cache entry rather than the empty one.
     @Test
     fun `a query that normalizes away keeps its own identity`() {
         assertEquals("[bios]", StudioQuery.normalize("[BIOS]"))
@@ -44,13 +40,10 @@ class StudioSearchTest {
 
     @Test
     fun `normalization is for keying only and never rewrites what the user typed`() {
-        // The function is pure and returns a NEW string; nothing here mutates the input.
         val typed = "  Final Fantasy: VII (USA)  "
         StudioQuery.normalize(typed)
         assertEquals("  Final Fantasy: VII (USA)  ", typed)
     }
-
-    // ── Request keys (task 1.2 / 1.3) ─────────────────────────────────────────
 
     @Test
     fun `two requests for the same thing are the same key`() {
@@ -67,7 +60,6 @@ class StudioSearchTest {
         assertNotEquals(base, StudioRequestKey.of("Halo 2", StudioSource.IGDB, ArtworkKind.HERO, false))
     }
 
-    // Task 1.3: mature is a SteamGridDB filter, so it must not touch any other source's key.
     @Test
     fun `mature only participates in SteamGridDB keys`() {
         for (source in StudioSource.entries.filter { it != StudioSource.STEAMGRIDDB }) {
@@ -90,8 +82,6 @@ class StudioSearchTest {
             StudioRequestKey.of("Halo", StudioSource.IGDB, ArtworkKind.HERO, false, matchId = "igdb:1234"),
         )
     }
-
-    // ── Cache (task 1.2) ──────────────────────────────────────────────────────
 
     @Test
     fun `each key keeps its own results`() {
@@ -128,7 +118,7 @@ class StudioSearchTest {
         val c = StudioRequestKey.of("C", StudioSource.IGDB, ArtworkKind.HERO, false)
         cache[a] = listOf(art("a"))
         cache[b] = listOf(art("b"))
-        cache[a]                       // touch A so B is now the oldest
+        cache[a]
         cache[c] = listOf(art("c"))
 
         assertEquals(2, cache.size)
@@ -136,8 +126,6 @@ class StudioSearchTest {
         assertFalse(cache.contains(b))
         assertTrue(cache.contains(c))
     }
-
-    // ── Paging (task 1.4) ─────────────────────────────────────────────────────
 
     @Test
     fun `a page is one gridful, and the range reads 1-based`() {
@@ -181,8 +169,6 @@ class StudioSearchTest {
         assertEquals(2, StudioPage.of((1..40).map { art("u$it") }, 0, 20).pageCount)
     }
 
-    // ── Asset keys (task 5.1) ─────────────────────────────────────────────────
-
     @Test
     fun `a ScreenScraper asset is the same asset whatever account fetched its URL`() {
         val anonymous = "https://neoclone.screenscraper.fr/api2/mediaJeu.php" +
@@ -218,9 +204,6 @@ class StudioSearchTest {
     fun `one asset offered on two tabs is two keys`() {
         assertNotEquals(StudioArtKey.of(ArtworkKind.ICON, art("u1")), StudioArtKey.of(ArtworkKind.SCREENSHOT, art("u1")))
     }
-
-    // ── ScreenScraper tiles (found on device during task 5.2) ─────────────────
-    // Shapes taken from real ss_media_cache rows: the same entry twice, and one file under three regions.
 
     private fun ssUrl(media: String) = "https://neoclone.screenscraper.fr/api2/mediaJeu.php" +
         "?devid=pfp&devpassword=x&softname=pfp&ssid=&sspassword=&systemeid=57&jeuid=3&media=$media"
@@ -265,8 +248,6 @@ class StudioSearchTest {
         assertEquals(listOf("ss · WOR", "ss · JP", "sstitle · WOR"), tiles.map { it.label })
     }
 
-    // ── What a slot already holds (found on device during task 5.2) ───────────
-
     private fun slot(originUrl: String?, providerAssetId: String? = null) = StudioArtworkSlot(
         sortOrder = 0, documentUri = "content://x", provider = null,
         originUrl = originUrl, providerAssetId = providerAssetId, sizeBytes = 0,
@@ -304,8 +285,6 @@ class StudioSearchTest {
 
     @Test
     fun `a single-art slot holds its one asset the same way (task 5-3)`() {
-        // The comparison never looked at how many assets the kind takes; 5.3 relies on that, because
-        // a single-art slot's position-0 record is the whole library it compares against.
         val library = StudioLibraryAssets.of(ArtworkKind.BOX_ART, listOf(slot(originUrl = "https://sgdb/1.png")))
         val tile = StudioArt(url = "https://sgdb/1.png", thumb = null, provider = "SteamGridDB")
 

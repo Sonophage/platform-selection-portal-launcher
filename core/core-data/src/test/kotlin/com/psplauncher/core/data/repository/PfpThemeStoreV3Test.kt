@@ -30,15 +30,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Schema-v3 behaviour of the theme library: `apply()` writing gif/sysicon/motion entries, and
- * `saveCurrentLook()` flattening the live look (user picks over applied-theme icons) into one
- * bundle — the exact inverse of apply().
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class PfpThemeStoreV3Test {
-
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Before
@@ -49,8 +43,6 @@ class PfpThemeStoreV3Test {
         File(context.filesDir, PfpThemeStore.THEME_ICONS_DIR).deleteRecursively()
         File(context.filesDir, CustomIconStore.CUSTOM_ICONS_DIR).deleteRecursively()
     }
-
-    // ── apply() with v3 bundles ───────────────────────────────────────────────
 
     @Test
     fun `applying a v3 bundle writes gif sysicon files and sets the motion wallpaper`() = runTest {
@@ -74,7 +66,7 @@ class PfpThemeStoreV3Test {
     fun `applying a v3 bundle still clears a previous motion wallpaper when it carries none`() = runTest {
         val store = PfpThemeStore(context)
         context.pfpDataStore.edit { it[KEY_MOTION_WALLPAPER] = "/old/wallpaper.mp4" }
-        // v2-shaped: icons only, no motion entry.
+
         val saved = requireNotNull(
             store.importBundle(
                 register(
@@ -102,7 +94,7 @@ class PfpThemeStoreV3Test {
     @Test
     fun `applying a theme never deletes a user pick`() = runTest {
         val store = PfpThemeStore(context)
-        // A user pick lives in custom-icons/, applied themes in theme-icons/ — separate dirs.
+
         val userDir = File(context.filesDir, CustomIconStore.CUSTOM_ICONS_DIR).apply { mkdirs() }
         File(userDir, "catbar_music.png").writeBytes(pngBytes())
         val saved = requireNotNull(store.importBundle(register(v3BundleBytes())))
@@ -112,8 +104,6 @@ class PfpThemeStoreV3Test {
         assertTrue(File(userDir, "catbar_music.png").isFile, "the user's pick survives the theme apply")
         assertTrue(File(File(context.filesDir, PfpThemeStore.THEME_ICONS_DIR), "catbar_games.gif").isFile)
     }
-
-    // ── saveCurrentLook() ─────────────────────────────────────────────────────
 
     @Test
     fun `saveCurrentLook flattens user pick over applied theme icon per slot`() = runTest {
@@ -161,8 +151,6 @@ class PfpThemeStoreV3Test {
     fun `saveCurrentLook excludes the device-specific XmbLayoutAdjust`() = runTest {
         val store = PfpThemeStore(context)
         context.pfpDataStore.edit {
-            // Stand-in for the per-screen-bucket adjust map's pref. The portable geometry
-            // (KEY_THEME_LAYOUT) is the one that travels; the adjust map never does.
             it[stringPreferencesKey("display_xmb_layout_adjust")] = """{"gameTopFraction":0.5}"""
         }
 
@@ -191,7 +179,7 @@ class PfpThemeStoreV3Test {
         File(customDir, "status_bluetooth.png").writeBytes(pngBytes())
 
         val saved = assertNotNull(store.saveCurrentLook("Round Trip"))
-        // Reset the live state to prove apply restores it.
+
         store.resetApplied()
         File(customDir, "status_bluetooth.png").delete()
 
@@ -201,9 +189,6 @@ class PfpThemeStoreV3Test {
         assertTrue(File(themeDir, "status_bluetooth.png").isFile, "the flattened look re-applies as the theme tier")
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
-
-    /** A v3 bundle: a gif icon, a sysicon and a motion wallpaper. */
     private fun v3BundleBytes(): ByteArray = PfpThemeCodec.write(
         PfpThemeBundle(
             manifest = PfpThemeManifest(name = "V3 Theme", accentColor = "#FF0000"),

@@ -14,24 +14,13 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * [ArtworkStore] backed by internal app storage at `{filesDir}/artwork/{gameId}/` — the exact
- * layout pre-seam builds used, so existing installs keep every file.
- *
- * Write discipline: bytes land in a cache temp file first, are sniffed to confirm they're really
- * an image, and only then move under the final name — a partial or bogus download is never
- * visible at a real artwork path.
- */
 @Singleton
 class InternalArtworkStore @Inject constructor(
     @ApplicationContext private val context: Context,
     private val httpClient: HttpClient,
 ) : ArtworkStore {
-
     private val root: File
         get() = File(context.filesDir, "artwork")
-
-    // ── Saves ─────────────────────────────────────────────────────────────────
 
     override suspend fun saveFromUrl(gameId: Long, kind: ArtworkKind, url: String, sortOrder: Int): String? =
         withContext(Dispatchers.IO) {
@@ -77,14 +66,10 @@ class InternalArtworkStore @Inject constructor(
             commit(tempFile, gameId, ArtworkFileNaming.fixedName(kind, sortOrder))
         }
 
-    // ── Validation / deletion ─────────────────────────────────────────────────
-
     override fun isValidRef(ref: String?): Boolean {
         if (ref.isNullOrBlank()) return false
         if (ref.startsWith("http", ignoreCase = true)) return true
-        // Portable-library references. A ref is valid when the document still opens under our
-        // persisted grant — File() checks would misjudge every content:// ref as stale, which
-        // made scrape-missing wipe imported artwork.
+
         if (ref.startsWith("content://", ignoreCase = true)) {
             return runCatching {
                 context.contentResolver.openAssetFileDescriptor(Uri.parse(ref), "r")
@@ -99,11 +84,6 @@ class InternalArtworkStore @Inject constructor(
             .takeIf { it.exists() && it.length() > 0 }?.absolutePath
     }
 
-    /**
-     * Every internal file of [kind] for this game, ordered by the ordinal its name carries —
-     * the on-disk recovery of `sort_order` (C16 AD-1). Versioned user picks resolve to the
-     * primary slot and are listed first when the bare fixed name is absent.
-     */
     override suspend fun findAll(gameId: Long, kind: ArtworkKind): List<String> = withContext(Dispatchers.IO) {
         val dir = File(root, gameId.toString())
         val files = dir.listFiles()?.filter { it.isFile && it.length() > 0 }.orEmpty()
@@ -112,7 +92,7 @@ class InternalArtworkStore @Inject constructor(
             val order = ArtworkFileNaming.sortOrderFromFileName(kind, file.name) ?: continue
             byOrder[order] = file
         }
-        // A user pick versioned under the primary slot stands in for a missing bare fixed file.
+
         if (0 !in byOrder) {
             files.filter { ArtworkFileNaming.isPruneCandidate(kind, it.name, sortOrder = 0) }
                 .maxByOrNull { it.name }
@@ -128,21 +108,14 @@ class InternalArtworkStore @Inject constructor(
         }
     }
 
-    // ── Legacy migration (M-F2) ───────────────────────────────────────────────
-
     data class LegacyAsset(
         val gameId: Long,
         val kind: ArtworkKind,
         val file: File,
-        val userPick: Boolean,   // versioned files came from a user pick → migrate as locked
+        val userPick: Boolean,
         val sizeBytes: Long,
     )
 
-    /**
-     * Every internal asset the migration worker should move to the portable library — at most
-     * one file per (game, kind): the newest versioned user pick wins over the scraper's fixed
-     * file (that mirrors what the game columns reference today).
-     */
     suspend fun enumerateForMigration(): List<LegacyAsset> = withContext(Dispatchers.IO) {
         val out = mutableListOf<LegacyAsset>()
         root.listFiles()?.forEach { dir ->
@@ -159,7 +132,6 @@ class InternalArtworkStore @Inject constructor(
         out
     }
 
-    /** Deletes every internal file of [kind] for the game (fixed + versioned), then the empty dir. */
     suspend fun deleteKind(gameId: Long, kind: ArtworkKind) = withContext(Dispatchers.IO) {
         val dir = File(root, gameId.toString())
         dir.listFiles()?.forEach { f ->
@@ -170,7 +142,6 @@ class InternalArtworkStore @Inject constructor(
         if (dir.listFiles()?.isEmpty() == true) dir.delete()
     }
 
-    /** (files, bytes) currently stored internally — drives the migration offer in settings. */
     suspend fun footprint(): Pair<Int, Long> = withContext(Dispatchers.IO) {
         var count = 0
         var bytes = 0L
@@ -182,19 +153,16 @@ class InternalArtworkStore @Inject constructor(
         count to bytes
     }
 
-    // ── Internals ─────────────────────────────────────────────────────────────
-
     private suspend fun downloadToTemp(url: String, kind: ArtworkKind): File? =
         ArtworkTempIO.downloadToTemp(httpClient, context.cacheDir, kind, url)
 
     private fun copyToTemp(input: InputStream, kind: ArtworkKind): File? =
         ArtworkTempIO.copyToTemp(input, context.cacheDir, kind)
 
-    /** Moves a verified temp file to `artwork/{gameId}/{name}`, returning the absolute path. */
     private fun commit(tmp: File, gameId: Long, name: String): String? = runCatching {
         val dir = File(root, gameId.toString()).also { it.mkdirs() }
         val dest = File(dir, name)
-        if (!tmp.renameTo(dest)) {           // cross-volume fallback (both live in /data, so rare)
+        if (!tmp.renameTo(dest)) {
             tmp.copyTo(dest, overwrite = true)
             tmp.delete()
         }
@@ -204,7 +172,6 @@ class InternalArtworkStore @Inject constructor(
         tmp.delete()
     }.getOrNull()
 
-    /** Deletes older files of [kind] for this game, keeping only [keepPath]. */
     private fun prune(gameId: Long, kind: ArtworkKind, keepPath: String) {
         runCatching {
             File(root, gameId.toString()).listFiles()?.forEach { f ->

@@ -21,22 +21,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * The app-wide [ArtworkStore]: routes every save into the user's portable media library when a
- * folder is linked, and falls back to [InternalArtworkStore] otherwise — callers (scraper,
- * detail-screen pickers) are unchanged either way.
- *
- * Conflict policy (spec §22) is enforced here for the portable side:
- *  • auto-scrapes ([saveFromUrl]) never overwrite an existing valid library asset — existing
- *    portable artwork outranks newly scraped; the existing reference is returned instead.
- *  • user picks ([saveVersionedFromUrl]/[saveVersionedFromUri]) always write and mark the
- *    record `user_assigned + locked`, so no automatic pass touches that slot again.
- *  • [deleteAll] clears app state (internal files + records) but NEVER deletes files in the
- *    user's folder — the library is user-owned; Relink can always reconnect it.
- *
- * Portable names are stable ("{ROM stem}.png"), so replacing bytes keeps the same content URI;
- * Coil's caches are invalidated for that URI on every portable write to make changes visible.
- */
 @Singleton
 class RoutingArtworkStore @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -49,13 +33,10 @@ class RoutingArtworkStore @Inject constructor(
     private val imageCache: ArtworkImageCache,
     private val identityRecorder: ArtworkIdentityRecorder,
 ) : ArtworkStore {
-
     override suspend fun saveFromUrl(gameId: Long, kind: ArtworkKind, url: String, sortOrder: Int): String? {
         val target = portableTarget(gameId) ?: return internal.saveFromUrl(gameId, kind, url, sortOrder)
         val (tree, game) = target
 
-        // Existing portable artwork outranks a new auto-scrape (§22) — including locked and
-        // user-assigned assets. Dead files fall through and are replaced.
         artworkRecordDao.getAt(gameId, kind.name, sortOrder)?.let { record ->
             if (record.locked || record.userAssigned || internal.isValidRef(record.documentUri)) {
                 return record.documentUri
@@ -106,11 +87,6 @@ class RoutingArtworkStore @Inject constructor(
         internal.find(gameId, kind, sortOrder)
             ?: artworkRecordDao.getAt(gameId, kind.name, sortOrder)?.documentUri?.takeIf { internal.isValidRef(it) }
 
-    /**
-     * Every reference for [kind] in position order. Internal files come first (they are what
-     * [find] prefers), then any recorded position the internal layout does not cover — a game is
-     * normally in one mode or the other, so in practice one of the two lists is empty.
-     */
     override suspend fun findAll(gameId: Long, kind: ArtworkKind): List<String> {
         val out = internal.findAll(gameId, kind).toMutableList()
         artworkRecordDao.findAll(gameId, kind.name)
@@ -121,15 +97,10 @@ class RoutingArtworkStore @Inject constructor(
 
     override suspend fun deleteAll() {
         internal.deleteAll()
-        // Records are app state; the library files are the user's and are never deleted here.
+
         artworkRecordDao.clear()
     }
 
-    /**
-     * Portable write for the internal-migration worker (M-F2): same naming/record/Coil-bust
-     * discipline as a scrape, with caller-supplied provenance. Consumes [tempFile] either way.
-     * Null when no folder is linked or the grant is dead.
-     */
     suspend fun saveTempPortable(
         gameId: Long,
         kind: ArtworkKind,
@@ -142,12 +113,6 @@ class RoutingArtworkStore @Inject constructor(
         return persistPortable(tree, game, kind, tempFile, source, userAssigned, sortOrder = sortOrder)
     }
 
-    // ── Studio pass 2 ───────────────────────────────────────────────────────────
-    // Record-driven operations. They work against the portable library's artwork_records; when
-    // no folder is linked there is no record, so info/restore/reset/crop return null (the Studio
-    // offers only Apply + Clear in that mode). Clear itself always works.
-
-    /** Everything the Studio's file-info panel and actions menu need, or null (no record). */
     suspend fun studioInfo(gameId: Long, kind: ArtworkKind, sortOrder: Int = 0): StudioArtworkInfo? {
         val rec = artworkRecordDao.getAt(gameId, kind.name, sortOrder) ?: return null
         return StudioArtworkInfo(
@@ -167,7 +132,6 @@ class RoutingArtworkStore @Inject constructor(
         )
     }
 
-    /** Ordered references for a multi-asset slot, newest position last. */
     suspend fun studioAssets(gameId: Long, kind: ArtworkKind): List<StudioArtworkSlot> =
         artworkRecordDao.findAll(gameId, kind.name).map {
             StudioArtworkSlot(
@@ -180,11 +144,6 @@ class RoutingArtworkStore @Inject constructor(
             )
         }
 
-    /**
-     * [studioAssets] without the records whose file no longer opens, which is what the gallery shows
-     * ([findAll] skips them too). The Studio marks tiles held from this, so a record left behind by a
-     * lost file never reads as checked.
-     */
     suspend fun studioAssetsOnDisk(gameId: Long, kind: ArtworkKind): List<StudioArtworkSlot> {
         val slots = studioAssets(gameId, kind)
         if (slots.isEmpty()) return slots
@@ -193,13 +152,11 @@ class RoutingArtworkStore @Inject constructor(
         }
     }
 
-    /** The position an append would write to — one past the highest in use, or 0 for an empty slot. */
     suspend fun nextSortOrder(gameId: Long, kind: ArtworkKind): Int =
         if (!ArtworkFileNaming.supportsMultiple(kind)) 0
         else (artworkRecordDao.maxSortOrder(gameId, kind.name) + 1)
             .coerceAtMost(ArtworkFileNaming.MAX_SORT_ORDER)
 
-    /** Studio Apply from a browse URL: versioned write, provenance recorded, previous backed up. */
     suspend fun studioApplyFromUrl(
         gameId: Long,
         kind: ArtworkKind,
@@ -218,18 +175,6 @@ class RoutingArtworkStore @Inject constructor(
         )
     }
 
-    /**
-     * Adds another asset to a multi-asset slot instead of replacing its primary — the write
-     * behind "add a screenshot" / "add a video". Single-art kinds fall back to a plain apply, so
-     * a caller never has to branch on the kind.
-     *
-     * The download runs *before* the position is decided: [nextSortOrder] reads "one past the
-     * highest position in use", and a removal racing a slow download must not let that answer go
-     * stale between being read and being persisted. Only the DB reads inside [nextSortOrder] and
-     * [persistPortable] itself run between the two — no network suspension in that window — so a
-     * concurrent removal is either fully visible (its compaction already landed) or not observed
-     * at all, never half-applied into a gap.
-     */
     suspend fun studioAppendFromUrl(
         gameId: Long,
         kind: ArtworkKind,
@@ -248,10 +193,6 @@ class RoutingArtworkStore @Inject constructor(
         )
     }
 
-    /**
-     * Removes one position of a multi-asset slot, deleting its file and closing the ordering gap
-     * so the remaining assets stay 0..n-1 with the primary at 0.
-     */
     suspend fun deleteAssetAt(gameId: Long, kind: ArtworkKind, sortOrder: Int): Boolean {
         val rec = artworkRecordDao.getAt(gameId, kind.name, sortOrder) ?: return false
         val target = portableTarget(gameId)
@@ -263,37 +204,18 @@ class RoutingArtworkStore @Inject constructor(
         return true
     }
 
-    /**
-     * Rewrites a slot's order. Only the records move — the files keep their ordinal names, which
-     * would otherwise have to be renamed one by one with no way to make that atomic. Relink
-     * rebuilds order from those names, so a reorder is re-applied by a later explicit reorder,
-     * not silently reverted mid-session.
-     */
     suspend fun reorderAssets(gameId: Long, kind: ArtworkKind, orderedSortOrders: List<Int>) {
         val rows = artworkRecordDao.findAll(gameId, kind.name).associateBy { it.sortOrder }
         artworkRecordDao.reorder(gameId, kind.name, orderedSortOrders.mapNotNull { rows[it]?.id })
     }
 
-    /**
-     * This game's crop-profile override for [kind], or null when it follows the shared defaults.
-     *
-     * Read at crop-editor open. A game with no stored artwork of the kind yet has no row to carry
-     * a key, so a pick cropped before it is applied (task 6.8) resolves on the defaults — the
-     * override is offered once there is something to hang it on.
-     */
     suspend fun cropProfileOverride(gameId: Long, kind: ArtworkKind): String? =
         artworkRecordDao.cropProfileKey(gameId, kind.name)
 
-    /**
-     * Stores [key] as this game's crop-profile override for [kind], or clears it when null
-     * (Reset to Platform Default). Writes no pixels: the override decides the crop FRAME the next
-     * crop is taken against, so already-baked artwork is untouched until it is re-cropped.
-     */
     suspend fun setCropProfileOverride(gameId: Long, kind: ArtworkKind, key: String?) {
         artworkRecordDao.setCropProfileKey(gameId, kind.name, key, System.currentTimeMillis())
     }
 
-    /** Studio Apply from a locally-produced file (manual download, cropped bake, local pick copy). */
     suspend fun studioApplyFromFile(
         gameId: Long, kind: ArtworkKind, tempFile: java.io.File, provider: String?, originUrl: String?,
         sortOrder: Int = 0,
@@ -306,7 +228,6 @@ class RoutingArtworkStore @Inject constructor(
         )
     }
 
-    /** Brings the one backed-up previous version back, swapping it with the current (toggle-able). */
     suspend fun restorePrevious(gameId: Long, kind: ArtworkKind, sortOrder: Int = 0): String? {
         val (tree, game) = portableTarget(gameId) ?: return null
         val rec = artworkRecordDao.getAt(gameId, kind.name, sortOrder) ?: return null
@@ -318,11 +239,10 @@ class RoutingArtworkStore @Inject constructor(
         val curTemp = if (internal.isValidRef(rec.documentUri))
             library.copyUriToTemp(curUri, context.cacheDir, extSuffix(rec.relativePath)) else null
 
-        // Previous → current slot (validated write into the media dir).
         val saved = library.saveFromFile(tree, game.platformId, kind, rec.portableName, prevTemp) ?: run {
             curTemp?.delete(); return null
         }
-        // Current → previous slot, so a second press toggles back.
+
         val newPrev = curTemp?.let {
             val prevExt = extSuffix(rec.relativePath).removePrefix(".")
             library.saveTempIntoPath(
@@ -338,7 +258,7 @@ class RoutingArtworkStore @Inject constructor(
                 prevDocumentUri = newPrev?.uriString,
                 prevRelativePath = newPrev?.let { versionsRelativePath(game.platformId, kind, it.fileName) },
                 prevSizeBytes = curTemp?.length() ?: 0L,
-                // The restored file is shown as-is; its own original/crop are not tracked.
+
                 cropRect = null,
                 hasOriginal = false,
                 updatedAt = System.currentTimeMillis(),
@@ -348,13 +268,12 @@ class RoutingArtworkStore @Inject constructor(
         return saved.uriString
     }
 
-    /** Re-download the scraped default from the recorded provenance URL (backs up the current). */
     suspend fun resetToScrapedDefault(gameId: Long, kind: ArtworkKind, sortOrder: Int = 0): String? {
         val rec = artworkRecordDao.getAt(gameId, kind.name, sortOrder) ?: return null
         val url = rec.originUrl ?: return null
         val (tree, game) = portableTarget(gameId) ?: return null
         val tmp = ArtworkTempIO.downloadToTemp(httpClient, context.cacheDir, kind, url) ?: return null
-        // source=scrape, unpinned: a reset returns the slot to scraper control.
+
         return persistPortable(
             tree, game, kind, tmp, source = SOURCE_SCRAPE, userAssigned = false,
             originUrl = url, provider = rec.provider, backupPrevious = true, sortOrder = sortOrder,
@@ -362,7 +281,6 @@ class RoutingArtworkStore @Inject constructor(
         )
     }
 
-    /** Deletes the current file, its backup and original, and the record. Returns true if anything went. */
     suspend fun clearArtwork(gameId: Long, kind: ArtworkKind): Boolean {
         val target = portableTarget(gameId)
         if (target == null) {
@@ -370,8 +288,7 @@ class RoutingArtworkStore @Inject constructor(
             return true
         }
         val (tree, game) = target
-        // Every position of the slot goes: clearing "the screenshot" when a game has five of
-        // them must not leave four orphaned files behind.
+
         val records = artworkRecordDao.findAll(gameId, kind.name)
         for (rec in records) {
             runCatching { library.deleteUri(Uri.parse(rec.documentUri)) }
@@ -384,12 +301,6 @@ class RoutingArtworkStore @Inject constructor(
         return records.isNotEmpty()
     }
 
-    /** The untouched original for re-cropping — the stashed pre-crop copy, or the current file
-     *  if nothing has been cropped yet. Caller owns and deletes the returned temp. */
-    /**
-     * Downloads a not-yet-applied pick to a temp file so it can be cropped before it is applied.
-     * Same download path the queue uses; the caller owns the file from here.
-     */
     suspend fun candidateToTemp(kind: ArtworkKind, url: String): java.io.File? =
         ArtworkTempIO.downloadToTemp(httpClient, context.cacheDir, kind, url)
 
@@ -405,20 +316,6 @@ class RoutingArtworkStore @Inject constructor(
         return library.copyUriToTemp(src, context.cacheDir, extSuffix(rec.relativePath))
     }
 
-    /**
-     * Persists a baked crop as the current file: stashes the untouched original on first crop,
-     * backs up the pre-crop current as the previous version, and records the normalized rect.
-     * [bakedTempFile] is consumed.
-     */
-    /**
-     * Saves a baked crop as [kind]'s artwork.
-     *
-     * [candidateOriginUrl], [candidateProvider] and [candidateAssetId] carry the provenance of a
-     * pick that is being cropped **before** it is applied, when the slot has no record to inherit
-     * from yet. Without them a crop-first apply would land as a plain user file and lose the
-     * provider it came from — which Reset to Scraped Default and duplicate detection both read.
-     * They are ignored once a record exists, since that record's provenance is the truth.
-     */
     suspend fun saveCropBaked(
         gameId: Long,
         kind: ArtworkKind,
@@ -432,8 +329,7 @@ class RoutingArtworkStore @Inject constructor(
         val target = portableTarget(gameId) ?: run { bakedTempFile.delete(); return null }
         val (tree, game) = target
         val rec = artworkRecordDao.getAt(gameId, kind.name, sortOrder)
-        // Stash the pre-crop current as the untouched original — only the FIRST time, so repeated
-        // re-crops always frame from the true original rather than a previously-cropped file.
+
         if (rec != null && !rec.hasOriginal && internal.isValidRef(rec.documentUri)) {
             val origExt = extSuffix(rec.relativePath).removePrefix(".")
             library.copyUriToTemp(Uri.parse(rec.documentUri), context.cacheDir, ".$origExt")?.let { origTmp ->
@@ -453,8 +349,6 @@ class RoutingArtworkStore @Inject constructor(
             providerAssetId = rec?.providerAssetId ?: candidateAssetId,
         )
     }
-
-    // ── Internals ─────────────────────────────────────────────────────────────
 
     private suspend fun portableTarget(gameId: Long): Pair<Uri, GameEntity>? {
         val treeUri = folderRepository.getTreeUri() ?: return null
@@ -480,9 +374,7 @@ class RoutingArtworkStore @Inject constructor(
     ): String? {
         val existing = artworkRecordDao.getAt(game.id, kind.name, sortOrder)
         val romFileName = game.romPath?.replace('\\', '/')?.substringAfterLast('/')
-        // Keep the established portable name for this slot; only compute a fresh one for a new slot.
-        // For multi-asset kinds the stored name carries the ordinal, so the base is recovered from
-        // whichever position already exists and every position shares one base + collision suffix.
+
         val multi = ArtworkFileNaming.supportsMultiple(kind)
         val slotRecords = if (multi) artworkRecordDao.findAll(game.id, kind.name) else emptyList()
         val establishedBase = if (multi) {
@@ -497,18 +389,12 @@ class RoutingArtworkStore @Inject constructor(
             artworkRecordDao.findNameCollisions(game.platformId, kind.name, portableName, game.id).isNotEmpty()) {
             portableName = "$portableName (2)"
         }
-        // A multi-asset file is named by its slot, never by its position (ArtworkFileNaming.nextOrdinal):
-        // a removal renumbers positions without renaming files, so the position's own ordinal can
-        // already name another asset's file, which saveFromFile below would delete as a same-stem
-        // predecessor. A rewrite of a position (crop, restore, reset) keeps the name its file has. An
-        // empty slot still starts at the bare name, so existing installs are untouched.
+
         if (multi) {
             portableName = existing?.portableName
                 ?: ArtworkFileNaming.withOrdinal(portableName, ArtworkFileNaming.nextOrdinal(slotRecords.map { it.portableName }))
         }
 
-        // Back up the current file (before saveFromFile deletes the same-stem occupant) so a single
-        // "Restore Previous" is possible. Only user/reset/crop writes back up; scrapes never do.
         var prevDocumentUri: String? = existing?.prevDocumentUri
         var prevRelativePath: String? = existing?.prevRelativePath
         var prevSizeBytes: Long = existing?.prevSizeBytes ?: 0L
@@ -528,9 +414,7 @@ class RoutingArtworkStore @Inject constructor(
         }
 
         val saved = library.saveFromFile(tree, game.platformId, kind, portableName, tempFile) ?: return null
-        // Durable identity for this file (task D.2): who owns it, stated as ids rather than as the
-        // name it happens to carry. Buffered only — the index is one document at the library root,
-        // so it is written at an operation boundary, never once per file. See ArtworkIdentityRecorder.
+
         identityRecorder.record(
             tree,
             ArtworkIdentityIndex.Entry(
@@ -575,10 +459,8 @@ class RoutingArtworkStore @Inject constructor(
         return saved.uriString
     }
 
-    // Stable names → stable URIs: bust Coil so the replacement is visible immediately.
     private fun bustCoil(uriString: String) = imageCache.evict(uriString)
 
-    // ".png" from a relative path/uri; ".jpg" fallback so a temp always has a plausible suffix.
     private fun extSuffix(pathOrNull: String?): String {
         val ext = pathOrNull?.substringAfterLast('.', "")?.takeIf { it.isNotBlank() && it.length <= 5 }
         return ".${(ext ?: "jpg").lowercase()}"
@@ -602,7 +484,6 @@ class RoutingArtworkStore @Inject constructor(
     }
 }
 
-/** The Studio's read model for one artwork slot (file-info panel + which actions are available). */
 data class StudioArtworkInfo(
     val provider: String?,
     val originUrl: String?,
@@ -619,7 +500,6 @@ data class StudioArtworkInfo(
     val sortOrder: Int = 0,
 )
 
-/** One asset of a multi-asset slot, as the Studio's media strip lists them. */
 data class StudioArtworkSlot(
     val sortOrder: Int,
     val documentUri: String,

@@ -8,8 +8,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.Video
 
-// One row per scanned video file. uri is a SAF document uri string. Cascade-deletes with its
-// library so removing a library removes its videos; indexed by library_id for per-library queries.
 @Serializable
 @Entity(
     tableName = "videos",
@@ -69,14 +67,6 @@ data class VideoEntity(
     @ColumnInfo(name = "custom_thumbnail_uri")
     val customThumbnailUri: String? = null,
 
-    /**
-     * A poster fetched from TMDB, or null when none has been matched.
-     *
-     * Its own column rather than overwriting [thumbnailUri]: that one is the scanner's frame grab
-     * and the scanner owns it, so a poster written there would be destroyed by the next rescan
-     * and the frame grab lost for good. Kept separately, both survive and the user can still
-     * override either with [customThumbnailUri].
-     */
     @ColumnInfo(name = "poster_uri")
     val posterUri: String? = null,
 

@@ -14,15 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Pins the detail page's shading to the App Drawer: the same translucent theme gradient (so the XMB
- * wave reads through identically), the mockup's layering on top of it (rows a step darker than the
- * page, a lifted edge, one bright accent for focus), and a hero that never pushes the primary
- * actions under the footer. Pure color math and arithmetic — no Compose runtime.
- */
 class DetailPaletteTest {
-
-    /** The palette XmbColorScheme.resolve produces for a wave color (white accent). */
     private fun scheme(wave: Long): PFPColors {
         val (top, bottom) = lightBackgroundAnchors(wave)
         return PFPColors(
@@ -40,22 +32,19 @@ class DetailPaletteTest {
 
     private val classicBlue = scheme(0xFF0055AA)
 
-    /** One wave per scheme family, including the pale ones that flip the drawer to dark text. */
     private val schemes = listOf(
         classicBlue,
-        scheme(0xFFFF7A1A), // sunset orange
-        scheme(0xFF2FA84F), // fresh green
-        scheme(0xFF6A3FB5), // royal purple
-        scheme(0xFFC0182B), // crimson red
-        scheme(0xFFB8C4D0), // silver
-        scheme(0xFFF29BB8), // sakura pink
-        scheme(0xFFE0A21A), // golden amber
-        scheme(0xFF18A7A0), // aqua teal
-        scheme(0xFF14204A), // midnight navy
-        scheme(0xFF2B2B2B), // charcoal
+        scheme(0xFFFF7A1A),
+        scheme(0xFF2FA84F),
+        scheme(0xFF6A3FB5),
+        scheme(0xFFC0182B),
+        scheme(0xFFB8C4D0),
+        scheme(0xFFF29BB8),
+        scheme(0xFFE0A21A),
+        scheme(0xFF18A7A0),
+        scheme(0xFF14204A),
+        scheme(0xFF2B2B2B),
     )
-
-    // ── Matches the App Drawer ────────────────────────────────────────────
 
     @Test
     fun `the page is the App Drawer's gradient at the App Drawer's alpha`() {
@@ -65,18 +54,12 @@ class DetailPaletteTest {
             assertEquals(drawer.backgroundDeep, page.pageTop)
             assertEquals(drawer.backgroundMid, page.pageBottom)
         }
-        // Derived, not transcribed. This line held the drawer's alpha as the literal 0.88, and
-        // when the drawer moved to the shared scrim it was the only thing in the file that broke —
-        // the two assertions above, which compare the pair to each other, stayed correctly green.
-        // A copy of a number is not a guard on it.
+
         assertEquals(XMB_SCRIM_TOP_ALPHA, detailPaletteFor(classicBlue).pageTop.alpha, 0.005f)
     }
 
     @Test
     fun `the header band is see-through like the App Drawer's`() {
-        // The footer band used to be asserted here too. It has no colour any more: the pinned
-        // helper footer draws the shared PfpHintBar, which brings its own scrim, so the palette
-        // entry that fed it was the last thing reading a value fixed at fully transparent.
         assertEquals(0f, detailPaletteFor(classicBlue).header.alpha, 0f)
     }
 
@@ -89,13 +72,10 @@ class DetailPaletteTest {
             assertEquals(drawer.tileSelectedEdge, p.focus)
             assertEquals(drawer.chromeDivider, p.divider)
         }
-        // Muted text is the drawer's own wherever that reads on a row (see the readability test).
+
         assertEquals(storefrontColorsFor(classicBlue).textSecondary, detailPaletteFor(classicBlue).textMuted)
     }
 
-    // ── The mockup's layering, over the lighter page ──────────────────────
-
-    /** What a surface actually looks like on screen: over the page, over the brightest wave. */
     private fun onScreen(surface: Color, page: Color): Color = composite(surface, composite(page, Color.White))
 
     @Test
@@ -127,8 +107,6 @@ class DetailPaletteTest {
         }
     }
 
-    // ── Hero sizing ───────────────────────────────────────────────────────
-
     @Test
     fun `the hero keeps its full height when everything fits`() {
         assertEquals(DetailHeroHeight, detailHeroHeightFor(viewport = 600.dp))
@@ -136,11 +114,6 @@ class DetailPaletteTest {
 
     @Test
     fun `the hero gives up height so the primary actions clear the footer`() {
-        // The AYN Thor: 468dp tall, less the status strip, the breadcrumb and the footer.
-        //
-        // The strip's band is in here because the page now reserves it -- it is drawn over every
-        // detail page by the shell. Leaving it out made this case 34dp roomier than the device,
-        // which is the wrong direction for a test about running out of room.
         val viewport = 468.dp - StatusStripHeight - 64.dp - DetailFooterHeight
         val hero = detailHeroHeightFor(viewport)
         assertTrue("hero $hero must shrink below $DetailHeroHeight", hero < DetailHeroHeight)

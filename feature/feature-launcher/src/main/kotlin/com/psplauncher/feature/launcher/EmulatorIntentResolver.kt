@@ -18,27 +18,11 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Builds the Android launch [android.content.Intent] for a game + chosen emulator profile.
- *
- * Supports `ACTION_VIEW` (ROM passed as a FileProvider content URI, with type/component fallbacks
- * for emulators whose intent filters omit a MIME type), `COMPONENT` (explicit activity + extras,
- * e.g. RetroArch's `ROM`/`LIBRETRO`), and `CUSTOM_COMMAND`. Validation (emulator installed, ROM
- * exists, core configured) happens up front; [resolve] never throws — it returns a [Result] with a
- * user-readable failure message instead.
- */
 @Singleton
 class EmulatorIntentResolver @Inject constructor(
     @ApplicationContext private val context: Context,
     private val romUriMinter: RomUriMinter,
 ) {
-
-    /**
-     * Resolves a launch [Intent] for the given [game] and selected [profile].
-     *
-     * Returns [Result.success] with the intent on success, or [Result.failure] with a
-     * user-readable message explaining why launch cannot proceed. Never throws.
-     */
     suspend fun resolve(game: Game, profile: EmulatorProfile): Result<Intent> {
         return runCatching {
             validateBeforeLaunch(game, profile)
@@ -79,12 +63,6 @@ class EmulatorIntentResolver @Inject constructor(
         }
     }
 
-    /**
-     * Refuses a launch that would hand the emulator a dead handle (B1 preflight): package gone,
-     * COMPONENT activity dropped by an update, or a stale RetroArch core mapping. Public so the
-     * XMB direct-launch path can run the identical checks Game Detail's resolve applies —
-     * failures refuse with a repair message before startActivity instead of at it.
-     */
     fun validateBeforeLaunch(game: Game, profile: EmulatorProfile) {
         if (profile.intentType != IntentType.CUSTOM_COMMAND) {
             try {
@@ -94,9 +72,6 @@ class EmulatorIntentResolver @Inject constructor(
             }
         }
 
-        // A COMPONENT launch targets a pinned activity by class name. If the emulator update
-        // dropped or renamed that activity, startActivity would throw ActivityNotFoundException
-        // at hand-off — catch it here so the failure names the repair instead.
         if (profile.intentType == IntentType.COMPONENT) {
             val activityClass = profile.activityClass ?: error("Activity class required for COMPONENT intent - profile: ${profile.name}")
             try {
@@ -113,23 +88,11 @@ class EmulatorIntentResolver @Inject constructor(
             }
         }
 
-        // ID-launch emulators (e.g. Vita3K) boot an installed title by its launch token, not a ROM
-        // file — there is nothing on disk for PFP to stat, so validate the token instead.
         if (launchesByToken(profile)) {
             if (game.launchToken.isNullOrBlank()) {
                 error("No launch ID recorded for ${game.title}. Re-scan its library.")
             }
         } else if (launchesByRawPath(profile)) {
-            // The profile will hand over a raw path, so THAT is what has to be checked — not the
-            // content URI, however healthy it is.
-            //
-            // This branch used to be unreachable for every SAF-scanned game, because such a game
-            // carries BOTH handles and the romUri branch below came first. So preflight opened a
-            // URI the emulator would never receive, said "yes, I can read this", and then handed
-            // RetroArch a path derived by string arithmetic from the document id. If that
-            // derivation was wrong — an odd document id, a volume mounted elsewhere — the result
-            // was RetroArch's black screen with preflight's blessing, which is the exact failure
-            // class the rest of this file exists to eliminate.
             val romPath = game.romPath
                 ?: error(
                     "${profile.name} launches games by file path and PSPLauncher has no path " +
@@ -137,28 +100,8 @@ class EmulatorIntentResolver @Inject constructor(
                 )
             val file = File(romPath)
             if (!file.exists()) error("ROM file not found: $romPath")
-            // canRead() is about US, and the file is about to be opened by SOMEBODY ELSE.
-            //
-            // A ROM on a removable card is the case that exposes the difference. PSPLauncher
-            // targets a modern SDK and holds no broad file access, so File.canRead() under
-            // /storage/XXXX-XXXX is false for everything there — while RetroArch, which targets
-            // SDK 28 and holds READ_EXTERNAL_STORAGE, reads the same path without trouble (its
-            // own playlists index those exact files). Blocking on our own answer refused a launch
-            // that works, with a message blaming the emulator for our permission.
-            //
-            // So this only decides anything when we COULD have read it: with all-files access a
-            // failure is about the file. Without it, stat said the path is there and that is all
-            // the evidence we have — the emulator's own error is better than our guess.
+
             if (!file.canRead()) {
-                // runCatching: isExternalStorageManager enumerates the storage volumes and can
-                // throw where they are not there to enumerate. Failing to answer means we do not
-                // know whether we could have read the file, and not knowing must never be the
-                // reason a launch is refused — so an unanswerable question reads as "no access".
-                //
-                // The SDK check is not decoration: isExternalStorageManager arrived in API 30 and
-                // this app's minSdk is 29. Without it the call is a NoSuchMethodError on Android
-                // 10, which runCatching does happen to swallow — Kotlin's catches Throwable — so
-                // it worked by accident, through a net cast for something else entirely.
                 val allFilesAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
                     runCatching { Environment.isExternalStorageManager() }.getOrDefault(false)
                 if (allFilesAccess) {
@@ -173,13 +116,6 @@ class EmulatorIntentResolver @Inject constructor(
                 )
             }
         } else if (!game.romUri.isNullOrBlank()) {
-            // A SAF game launches from its granted content:// URI — PFP holds no raw path to stat,
-            // so just require the URI is present/parseable, then probe whether the grant still
-            // resolves. A revoked grant (volume unmounted, URI permission cleared) reaches the
-            // emulator as an unreadable URI and looks exactly like a black screen — the corpus's
-            // known-bad case. openFileDescriptor is the same handshake the emulator performs;
-            // refusing only on SecurityException keeps ambiguity (a transient I/O error) on the
-            // permissive side so a real failure stays detectable instead of being guessed at.
             val romUri = runCatching { Uri.parse(game.romUri) }.getOrNull()
                 ?: error("This game's ROM link is invalid. Re-scan its library.")
             try {
@@ -191,9 +127,6 @@ class EmulatorIntentResolver @Inject constructor(
                     LaunchFailureKind.STORAGE_ACCESS_LOST,
                 )
             } catch (_: Exception) {
-                // Anything else (a provider we cannot see from here, a transient I/O error) is
-                // ambiguous — never guess "broken" when the probe itself may be the problem.
-                // A genuinely revoked grant surfaces as SecurityException above.
             }
         } else {
             val romPath = game.romPath ?: error("ROM path is required to launch ${game.title}")
@@ -205,30 +138,17 @@ class EmulatorIntentResolver @Inject constructor(
             if (corePath.isNullOrBlank()) {
                 error("No RetroArch core configured for platform '${game.platformId}' in profile '${profile.name}'. Open RetroArch → Core Downloader to install a core for this system.")
             }
-            // We cannot read /data/data/<pkg>/cores/ — it's the emulator's private internal
-            // storage. Skip the file-existence check and let RetroArch report a missing core.
         }
     }
 
-    /**
-     * The profile hands the emulator a RAW FILESYSTEM PATH rather than a content URI.
-     *
-     * RetroArch is the headline case: `EmulatorDetector` generates its profiles with a single
-     * `"ROM" to "{rom_path}"` extra and no `attachRomData`, so whatever `romUri` says, what
-     * actually reaches RetroArch is a string built by path arithmetic from the SAF document id.
-     */
     private fun launchesByRawPath(profile: EmulatorProfile): Boolean =
         profile.intentArrayExtras.values.flatten().any { it.contains(LaunchTemplate.ROM_PATH) } ||
             profile.intentExtras.values.any { it.contains(LaunchTemplate.ROM_PATH) }
 
-    // True when the profile boots by launch token (the {title_id} template appears in a string or
-    // array extra) rather than by ROM file — e.g. Vita3K's AppStartParameters.
     private fun launchesByToken(profile: EmulatorProfile): Boolean =
         profile.intentArrayExtras.values.flatten().any { it.contains(LaunchTemplate.TITLE_ID) } ||
             profile.intentExtras.values.any { it.contains(LaunchTemplate.TITLE_ID) }
 
-    // Covered by QUERY_ALL_PACKAGES, declared and reasoned in app/src/main/AndroidManifest.xml.
-    // Lint warns per call site because a library module cannot see the app module's manifest.
     @Suppress("QueryPermissionsNeeded")
     private suspend fun buildViewIntent(game: Game, profile: EmulatorProfile): Intent {
         val uri = romLaunchUri(game, profile)
@@ -237,10 +157,6 @@ class EmulatorIntentResolver @Inject constructor(
 
         fun build(withType: Boolean, withComponent: Boolean): Intent =
             Intent(Intent.ACTION_VIEW).apply {
-                // Android matching rule: if the intent sets a MIME type, the target's intent
-                // filter must ALSO declare a type. Some emulators (e.g. the AzaharPlus build on
-                // the Lime3DS package) declare ACTION_VIEW with only a content scheme and NO type,
-                // so a typed intent fails to resolve — hence the no-type fallback.
                 if (withType) setDataAndType(uri, mime) else data = uri
                 if (withComponent && activityClass != null) {
                     component = ComponentName(profile.packageName, activityClass)
@@ -251,9 +167,6 @@ class EmulatorIntentResolver @Inject constructor(
                 applyProfileFlags(profile)
             }
 
-        // Most-specific first (preserves behaviour for emulators that already work), then relax:
-        // drop the MIME type (scheme-only filters), then drop the pinned component (resolve by the
-        // app's own declared ACTION_VIEW handler).
         val candidates = listOf(
             build(withType = true,  withComponent = true),
             build(withType = false, withComponent = true),
@@ -281,7 +194,6 @@ class EmulatorIntentResolver @Inject constructor(
         val needsRomUri = profile.attachRomData ||
             profile.intentExtras.values.any { it.contains(LaunchTemplate.ROM_URI) }
         val romUri: Uri? = if (needsRomUri) {
-            // SAF game → the granted content URI; legacy game → a FileProvider URI from its raw path.
             game.romUri?.takeIf { it.isNotBlank() }?.let { runCatching { Uri.parse(it) }.getOrNull() }
                 ?: romUriMinter.mint(game.romPath ?: error("ROM path required for ${profile.name}"))
         } else null
@@ -302,7 +214,7 @@ class EmulatorIntentResolver @Inject constructor(
             profile.intentBoolExtras.forEach { (key, value) ->
                 putExtra(key, value)
             }
-            // String-array extras (e.g. Vita3K's AppStartParameters = ["-r", "<TITLE_ID>"]).
+
             profile.intentArrayExtras.forEach { (key, templates) ->
                 putExtra(key, templates.map { resolveTemplate(it, game, profile, romUri) }.toTypedArray())
             }
@@ -323,9 +235,6 @@ class EmulatorIntentResolver @Inject constructor(
         return parseAmCommand(resolved, profile.packageName)
     }
 
-    // The URI handed to an ACTION_VIEW emulator. A SAF game uses its granted content:// document URI
-    // directly (no FileProvider, no raw-file access by PFP). A legacy raw-path game keeps the prior
-    // behaviour: file:// on very old APIs when explicitly requested, else a FileProvider content URI.
     private suspend fun romLaunchUri(game: Game, profile: EmulatorProfile): Uri {
         game.romUri?.takeIf { it.isNotBlank() }?.let { return Uri.parse(it) }
 
@@ -338,8 +247,7 @@ class EmulatorIntentResolver @Inject constructor(
                 "Profile ${profile.id} requests file:// ROM launch; using granted content:// URI on API ${Build.VERSION.SDK_INT}"
             )
         }
-        // Minted through RomUriMinter, which refuses any path outside a configured ROM source —
-        // the FileProvider's own root is far wider than a launch ever needs.
+
         return romUriMinter.mint(romPath)
             ?: error(
                 "${game.title} is not inside a configured ROM folder, so it cannot be handed to " +
@@ -388,8 +296,6 @@ class EmulatorIntentResolver @Inject constructor(
         "/storage/emulated/0/Android/data/$packageName/files/retroarch.cfg"
 
     private fun parseAmCommand(command: String, packageName: String): Intent {
-        // Minimal am-start parser: extracts -e/--es key value pairs as intent extras.
-        // Full am-start syntax is not supported — use COMPONENT or ACTION_VIEW profiles instead.
         val intent = Intent(Intent.ACTION_MAIN).apply {
             setPackage(packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -417,8 +323,4 @@ class EmulatorIntentResolver @Inject constructor(
         Timber.d("Parsed am command: package=$packageName, extras=${intent.extras?.keySet()?.joinToString()}, component=${intent.component}")
         return intent
     }
-
-    // corePathFor / platformAliases / normalizeRetroArchCorePath live in
-    // EmulatorPlatformMapping.kt (shared with EmulatorProfileRepository and the launch ladder) so
-    // the path shown to users and the path handed to RetroArch can never drift.
 }

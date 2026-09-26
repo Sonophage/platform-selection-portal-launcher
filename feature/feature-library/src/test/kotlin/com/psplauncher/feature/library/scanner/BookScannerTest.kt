@@ -6,18 +6,7 @@ import io.mockk.mockk
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * The walk, driven over a fake tree. Every case here is something a real folder does and a user
- * would notice: a book two folders down, a folder the user asked not to descend into, a cache
- * directory, a `.nomedia` marker, and a provider listing the same document twice.
- *
- * `collectBookFiles` takes its directory listing as a function for exactly this reason. The rest
- * of `BookScanner` is a permission check and a map onto `Book`, which needs a device to say
- * anything about.
- */
 class BookScannerTest {
-
-    /** A fake tree: document id to its children. */
     private class Tree(private val dirs: Map<String, List<SafChild>>) {
         val listChildren: (String) -> List<SafChild> = { dirs[it].orEmpty() }
     }
@@ -25,8 +14,7 @@ class BookScannerTest {
     private fun file(name: String, mime: String? = "application/epub+zip", id: String = name) =
         SafChild(
             documentId = id,
-            // The walk keys on documentId and never reads this, so a stub keeps the test
-            // on the JVM with no Robolectric runtime for one field.
+
             uri = STUB_URI,
             name = name,
             mime = mime,

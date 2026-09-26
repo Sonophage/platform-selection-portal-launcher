@@ -6,13 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/**
- * The superset registry the icon customizer and the v3 codec gate on. `IconSlots.ALL` is the
- * bundle contract (keys are zip entry names) and must be untouched inside the superset; the
- * console slots extend it under `sysicon_<platformId>` keys.
- */
 class CustomizableIconsTest {
-
     @Test
     fun `all keys are unique`() {
         val keys = CustomizableIcons.ALL.map { it.key }
@@ -56,8 +50,7 @@ class CustomizableIconsTest {
         assertFalse(CustomizableIcons.isValidKey("sysicon_snes/"))
         assertFalse(CustomizableIcons.isValidKey("/etc/passwd"))
         assertFalse(CustomizableIcons.isValidKey("not_a_slot"))
-        // sysicon_default is the built-in fallback art, not a platform slot — the customizer
-        // must not offer it (nothing renders through it but the fallback itself).
+
         assertFalse(CustomizableIcons.isValidKey("sysicon_default"))
     }
 

@@ -4,9 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-// Verifies the ES-DE folder-name → platform mapping that drives single-scan autoload.
 class PlatformFolderHintResolverTest {
-
     private val resolver = PlatformFolderHintResolver()
 
     @Test
@@ -49,7 +47,7 @@ class PlatformFolderHintResolverTest {
     fun `newly added Microsoft and PC gaps resolve`() {
         assertEquals("x360", resolver.detectFromFolderName("xbox360"))
         assertEquals("x360", resolver.detectFromFolderName("x360"))
-        // Original Xbox: ES-DE canonical folder is "xbox", which is also our id.
+
         assertEquals("xbox", resolver.detectFromFolderName("xbox"))
         assertEquals("xbox", resolver.detectFromFolderName("xemu"))
         assertEquals("xbox", resolver.detectFromFolderName("Microsoft Xbox"))
@@ -63,13 +61,12 @@ class PlatformFolderHintResolverTest {
         assertEquals("gba", resolver.esDeFolderName("gba"))
         assertEquals("snes", resolver.esDeFolderName("snes"))
         assertEquals("psx", resolver.esDeFolderName("psx"))
-        // Xbox 360: our id is x360, ES-DE folder is xbox360.
+
         assertEquals("xbox360", resolver.esDeFolderName("x360"))
     }
 
     @Test
     fun `esDeFolderName round-trips back through detection`() {
-        // Every created folder name must be re-detected as the same platform by autoload.
         listOf("gba", "snes", "psx", "n3ds", "megadrive", "x360").forEach { platformId ->
             val folder = resolver.esDeFolderName(platformId)
             assertEquals(platformId, resolver.detectFromFolderName(folder))

@@ -3,17 +3,11 @@ package com.psplauncher.feature.xmb.viewmodel
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * A renamed game re-sorts its list. The cursor must follow the game, not stay on its old slot —
- * which is what made a rename look like it had not applied.
- */
 class CursorAfterRefreshTest {
-
     private fun rows(vararg ids: String) = ids.map { XMBItem(id = it, title = it) }
 
     @Test
     fun `a renamed game that moves down the list keeps the cursor`() {
-        // "crash" was renamed to something that sorts after "sonic": first row to last.
         val before = rows("crash", "mario", "sonic")
         val after = rows("mario", "sonic", "crash")
 

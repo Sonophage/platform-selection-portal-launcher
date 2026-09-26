@@ -26,26 +26,8 @@ import com.psplauncher.feature.settings.viewmodel.AudioSettingsViewModel
 import com.psplauncher.feature.settings.viewmodel.NO_SOUND_LABEL
 import com.psplauncher.themekit.UiMediaLimits
 
-/**
- * MIME filter for the picker, taken from the import gate's accepted set so the two can never
- * disagree. `OpenDocument` takes an array; the gate re-checks the resolver's MIME anyway.
- */
 private val AUDIO_PICKER_MIME = UiMediaLimits.AUDIO_MIME.toTypedArray()
 
-/**
- * Interface ▸ Sound — the Menu Sounds toggle plus the eleven sound assignments: the eight menu
- * sounds and the three AUDIO_TRACK rows (Boot Sound and the launch ceremony's two cues), which
- * preview through their own ExoPlayer path
- * ([com.psplauncher.core.ui.media.UiMediaAudioPlayer]) instead of SoundPool.
- *
- * There is no editor sub-screen: selecting a row opens the system picker directly, and the row's
- * own inline actions carry Preview and Use Default. That is how every other media assignment in
- * this app works (wallpaper, custom icons), and it keeps the whole feature on one screen.
- *
- * The rows, and the north/west face-button shortcuts that act on the focused one, are
- * [MediaAssignmentRow] and [MediaRowShortcuts] — shared with Display ▸ Boot Sequence and
- * Display ▸ GameBoot so a user who learns them here already knows them there.
- */
 @Composable
 fun AudioSettingsScreen(
     onBack: () -> Unit,
@@ -54,9 +36,6 @@ fun AudioSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Remember the sound field being changed so focus can return to it after the picker or a
-    // reset removes the field's inline action. Without this, the navigation fallback lands on
-    // the bottom Reset row when the focused action disappears.
     var focusTargetSlot by remember { mutableStateOf<UiMediaSlot?>(null) }
     var focusRequestToken by remember { mutableIntStateOf(0) }
     var importWasActive by remember { mutableStateOf(false) }
@@ -66,15 +45,12 @@ fun AudioSettingsScreen(
         focusRequestToken++
     }
 
-    // ONE picker for all eleven rows — the pending slot is held on the ViewModel, so the callback
-    // does not need to close over which row launched it.
     val soundPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
             viewModel.onSoundPicked(uri)
         } else {
-            // Cancellation does not change import state, so restore immediately.
             focusTargetSlot?.let(::requestSoundFocus)
         }
     }
@@ -85,9 +61,6 @@ fun AudioSettingsScreen(
         soundPicker.launch(AUDIO_PICKER_MIME)
     }
 
-    // Restore after the asynchronous import has finished, whether it succeeded or was rejected.
-    // A replacement can leave the assignment set unchanged, so importing is the reliable
-    // completion signal rather than waiting only for assignedSlots to differ.
     LaunchedEffect(state.importing) {
         if (state.importing) {
             importWasActive = true
@@ -97,8 +70,6 @@ fun AudioSettingsScreen(
         }
     }
 
-    // Which assignment row the cursor is on right now — the north/west face-button shortcuts
-    // operate on it. Toggle and reset rows never set it, so shortcuts are inert over them.
     var focusedSlot by remember { mutableStateOf<UiMediaSlot?>(null) }
 
     Box(modifier = modifier) {
@@ -113,9 +84,6 @@ fun AudioSettingsScreen(
                 when {
                     MediaRowShortcuts.isNorthFace(action, state.xyLayout) &&
                         slot in state.assignedSlots -> {
-                        // The helper is only advertised while this row has a custom assignment,
-                        // so the north-face shortcut is consumed only when it has real work to do.
-                        // Restore the row after Use Default removes its inline action.
                         requestSoundFocus(slot)
                         viewModel.useDefault(slot)
                         true
@@ -131,8 +99,6 @@ fun AudioSettingsScreen(
             val focusRegistry = LocalSettingsFocusRegistry.current
             LaunchedEffect(focusRequestToken) {
                 if (focusRequestToken > 0) {
-                    // Wait until the reset action has been removed from the composition and the
-                    // scaffold has finished its normal focus-recovery pass.
                     withFrameNanos { }
                     withFrameNanos { }
                     focusTargetSlot?.let { slot ->
@@ -181,9 +147,7 @@ fun AudioSettingsScreen(
                     value = state.menuMusicLabel,
                     isAssigned = state.menuMusicAssigned,
                     onPick = { pickFor(UiMediaSlot.MENU_MUSIC) },
-                    // No preview: auditioning a five-minute loop from a settings row is a worse
-                    // control than the switch directly above it. The reset is a REMOVAL here,
-                    // because this slot has no bundled track to return to.
+
                     onUseDefault = { viewModel.useDefault(UiMediaSlot.MENU_MUSIC) },
                     resetLabel = "Remove the menu music track",
                     onFocusChanged = { focused ->
@@ -193,10 +157,6 @@ fun AudioSettingsScreen(
 
                 SettingsGroup("Sound Assignments")
 
-                // Keep the assignment rows composed while an import is in flight. Removing
-                // them here unregisters their FocusRequesters; the navigation engine then
-                // recovers to the only remaining selectable row (Reset Sound), so returning
-                // from the picker appears to jump away from the sound field being edited.
                 if (state.importing) {
                     LinearProgressIndicator(
                         modifier = Modifier
@@ -213,9 +173,7 @@ fun AudioSettingsScreen(
                         isAssigned = slot in state.assignedSlots,
                         onPick = { pickFor(slot) },
                         onPreview = { viewModel.preview(slot) },
-                        // The disc's opener is the one row with no bundled sample, so "use the
-                        // PFP default" would be a lie there: clearing it returns the ceremony to
-                        // opening in silence.
+
                         resetLabel = if (slot == UiMediaSlot.LAUNCH_DISC_AUDIO) {
                             "Open the launch disc in silence again"
                         } else {
@@ -241,7 +199,6 @@ fun AudioSettingsScreen(
                 )
             }
         }
-
     }
 
     state.message?.let { message ->

@@ -9,7 +9,6 @@ import androidx.room.Transaction
 import com.psplauncher.core.data.database.entity.BookEntity
 import kotlinx.coroutines.flow.Flow
 
-/** One row's recency, read back before a scan replaces it. See [BookDao.replaceForLibrary]. */
 data class BookOpenStamp(
     val id: String,
     @ColumnInfo(name = "last_opened_at") val lastOpenedAt: Long?,
@@ -17,9 +16,6 @@ data class BookOpenStamp(
 
 @Dao
 interface BookDao {
-
-    // Sorted by the parsed title when a later pass fills one in, else the file name, so the list
-    // order does not jump around once metadata lands.
     @Query("SELECT * FROM books ORDER BY COALESCE(title, display_name) COLLATE NOCASE ASC")
     fun observeAll(): Flow<List<BookEntity>>
 
@@ -53,14 +49,6 @@ interface BookDao {
     )
     suspend fun openStampsForLibrary(libraryId: String): List<BookOpenStamp>
 
-    /**
-     * Replaces a single library's books atomically; other libraries are never touched.
-     *
-     * last_opened_at survives the replace, for the same reason music_tracks.last_played_at does:
-     * this deletes and re-inserts from a scan that knows only the filesystem, so without it a
-     * rescan would silently clear the recents shelf. Restored by id, which BookScanner keeps
-     * stable by carrying `prior?.id` forward.
-     */
     @Transaction
     suspend fun replaceForLibrary(libraryId: String, books: List<BookEntity>) {
         val stamps = openStampsForLibrary(libraryId).associate { it.id to it.lastOpenedAt }
@@ -70,11 +58,9 @@ interface BookDao {
         )
     }
 
-    /** Stamps a book as opened now. */
     @Query("UPDATE books SET last_opened_at = :openedAt WHERE id = :id")
     suspend fun markOpened(id: String, openedAt: Long)
 
-    /** Drops the book off the recents shelf without touching anything else about it. */
     @Query("UPDATE books SET last_opened_at = NULL WHERE id = :id")
     suspend fun clearLastOpened(id: String)
 
@@ -84,17 +70,6 @@ interface BookDao {
     )
     fun observeRecentlyOpened(limit: Int): Flow<List<BookEntity>>
 
-    /**
-     * The newest covers in this library, newest first — for the XMB's card art grids.
-     *
-     * A LIMIT query returning only the URIs, not the rows. The grids need four per card and the
-     * media columns slice one pool across their rows, so this is tens of strings; streaming every
-     * track or photo to read one column off each would be thousands of rows for a handful of
-     * thumbnails.
-     *
-     * Newest is highest id, the same proxy the games grid uses: these tables have no added-at
-     * column either, and rows are inserted in scan order.
-     */
     @Query(
         """
         SELECT cover_uri FROM books

@@ -28,21 +28,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Pins the two things about [dragToScroll] that a reader cannot check by eye: that a null state is
- * inert, and that the drag direction matches `Modifier.verticalScroll`. An inverted header would be
- * worse than the dead one it replaces, and the `reverseDirection` sign that gets it right is not
- * self-evident.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w400dp-h800dp")
 class DragToScrollTest {
-
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** The scaffold's shape in miniature: a "header" that is a sibling of the scrolling body. */
     private fun setContent(attachState: Boolean) {
         composeRule.setContent {
             val scrollState = rememberScrollState()

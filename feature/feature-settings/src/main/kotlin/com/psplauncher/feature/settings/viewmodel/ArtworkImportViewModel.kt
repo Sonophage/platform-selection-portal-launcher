@@ -29,38 +29,37 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
-// Sticky Move/Copy choice for artwork imports — survives process restarts.
 private val KEY_MOVE_FILES = booleanPreferencesKey("artwork_import_move_files")
 
 data class ArtworkImportUiState(
-    // Folder link
+
     val folderDisplay: String? = null,
     val folderLinked: Boolean = false,
     val grantAlive: Boolean = true,
     val confirmForget: Boolean = false,
-    // Detected sources under import/
+
     val scanning: Boolean = false,
     val sources: List<SourceUi> = emptyList(),
     val unrecognized: List<String> = emptyList(),
-    // Preview
+
     val planning: Boolean = false,
     val plan: ImportPlan? = null,
     val moveFiles: Boolean = false,
     val expandedAmbiguousIndex: Int? = null,
-    // Running import
+
     val importRunning: Boolean = false,
     val importDone: Int = 0,
     val importTotal: Int = 0,
     val importLabel: String = "",
-    // Maintenance
+
     val relinking: Boolean = false,
-    // Internal-storage migration (M-F2)
+
     val internalFiles: Int = 0,
     val internalBytes: Long = 0L,
     val migrationRunning: Boolean = false,
     val migrationDone: Int = 0,
     val migrationTotal: Int = 0,
-    // Reports
+
     val reports: List<ReportUi> = emptyList(),
     val error: String? = null,
     val notice: String? = null,
@@ -74,21 +73,16 @@ class ArtworkImportViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val importManager: ArtworkImportManager,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ArtworkImportUiState())
     val uiState: StateFlow<ArtworkImportUiState> = _uiState.asStateFlow()
 
     init {
-        // "Move Files" is a persisted preference, not per-visit state — an ephemeral toggle
-        // silently reset to Copy on every process restart, which read as "Move doesn't work".
         viewModelScope.launch {
             context.pfpDataStore.data.collect { prefs ->
                 _uiState.value = _uiState.value.copy(moveFiles = prefs[KEY_MOVE_FILES] ?: false)
             }
         }
         viewModelScope.launch {
-            // distinctUntilChanged is load-bearing: the underlying DataStore flow emits on EVERY
-            // preference write, and each emission here triggers a SAF rescan of the import tree.
             importManager.folderTreeUri.distinctUntilChanged().collect { uri ->
                 val alive = uri != null && importManager.hasLiveGrant()
                 _uiState.value = _uiState.value.copy(
@@ -117,8 +111,6 @@ class ArtworkImportViewModel @Inject constructor(
         viewModelScope.launch { refreshInternalFootprint() }
     }
 
-    // ── Folder link ───────────────────────────────────────────────────────────
-
     fun onFolderPicked(uri: Uri) {
         viewModelScope.launch {
             val result = importManager.linkFolder(uri)
@@ -128,8 +120,7 @@ class ArtworkImportViewModel @Inject constructor(
                 )
                 return@launch
             }
-            // Zero-copy adoption: any ES-DE-shaped media already in the folder (a PFP library
-            // OR a plain downloaded_media tree) is linked to games right now — nothing copied.
+
             val scan = runCatching { importManager.relinkLibrary() }.getOrNull()
             refreshInternalFootprint()
             _uiState.value = _uiState.value.copy(
@@ -168,15 +159,11 @@ class ArtworkImportViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(confirmForget = false)
     }
 
-    // ── Sources & preview ─────────────────────────────────────────────────────
-
     fun rescan() {
         if (_uiState.value.scanning) return
         _uiState.value = _uiState.value.copy(scanning = true)
         viewModelScope.launch {
             runCatching {
-                // One-time in-place upgrade of v1 (per-game-folder) libraries to the ES-DE
-                // layout — same-tree moves, lossless, no-op once migrated.
                 val migrated = importManager.migrateV1IfNeeded()
                 if (migrated > 0) {
                     _uiState.value = _uiState.value.copy(
@@ -229,8 +216,6 @@ class ArtworkImportViewModel @Inject constructor(
         }
     }
 
-    // ── Ambiguous review ──────────────────────────────────────────────────────
-
     fun toggleAmbiguous(index: Int) {
         val current = _uiState.value.expandedAmbiguousIndex
         _uiState.value = _uiState.value.copy(expandedAmbiguousIndex = if (current == index) null else index)
@@ -252,8 +237,6 @@ class ArtworkImportViewModel @Inject constructor(
         )
     }
 
-    // ── Import run ────────────────────────────────────────────────────────────
-
     fun startImport() {
         val state = _uiState.value
         val plan = state.plan ?: return
@@ -263,7 +246,7 @@ class ArtworkImportViewModel @Inject constructor(
         }
         val transfer = if (state.moveFiles) PortableArtworkLibrary.Transfer.MOVE
         else PortableArtworkLibrary.Transfer.COPY
-        // File-logged so a "Move didn't move" report can be checked against what was requested.
+
         Timber.i("Import starting: transfer=$transfer, ${plan.itemCount} items from '${plan.sourceLabel}'")
         importManager.startImport(plan, transfer)
         _uiState.value = state.copy(plan = null, importRunning = true, importDone = 0, importTotal = plan.itemCount)
@@ -307,8 +290,6 @@ class ArtworkImportViewModel @Inject constructor(
         }
     }
 
-    // ── Internal-storage migration (M-F2) ─────────────────────────────────────
-
     fun startInternalMigration() {
         if (_uiState.value.migrationRunning) return
         importManager.startInternalMigration()
@@ -324,8 +305,6 @@ class ArtworkImportViewModel @Inject constructor(
     fun dismissError() {
         _uiState.value = _uiState.value.copy(error = null, notice = null)
     }
-
-    // ── Internals ─────────────────────────────────────────────────────────────
 
     private fun onWorkInfos(infos: List<WorkInfo>) {
         val active = infos.firstOrNull { !it.state.isFinished }

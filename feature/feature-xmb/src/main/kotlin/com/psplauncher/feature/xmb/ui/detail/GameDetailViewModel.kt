@@ -50,7 +50,6 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
-// ── Artwork type ──────────────────────────────────────────────────────────────
 enum class ArtworkType { ICON, HERO, BACKGROUND }
 
 val ArtworkType.displayLabel: String
@@ -60,15 +59,8 @@ val ArtworkType.displayLabel: String
         ArtworkType.BACKGROUND -> "Background"
     }
 
-// ── Unified artwork picker item ───────────────────────────────────────────────
-//
-// Used by all grid-based sources (SGDB, IGDB, TheGamesDB).
-// SGDB items carry a thumbUrl for faster thumbnail loading; other sources use
-// the full URL as thumb since no separate thumbnail endpoint is available.
-// Mirrors VideoRepositoryImpl / Settings > Video — the pinned external player package.
 private val KEY_VIDEO_DEFAULT_PLAYER = stringPreferencesKey("video_default_player")
 
-/** One tile in the Game Detail media strip - videos lead, then screenshots/title screens. */
 data class DetailMedia(val uri: String, val isVideo: Boolean)
 
 data class ArtPickerItem(
@@ -77,91 +69,64 @@ data class ArtPickerItem(
     val label: String? = null,
 )
 
-// ── UI state ──────────────────────────────────────────────────────────────────
 data class GameDetailUiState(
     val game: Game? = null,
     val platform: PlatformEntity? = null,
-    /** All rows in the loaded set; empty for ordinary single-ROM/app entries. */
+
     val discMembers: List<Game> = emptyList(),
     val selectedDiscId: Long? = null,
     val isLoading: Boolean = true,
     val isEditingNote: Boolean = false,
     val noteText: String = "",
-    /**
-     * The game's own colour, derived from its artwork, or null while it is still being read and
-     * whenever the art has no saturated hue to find. The page wears it instead of the user's
-     * scheme; null means the page keeps the user's scheme, which is also what it looks like for
-     * the first frame, so the change arrives as a tint settling in rather than a flash.
-     */
+
     val artAccentArgb: Long? = null,
     val isFetchingArtwork: Boolean = false,
     val artworkMessage: String? = null,
     val launchError: String? = null,
 
-
-    // Stored media surfaced on the page (resolved once per load via ArtworkStore.find).
-    val videoUri: String? = null,        // the game's video — playable from the Video button/strip
+    val videoUri: String? = null,
     val hasManual: Boolean = false,
-    val showVideoPlayer: Boolean = false,   // built-in fullscreen video player overlay
-    // Steam-style MEDIA PREVIEW strip: videos first, then images.
-    val detailMedia: List<DetailMedia> = emptyList(),
-    val imageViewerUri: String? = null,     // fullscreen image preview overlay
+    val showVideoPlayer: Boolean = false,
 
-    // ── Navigation (unified engine — see GameDetailNav) ───────────────────
-    // The stable key of the node the controller cursor is on, mirrored from the engine so the page
-    // can render focus. Null until the page is ready, and when nothing is focusable.
+    val detailMedia: List<DetailMedia> = emptyList(),
+    val imageViewerUri: String? = null,
+
     val navFocusKey: String? = null,
-    // False while the last input was touch: the cursor is hidden, logical focus is preserved.
+
     val cursorVisible: Boolean = true,
-    // The Overview row's expanded state — Confirm toggles it.
+
     val descriptionExpanded: Boolean = false,
 
-    /**
-     * Which page of the panel the body is showing. L1/R1 walk it, exactly as on the crossbar.
-     *
-     * Not reset per game the way the crossbar's is: this page is opened FOR one game and closed
-     * again, so there is no next row to carry a stale choice onto.
-     */
     val panelPage: DetailPanelPage = DetailPanelPage.LOGO,
 
     val showOptions: Boolean = false,
-    // Mirrors the engine's Options focus for rendering. The engine owns the authoritative node;
-    // this index only positions the menu's highlight.
+
     val optionsIndex: Int = 0,
 
-    // The Details dropdown: the short menu the page's one secondary button opens. Same mirroring
-    // rule as Options above -- the engine owns the cursor, this index only draws it.
     val showDetailsMenu: Boolean = false,
     val detailsIndex: Int = 0,
-    // The resolved emulator + RetroArch core and the ladder level that decided them for the loaded
-    // game; null while nothing resolves (loading / no emulator / package-backed entry).
+
     val resolvedLaunch: ResolvedLaunch? = null,
     val confirmRemove: Boolean = false,
     val actionMessage: String? = null,
     val closed: Boolean = false,
 
-    // ── Title editing ─────────────────────────────────────────────────────
     val isEditingTitle: Boolean = false,
     val titleText: String = "",
 
-    // ── In-app manual viewer ──────────────────────────────────────────────
-    val manualViewerUri: String? = null,     // non-null = viewer open
+    val manualViewerUri: String? = null,
     val manualPage: Int = 0,
     val manualPageCount: Int = 0,
     val manualScrollSteps: Int = 0,
 
-    // Fullscreen Artwork Studio (replaces the old in-detail artwork manager UI).
     val showArtworkStudio: Boolean = false,
 
-    // Current-vs-Incoming metadata overlay (C16 task 3.2); null = closed.
     val metadataPreview: MetadataPreviewUi? = null,
 
-    // ── Emulator picker ───────────────────────────────────────────────────
     val showEmulatorPicker: Boolean = false,
     val emulatorPickerOptions: List<EmulatorProfile> = emptyList(),
     val emulatorPickerIndex: Int = 0,
 
-    // ── Add-to-collection picker ──────────────────────────────────────────
     val collectionPicker: CollectionPickerUi = CollectionPickerUi(),
 ) {
     val selectedDisc: Game?
@@ -170,13 +135,6 @@ data class GameDetailUiState(
     val showDiscPicker: Boolean
         get() = discMembers.size > 1
 
-    // Package-backed gaming apps (Android / Windows card entries) launch through their package,
-    // shortcut, or captured-intent handle — never an emulator.
-    /**
-     * What the panel draws, built from the loaded game. Same shape the crossbar's hover panel
-     * uses — one component, one content type, two hosts — so the two can never describe the same
-     * game differently.
-     */
     val panelContent: DetailPanelContent?
         get() = game?.let { g ->
             detailPanelContentFor(
@@ -187,25 +145,15 @@ data class GameDetailUiState(
             )
         }
 
-    /** The page actually on screen: the walked-to one, or the first the strip offers. */
     val effectivePanelPage: DetailPanelPage
         get() = panelContent?.let { resolvePanelPage(panelPage, it.pages) } ?: DetailPanelPage.LOGO
 
     val isPackageBacked: Boolean
         get() = game != null && game.romPath == null && game.packageName != null
 
-    /**
-     * Emulator controls apply to this entry: the information band's Emulator field, and confirming
-     * the band to change it. Package-backed entries have neither, because emulator configuration is
-     * irrelevant for them.
-     */
     val showEmulatorAction: Boolean
         get() = game != null && !isPackageBacked
 
-    /**
-     * The Game Information band has anything to show. Absent values are omitted rather than filled
-     * with "Unknown", and an entry with nothing at all shows no band.
-     */
     val showInfoBand: Boolean
         get() {
             val loaded = game ?: return false
@@ -220,9 +168,6 @@ data class GameDetailUiState(
             ).any { it != null }
         }
 
-    // The options rows actually shown: the emulator picker is meaningless for package-backed
-    // entries, so its row is hidden there. Index-based navigation must use THIS list.
-    // Export Game writes a PC game's .pfpgame file (C18 task X.7), so it is offered on Windows games only.
     val visibleActions: List<DetailAction>
         get() = DetailAction.entries.filter { action ->
             when (action) {
@@ -232,43 +177,25 @@ data class GameDetailUiState(
             }
         }
 
-    /**
-     * The Details dropdown's rows. Manual is OMITTED without one rather than shown disabled: the
-     * pill it replaced had a fixed slot in a row whose shape had to stay put, and a dropdown has
-     * no shape to protect. A menu row that cannot be chosen is only there to be bumped into.
-     */
     val visibleDetailRows: List<DetailQuickAction>
         get() = DetailQuickAction.entries.filter { it != DetailQuickAction.MANUAL || hasManual }
 }
 
-// ── Metadata preview ──────────────────────────────────────────────────────────
-
-/**
- * C16 task 3.2 — the Current-vs-Incoming overlay. Retrieval fills it and nothing is written until
- * [GameDetailViewModel.applyMetadataPreview] runs; Back always closes without a write.
- *
- * The "will change" markers ([willWrite]) come from the same `MetadataApply.plan` the repository
- * writes with, so the preview can never promise a change the SQL does not make.
- */
 data class MetadataPreviewUi(
     val loading: Boolean = true,
     val applying: Boolean = false,
-    /** Retrieval threw, as opposed to every provider answering with nothing. */
+
     val failed: Boolean = false,
     val current: Map<MetadataField, Any?> = emptyMap(),
     val presets: List<MetadataPreset> = emptyList(),
     val presetIndex: Int = 0,
     val policy: MetadataApplyPolicy = MetadataApplyPolicy.FILL_MISSING_ONLY,
     val chosen: Set<MetadataField> = emptySet(),
-    /** `0..rows.lastIndex` is a field row; [applyIndex] is the Apply button. */
+
     val focus: Int = 0,
 ) {
     val preset: MetadataPreset? get() = presets.getOrNull(presetIndex)
 
-    /**
-     * Retrieval finished with no preset to offer. The overlay stays open and says so: closing on its
-     * own, with the reason in a message behind it, looked like a crash.
-     */
     val nothingFound: Boolean get() = !loading && presets.isEmpty()
     val rows: List<MetadataFieldRow> get() = preset?.let { MetadataApply.rows(current, it) }.orEmpty()
     val willWrite: Set<MetadataField>
@@ -276,18 +203,7 @@ data class MetadataPreviewUi(
     val applyIndex: Int get() = rows.size
 }
 
-// ── Options menu ──────────────────────────────────────────────────────────────
-/**
- * The Options menu on a game, in the order it is drawn. [section] groups the run of actions it
- * heads; the screen turns each change of section into a heading, so THIS ORDER IS THE MENU, and
- * reordering an entry moves it on screen.
- *
- * Grouped because thirteen flat rows put Remove immediately under Open Location with nothing
- * between them, and overflowed the panel besides.
- */
 enum class DetailAction(val label: String, val section: String) {
-    // Favorite stays first: the menu opens with the cursor on row one, and toggling a favorite is
-    // the one action worth reaching in two presses. Grouping must not cost that.
     FAVORITE("Favorite", ORGANIZE_SECTION),
     COLLECTIONS("Collections", ORGANIZE_SECTION),
 
@@ -306,16 +222,6 @@ enum class DetailAction(val label: String, val section: String) {
     REMOVE("Remove", FILE_SECTION),
 }
 
-/**
- * The Details dropdown, in the order it is drawn.
- *
- * These four were pills in a row under the hero. They are a menu now because the page's top band
- * is artwork, and five controls laid across a game's own key art is five things asking to be read
- * before the art is. One button opens this; the art keeps the rest of the band.
- *
- * OPTIONS is last on purpose: it is the way through to the full Options menu, and the three
- * actions worth reaching directly sit above it.
- */
 enum class DetailQuickAction(val label: String) {
     FAVORITE("Favorite"),
     ARTWORK("Artwork"),
@@ -323,13 +229,6 @@ enum class DetailQuickAction(val label: String) {
     OPTIONS("Options"),
 }
 
-/**
- * The heading to draw above each action, or null where the action continues the run above it.
- *
- * Runs are computed AFTER filtering, which is the whole point: hiding Emulator on a
- * package-backed game must promote Saves to carry the "Play" heading, not leave the heading
- * stranded on a group that no longer starts there.
- */
 fun sectionHeadings(actions: List<DetailAction>): List<String?> =
     actions.mapIndexed { index, action ->
         action.section.takeIf { it != actions.getOrNull(index - 1)?.section }
@@ -340,23 +239,13 @@ private const val EDIT_SECTION = "Edit"
 private const val PLAY_SECTION = "Play"
 private const val FILE_SECTION = "File"
 
-
-/**
- * The picker id that means "no per-game override". Same string the XMB context menu writes
- * through `choice.takeIf { it != "default" }`, so both paths clear an override identically.
- */
 internal const val DEFAULT_EMULATOR_SENTINEL = "default"
 
-// Key prefixes the node graph hands back through [GameDetailNav.onActivate]. Kept next to the keys
-// themselves in GameDetailKeys; these are only the parts the ViewModel splits on.
 private const val DISC_KEY_PREFIX = "game-detail:disc:"
 private const val MEDIA_KEY_PREFIX = "game-detail:media:"
 
-// Upper bound for the manual viewer's page scrolling — generous enough for the longest pages; the
-// viewer clamps to the real content height, so overshoot is harmless.
 const val MAX_PAGE_SCROLL_STEPS = 20
 
-// ── ViewModel ─────────────────────────────────────────────────────────────────
 @HiltViewModel
 class GameDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -375,41 +264,26 @@ class GameDetailViewModel @Inject constructor(
     private val launchResolver: com.psplauncher.feature.launcher.GameLaunchResolver,
     private val pcGameExporter: com.psplauncher.feature.settings.pc.PcGameExporter,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(GameDetailUiState())
     val uiState: StateFlow<GameDetailUiState> = _uiState.asStateFlow()
 
-    /**
-     * The page's navigation state: stable semantic nodes, geometry-driven traversal, readiness
-     * gating, and one modal context per blocking overlay. Owns navigation only — every business
-     * action still lives on this ViewModel.
-     */
     private val nav = GameDetailNav(logger = NavigationLogger { Timber.w(it) })
 
     init {
-        // The engine reports activations by stable key; the ViewModel decides what each one means.
         nav.onActivate = ::activateNode
 
-        // The page graph follows the state it renders, from one place: media arriving, a manual
-        // appearing after an artwork refresh, discs resolving, the emulator changing — none of them
-        // touch navigation directly, and the engine preserves (or recovers) focus by itself.
         viewModelScope.launch {
             uiState
                 .map { navContentOf(it) }
                 .distinctUntilChanged()
                 .collect { content ->
                     nav.updateContent(content)
-                    // The gate opens as soon as a loaded graph exists: until then the engine ignores
-                    // navigation input outright rather than buffering it, so a press during load
-                    // cannot fire late. The screen's onPageLaidOut() is the second, idempotent
-                    // signal (it also covers the load-error surface, which has no graph at all).
+
                     if (content.loaded) nav.markReady()
                     publishNav()
                 }
         }
 
-        // Modal contexts are pushed/popped from the same state, so an overlay opened by an async
-        // action (the manual viewer's file lookup) pauses the page exactly like a synchronous one.
         viewModelScope.launch {
             uiState
                 .map { topModalId(it) }
@@ -420,10 +294,6 @@ class GameDetailViewModel @Inject constructor(
                 }
         }
 
-        // A modal's own rows can arrive asynchronously too (metadata retrieval, the collection list,
-        // the installed-emulator catalog), so while one is up its nodes are rebuilt from state.
-        // publishNav matters here: rebuilding the graph can be what finally gives the overlay a
-        // cursor, and the state mirror has to carry that back to the screen.
         viewModelScope.launch {
             uiState.collect { s ->
                 val active = unlessModal(nav) ?: return@collect
@@ -436,24 +306,17 @@ class GameDetailViewModel @Inject constructor(
     private fun unlessModal(nav: GameDetailNav): String? =
         if (nav.isModalActive) nav.activeContextId else null
 
-    // ── Navigation plumbing ──────────────────────────────────────────────
-
-    /**
-     * What the page's node graph is built from. Only the affordances that actually change the
-     * focusable layout — everything else in the UI state is data, not navigation.
-     */
     private fun navContentOf(s: GameDetailUiState): GameDetailNavContent {
         val game = s.game
         val loaded = game != null && !s.isLoading
         return GameDetailNavContent(
             gameId      = game?.id ?: 0L,
             loaded      = loaded,
-            // Package-backed entries launch through a package/shortcut/intent — never an emulator,
-            // so they get no emulator nodes at all.
+
             showEmulatorControls = loaded && s.showEmulatorAction,
             discIds     = if (s.showDiscPicker) s.discMembers.map { it.id } else emptyList(),
             mediaIds    = s.detailMedia.map { mediaStableId(it) },
-            // The tiles are reachable only while their page is up — see GameDetailNavContent.
+
             onMediaPage = loaded && s.effectivePanelPage == DetailPanelPage.GALLERY,
         )
     }
@@ -461,13 +324,11 @@ class GameDetailViewModel @Inject constructor(
     private fun mediaIndexFor(key: String): Int =
         _uiState.value.detailMedia.indexOfFirst { GameDetailKeys.media(mediaStableId(it)) == key }
 
-    /** Business meaning of a page node's stable key. */
     private fun activateNode(key: String) {
         when {
             key == GameDetailKeys.LAUNCH -> { Timber.d("Controller SELECT activated Launch"); launch() }
             key == GameDetailKeys.DETAILS -> openDetailsMenu()
-            // The footer's two other buttons. The gear is Options, which is where scrape and edit
-            // already lived — the owner's call, and it cost no new action plumbing.
+
             key == GameDetailKeys.FAVORITE -> toggleFavorite()
             key == GameDetailKeys.OPTIONS -> openOptions()
             key.startsWith(DISC_KEY_PREFIX) ->
@@ -480,14 +341,9 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    /** Confirm on the Overview row: expand or collapse the description. */
     private fun toggleDescriptionExpanded() =
         _uiState.update { it.copy(descriptionExpanded = !it.descriptionExpanded) }
 
-    /**
-     * Publish the engine's result after an input: the modal stack (a confirm may have opened or
-     * closed an overlay), the page cursor, and the indices the overlays still take as parameters.
-     */
     private fun finishInput() {
         syncNavStack()
         publishNav()
@@ -522,7 +378,6 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    /** The topmost blocking overlay, or null when the page itself owns input. */
     private fun topModalId(s: GameDetailUiState): String? = when {
         s.showArtworkStudio -> GameDetailKeys.MODAL_ARTWORK_STUDIO
         s.imageViewerUri != null -> GameDetailKeys.MODAL_IMAGE_VIEWER
@@ -535,26 +390,16 @@ class GameDetailViewModel @Inject constructor(
         s.showEmulatorPicker -> GameDetailKeys.MODAL_EMULATOR_PICKER
         s.collectionPicker.visible -> GameDetailKeys.MODAL_COLLECTION_PICKER
         s.showOptions -> GameDetailKeys.MODAL_OPTIONS
-        // Lowest of the stack: choosing Options in here closes this menu and opens that one, so
-        // the two are never both up at once, and the order only decides which wins if they were.
+
         s.showDetailsMenu -> GameDetailKeys.MODAL_DETAILS
         else -> null
     }
 
-    /**
-     * Keep the engine's context stack in step with the overlays the state says are open. Overlays in
-     * this screen never stack — each one closes the picker below it — so unwinding to the page graph
-     * and pushing the new context is the whole story.
-     */
     private fun syncNavStack() {
         val s = _uiState.value
         val target = topModalId(s)
         val active = if (nav.isModalActive) nav.activeContextId else null
         if (target == active) {
-            // The overlay is the one already on top, but its rows may have arrived after it opened
-            // (metadata retrieval, the collection list, the emulator catalog). Re-registering is
-            // idempotent: it never steals focus from a user who already moved, and it keeps the
-            // overlay's cursor on the node it was on as long as that node still exists.
             if (target != null) {
                 nav.updateModalNodes(modalNodesFor(target), preferredModalFocus(target, s))
             }
@@ -566,7 +411,6 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    /** The rows of a modal context. Empty for overlays whose input is bespoke (viewers, editors). */
     private fun modalNodesFor(contextId: String): List<NavigationNode> {
         val s = _uiState.value
         return when (contextId) {
@@ -605,34 +449,25 @@ class GameDetailViewModel @Inject constructor(
                     }
                 }
             }
-            // THIS ORDER IS THE PROMPT, the same rule the options menu follows: these are
-            // top-level sibling nodes, so the cursor moves between them vertically, and the
-            // overlay draws them stacked in this order. Cancel first -- safe choice on top, and
-            // where the cursor starts.
+
             GameDetailKeys.MODAL_CONFIRM_REMOVE -> listOf(
                 NavigationNode(GameDetailKeys.CONFIRM_CANCEL, onSelect = { cancelRemove() }),
                 NavigationNode(GameDetailKeys.CONFIRM_REMOVE, onSelect = { confirmRemoveGame() }),
             )
-            // Viewers, text editors and the full-screen Artwork Studio own their own input.
+
             else -> emptyList()
         }
     }
 
-    /**
-     * Where a freshly opened modal's cursor starts. Only consulted while its graph is still
-     * focus-less, so an async row arriving later never steals the cursor from the user.
-     */
     private fun preferredModalFocus(contextId: String, s: GameDetailUiState): String? = when (contextId) {
         GameDetailKeys.MODAL_OPTIONS -> s.visibleActions.firstOrNull()?.let { GameDetailKeys.option(it.name) }
         GameDetailKeys.MODAL_DETAILS -> s.visibleDetailRows.firstOrNull()?.let { GameDetailKeys.detailsRow(it.name) }
         GameDetailKeys.MODAL_EMULATOR_PICKER ->
             s.emulatorPickerOptions.getOrNull(s.emulatorPickerIndex)?.let { GameDetailKeys.emulatorPick(it.id) }
         GameDetailKeys.MODAL_COLLECTION_PICKER -> collectionKeyAt(s, s.collectionPicker.selectedIndex)
-        // The metadata overlay opens on Apply: the default policy is the non-destructive one.
+
         GameDetailKeys.MODAL_METADATA -> GameDetailKeys.METADATA_APPLY
-        // Cancel, never Remove. The metadata overlay two lines up opens on its non-destructive
-        // default for the same reason; this one said the opposite while the intercept above made
-        // it moot. Now that the engine really drives this modal, the default is load-bearing.
+
         GameDetailKeys.MODAL_CONFIRM_REMOVE -> GameDetailKeys.CONFIRM_CANCEL
         else -> null
     }
@@ -658,10 +493,8 @@ class GameDetailViewModel @Inject constructor(
         return if (rowIndex >= 0) rowIndex else -1
     }
 
-    /** Back on the base page: leave Game Detail. */
     private fun close() = _uiState.update { it.copy(closed = true) }
 
-    /** Back inside a modal: close the topmost overlay before anything else. */
     private fun closeActiveModal() {
         val s = _uiState.value
         when {
@@ -670,51 +503,34 @@ class GameDetailViewModel @Inject constructor(
             s.collectionPicker.visible -> closeCollectionPicker()
             s.showOptions -> closeOptions()
             s.showDetailsMenu -> closeDetailsMenu()
-            // Back on the remove prompt cancels it. This branch is NEW: the prompt used to be
-            // intercepted before the engine and answered BACK itself, so removing that intercept
-            // left Back falling through to close() -- which shut the whole page instead of the
-            // prompt. Caught by `Back closes the prompt without removing`.
+
             s.confirmRemove -> cancelRemove()
             else -> close()
         }
     }
 
-    // ── Touch (same actions, one path) ────────────────────────────────────
-
-    /** A tap on any page node: logical focus moves there, then the node activates. */
     fun onNodeTapped(key: String) {
         nav.touch(key)
         finishInput()
     }
 
-    /** Any touch anywhere: hide the controller cursor, keep logical focus (design §10). */
     fun onTouchInput() {
         nav.markTouchInput()
         publishNav()
     }
 
-    /**
-     * The page's first usable graph is on screen. Until this fires the engine ignores navigation
-     * input outright — it is never buffered — so a press during load cannot fire late.
-     */
     fun onPageLaidOut() {
         nav.markReady()
         publishNav()
     }
 
-    /** Test seam: every node key the cursor can reach, inline children included. */
     internal fun focusableNodeKeys(): Set<String> = nav.reachableKeys()
 
-    /** Root-space Y of every page node the screen composed, for geometry-driven movement. */
     fun onNodeGeometry(geometry: Map<String, Float>) {
         nav.reportGeometry(geometry)
         publishNav()
     }
 
-    /**
-     * The page is animating the cursor into view. Repeated directional input during the alignment is
-     * dropped rather than queued, so a held direction cannot outrun the scroll.
-     */
     fun onScrollAlignmentChanged(aligning: Boolean) {
         if (aligning) nav.beginRecoveryLock() else nav.endRecoveryLock()
     }
@@ -729,9 +545,7 @@ class GameDetailViewModel @Inject constructor(
                 isEditingTitle = false,
                 actionMessage = null,
                 launchError = null,
-                // An overlay left over from a previous open must not survive into this one, and the
-                // engine's modal stack has to unwind with it — otherwise the page would come back
-                // with a modal context still on top of its graph.
+
                 showEmulatorPicker = false,
                 metadataPreview = null,
                 collectionPicker = CollectionPickerUi(),
@@ -745,27 +559,14 @@ class GameDetailViewModel @Inject constructor(
         publishNav()
     }
 
-    /**
-     * @param requestedDiscId when set (XMB context menu "Choose Disc"), the set member to select
-     *   instead of the primary — the disc an auto-launch then boots. Falls back to the primary
-     *   when the id isn't a member (stale row, single-disc game).
-     */
-    /**
-     * Reads the game's colour out of its artwork, preferring the art that fills the most of the
-     * page: the hero (which is now the page's whole background), then the XMB background, then
-     * the box, then the icon. The first one that yields a hue wins; a game whose art is all
-     * greyscale keeps the user's theme.
-     */
     private suspend fun resolveArtAccent(game: Game) {
         val accent = artworkAccent.of(game.heroUri, game.artworkUri, game.boxArtUri, game.iconUri)
-        // The page may already have moved on to another game while this decoded.
+
         _uiState.update { if (it.game?.id == game.id) it.copy(artAccentArgb = accent) else it }
     }
 
     fun loadGame(id: Long, requestedDiscId: Long? = null) {
         viewModelScope.launch {
-            // Loading is a fresh page: every overlay closes with it, and the engine's modal stack
-            // unwinds from the state (below) rather than being left on top of a new graph.
             _uiState.update {
                 it.copy(
                     isLoading = true,
@@ -780,17 +581,14 @@ class GameDetailViewModel @Inject constructor(
                     manualViewerUri = null,
                     imageViewerUri = null,
                     showVideoPlayer = false,
-                    // The OUTGOING game's colour must not stay on the incoming page even for a
-                    // frame: a red game opening over a blue one would flash blue chrome.
+
                     artAccentArgb = null,
                 )
             }
             syncNavStack()
             publishNav()
             val game     = gameRepository.getById(id)
-            // Always keep the detail picker in numeric disc order. The primary flag only
-            // determines the highlighted/default selection; it must never move that disc ahead
-            // of the numbered rows.
+
             val discMembers = game?.discSetKey
                 ?.let { gameRepository.getDiscSetMembers(it) }
                 ?.takeIf { it.isNotEmpty() }
@@ -805,9 +603,7 @@ class GameDetailViewModel @Inject constructor(
                 ?: discMembers.firstOrNull()
             val platform = game?.let { platformDao.getById(it.platformId) }
             val resolvedLaunch = game?.let { resolveLaunchProfile(it, platform).getOrNull() }
-            // VIDEO and SCREENSHOT are multi-asset kinds (ArtworkFileNaming.MULTI_ASSET_KINDS), so
-            // the strip reads the whole ordered set rather than position 0 alone. ICON1 (the icon
-            // snap) is a single-art fallback for a game that has no full video at all.
+
             val videoUris = game
                 ?.let { g ->
                     artworkStore.findAll(g.id, ArtworkKind.VIDEO)
@@ -823,22 +619,19 @@ class GameDetailViewModel @Inject constructor(
                     selectedDiscId    = selectedDisc?.id,
                     noteText          = game?.userNote ?: "",
                     resolvedLaunch    = resolvedLaunch,
-                    // Media strip plays the full VIDEO; ICON1 (icon snap) is a fallback so a game
-                    // that only has a snap still shows a video card.
+
                     videoUri          = videoUris.firstOrNull(),
                     detailMedia       = if (game == null) emptyList() else buildList {
                         videoUris.forEach { add(DetailMedia(it, isVideo = true)) }
                         screenshotUris.forEach { add(DetailMedia(it, isVideo = false)) }
                         artworkStore.find(game.id, ArtworkKind.TITLESCREEN)?.let { add(DetailMedia(it, isVideo = false)) }
                     },
-                    // The same two sources the viewer opens from, so an action that is enabled always
-                    // opens and a manual that exists is never disabled.
+
                     hasManual         = game?.let { g -> manualPath(g.id) } != null,
                     showVideoPlayer   = false,
                     imageViewerUri    = null,
                     isLoading         = false,
-                    // A fresh page shows the description collapsed again; focus itself is preserved
-                    // by the engine when this is a reload of the same game (Artwork Studio return).
+
                     descriptionExpanded = false,
                     manualViewerUri   = null,
                     showOptions       = false,
@@ -851,25 +644,17 @@ class GameDetailViewModel @Inject constructor(
                     closed            = false,
                 )
             }
-            // AFTER the state carries the game, never before. resolveArtAccent only writes when
-            // the page still shows the game it decoded for, and launching it above meant a cached
-            // accent could come back before `game` was in the state at all -- the guard would then
-            // compare against the PREVIOUS game and throw the answer away. Reliably on a reopen,
-            // where the cache makes it instant.
+
             game?.let { g -> viewModelScope.launch { resolveArtAccent(g) } }
             finishInput()
         }
     }
 
-    // ── Disc picker ───────────────────────────────────────────────────────
-
     fun selectDisc(id: Long) {
         val state = _uiState.value
         if (state.discMembers.any { it.id == id }) {
             _uiState.update { it.copy(selectedDiscId = id, actionMessage = null, launchError = null) }
-            // Selecting a disc in detail is the same preference-changing action as selecting one
-            // from the XMB context menu. Persist it immediately so the highlight and subsequent
-            // launches remain consistent after leaving and reopening this screen.
+
             val gameId = state.game?.id
             if (gameId != null && state.discMembers.size > 1) {
                 viewModelScope.launch {
@@ -879,29 +664,17 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    // ── Controller input ──────────────────────────────────────────────────
-
     fun handleGamepadAction(action: GamepadAction) {
-        // Catch the engine up before dispatching: an overlay may have been opened since the last
-        // input, and an asynchronously loaded row list (metadata rows, the collection list, the
-        // installed-emulator catalog) may have arrived. Neither may leave the press navigating the
-        // paused page behind the overlay, so the stack is reconciled first.
         syncNavStack()
         val s = _uiState.value
 
-        // ── Overlays that own their own semantics ─────────────────────────────
-        // Each of these still pushes a modal navigation context (see syncNavStack), so the page
-        // graph behind it is paused and gets its exact cursor back when the overlay closes. What
-        // they do NOT do is navigate by node — a text field, a flipbook and a video player have no
-        // row geometry to move through.
         if (s.imageViewerUri != null) {
             if (action == GamepadAction.BACK || action == GamepadAction.SELECT) closeImageViewer()
             finishInput()
             return
         }
-        if (s.showArtworkStudio) return   // actions are forwarded to the Studio's own VM
+        if (s.showArtworkStudio) return
         if (s.showVideoPlayer) {
-            // Fullscreen snap player: Back (or Confirm) closes; everything else is consumed.
             if (action == GamepadAction.BACK || action == GamepadAction.SELECT) closeVideoPlayer()
             finishInput()
             return
@@ -912,10 +685,6 @@ class GameDetailViewModel @Inject constructor(
             return
         }
         if (s.collectionPicker.showCreateDialog) {
-            // The new-collection prompt is a text field: the keyboard owns every key except the
-            // two the XMB always means. A creates the collection with what has been typed
-            // (confirmCreateCollection reads createText, which the field already writes back),
-            // B cancels.
             when (action) {
                 GamepadAction.SELECT -> confirmCreateCollection()
                 GamepadAction.BACK   -> cancelCreateCollection()
@@ -940,19 +709,12 @@ class GameDetailViewModel @Inject constructor(
             return
         }
 
-        // ── Engine-owned navigation ───────────────────────────────────────────
-        // Everything left — the page itself and the pickers whose rows ARE a graph — goes through
-        // the shared engine, so exactly one thing owns the cursor at a time.
         when (action) {
-            // Y / Triangle opens Options from anywhere on the base page. Inside a modal it is
-            // inert: a context menu of a context menu is not a thing.
             GamepadAction.OPEN_CONTEXT_MENU -> if (!nav.isModalActive) openOptions()
             GamepadAction.BACK -> if (nav.isModalActive) closeActiveModal() else close()
-            // HOME belongs to the shell (the XMB bar), never to this page.
+
             GamepadAction.HOME -> Unit
-            // The shoulders walk the panel's pages, the same as on the crossbar. Inside a modal
-            // they belong to whatever is on top (the metadata preview cycles its source with
-            // them), which is why this sits after the modal branches above.
+
             GamepadAction.PREV_CATEGORY -> if (!nav.isModalActive) stepPanelPage(-1)
             GamepadAction.NEXT_CATEGORY -> if (!nav.isModalActive) stepPanelPage(+1)
             else -> nav.handleAction(action)
@@ -960,46 +722,34 @@ class GameDetailViewModel @Inject constructor(
         finishInput()
     }
 
-    /** Walk the panel by [delta], clamped to the pages this game actually offers. */
     private fun stepPanelPage(delta: Int) = _uiState.update { s ->
         val pages = s.panelContent?.pages ?: return@update s
         s.copy(panelPage = com.psplauncher.feature.xmb.ui.detail.stepPanelPage(s.effectivePanelPage, pages, delta))
     }
 
-    /** A tap on the strip goes straight to that page. */
     fun onPanelPageTapped(page: DetailPanelPage) = _uiState.update { it.copy(panelPage = page) }
 
-    // ── Artwork Studio open / close ───────────────────────────────────────
-
     fun openArtworkManager() {
-        // The legacy in-detail manager is retired — the fullscreen Artwork Studio replaces it.
         _uiState.update { it.copy(showArtworkStudio = true) }
     }
 
-    /** Called when the Studio closes: reload so applied artwork shows immediately. */
     fun onArtworkStudioClosed() {
         _uiState.update { it.copy(showArtworkStudio = false) }
         val id = _uiState.value.game?.id ?: return
         loadGame(id)
     }
 
-    // ── Details dropdown ──────────────────────────────────────────────────
-
     fun openDetailsMenu() =
         _uiState.update { it.copy(showDetailsMenu = true, detailsIndex = 0, actionMessage = null) }
 
     fun closeDetailsMenu() = _uiState.update { it.copy(showDetailsMenu = false) }
 
-    /** Tap on a Details row: focus first, then activate, so touch and controller share one path. */
     fun onDetailsRowTapped(row: DetailQuickAction) {
         if (!nav.touch(GameDetailKeys.detailsRow(row.name))) activateQuickAction(row)
         finishInput()
     }
 
     fun activateQuickAction(row: DetailQuickAction) {
-        // Closing first is what keeps the overlay stack flat: Options is opened by the branch
-        // below, and if this menu were still up it would be two modal contexts deep for a menu
-        // the user has already left.
         _uiState.update { it.copy(showDetailsMenu = false) }
         when (row) {
             DetailQuickAction.FAVORITE -> toggleFavorite()
@@ -1009,8 +759,6 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    // ── Options menu ──────────────────────────────────────────────────────
-
     fun openOptions()  = _uiState.update { it.copy(showOptions = true, optionsIndex = 0, actionMessage = null) }
     fun closeOptions() = _uiState.update { it.copy(showOptions = false) }
 
@@ -1019,7 +767,6 @@ class GameDetailViewModel @Inject constructor(
         activateAction(action)
     }
 
-    /** Tap on an Options row: focus first, then activate — one path for touch and controller. */
     fun onOptionRowTapped(action: DetailAction) {
         if (!nav.touch(GameDetailKeys.option(action.name))) activateAction(action)
         finishInput()
@@ -1053,10 +800,6 @@ class GameDetailViewModel @Inject constructor(
 
     private fun showActionMessage(msg: String) = _uiState.update { it.copy(actionMessage = msg) }
 
-    /**
-     * Export Game (C18 task X.7): writes this PC game's `.pfpgame` file into `windows/import`, so a
-     * fresh install's Scan Import Folder can bring it back with its artwork.
-     */
     private fun exportGame() {
         val gameId = _uiState.value.game?.id ?: return
         viewModelScope.launch {
@@ -1067,15 +810,8 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    // Opens the scraped PDF manual (ScreenScraper, stored as artwork/{gameId}/manual.pdf) in the
-    // user's PDF viewer. Goes through the existing launch-intent channel.
     fun onManualClicked() = openManual()
 
-    /**
-     * Plays the game's video snap. Honors Settings ▸ Video's default player: a pinned external
-     * package gets an ACTION_VIEW intent (falling back to built-in on failure); otherwise the
-     * built-in fullscreen overlay plays it in place.
-     */
     fun onVideoClicked() {
         val uri = _uiState.value.videoUri ?: run {
             _uiState.update { it.copy(actionMessage = "No video snap — enable Download Video Snaps and re-scrape") }
@@ -1112,8 +848,6 @@ class GameDetailViewModel @Inject constructor(
 
     fun closeVideoPlayer() = _uiState.update { it.copy(showVideoPlayer = false) }
 
-    /** Confirm/tap on a media-strip tile: videos route like the Video button, images open the
-     *  fullscreen viewer — Steam-store-style previews. */
     fun openMediaAt(index: Int) {
         val media = _uiState.value.detailMedia.getOrNull(index) ?: return
         if (media.isVideo) onVideoClicked()
@@ -1130,7 +864,7 @@ class GameDetailViewModel @Inject constructor(
                 showActionMessage("No manual available for this game")
                 return@launch
             }
-            // Displayed in-app via PdfRenderer (ManualViewerOverlay) — no external PDF app needed.
+
             _uiState.update {
                 it.copy(
                     showOptions = false,
@@ -1143,10 +877,6 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Where [gameId]'s manual lives: the internal store first (scraped manuals), then the portable
-     * media library ({platform}/manuals/{name}.pdf, tracked by the game's artwork record).
-     */
     private suspend fun manualPath(gameId: Long): String? =
         artworkStore.find(gameId, ArtworkKind.MANUAL)
             ?: artworkRecordDao.get(gameId, ArtworkKind.MANUAL.name)?.documentUri
@@ -1185,8 +915,6 @@ class GameDetailViewModel @Inject constructor(
 
     fun dismissActionMessage() = _uiState.update { it.copy(actionMessage = null) }
 
-    // ── Remove ────────────────────────────────────────────────────────────
-
     fun requestRemove() = _uiState.update { it.copy(confirmRemove = true) }
     fun cancelRemove()  = _uiState.update { it.copy(confirmRemove = false) }
     fun confirmRemoveGame() {
@@ -1197,26 +925,13 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    // ── Launch ────────────────────────────────────────────────────────────
-
-    // playSound is false for direct-launch auto-fire: the XMB icon confirm already handled the
-    // launch sound, so replaying it here would double it. Manual Play (button / controller
-    // SELECT) leaves it true. Either way, a game boot never scores the App Launch sfx — GameBoot
-    // owns sfx_launch when it is on, and with GameBoot off the launch is silent by decision.
     fun launch(playSound: Boolean = true) {
         val selectedGame = _uiState.value.selectedDisc ?: run {
             Timber.w("Play requested before game detail state was loaded")
             _uiState.update { it.copy(actionMessage = null, launchError = "Game is still loading") }
             return
         }
-        // A missing game's file was gone on the last trustworthy scan, so every launch handle below
-        // would hand the emulator a dead path and surface as an opaque emulator-side error. Refuse
-        // here instead, with the reason. Deliberately before the launch sfx — a refused launch that
-        // still plays the launch sound reads as a crash.
-        //
-        // This is the single chokepoint for Play, controller SELECT, and direct-launch auto-fire,
-        // so guarding it once covers all three. The entry is untouched: dropping the file back
-        // clears is_missing on the next scan and Play works again.
+
         if (selectedGame.isMissing) {
             Timber.i("Launch refused for missing game: ${selectedGame.title}")
             _uiState.update {
@@ -1228,9 +943,7 @@ class GameDetailViewModel @Inject constructor(
             }
             return
         }
-        // No launch sound on a game boot: GameBoot brings its own when it is on, and with
-        // GameBoot off the launch stays silent — never the App Launch sfx, which is the same
-        // sfx_launch sample the built-in sequence is timed to.
+
         if (playSound) {
             menuSound.play(com.psplauncher.core.ui.sound.MenuSound.SELECT)
         }
@@ -1247,14 +960,12 @@ class GameDetailViewModel @Inject constructor(
                 "Launch requested: gameId=${game.id}, title=${game.title}, platform=${game.platformId}, rom=${game.romPath ?: game.packageName.orEmpty()}"
             )
 
-            // Harvested launcher shortcut (Windows Games card) — startShortcut is an API call,
-            // not an intent, so it can't ride the normal launch channel.
             if (game.shortcutId != null && game.packageName != null) {
                 launcherShortcutRepository.launch(game.packageName!!, game.shortcutId!!)
                     .onSuccess { _uiState.update { it.copy(actionMessage = null) } }
                     .onFailure { e ->
                         Timber.e(e, "Shortcut launch failed: ${game.packageName}/${game.shortcutId}")
-                        // B1: record + offer the recovery sheet (no intent was involved).
+
                         launchDispatcher.recordPreflightFailure(
                             game   = game,
                             resolved = null,
@@ -1268,8 +979,6 @@ class GameDetailViewModel @Inject constructor(
                 return@launch
             }
 
-            // Captured launch intent (add-by-ID / folder-scan PC games, legacy INSTALL_SHORTCUT).
-            // Re-hardened at launch so a stored intent can never grant file access or redirect.
             if (game.launchIntentUri != null) {
                 runCatching {
                     val parsed = Intent.parseUri(game.launchIntentUri, Intent.URI_INTENT_SCHEME)
@@ -1349,13 +1058,6 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    // ── Launch funnel (B1) ──────────────────────────────────────────────────
-    //
-    // Game Detail no longer touches startActivity itself: the resolved intent goes to the shared
-    // LaunchDispatcher, which performs startActivity with named failures, records the launch
-    // outcome (launch_outcomes), and verifies the emulator actually came to the foreground
-    // (home-launcher lifecycle handshake). Game Detail renders the rejection inline (launchError)
-    // instead of the dispatcher's recovery sheet to avoid double-surfacing the same failure.
     private suspend fun dispatchLaunch(
         intent: Intent,
         game: Game,
@@ -1368,8 +1070,6 @@ class GameDetailViewModel @Inject constructor(
                 }
             }
             LaunchDispatchResult.Accepted -> {
-                // startActivity succeeded — drop the transient "Launching…" line; the emulator
-                // covers the launcher next.
                 _uiState.update { it.copy(actionMessage = null) }
             }
         }
@@ -1379,7 +1079,6 @@ class GameDetailViewModel @Inject constructor(
         _uiState.update { it.copy(actionMessage = null, launchError = message) }
     }
 
-    /** "Get help" on the Game Detail launch-error line: opens the shell's recovery sheet. */
     fun requestLaunchHelp() {
         val game = _uiState.value.game ?: return
         val error = _uiState.value.launchError ?: return
@@ -1388,32 +1087,11 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Which emulator (and RetroArch core) will launch [game].
-     *
-     * Both the precedence and the gathering of its inputs live in `GameLaunchResolver`
-     * (feature-launcher). This page used to gather them itself, which was fine while it was the
-     * only thing that launched a game; the XMB hands off directly when direct launch is on, and
-     * the copy IT made of this function had only the bottom rung of the ladder in it.
-     */
     private suspend fun resolveLaunchProfile(
         game: Game,
         platform: PlatformEntity? = null,
     ): Result<ResolvedLaunch> = launchResolver.resolve(game, platform)
 
-    // ── Emulator picker ───────────────────────────────────────────────────
-
-    /**
-     * The picker's "Use system default" row, as a synthetic profile so it rides the same list,
-     * the same node keys and the same confirm path as a real one.
-     *
-     * Its id is the sentinel the XMB's context menu already uses, and [confirmEmulatorPick] turns
-     * it into a null write. Without this row the picker could only ever SET an override: try a
-     * different core from this page, find it does not help, and that game is pinned to
-     * PER_GAME_OVERRIDE -- the top rung of the resolver ladder -- for good. Fixing the console's
-     * default later would not reach it, and the only way back was the XMB's own context menu,
-     * which nobody connects to the screen where the change was made.
-     */
     private fun systemDefaultOption(platformId: String) = EmulatorProfile(
         id = DEFAULT_EMULATOR_SENTINEL,
         name = "Use system default",
@@ -1431,12 +1109,12 @@ class GameDetailViewModel @Inject constructor(
             showActionMessage("No emulators installed for ${game.platformId.uppercase()}")
             return
         }
-        // The clear-the-override row leads the list, so it is always reachable with one UP.
+
         val rows = listOf(systemDefaultOption(game.platformId)) + options
         val stored = game.emulatorPackage
         val currentIndex = if (stored != null) {
             rows.indexOfFirst { it.id == stored || it.packageName == stored }.coerceAtLeast(0)
-        } else 0   // no override: the cursor starts on "Use system default", which is the truth
+        } else 0
         _uiState.update {
             it.copy(
                 showOptions           = false,
@@ -1451,13 +1129,8 @@ class GameDetailViewModel @Inject constructor(
         _uiState.update { it.copy(showEmulatorPicker = false) }
     }
 
-    /** Tap on the Game Detail emulator line — same per-game-only override flow as Options ▸ Emulator. */
     fun requestChangeEmulator() = openEmulatorPicker()
 
-    /**
-     * Tap on a picker row: the same path as Confirm. Logical focus moves to the picked profile
-     * first, so touch and the controller cannot disagree about where the cursor is.
-     */
     fun onEmulatorPickTapped(profileId: String) {
         if (!nav.touch(GameDetailKeys.emulatorPick(profileId))) confirmEmulatorPick(profileId)
         finishInput()
@@ -1466,12 +1139,10 @@ class GameDetailViewModel @Inject constructor(
     fun confirmEmulatorPick(profileId: String) {
         val game = _uiState.value.game ?: return
         viewModelScope.launch {
-            // null CLEARS the override, exactly as the XMB's context menu has always done.
             gameRepository.setPreferredEmulator(game.id, profileId.takeIf { it != DEFAULT_EMULATOR_SENTINEL })
             val updated = gameRepository.getById(game.id)
             val profile = profileRepository.getInstalledProfiles().firstOrNull { it.id == profileId }
-            // Re-resolve from the fresh override so the emulator line shows the new winner + core
-            // and reports PER_GAME_OVERRIDE rather than a stale lower-level attribution.
+
             val resolved = updated?.let {
                 resolveLaunchProfile(it, _uiState.value.platform).getOrNull()
             }
@@ -1489,12 +1160,6 @@ class GameDetailViewModel @Inject constructor(
             }
         }
     }
-
-    // supportsPlatform / platformAliases / corePathFor live in feature-launcher's
-    // EmulatorPlatformMapping.kt — shared with EmulatorProfileRepository, EmulatorIntentResolver
-    // and EmulatorLaunchResolver so the launch ladder and the UI can never disagree.
-
-    // ── Add-to-collection picker ──────────────────────────────────────────
 
     private fun openCollectionPicker() {
         val gameId = _uiState.value.game?.id ?: return
@@ -1519,14 +1184,9 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Tap on a picker row. Touch takes the same path as Confirm: logical focus moves to the tapped
-     * row first, then the engine activates it, so a tap and a Cross press can never drift apart.
-     */
     fun onCollectionRowClick(index: Int) {
         val key = collectionKeyAt(_uiState.value, index)
-        // A tap can land before the node graph is ready (options load asynchronously); the direct
-        // fallback keeps the panel usable in that window.
+
         if (key == null || !nav.touch(key)) activateCollectionRowAt(index)
         finishInput()
     }
@@ -1540,7 +1200,6 @@ class GameDetailViewModel @Inject constructor(
         options.getOrNull(index)?.let { toggleCollection(it.id) }
     }
 
-    /** Confirm on a picker row: toggle this game's membership of that collection. */
     private fun toggleCollection(collectionId: Long) {
         val gameId = _uiState.value.game?.id ?: return
         viewModelScope.launch {
@@ -1549,7 +1208,6 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    /** The picker's last row opens the new-collection prompt. */
     private fun startCreateCollection() {
         _uiState.update {
             it.copy(collectionPicker = it.collectionPicker.copy(showCreateDialog = true, createText = ""))
@@ -1585,8 +1243,6 @@ class GameDetailViewModel @Inject constructor(
         _uiState.update { it.copy(collectionPicker = CollectionPickerUi()) }
     }
 
-    // ── Favorite ──────────────────────────────────────────────────────────
-
     fun toggleFavorite() {
         val game = _uiState.value.game ?: return
         viewModelScope.launch {
@@ -1595,8 +1251,6 @@ class GameDetailViewModel @Inject constructor(
             _uiState.update { it.copy(game = game.copy(isFavorite = next)) }
         }
     }
-
-    // ── Note editing ──────────────────────────────────────────────────────
 
     fun startEditNote() {
         _uiState.update { it.copy(isEditingNote = true, noteText = it.game?.userNote ?: "") }
@@ -1616,8 +1270,6 @@ class GameDetailViewModel @Inject constructor(
     fun cancelNote() {
         _uiState.update { it.copy(isEditingNote = false, noteText = _uiState.value.game?.userNote ?: "") }
     }
-
-    // ── Title editing ─────────────────────────────────────────────────────
 
     fun startEditTitle() {
         val game = _uiState.value.game ?: return
@@ -1661,8 +1313,6 @@ class GameDetailViewModel @Inject constructor(
         _uiState.update { it.copy(isEditingTitle = false, titleText = _uiState.value.game?.displayTitle ?: "") }
     }
 
-    // ── Artwork — scraper refresh ─────────────────────────────────────────
-
     fun fetchArtwork() {
         val game = _uiState.value.game ?: return
         if (_uiState.value.isFetchingArtwork) return
@@ -1670,9 +1320,7 @@ class GameDetailViewModel @Inject constructor(
             _uiState.update { it.copy(isFetchingArtwork = true, artworkMessage = null) }
             val result = artworkRepository.fetchArtworkForGame(game.id, game.title)
             val updated = gameRepository.getById(game.id)
-            // Re-scraped files reuse stable names, so evict only THIS game's refs (old and new)
-            // from the image cache. Never clearCache() here — that is the library-wide reset
-            // behind Settings > Artwork > Clear All Artwork.
+
             artworkRepository.evictFromImageCache((artRefsOf(game) + artRefsOf(updated)).toSet())
             _uiState.update {
                 it.copy(
@@ -1691,10 +1339,6 @@ class GameDetailViewModel @Inject constructor(
     fun dismissArtworkMessage() = _uiState.update { it.copy(artworkMessage = null) }
     fun dismissLaunchError()    = _uiState.update { it.copy(launchError = null) }
 
-    // ── Metadata presets — Current vs Incoming (C16 task 3.2) ─────────────
-
-    // Bumped on every open and close: a retrieval that finishes after the overlay was closed (or
-    // closed and reopened) is dropped rather than repainting a preview the user already left.
     private var metadataPreviewGeneration = 0L
 
     fun openMetadataPreview() {
@@ -1710,7 +1354,6 @@ class GameDetailViewModel @Inject constructor(
             _uiState.update { s ->
                 if (s.metadataPreview == null) return@update s
                 if (preview == null || preview.presets.isEmpty()) {
-                    // Stays open on an explanation; the user dismisses it (nothingFound).
                     return@update s.copy(
                         metadataPreview = MetadataPreviewUi(loading = false, failed = outcome.isFailure),
                     )
@@ -1721,7 +1364,7 @@ class GameDetailViewModel @Inject constructor(
                     presets = preview.presets,
                     chosen  = MetadataApply.changedFields(preview.current, preview.presets.first()),
                 )
-                // Focus starts on Apply: the default policy is the non-destructive one.
+
                 s.copy(metadataPreview = loaded.copy(focus = loaded.applyIndex))
             }
         }
@@ -1739,7 +1382,6 @@ class GameDetailViewModel @Inject constructor(
         p.copy(policy = all[(p.policy.ordinal + delta).mod(all.size)])
     }
 
-    /** Switches the incoming provider; Choose Fields re-ticks what THAT provider would change. */
     fun cycleMetadataSource(delta: Int) = updateMetadataPreview { p ->
         if (p.presets.size < 2) return@updateMetadataPreview p
         val index = (p.presetIndex + delta).mod(p.presets.size)
@@ -1747,7 +1389,6 @@ class GameDetailViewModel @Inject constructor(
         next.copy(focus = next.focus.coerceIn(0, next.applyIndex))
     }
 
-    /** Toggling a row IS choosing fields, so the policy follows to Choose Fields. */
     fun toggleMetadataField(field: MetadataField) = updateMetadataPreview { p ->
         p.copy(
             policy = MetadataApplyPolicy.CHOOSE_FIELDS,
@@ -1759,7 +1400,7 @@ class GameDetailViewModel @Inject constructor(
         val game = _uiState.value.game ?: return
         val p = _uiState.value.metadataPreview ?: return
         if (p.loading || p.applying) return
-        // The empty preview's only button is Close.
+
         val preset = p.preset ?: return closeMetadataPreview()
         if (p.policy == MetadataApplyPolicy.KEEP_CURRENT) {
             closeMetadataPreview()
@@ -1796,16 +1437,10 @@ class GameDetailViewModel @Inject constructor(
         if (p.loading || p.applying) s else s.copy(metadataPreview = transform(p))
     }
 
-    /**
-     * Metadata overlay input. Its field rows and Apply button are engine nodes, so UP/DOWN/Confirm
-     * go through the shared engine like everywhere else; the policy and provider cycles stay
-     * horizontal shortcuts, because those rows have no inline siblings for LEFT/RIGHT to traverse.
-     */
     private fun handleMetadataPreviewInput(action: GamepadAction) {
         val p = _uiState.value.metadataPreview ?: return
-        if (p.applying) return   // the write is already committed to; let it finish
+        if (p.applying) return
         if (p.nothingFound) {
-            // Nothing to choose between: Select and Back both dismiss the explanation.
             if (action == GamepadAction.SELECT || action == GamepadAction.BACK) closeMetadataPreview()
             return
         }
@@ -1822,7 +1457,6 @@ class GameDetailViewModel @Inject constructor(
         }
     }
 
-    // Every artwork column a scrape can rewrite — the eviction set for a single-game refresh.
     private fun artRefsOf(game: Game?): List<String> = listOfNotNull(
         game?.artworkUri, game?.heroUri, game?.logoUri, game?.iconUri,
         game?.boxArtUri, game?.physicalMediaUri, game?.box3dUri,

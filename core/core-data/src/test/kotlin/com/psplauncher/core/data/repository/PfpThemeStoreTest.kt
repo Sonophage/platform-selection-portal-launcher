@@ -31,27 +31,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Behaviour of the launcher-side `.pfptheme` library — the import and apply paths a shared
- * theme travels through. Guards the wave-only regression: a theme authored with just an accent
- * (no wallpaper) is a valid bundle and must import and apply, reverting to the live wave
- * background rather than being rejected as "not a valid .pfptheme file".
- *
- * Coverage note: the "wallpaper bytes present but undecodable -> reject" branch of importBundle
- * is not exercised here. Robolectric's BitmapFactory shadow returns a placeholder bitmap for
- * arbitrary bytes instead of failing, so a decode failure can't be simulated deterministically
- * on the JVM; that branch is better covered by an instrumented (androidTest) run.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class PfpThemeStoreTest {
-
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Before
     fun clearState() {
-        // The prefs DataStore and the on-disk library persist within the test JVM; wipe both so
-        // each case starts from the stock look with an empty library.
         runBlocking { context.pfpDataStore.edit { it.clear() } }
         File(context.filesDir, "pfpthemes").deleteRecursively()
         File(context.filesDir, "wallpaper").deleteRecursively()
@@ -104,18 +90,6 @@ class PfpThemeStoreTest {
         assertNull(store.importBundle(register("not a zip".toByteArray())))
     }
 
-    /**
-     * The import failures the UI is allowed to distinguish.
-     *
-     * These exist because every one of them used to be a bare null rendered as "not a valid
-     * .pfptheme file" — which is a lie for four of the six, and sent at least one debugging
-     * session hunting a corrupt bundle that was byte-for-byte fine.
-     *
-     * Coverage note: TooLarge and OutOfMemory are deliberately not unit-tested. Both are
-     * defined by allocation size (a 64 MB read cap, and exhausting the device heap), so
-     * reproducing them here would mean allocating ~96 MB inside the test JVM to assert a
-     * branch that is two lines long. They are pinned by the Timber lines they emit instead.
-     */
     @Test
     fun `a successful import reports Success carrying the theme`() = runTest {
         val store = PfpThemeStore(context)
@@ -138,8 +112,7 @@ class PfpThemeStoreTest {
     @Test
     fun `a stream that fails mid-read reports Unreadable, not a bad bundle`() = runTest {
         val store = PfpThemeStore(context)
-        // A truncated download or a revoked SAF grant fails here, and the file it points at may
-        // be a perfectly good theme — reporting it as invalid blames the wrong thing.
+
         val uri = Uri.parse("content://test/broken.pfptheme")
         shadowOf(context.contentResolver).registerInputStream(uri, failingStream())
 
@@ -152,7 +125,7 @@ class PfpThemeStoreTest {
     @Test
     fun `applying a wave-only theme clears a previous wallpaper and sets the accent`() = runTest {
         val store = PfpThemeStore(context)
-        // Stand in for a previously-applied wallpaper theme.
+
         context.pfpDataStore.edit { it[KEY_CUSTOM_WALLPAPER] = "/old/wallpaper.jpg" }
         val saved = requireNotNull(store.importBundle(register(bundleBytes("Red", "#FF0000"))))
 
@@ -182,7 +155,7 @@ class PfpThemeStoreTest {
     @Test
     fun `applying a wave-only theme clears a previous motion wallpaper too`() = runTest {
         val store = PfpThemeStore(context)
-        // Stand in for a previously-applied motion wallpaper (poster + video pair).
+
         context.pfpDataStore.edit {
             it[KEY_CUSTOM_WALLPAPER] = "/old/wallpaper.jpg"
             it[KEY_MOTION_WALLPAPER] = "/old/wallpaper.mp4"
@@ -227,9 +200,6 @@ class PfpThemeStoreTest {
         assertNull(context.pfpDataStore.data.first()[KEY_WAVE_STYLE])
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────────
-
-    /** Serializes a `.pfptheme` bundle exactly as Theme Studio / share export would. */
     private fun bundleBytes(
         name: String,
         accent: String,
@@ -249,8 +219,6 @@ class PfpThemeStoreTest {
         return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
     }
 
-    /** Exposes [bytes] to the store through the SAF ContentResolver, as a picked file would arrive. */
-    /** An input stream that opens fine and then fails, like a dropped SAF descriptor. */
     private fun failingStream(): InputStream = object : InputStream() {
         override fun read(): Int = throw IOException("descriptor went away")
         override fun read(b: ByteArray, off: Int, len: Int): Int = throw IOException("descriptor went away")
@@ -266,7 +234,6 @@ class PfpThemeStoreTest {
     private fun wallpaperSidecar(id: String) = File(File(context.filesDir, "pfpthemes"), "$id.wallpaper.jpg")
 
     private companion object {
-        // Mirror PfpThemeStore's private cascade-pref keys by their string contract.
         val KEY_CUSTOM_WALLPAPER = stringPreferencesKey("display_custom_wallpaper")
         val KEY_MOTION_WALLPAPER = stringPreferencesKey("display_motion_wallpaper")
         val KEY_WAVE_STYLE = stringPreferencesKey("display_wave_style")

@@ -15,11 +15,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 @RunWith(RobolectricTestRunner::class)
-// Pin to minSdk so the sanitizer takes the legacy resolveActivity(Intent, Int) path (the API-33
-// ResolveInfoFlags overload isn't present in Robolectric's runtime android image).
+
 @Config(manifest = Config.NONE, sdk = [29])
 class ShortcutIntentSanitizerTest {
-
     private val pm = mockk<PackageManager>()
 
     private val grantFlags =

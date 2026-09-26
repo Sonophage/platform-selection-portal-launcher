@@ -7,14 +7,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/**
- * The FileProvider can mint a URI for any file under `/storage/`, but a launch only ever needs a
- * file belonging to a configured ROM source. Nothing enforced the narrower rule, and the grantee
- * package is chosen by an emulator profile — which a restored backup can supply. This is the check
- * that makes the provider's reach irrelevant.
- */
 class RomSourceAdmissionTest {
-
     @get:Rule val temp = TemporaryFolder()
 
     @Test
@@ -44,8 +37,6 @@ class RomSourceAdmissionTest {
 
     @Test
     fun `another app's external data directory is refused`() {
-        // The concrete shape the repo's own test already imagines:
-        // content://.../storage_volumes/emulated/0/secret
         val roms = temp.newFolder("roms")
 
         assertFalse(
@@ -95,7 +86,7 @@ class RomSourceAdmissionTest {
 
         assertFalse(RomSourceAdmission.isAdmissible("", listOf(roms.path)))
         assertFalse(RomSourceAdmission.isAdmissible("   ", listOf(roms.path)))
-        // A blank *source* must not admit everything either.
+
         assertFalse(RomSourceAdmission.isAdmissible(File(roms, "g.iso").path, listOf("", "  ")))
     }
 

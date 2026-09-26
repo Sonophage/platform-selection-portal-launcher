@@ -6,10 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-// State-machine tests for ControllerRegistry — the Android InputDeviceListener is a thin adapter
-// over onDeviceAdded/onDeviceRemoved, so the tracking rules are exercised without platform APIs.
 class ControllerRegistryTest {
-
     private val registry = ControllerRegistry(mockk(relaxed = true))
 
     private fun device(id: Int, name: String = "Pad $id") = ControllerDevice(

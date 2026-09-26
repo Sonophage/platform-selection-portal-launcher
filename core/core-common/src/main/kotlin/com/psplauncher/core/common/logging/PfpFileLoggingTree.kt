@@ -9,21 +9,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
-/**
- * Timber tree that persists INFO+ log lines to rotating files in [logsDir] — the backing
- * store of Settings ▸ Logs, and what users share when something went wrong in the field.
- *
- * Disciplines:
- *  • PRIVACY — every line (and every throwable message) passes [LogRedaction] first;
- *    credentials, tokens, account names and emails never reach a file a user might share.
- *  • Battery/IO — writes happen on one MIN_PRIORITY background thread; DEBUG/VERBOSE are
- *    filtered out entirely, so steady-state volume is tiny.
- *  • Bounded — one file per app session ("pfp-yyyyMMdd-HHmmss.log"), rotated at
- *    [MAX_FILE_BYTES]; only the newest [MAX_FILES] files survive, so the folder can never
- *    grow past ~2 MB.
- */
 class PfpFileLoggingTree(private val logsDir: File) : Timber.Tree() {
-
     private val executor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "pfp-file-log").apply { priority = Thread.MIN_PRIORITY }
     }
@@ -60,19 +46,16 @@ class PfpFileLoggingTree(private val logsDir: File) : Timber.Tree() {
         executor.execute { write(line) }
     }
 
-    // ── Worker-thread internals ───────────────────────────────────────────────
-
     private fun write(line: String) {
         try {
             val file = currentFile ?: openSessionFile() ?: return
             file.appendText(line)
             bytesWritten += line.length
             if (bytesWritten >= MAX_FILE_BYTES) {
-                openSessionFile()   // roll to a fresh file
+                openSessionFile()
                 prune()
             }
         } catch (_: IOException) {
-            // Logging must never crash or spam the app; drop the line.
         }
     }
 

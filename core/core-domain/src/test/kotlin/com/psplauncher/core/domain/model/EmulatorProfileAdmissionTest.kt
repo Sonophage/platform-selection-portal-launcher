@@ -4,14 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * A restored `custom_profiles.json` decides a ComponentName, arbitrary intent extras and a
- * customCommand — and the profile's package then receives `grantUriPermission(...)` for the ROM.
- * That makes an emulator profile from an untrusted archive the highest-value thing in a backup,
- * so it gets a whitelist rather than a sanity check.
- */
 class EmulatorProfileAdmissionTest {
-
     private fun profile(
         id: String = "custom.emu",
         packageName: String = "org.example.emu",
@@ -35,8 +28,6 @@ class EmulatorProfileAdmissionTest {
 
     private fun admit(p: EmulatorProfile) = EmulatorProfileAdmission.admit(listOf(p))
 
-    // ── Accepted ──────────────────────────────────────────────────────────────
-
     @Test
     fun `an ordinary component profile is admitted unchanged`() {
         val p = profile()
@@ -54,12 +45,8 @@ class EmulatorProfileAdmissionTest {
         assertEquals(listOf(p), admit(p).admitted)
     }
 
-    // ── Refused ───────────────────────────────────────────────────────────────
-
     @Test
     fun `a custom-command profile is refused`() {
-        // CUSTOM_COMMAND runs an arbitrary string. Nothing in a backup file should be able to
-        // introduce one, and no bundled profile uses it.
         val p = profile(intentType = IntentType.CUSTOM_COMMAND, customCommand = "su -c rm -rf /")
 
         val result = admit(p)
@@ -78,8 +65,6 @@ class EmulatorProfileAdmissionTest {
 
     @Test
     fun `a profile targeting this launcher's own package is refused`() {
-        // Self-targeting would let a restored profile aim a granted ROM URI back at PFP's own
-        // exported surface.
         val p = profile(packageName = "com.psplauncher")
 
         val result = EmulatorProfileAdmission.admit(listOf(p), selfPackage = "com.psplauncher")
@@ -114,8 +99,6 @@ class EmulatorProfileAdmissionTest {
 
         assertTrue(admit(p).admitted.isEmpty())
     }
-
-    // ── Partial admission ─────────────────────────────────────────────────────
 
     @Test
     fun `one bad profile does not discard the good ones`() {

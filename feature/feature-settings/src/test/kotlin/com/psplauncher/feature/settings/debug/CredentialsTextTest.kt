@@ -4,9 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The size cap on a picked credentials file: a wrong pick (a video, a ROM) must never be read whole. */
 class CredentialsTextTest {
-
     @Test
     fun `a small file is read whole`() {
         val text = "steamgriddb.apiKey=k\n"

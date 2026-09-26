@@ -17,83 +17,37 @@ import com.psplauncher.core.ui.components.LocalControllerPromptStyle
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 
-// ── Idle hint pill ────────────────────────────────────────────────────────────
-//
-// A small black rounded pill shown in the XMB's bottom-right (stacked above the App
-// Drawer button) after the user has been idle for a moment. It names *actions*, so the
-// glyphs track both the controller display style and a swapped X/Y layout, mirroring the
-// reference PSP UI.
-//
-// The pill carries up to three prompts:
-//   [ {PREV_CATEGORY}{NEXT_CATEGORY} Pages  {CHANGE_SORT} Sort  {OPEN_CONTEXT_MENU} Options ]
-// Sort appears only where an X/Square press really re-sorts the list on screen
-// (XMBUiState.canSortCurrentList), Options only where the focused item really has a
-// context menu (XMBUiState.focusedItemHasContextMenu), and Pages only where the hovered game
-// has a second panel page to walk to (XMBUiState.hoverPanelHasPages). All three are conditional
-// because a pill promising an action that does nothing is worse than a smaller pill.
-//
-// Pages is one prompt over both shoulders rather than two prompts, which is what the
-// multi-action ControllerPromptItem is for — and it is correctly not tappable, because a tap
-// cannot say which shoulder was meant.
-//
-// Visibility is driven entirely by XMBUiState.showContextMenuHint (the shell/detail screens
-// fade it in but remove it immediately when it becomes ineligible); this composable only renders
-// its content.
-//
-// The pill chrome itself is the shared core-ui [ControllerHintBar]. It is the last pill in the
-// app: the App Drawer, Search and the detail pages all moved to the full-width PfpHintBar, and
-// this one survives because it is a floating hint over the live crossbar rather than a footer.
-
 @Composable
 fun ContextMenuHint(
     modifier: Modifier = Modifier,
-    /** Show the Sort half — the current list responds to CHANGE_SORT. */
+
     showSort: Boolean = false,
-    /** Show the Filter half — X cycles the home shelf's media instead of sorting. */
+
     showFilter: Boolean = false,
-    /** Show the Options half — the focused item has a context menu. */
+
     showOptions: Boolean = true,
-    /**
-     * Show Search and Apps — the two things that used to be big square buttons in this corner.
-     *
-     * They sat UNDER this pill and pushed it up 68dp to avoid overlapping, which is two rows of
-     * controls in one corner saying the same kind of thing in two sizes. As prompts they are the
-     * same row, the same size, and named by the button that does them: Search is Select at the
-     * root, Apps is Back at the root.
-     */
+
     showRootActions: Boolean = false,
-    /** Runs a tapped prompt. Null leaves the pill a legend (previews, and any caller that has
-     *  no dispatcher to offer). */
+
     onAction: ((GamepadAction) -> Unit)? = null,
 ) {
     val items = buildList {
-        // No Pages prompt. The page strip carries its own LB/RB glyphs at its ends now, right
-        // on the row they walk, so one in this corner is the same instruction twice and further
-        // from what it refers to. The parameter went with it: a caller still passing a flag
-        // nothing reads is a lie about what this depends on.
-        // Sort and Filter are the same button doing two jobs, so they are mutually exclusive
-        // by construction rather than by both callers remembering to be careful.
         if (showFilter) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Filter"))
         else if (showSort) add(ControllerPromptItem(GamepadAction.CHANGE_SORT, "Sort"))
         if (showOptions) add(ControllerPromptItem(GamepadAction.OPEN_CONTEXT_MENU, "Options"))
         if (showRootActions) {
             add(ControllerPromptItem(GamepadAction.OPEN_SEARCH, "Search"))
-            // Back opens the drawer at the root — that IS what the button did, and a prompt that
-            // named a different button would be teaching the wrong thing to a controller user.
+
             add(ControllerPromptItem(GamepadAction.BACK, "Apps"))
         }
     }
     ControllerHintBar(items = items, modifier = modifier, onAction = onAction)
 }
 
-// ── Previews ──────────────────────────────────────────────────────────────────
-
 @CombinedPreviews
 @Composable
 fun ContextMenuHintPreview() {
     PfpPreview {
-        // One pill per family, each given its own ambient style so the preview
-        // still shows △ / Y / X side by side now that the hint reads context.
         Row(verticalAlignment = Alignment.CenterVertically) {
             for (family in ControllerDisplayType.entries) {
                 CompositionLocalProvider(

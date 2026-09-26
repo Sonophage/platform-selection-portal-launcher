@@ -47,29 +47,16 @@ import com.psplauncher.themekit.XmbLayoutSpec
 import kotlin.math.min
 import kotlin.math.sin
 
-/*
- * A static, faithful frame of the launcher's XMB, replicated from the launcher sources so
- * "what you author is what the phone renders". Every constant here mirrors a named source:
- *   background/wave/bloom — feature-xmb XmbBackground.kt
- *   crossbar geometry     — feature-xmb XMBShell.kt + XMBCategoryBar.kt
- *   item rows             — feature-xmb XMBItemList.kt
- *   sizes/fractions       — theme-kit XmbLayoutSpec.DEFAULT (shared, not re-typed)
- */
-
-// Design box the frame is authored at; the canvas fit-scales it into whatever space it gets.
 private val DESIGN_WIDTH = 960.dp
 private val DESIGN_HEIGHT = 540.dp
 
-// XMBCategoryBar.kt (constants that are NOT part of the per-theme spec)
 private val CategorySlotWidth = 124.dp
 private val CatBarHeight = 112.dp
 private val LabelInactive = Color(0xCCD8E6FF)
 private val SelectedLabelShadow = Shadow(color = Color(0x73001627), offset = Offset.Zero, blurRadius = 12f)
 
-// XMBItemList.kt
 private val RowHeight = 88.dp
 
-// XmbBackground.kt
 private const val STATIC_TIME = 2.0f
 private const val TAU = 6.2831853f
 private val WallpaperScrim = Color(0x59000000)
@@ -89,12 +76,10 @@ fun XmbPreviewCanvas(model: XmbPreviewModel, modifier: Modifier = Modifier) {
     }
 }
 
-/** The full frame at design size — also rendered offscreen for the bundle's preview.png. */
 @Composable
 fun XmbFrame(model: XmbPreviewModel) {
     Box(Modifier.fillMaxSize()) {
         if (model.wallpaper != null) {
-            // WallpaperBackground: image fills, plus the legibility scrim. No wave.
             Image(
                 bitmap = model.wallpaper,
                 contentDescription = null,
@@ -124,7 +109,6 @@ fun XmbFrame(model: XmbPreviewModel) {
 
 @Composable
 private fun WaveBackground(model: XmbPreviewModel) {
-    // The launcher's exact gradient call — including its default (diagonal) direction.
     val gradient = Brush.linearGradient(
         colorStops = arrayOf(
             0.00f to model.backgroundTop,
@@ -137,11 +121,10 @@ private fun WaveBackground(model: XmbPreviewModel) {
     val ampScale = if (model.reducedWave) 0.65f else 1f
     Box(Modifier.fillMaxSize().background(gradient)) {
         Canvas(Modifier.fillMaxSize()) {
-            // FallbackWave frozen at the launcher's static pose.
             val amp = 0.05f * ampScale
             drawFold(STATIC_TIME, base01 = 0.63f, amp01 = amp * 0.9f, freq = 0.80f, phase = 1.7f, drift = -0.38f, sheet = 0.090f * alphaScale, edge = 0.125f * alphaScale)
             drawFold(STATIC_TIME, base01 = 0.75f, amp01 = amp * 1.2f, freq = 0.42f, phase = 3.1f, drift = 0.30f, sheet = 0.105f * alphaScale, edge = 0.145f * alphaScale)
-            // Soft off-centre light bloom.
+
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(Color.White.copy(alpha = 0.10f), Color.Transparent),
@@ -153,7 +136,6 @@ private fun WaveBackground(model: XmbPreviewModel) {
     }
 }
 
-// Verbatim port of XmbBackground.drawFold.
 private fun DrawScope.drawFold(
     t: Float, base01: Float, amp01: Float, freq: Float, phase: Float, drift: Float,
     sheet: Float, edge: Float,
@@ -187,8 +169,6 @@ private fun XmbCross(model: XmbPreviewModel) {
             val barTop = maxHeight * spec.barTopFraction
             val anchorTop = barTop + CatBarHeight
 
-            // ── Category bar: the selected slot seats at the left anchor; earlier
-            //    categories tile leftward (mostly off-screen), later ones rightward. ──
             val barStart = xmbLeftAnchor - CategorySlotWidth * SampleContent.SELECTED_CATEGORY
             Row(Modifier.offset(x = barStart, y = barTop).height(CatBarHeight)) {
                 SampleContent.categories.forEachIndexed { index, category ->
@@ -196,7 +176,6 @@ private fun XmbCross(model: XmbPreviewModel) {
                 }
             }
 
-            // ── Item column under the caticon (XMBShell startPad math). ──
             val startPad = xmbLeftAnchor + (CategorySlotWidth / 2) - leadingIconCenter
             Column(Modifier.offset(x = startPad, y = anchorTop)) {
                 SampleContent.rows.forEachIndexed { index, row ->
@@ -210,9 +189,7 @@ private fun XmbCross(model: XmbPreviewModel) {
 @Composable
 private fun CategoryCell(model: XmbPreviewModel, category: SampleContent.Category, selected: Boolean) {
     val spec = model.layout
-    // Matches XMBCategoryBar: one size for every category, selected or not. A preview that still
-    // grew the selected slot would show a theme author a bar the device does not draw, which is
-    // the one thing a preview must never do.
+
     val iconSize = spec.categoryIconDp.dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -248,7 +225,7 @@ private fun ItemRow(model: XmbPreviewModel, row: SampleContent.Row, selected: Bo
                 scaleX = if (selected) 1.06f else 0.9f,
                 scaleY = if (selected) 1.06f else 0.9f,
                 alpha = if (selected) 1f else 0.68f,
-                // Scale pivots on the leading-icon centre so icons stay on the caticon line.
+
                 transformOrigin = TransformOrigin(0f, 0.5f),
             )
             .padding(horizontal = 18.dp),
@@ -286,11 +263,6 @@ private fun androidx.compose.foundation.layout.BoxScope.StatusStrip(model: XmbPr
     }
 }
 
-/**
- * Context-menu preview — replicates ContextMenuOverlay.kt: right-edge 300dp column over a
- * light scrim; panel backdrop = waveColor@75%; selected row carries the accent cursor glow
- * (transparent → menuCursorEdge@40% left-to-right); destructive rows stay red.
- */
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.ContextMenuFrame(model: XmbPreviewModel) {
     Box(Modifier.fillMaxSize().background(Color(0x40000000)))
@@ -344,11 +316,6 @@ private fun androidx.compose.foundation.layout.BoxScope.ContextMenuFrame(model: 
     }
 }
 
-/**
- * Fullscreen-menu preview — replicates MusicBrowserScreen.kt's frame: full gradient
- * backdrop (backgroundTop@72% → backgroundBottom@90%) over the wave, header with a 24sp
- * Light title, accent-bordered search field, sample rows.
- */
 @Composable
 private fun FullscreenMenuFrame(model: XmbPreviewModel) {
     Column(
@@ -370,7 +337,7 @@ private fun FullscreenMenuFrame(model: XmbPreviewModel) {
             Text("Music", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Light)
         }
         Spacer(Modifier.height(14.dp))
-        // Search field: white@14% fill, menuCursorEdge focused border.
+
         Box(
             Modifier
                 .fillMaxWidth()
@@ -403,10 +370,6 @@ private fun FullscreenMenuFrame(model: XmbPreviewModel) {
     }
 }
 
-/**
- * One draw path for every slot: a custom icon renders as-authored (untinted, like PSP theme
- * icons); the built-in glyph follows the unified icon color via SrcIn — the PortalIcon rule.
- */
 @Composable
 private fun SlotIcon(model: XmbPreviewModel, key: String, modifier: Modifier) {
     val override = model.iconOverrides[key]

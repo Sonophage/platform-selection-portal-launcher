@@ -31,18 +31,6 @@ import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 import com.psplauncher.core.ui.theme.LocalPFPColors
 
-// The Studio's paging and options controls, stateless so they can be previewed: the screen itself
-// takes a Hilt ViewModel. Touch mode draws each as a pill a user can see is tappable; controller
-// mode keeps the compact hints whose glyphs follow the live bindings.
-
-/**
- * The page line under the grid: range on the left, paging on the right.
- *
- * The band keeps its height even with nothing to count, so a line that appeared only once results
- * arrived cannot shrink the grid slot mid-load and re-page what was just measured. It is 40 dp in
- * touch mode, so the pills are never clipped, and 16 dp otherwise. That one height change
- * re-measures the grid when the mode flips; AD-17 keeps the focused result focused across it.
- */
 @Composable
 internal fun StudioPageLine(
     rangeStart: Int,
@@ -56,7 +44,7 @@ internal fun StudioPageLine(
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
     modifier: Modifier = Modifier,
-    // The active tab's changes and their downloads (tasks 5.1, 5.2), after the range and inside the band's height.
+
     picks: StudioQueueSummary = StudioQueueSummary(),
     onApply: () -> Unit = {},
     onRetryFailed: () -> Unit = {},
@@ -66,8 +54,6 @@ internal fun StudioPageLine(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth().height(if (showTouchControls) 40.dp else 16.dp),
     ) {
-        // Texts here set lineHeight: the theme's 24 sp bodyLarge line is taller than the 16 dp band,
-        // which drew the text ~3 dp below the centred LB/RB glyphs.
         if (totalResults > 0) {
             Text(
                 "$rangeStart–$rangeEnd of $totalResults",
@@ -75,7 +61,7 @@ internal fun StudioPageLine(
                 maxLines = 1,
             )
         }
-        // Counted even with no results: a pick made on another source or query is still held.
+
         if (picks.hasChanges || picks.inQueue) {
             StudioPickStatus(
                 picks = picks,
@@ -87,7 +73,7 @@ internal fun StudioPageLine(
             )
         }
         Spacer(Modifier.weight(1f))
-        // A single page has nothing to move to, so only the range shows.
+
         if (pageCount > 1 && showTouchControls) {
             TouchPagePill("‹ Prev", enabled = hasPreviousPage, onClick = onPreviousPage)
             Text(
@@ -98,7 +84,6 @@ internal fun StudioPageLine(
             )
             TouchPagePill("Next ›", enabled = hasNextPage, onClick = onNextPage)
         } else if (pageCount > 1) {
-            // The arrows stay tappable; LB/RB page while the grid is focused.
             ControllerPrompt(
                 action = GamepadAction.PREV_CATEGORY,
                 label = "",
@@ -122,12 +107,6 @@ internal fun StudioPageLine(
     }
 }
 
-/**
- * The page line's changes: what waits for Apply ("2 to add · 1 to remove", or "+2 −1" in touch mode
- * where the pills need the width), then how the queue is doing ("2 of 5 added · 1 failed"). Touch draws
- * Apply, Retry and Remove as pills; a controller applies with START and retries or removes failures
- * from the options menu, so it only needs the hint and the text.
- */
 @Composable
 private fun StudioPickStatus(
     picks: StudioQueueSummary,
@@ -188,11 +167,6 @@ private fun StudioPickStatus(
     }
 }
 
-/**
- * The rail's options control. Controller mode shows the Y hint; in touch mode a small hint does not
- * read as tappable, so it becomes a pill. Either way [onClick] opens the actions menu, which decides
- * for itself whether anything can open.
- */
 @Composable
 internal fun StudioOptionsControl(
     showTouchControls: Boolean,
@@ -216,7 +190,6 @@ internal fun StudioOptionsControl(
     }
 }
 
-/** Prev / page / Next under a manual (PDF) candidate preview. [page] is 0-based. */
 @Composable
 internal fun StudioManualPager(
     page: Int,
@@ -239,7 +212,6 @@ internal fun StudioManualPager(
     }
 }
 
-// Dimmed and inert at either end, rather than hidden, so the pager keeps its shape.
 @Composable
 private fun TouchPagePill(label: String, enabled: Boolean, onClick: () -> Unit) {
     XmbHeaderPill(
@@ -278,10 +250,6 @@ private fun ManualPagerButton(label: String, enabled: Boolean, showTouchControls
     }
 }
 
-// ── Previews ──────────────────────────────────────────────────────────────────
-// Each shows touch mode above controller mode. Widths are the AYN Thor's measured grid slot
-// (613 dp) and rail (150 dp), so what fits here fits there.
-
 @Composable
 private fun StudioPreviewBackdrop(content: @Composable ColumnScope.() -> Unit) {
     val colors = LocalPFPColors.current
@@ -319,7 +287,7 @@ private fun StudioPageLinePreview() {
                     onPreviousPage = {}, onNextPage = {}, modifier = Modifier.width(613.dp),
                     picks = StudioQueueSummary(toAdd = 3),
                 )
-                // The widest the line gets: changes waiting, a failure and the pager, at the Thor's slot.
+
                 PreviewCaption("$mode · middle page · 2 to add, 1 to remove · 3 of 4 added, 1 failed")
                 StudioPageLine(
                     rangeStart = 16, rangeEnd = 30, totalResults = 50, page = 1, pageCount = 4,

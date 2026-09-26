@@ -4,17 +4,7 @@ import com.psplauncher.core.ui.wave.WaveStyle
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Pins the motion-wallpaper freeze contract — the plan's central claim: **when the wave would be
- * frozen, the motion wallpaper is not merely paused, no decoder exists.** Every freeze input must
- * independently force [MotionWallpaperPolicy.Decision.POSTER], and only the all-clear case plays.
- *
- * The composable that consumes [MotionWallpaperPolicy] releases its ExoPlayer whenever the
- * decision is POSTER (leaving the motion branch), so these decisions are literally the difference
- * between "a codec is running" and "a JPEG on screen".
- */
 class MotionWallpaperPolicyTest {
-
     private val allClear = MotionWallpaperPolicy.Inputs(
         hasMotion = true,
         hasPoster = true,
@@ -24,14 +14,10 @@ class MotionWallpaperPolicyTest {
         appVisible = true,
     )
 
-    // ── The all-clear case is the ONLY one that plays ──────────────────────────
-
     @Test
     fun `all-clear inputs play at full motion`() {
         assertEquals(MotionWallpaperPolicy.Decision.PLAY, MotionWallpaperPolicy.decide(allClear))
     }
-
-    // ── Every freeze input independently forces POSTER ─────────────────────────
 
     @Test
     fun `covered background forces poster (overlay is opaque above it)`() {
@@ -73,8 +59,6 @@ class MotionWallpaperPolicyTest {
         )
     }
 
-    // ── The two remaining WaveStyles modulate playback, never bypass the gate ──
-
     @Test
     fun `REDUCED style plays slowed (half speed), not frozen`() {
         assertEquals(
@@ -91,12 +75,8 @@ class MotionWallpaperPolicyTest {
         )
     }
 
-    // ── Invalid render states degrade to the poster, never a black screen ──────
-
     @Test
     fun `motion path without a poster is unrenderable - falls back to poster`() {
-        // Invariant enforced at the write sites: motion is never set without its poster. Reading
-        // that invalid state must degrade to "no motion" rather than try to recover.
         assertEquals(
             MotionWallpaperPolicy.Decision.POSTER,
             MotionWallpaperPolicy.decide(allClear.copy(hasPoster = false)),
@@ -110,8 +90,6 @@ class MotionWallpaperPolicyTest {
             MotionWallpaperPolicy.decide(allClear.copy(hasMotion = false)),
         )
     }
-
-    // ── Combinations of independent freeze inputs all stay POSTER ──────────────
 
     @Test
     fun `covered plus backgrounded stays poster`() {

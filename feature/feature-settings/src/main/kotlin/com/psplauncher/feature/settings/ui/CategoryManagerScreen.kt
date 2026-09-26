@@ -24,20 +24,6 @@ import com.psplauncher.feature.settings.viewmodel.CategoryStep
 import com.psplauncher.feature.settings.viewmodel.CollectionsSettingsViewModel
 import com.psplauncher.core.domain.model.GameCollection
 
-/**
- * Categories and Collections, on one screen.
- *
- * They were two Settings entries in two different sections -- Collections under Library,
- * Categories under Interface -- for what reads as one idea: the groups the crossbar is made of.
- * You could add a collection to a category from one screen and never find the category from the
- * other.
- *
- * The two flows are still two state machines, owned by two ViewModels, and this only decides
- * which one is on screen. The merged list shows when BOTH are at rest; a category step or an
- * open collection takes over, because each of those is a whole screen of its own. Merging the
- * state machines as well would have been a rewrite of two working things to change where a row
- * is drawn.
- */
 @Composable
 fun CategoryManagerScreen(
     onBack: () -> Unit,
@@ -49,17 +35,12 @@ fun CategoryManagerScreen(
     val collections by collectionsViewModel.collections.collectAsState()
     val gamingCategories by collectionsViewModel.gamingCategories.collectAsState()
 
-    // Collections' sub-steps, hoisted out of the screen this list used to live on so the merged
-    // list can decide which flow is showing. Same variables, same meanings.
     var openCollectionId by remember { mutableStateOf<Long?>(null) }
     var dialog by remember { mutableStateOf<CollectionDialog?>(null) }
     var pickCategoryForNewCollection by remember { mutableStateOf<String?>(null) }
     var iconPickerFor by remember { mutableStateOf<Long?>(null) }
     val openCollection = collections.firstOrNull { it.id == openCollectionId }
 
-    // One Back, two flows: collapse whatever collection sub-step is open, then let the category
-    // ViewModel collapse its own, then leave. Order matters -- a collection dialog opened from
-    // the merged list must not fall through to the category machine, which knows nothing of it.
     val handleBack: () -> Unit = {
         when {
             iconPickerFor != null               -> iconPickerFor = null
@@ -98,8 +79,6 @@ fun CategoryManagerScreen(
         )
     }
 
-    // Name entry for a new or renamed collection. Suppressed while the category picker is up:
-    // creating runs name-then-category, and both dialogs at once would stack.
     if (pickCategoryForNewCollection == null) {
         dialog?.let { d ->
             CollectionTextDialog(
@@ -142,7 +121,6 @@ fun CategoryManagerScreen(
         )
     }
 
-    // Create-name dialog
     if (state.showCreateNameDialog) {
         var text by remember { mutableStateOf("") }
         SettingsTextPromptOverlay(
@@ -156,7 +134,6 @@ fun CategoryManagerScreen(
         )
     }
 
-    // Rename dialog
     state.renameTargetId?.let { id ->
         val current = state.categories.firstOrNull { it.id == id }?.name ?: ""
         var text by remember(id) { mutableStateOf(current) }
@@ -169,8 +146,6 @@ fun CategoryManagerScreen(
         )
     }
 }
-
-// ── LIST ────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun CategoryListContent(
@@ -214,9 +189,6 @@ private fun CategoryListContent(
                 )
             }
 
-            // Collections sit UNDER the categories they belong to, which is the relationship
-            // they actually have: a collection lives inside a gaming category, and the two were
-            // being managed from opposite ends of Settings.
             SettingsGroup("Collections")
             if (collections.isEmpty()) {
                 SettingsRow(
@@ -237,8 +209,6 @@ private fun CategoryListContent(
     }
 }
 
-// ── PICK ICON ─────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun PickIconContent(
     state: CategoryManagerUiState,
@@ -248,9 +218,6 @@ private fun PickIconContent(
 ) {
     val subtitle = if (state.pickingIconForCreate) "Choose Icon" else "Change Icon"
     SettingsPageScaffold(heading = "Category", subtitle = subtitle, onBack = onBack, modifier = modifier) {
-        // Registered like the list screens: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
-        // the body itself is unchanged.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -266,8 +233,6 @@ private fun PickIconContent(
     }
 }
 
-// ── PICK TYPE ──────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun PickTypeContent(
     state: CategoryManagerUiState,
@@ -276,9 +241,6 @@ private fun PickTypeContent(
     modifier: Modifier,
 ) {
     SettingsPageScaffold(heading = "Category", subtitle = "Content Type", onBack = onBack, modifier = modifier) {
-        // Registered like the list screens: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
-        // the body itself is unchanged.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -297,8 +259,6 @@ private fun PickTypeContent(
     }
 }
 
-// ── DETAIL ──────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun CategoryDetailContent(
     state: CategoryManagerUiState,
@@ -312,9 +272,6 @@ private fun CategoryDetailContent(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     SettingsPageScaffold(heading = "Categories", subtitle = cat.name, onBack = onBack, modifier = modifier) {
-        // Registered like the list screens: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view. Registering is the whole fix;
-        // the body itself is unchanged.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {

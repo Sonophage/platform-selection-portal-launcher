@@ -4,25 +4,11 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
 
-/**
- * Legibility heuristics for wallpapers and icon colors. Sony's own theme wallpapers are
- * soft, low-contrast photos precisely so the XMB's white labels stay readable; these
- * metrics power the Studio's non-blocking hints toward the same, without ever refusing
- * an image.
- */
 object WallpaperMetrics {
-
-    /** Busyness above this reads as "labels may struggle" (soft gradients score ≲0.02). */
     const val BUSY_THRESHOLD = 0.055f
 
-    /** Icon colors darker than this fight the wallpaper scrim / gradient. */
     const val DARK_ICON_LUMINANCE = 0.35f
 
-    /**
-     * Mean absolute luminance gradient over the label band — the region the item column's
-     * text sits on (x 0.10..0.60, y 0.30..0.85) — sampled at ~[maxSamples] pixels.
-     * Flat image → ~0; 1px checkerboard → ~1.
-     */
     fun busyness(image: BmpImage, maxSamples: Int = 6000): Float {
         val width = image.width
         val height = image.height
@@ -57,6 +43,5 @@ object WallpaperMetrics {
 
     fun isBusy(image: BmpImage): Boolean = busyness(image) > BUSY_THRESHOLD
 
-    /** Rec.601 luma of an ARGB pixel, 0..1. */
     fun luminance(argb: Int): Float = CrossBandDetector.luminance(argb)
 }

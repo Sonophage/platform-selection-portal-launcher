@@ -36,16 +36,8 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 
-// ── Current-vs-Incoming metadata preview (C16 task 3.2) ──────────────────────
-// GameDetailViewModel owns the state and routes controller input (Up/Down rows, Left/Right policy,
-// L1/R1 source, Select toggles a row or applies, Back closes without writing); this renders it and
-// forwards taps.
-
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
 private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
-// Resolved per theme rather than fixed: on a pale scheme a light label on a light
-// wallpaper is unreadable, and every one of these was light. See PFPTheme.
+
 private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.secondary
 private val RowFill = Color(0xFF1B1B26)
 private val ChangeGreen = Color(0xFF45C46A)
@@ -92,7 +84,6 @@ fun MetadataPreviewPanel(
                 return@Column
             }
 
-            // Nothing to preview: say why in the overlay the user opened, and leave closing to them.
             if (ui.nothingFound) {
                 Text(
                     if (ui.failed) "The metadata sources didn't answer." else "No source recognised this game.",
@@ -103,8 +94,6 @@ fun MetadataPreviewPanel(
                     if (ui.failed) {
                         "Nothing was changed. Check the connection and try again."
                     } else {
-                        // Presets come from ScreenScraper (by its saved id),
-                        // so a ScreenScraper Change Match is what gives this game a source.
                         "Nothing was changed. To identify it, open Artwork, choose ScreenScraper and " +
                             "use Change Match, then update metadata again."
                     },
@@ -126,7 +115,6 @@ fun MetadataPreviewPanel(
                 return@Column
             }
 
-            // Source: one chip per provider that returned text.
             ChipRow {
                 ui.presets.forEachIndexed { index, preset ->
                     Chip(
@@ -138,7 +126,7 @@ fun MetadataPreviewPanel(
                     )
                 }
             }
-            // Policy: the four ways to apply.
+
             ChipRow {
                 MetadataApplyPolicy.entries.forEach { policy ->
                     Chip(
@@ -279,7 +267,7 @@ private fun FieldRow(
         )
         Text(
             formatMetadataValue(row.incoming).orEmpty(),
-            // Green is exactly "this policy writes it"; an equal value reads dimmed.
+
             color = when {
                 writes -> ChangeGreen
                 !row.differs -> TextMuted.copy(alpha = 0.6f)
@@ -293,7 +281,6 @@ private fun FieldRow(
     }
 }
 
-/** Community rating is stored normalized 0..1 (ScreenScraper's /20); everything else prints as-is. */
 private fun formatMetadataValue(value: Any?): String? = when (value) {
     null -> null
     is Float -> "${(value * 100).roundToInt()}%"

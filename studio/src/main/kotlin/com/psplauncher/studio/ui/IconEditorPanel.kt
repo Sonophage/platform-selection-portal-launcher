@@ -38,11 +38,6 @@ import com.psplauncher.studio.preview.StudioIconSet
 import com.psplauncher.themekit.IconSlot
 import com.psplauncher.themekit.IconSlots
 
-/**
- * Icons tab: every themeable slot, grouped like the XMB itself. Click a slot to import a
- * replacement image; overridden slots get a reset. "Export icon templates" hands users the
- * default silhouettes to edit in any image editor.
- */
 @Composable
 fun IconEditorPanel(
     state: StudioState,
@@ -136,7 +131,6 @@ private fun SlotCell(slot: IconSlot, state: StudioState, onClick: () -> Unit, on
     }
 }
 
-/** Alpha-checkerboard backdrop so transparent icon regions are visible. */
 @Composable
 private fun Checkerboard() {
     Canvas(Modifier.size(56.dp)) {

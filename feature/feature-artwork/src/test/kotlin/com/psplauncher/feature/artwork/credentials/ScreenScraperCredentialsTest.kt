@@ -4,13 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * The developer pair is what decides whether ScreenScraper works at all, so "is it configured"
- * has to be a single decision made in one place. These cases are the ones that used to be spread
- * across `BuildConfig.SS_DEV_ID.isNotBlank()` checks at three call sites.
- */
 class ScreenScraperCredentialsTest {
-
     @Test
     fun `both developer fields present yields credentials`() {
         val creds = ScreenScraperCredentials.of("dev", "secret", null, null)

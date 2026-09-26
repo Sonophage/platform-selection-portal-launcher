@@ -58,66 +58,44 @@ private val KEY_SHOW_BOOT          = booleanPreferencesKey("display_show_boot")
 private val KEY_BOOT_ON_RESUME     = booleanPreferencesKey("display_boot_on_resume")
 private val KEY_THERMAL_AWARE      = booleanPreferencesKey("display_thermal_aware")
 private val KEY_RESPECT_BATTERY    = booleanPreferencesKey("display_battery_saver")
-// The wave normally gives way to a wallpaper entirely — see XmbBackground. This keeps it, drawn
-// over the picture. Off by default: the existing behaviour is what every current install has, and
-// a setting that changes how someone's home screen looks on upgrade is a setting that arrives
-// broken.
+
 private val KEY_WAVE_OVER_WALLPAPER = booleanPreferencesKey("display_wave_over_wallpaper")
-// Must match XMBViewModel.KEY_TOUCH_NAV_BUTTON — both read/write this same pref.
+
 private val KEY_TOUCH_NAV_BUTTON   = stringPreferencesKey("interface_touch_nav_button")
-// Must match XMBViewModel.KEY_CONTEXT_MENU_HINT — both read/write this same pref.
+
 private val KEY_CONTEXT_MENU_HINT  = booleanPreferencesKey("interface_context_menu_hint")
 private val KEY_CONTEXT_MENU_HINT_DELAY_SECONDS = floatPreferencesKey("interface_context_menu_hint_delay_seconds")
-// Must match XMBViewModel.KEY_TOUCH_SENSITIVITY — both read/write this same pref.
+
 private val KEY_TOUCH_SENSITIVITY  = stringPreferencesKey("interface_touch_sensitivity")
-// Must match GameLaunchPreferences.KEY_DIRECT_LAUNCH — both read/write this same pref.
+
 private val KEY_DIRECT_LAUNCH      = booleanPreferencesKey("pref_direct_game_launch")
-// Must match XMBViewModel.KEY_ICON_LEGIBILITY — both read/write this same pref.
+
 private val KEY_ICON_LEGIBILITY    = stringPreferencesKey("display_icon_legibility")
-// Must match XMBViewModel.KEY_FADE_BY_DISTANCE — both read/write this same pref.
+
 private val KEY_FADE_BY_DISTANCE = booleanPreferencesKey("display_fade_by_distance")
 
-// Must match XMBViewModel.KEY_CARD_ART_GRID — both read/write this same pref.
 private val KEY_CARD_ART_GRID = booleanPreferencesKey("display_card_art_grid")
 
-/**
- * Whether the Recent shelf carries Android apps beside games, music, books and videos.
- *
- * DEFAULT OFF. The shelf is the screen the launcher opens on, and on a device with a hundred and
- * fifty apps the most recently used thing is very often an app you opened for ten seconds — which
- * would push the game you were actually playing off the front of your own home screen.
- */
 private val KEY_RECENTS_INCLUDE_APPS = booleanPreferencesKey("display_recents_include_apps")
-// Must match XMBViewModel.KEY_TEXT_SHADOW — both read/write this same pref.
+
 private val KEY_TEXT_SHADOW = booleanPreferencesKey("display_text_shadow")
-// ── Font colour (Display ▸ Font Colour) ──────────────────────────────────────
-// Must match XMBViewModel.KEY_TEXT_COLOR — both read/write this same pref.
-// Absent = inherit the theme's own text colour (white on every preset).
+
 private val KEY_TEXT_COLOR = longPreferencesKey("display_text_color")
-// "Use my exact colour": skip the lightness clamp. Protection still applies — a plate can rescue
-// a colour without repainting it, which is the whole reason the two are separate settings.
+
 private val KEY_TEXT_COLOR_EXACT = booleanPreferencesKey("display_text_color_exact")
-// Must match XMBViewModel — the resolved text-protection instrument (AUTO by default).
+
 private val KEY_TEXT_LEGIBILITY = stringPreferencesKey("display_text_legibility")
-// "Don't warn again": adjustment continues silently, only the notice stops.
+
 private val KEY_TEXT_NOTICE_SUPPRESSED = booleanPreferencesKey("display_text_contrast_notice_suppressed")
-// Read-only here: the theme owns these, this screen only needs them to know which backdrop the
-// picked font colour will land on. Must match ThemesSettingsViewModel / XMBViewModel.
+
 private val KEY_ACCENT_OVERRIDE = longPreferencesKey("theme_accent_override")
 private val KEY_COLOR_SCHEME    = stringPreferencesKey("display_color_scheme")
 internal val KEY_CUSTOM_WALLPAPER  = stringPreferencesKey("display_custom_wallpaper")
-// Motion wallpaper (looping MP4/WebM/GIF). Must match XMBViewModel — shared cascade pref.
-// INVARIANT: never set without KEY_CUSTOM_WALLPAPER — the poster is the fallback for both the
-// freeze paths and decode failure, so a motion file without one is an unrenderable state.
-// Enforced at the two write sites (import, clear) and on read ("motion set, poster missing"
-// degrades to "no motion").
+
 internal val KEY_MOTION_WALLPAPER  = stringPreferencesKey("display_motion_wallpaper")
-// Scale & Layout now live in the XMB's on-screen "Adjust XMB Layout" editor (see XMBViewModel);
-// this screen only launches it, so the old scale/bar prefs and steppers were removed here.
 
 private val SUPPORTED_WALLPAPER_MIME = setOf("image/png", "image/jpeg", "image/webp") + MotionLimits.SUPPORTED_MIME
 
-/** Mimes routed to the motion (looping) path rather than the plain still path. */
 private val MOTION_WALLPAPER_MIME = MotionLimits.SUPPORTED_MIME
 
 private val TOUCH_NAV_BUTTON_LABELS = mapOf(
@@ -139,10 +117,6 @@ private val WAVE_STYLE_LABELS = mapOf(
     WaveStyle.REDUCED_STATIC to "Reduced + Static",
 )
 
-/**
- * The four transient facts that ride together through the nested [combine] — [combine] takes at
- * most five typed sources, and the outer one is already full of DataStore and import state.
- */
 private data class Transient(
     val bootPreviewVisible: Boolean,
     val gameBootPreviewVisible: Boolean,
@@ -156,65 +130,54 @@ data class DisplaySettingsUiState(
     val showBootOnResume: Boolean = false,
     val thermalThrottleAware: Boolean = true,
     val respectBatterySaver: Boolean = true,
-    /** Draw the wave on top of a custom wallpaper instead of letting the wallpaper replace it. */
+
     val waveOverWallpaper: Boolean = false,
     val touchNavButtonMode: TouchNavButtonMode = TouchNavButtonMode.AUTO,
-    // Icon legibility treatment for XMB silhouette glyphs (None / Offset Shadow / Contour…).
+
     val iconLegibility: IconLegibilityStyle = IconLegibilityStyle.DEFAULT,
-    // Draw unselected XMB icons at full opacity (selection reads by size and label).
+
     val fadeByDistance: Boolean = true,
     val cardArtGrid: Boolean = true,
     val recentsIncludeApps: Boolean = false,
-    // Directional drop shadow behind XMB row subtitles, so helper text stays readable over
-    // bright wallpaper regions. Default on — the shadow is subtle; without it the flat gray
-    // subtitle is the one label that washes out.
+
     val textShadow: Boolean = true,
-    // ── Font colour ──────────────────────────────────────────────────────────
-    /** User-picked text colour, or null to inherit the theme's. */
+
     val textColorArgb: Long? = null,
-    /** Render the pick verbatim, skipping the lightness clamp (protection still applies). */
+
     val textColorExact: Boolean = false,
     val textLegibility: TextLegibilityStyle = TextLegibilityStyle.DEFAULT,
     val textContrastNoticeSuppressed: Boolean = false,
-    /** Transient "we adjusted your colour" notice; null when there is nothing to say. */
+
     val textContrastNotice: String? = null,
-    // Show the idle "Options" hint pill over XMB items with a context menu. Default on.
+
     val contextMenuHintDelaySeconds: Float = ControllerHintPolicy.DEFAULT_DELAY_SECONDS,
     val touchSensitivity: TouchSensitivity = TouchSensitivity.NORMAL,
-    // Confirm on a game launches it directly (true) or opens Game Detail first (false).
+
     val directLaunch: Boolean = false,
     val customWallpaperPath: String? = null,
-    // Absolute path of the looping motion file, when one is set (and its poster exists).
+
     val motionWallpaperPath: String? = null,
     val wallpaperMessage: String? = null,
     val contextMenuHintEnabled: Boolean = ControllerHintPolicy.DEFAULT_ENABLED,
     val wallpaperImporting: Boolean = false,
     val wallpaperPreviewVisible: Boolean = false,
-    // ── Boot Sequence media (Display ▸ Boot Sequence) ────────────────────────
-    // ONE field, exactly like GameBoot: the boot sequence is the built-in logo animation until
-    // the user replaces the whole thing with a clip of their own. Boot SOUND is not here — it is
-    // the seventh row of Interface ▸ Sound, which owns every sound in the app.
+
     val bootVideoLabel: String = UI_MEDIA_DEFAULT_LABEL,
     val bootVideoAssigned: Boolean = false,
     val bootPreviewVisible: Boolean = false,
-    // ── GameBoot (Display ▸ GameBoot) ────────────────────────────────────────
-    // One switch and one replaceable asset: on/off, plus the user's own clip when they have one.
+
     val gameBootEnabled: Boolean = true,
     val launchDiscEnabled: Boolean = true,
     val gameBootVideoLabel: String = UI_MEDIA_DEFAULT_LABEL,
     val gameBootVideoAssigned: Boolean = false,
     val gameBootPreviewVisible: Boolean = false,
-    /**
-     * Which physical face button does what on a focused media row — the north/west shortcuts are
-     * bound to positions, so they need the user's X/Y layout to resolve. See MediaRowShortcuts.
-     */
+
     val xyLayout: XYLayout = XYLayout.STANDARD,
-    /** The layout saved for this screen size is the PSP preset, so Biblically Accurate PSP XMB greys out. */
+
     val pspLayoutApplied: Boolean = false,
 ) {
 }
 
-/** Row summary for a UI-media slot with no user assignment. */
 const val UI_MEDIA_DEFAULT_LABEL = "PSP Default"
 
 @HiltViewModel
@@ -225,33 +188,18 @@ class DisplaySettingsViewModel @Inject constructor(
     private val launchDiscPreferences: com.psplauncher.core.data.launch.LaunchDiscPreferences,
     private val menuSound: com.psplauncher.core.ui.sound.MenuSoundPlayer,
     private val controllerLayout: ControllerLayoutRepository,
-    /**
-     * Where the disk work goes. Injected so a test can put it on its own scheduler.
-     *
-     * It was a hard-coded Dispatchers.IO in five places, and that is what made
-     * DisplaySettingsViewModelFontColorTest flaky: the test drives VIRTUAL time, the luma
-     * computation and the DataStore read hop to a REAL thread pool, and under a full-suite run
-     * that pool is contended by fifteen other modules. The wait then expires on wall-clock with
-     * the work still queued -- which reads as a product bug and is not one. The budget had
-     * already been raised 10s -> 60s once and it still timed out, because no timeout fixes a
-     * race between two clocks.
-     */
+
     @com.psplauncher.feature.settings.di.SettingsIoDispatcher
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
-
     private val _wallpaperMessage  = MutableStateFlow<String?>(null)
     private val _wallpaperImporting = MutableStateFlow(false)
     private val _wallpaperPreviewVisible = MutableStateFlow(false)
     private val _bootPreviewVisible = MutableStateFlow(false)
     private val _gameBootPreviewVisible = MutableStateFlow(false)
-    /**
-     * Transient font-colour notice, on the same channel idiom as [_wallpaperMessage]: raised by a
-     * pick that had to be adjusted, cleared by Dismiss or by "Don't warn again".
-     */
+
     private val _textContrastNotice = MutableStateFlow<String?>(null)
 
-    /** The slot the UI-media picker was launched for, read back when the Uri arrives. */
     private var pendingUiMediaSlot: UiMediaSlot? = null
 
     val uiState: StateFlow<DisplaySettingsUiState> = combine(
@@ -259,9 +207,7 @@ class DisplaySettingsViewModel @Inject constructor(
         _wallpaperMessage,
         _wallpaperImporting,
         _wallpaperPreviewVisible,
-        // combine tops out at five typed sources, so everything transient rides together — the
-        // same nesting the two boot previews already used, now carrying the controller layout as
-        // well (it maps over the same DataStore, so this costs no extra read).
+
         combine(
             _bootPreviewVisible,
             _gameBootPreviewVisible,
@@ -271,8 +217,7 @@ class DisplaySettingsViewModel @Inject constructor(
             Transient(boot, gameBoot, notice, layout.xyLayout)
         },
     ) { prefs, msg, importing, previewVisible, transient ->
-        // Every UI-media fact below comes from the same DataStore emission plus one directory
-        // listing, so the rows follow an import or a clear without a second flow.
+
         val assigned = uiMediaStore.assignments()
         fun label(slot: UiMediaSlot): String = when {
             slot !in assigned -> UI_MEDIA_DEFAULT_LABEL
@@ -313,35 +258,25 @@ class DisplaySettingsViewModel @Inject constructor(
             bootVideoLabel       = label(UiMediaSlot.BOOT_VIDEO),
             bootVideoAssigned    = UiMediaSlot.BOOT_VIDEO in assigned,
             bootPreviewVisible   = transient.bootPreviewVisible,
-            // Same read-time migration the gate uses, so the row can never disagree with what
-            // will actually play at launch.
+
             gameBootEnabled      = GameBootPreferences.resolve(prefs),
             launchDiscEnabled    = com.psplauncher.core.data.launch.LaunchDiscPreferences.resolve(prefs),
             gameBootVideoLabel   = label(UiMediaSlot.GAMEBOOT_VIDEO),
             gameBootVideoAssigned = UiMediaSlot.GAMEBOOT_VIDEO in assigned,
             gameBootPreviewVisible = transient.gameBootPreviewVisible,
             xyLayout             = transient.xyLayout,
-            // Re-derived on every DataStore emission, so a save from the Adjust XMB Layout editor
-            // (a reset to default included) re-enables the row the moment it lands.
+
             pspLayoutApplied     = PspXmbLayout.isApplied(prefs, PspXmbLayout.forWindow(context)),
         )
     }
-        // uiMediaStore.assignments() is a directory listing — cheap, but still file IO.
+
         .flowOn(io)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DisplaySettingsUiState())
 
-    // ── Boot / GameBoot media ─────────────────────────────────────────────────
-
-    /** Records which media row the picker was launched for. Called just before launching it. */
     fun onUiMediaPickerLaunchedFor(slot: UiMediaSlot) {
         pendingUiMediaSlot = slot
     }
 
-    /**
-     * Imports the picked file for the pending boot/GameBoot slot. A rejection surfaces its reason
-     * through the same message channel the wallpaper uses and leaves the previous assignment
-     * playing — the store stages the copy and only commits it once the gate passes.
-     */
     fun onUiMediaPicked(uri: Uri) {
         val slot = pendingUiMediaSlot ?: return
         pendingUiMediaSlot = null
@@ -353,8 +288,6 @@ class DisplaySettingsViewModel @Inject constructor(
                 _wallpaperImporting.value = false
             }
             if (!result.ok) {
-                // A refused import is an ERROR event, not just a dialog — the user did
-                // something and the launcher said no.
                 menuSound.play(com.psplauncher.core.ui.sound.MenuSound.ERROR)
                 _wallpaperMessage.value = result.message
             }
@@ -363,7 +296,6 @@ class DisplaySettingsViewModel @Inject constructor(
 
     fun clearUiMedia(slot: UiMediaSlot) = viewModelScope.launch { uiMediaStore.clear(slot) }
 
-    /** Display ▸ GameBoot — the one switch for the whole presentation. */
     fun setGameBootEnabled(enabled: Boolean) = viewModelScope.launch {
         gameBootPreferences.setGameBootEnabled(enabled)
     }
@@ -377,16 +309,12 @@ class DisplaySettingsViewModel @Inject constructor(
     fun showGameBootPreview() { _gameBootPreviewVisible.value = true }
     fun hideGameBootPreview() { _gameBootPreviewVisible.value = false }
 
-    /** MIME arrays for the two pickers, straight off the import gate so they cannot disagree. */
     fun uiMediaPickerMime(slot: UiMediaSlot): Array<String> =
         if (slot.kind == UiMediaKind.VIDEO) UiMediaLimits.VIDEO_MIME.toTypedArray()
         else UiMediaLimits.AUDIO_MIME.toTypedArray()
 
     fun setWaveStyle(style: WaveStyle) = save { it[KEY_WAVE_STYLE] = style.name }
 
-    // The three label maps below are private to this file, so the picker rows cannot build their
-    // own option lists from them. These expose value-and-label pairs in enum order, which is the
-    // order the picker shows and the order its indices mean.
     val waveStyleOptions: List<Pair<WaveStyle, String>> =
         WaveStyle.entries.map { it to (WAVE_STYLE_LABELS[it] ?: it.name) }
     val touchNavButtonOptions: List<Pair<TouchNavButtonMode, String>> =
@@ -403,19 +331,8 @@ class DisplaySettingsViewModel @Inject constructor(
 
     fun setTextShadow(v: Boolean) = save { it[KEY_TEXT_SHADOW] = v }
 
-    /** Display ▸ XMB Layout ▸ Biblically Accurate PSP XMB: saves the PSP preset for this screen size. */
     fun applyPspLayout() = save { PspXmbLayout.write(it, PspXmbLayout.forWindow(context)) }
 
-    // ── Font colour ───────────────────────────────────────────────────────────
-
-    /**
-     * Persist the picked colour (null clears back to the theme's own), then measure it against the
-     * backdrop it will actually land on and raise the notice if it had to be adjusted.
-     *
-     * The measurement happens here rather than at render time because this is where the user is
-     * looking: telling them at the moment of the pick is an explanation, telling them later is a
-     * mystery.
-     */
     fun setTextColor(argb: Long?) {
         viewModelScope.launch {
             context.pfpDataStore.edit { prefs ->
@@ -425,32 +342,25 @@ class DisplaySettingsViewModel @Inject constructor(
         }
     }
 
-    /** Render the pick verbatim. Protection (shadow/plate) still applies — the dialog says so. */
     fun setTextColorExact(v: Boolean) {
         viewModelScope.launch {
             context.pfpDataStore.edit { it[KEY_TEXT_COLOR_EXACT] = v }
-            // The standing notice described a clamp that no longer happens.
+
             if (v) _textContrastNotice.value = null
         }
     }
 
     fun setTextLegibility(style: TextLegibilityStyle) = save { it[KEY_TEXT_LEGIBILITY] = style.name }
 
-    /** Transient dismiss — the notice comes back on the next pick that needs it. */
     fun dismissTextContrastNotice() {
         _textContrastNotice.value = null
     }
 
-    /** Permanent: adjustment carries on, the user just stops hearing about it. */
     fun suppressTextContrastNotice() {
         _textContrastNotice.value = null
         save { it[KEY_TEXT_NOTICE_SUPPRESSED] = true }
     }
 
-    /**
-     * The notice text for [argb], or null when there is nothing to say — no pick, "use my exact
-     * colour", the notice suppressed, or the colour simply passes.
-     */
     private suspend fun noticeFor(argb: Long?): String? {
         if (argb == null) return null
         val prefs = context.pfpDataStore.data.first()
@@ -471,11 +381,6 @@ class DisplaySettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * The two backdrops Settings actually paints — the solved scrim anchors over a worst-case
-     * bright wallpaper. Reading the live theme (rather than assuming the default) is what keeps
-     * the reported ratio honest on a custom accent.
-     */
     private fun settingsBackdropAnchors(
         prefs: androidx.datastore.preferences.core.Preferences,
     ): List<androidx.compose.ui.graphics.Color> {
@@ -517,11 +422,7 @@ class DisplaySettingsViewModel @Inject constructor(
 
     fun setTouchNavButtonMode(mode: TouchNavButtonMode) = save { it[KEY_TOUCH_NAV_BUTTON] = mode.name }
 
-
     fun setTouchSensitivity(level: TouchSensitivity) = save { it[KEY_TOUCH_SENSITIVITY] = level.name }
-
-
-    // ── Wallpaper ─────────────────────────────────────────────────────────────
 
     fun onWallpaperPicked(uri: Uri) {
         viewModelScope.launch {
@@ -543,16 +444,9 @@ class DisplaySettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Today's still-image path, unchanged except that it clears a previous motion file —
-     * setting a still poster must not leave an orphaned looping video behind it.
-     */
     private suspend fun importStillWallpaper(uri: Uri) {
         val dir = wallpaperDir()
-        // Write each wallpaper to a UNIQUE file. A fixed filename kept the stored path string
-        // identical across replacements, so neither the state (same value) nor Coil's
-        // path-keyed image cache ever updated — the old wallpaper stayed on screen. A unique
-        // path changes the value (triggering recomposition) and is a fresh Coil key.
+
         val stamp = System.currentTimeMillis()
         val dest = File(dir, "wallpaper_$stamp.jpg")
         val ok = runCatching {
@@ -561,15 +455,10 @@ class DisplaySettingsViewModel @Inject constructor(
             } != null && isDecodableImage(dest)
         }.getOrDefault(false)
         if (ok) {
-            // Survey the new wallpaper BEFORE opening the transaction: edit{}'s transform may be
-            // re-run under contention, and a bitmap decode is not something to repeat under a lock.
-            // Free here — we are already off the main thread behind the import spinner.
             val luma = withContext(io) {
                 WallpaperLuminanceProbe.survey(dest.absolutePath)
             }
-            // All three keys together — even though a still import never sets the motion key, a
-            // previous motion file must go when its poster is replaced, and a survey of the old
-            // wallpaper must never outlive the wallpaper it describes.
+
             save {
                 it[KEY_CUSTOM_WALLPAPER] = dest.absolutePath
                 it.remove(KEY_MOTION_WALLPAPER)
@@ -583,18 +472,10 @@ class DisplaySettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * The motion path: gate BEFORE any decode/copy work where possible — playback discipline
-     * cannot rescue a file that should never have been accepted — and on success write the
-     * poster still and the motion file as a PAIR (unique stamp, same dir, so the dir prune
-     * keeps or drops both members together).
-     */
     private suspend fun importMotionWallpaper(uri: Uri, mime: String) {
         val dir = wallpaperDir()
         val stamp = System.currentTimeMillis()
 
-        // GIF / animated WebP keep their container (ExoPlayer can't play them; the global Coil
-        // ImageLoader's AnimatedImageDecoder animates them through AsyncImage instead).
         val motionExt = when (mime) {
             "video/webm" -> "webm"
             "image/gif" -> "gif"
@@ -604,8 +485,6 @@ class DisplaySettingsViewModel @Inject constructor(
         val motionDest = File(dir, "wallpaper_$stamp.$motionExt")
         val posterDest = File(dir, "wallpaper_$stamp.jpg")
 
-        // Size pre-check straight off the descriptor when the provider reports one: a 200 MB
-        // pick is rejected without transferring a byte.
         val knownSize = runCatching {
             context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
         }.getOrNull()?.takeIf { it > 0 }
@@ -625,7 +504,6 @@ class DisplaySettingsViewModel @Inject constructor(
             return
         }
 
-        // Probe the copied file (authoritative size even when the provider hid it).
         val probe = probeMotionFile(motionDest, mime)
         val rejection = probe?.let { MotionLimits.validate(it) }
         if (probe == null || rejection != null) {
@@ -634,10 +512,6 @@ class DisplaySettingsViewModel @Inject constructor(
             return
         }
 
-        // Poster extraction at IMPORT time, not render time: the frozen paths become literally
-        // the existing still-wallpaper composable (Coil AsyncImage of a JPEG), battery-saver
-        // costs what a static wallpaper costs, and a corrupt file degrades to a still instead
-        // of a black screen.
         val poster = extractPoster(motionDest, mime)
         if (poster == null) {
             runCatching { motionDest.delete() }
@@ -655,16 +529,10 @@ class DisplaySettingsViewModel @Inject constructor(
             return
         }
 
-        // Surveyed from the written poster rather than the in-memory bitmap above: that one is
-        // full-size, so getPixels() on it would cost more than re-decoding the poster at
-        // inSampleSize. The poster is what the XMB paints under its text while a motion wallpaper
-        // loads, and live frames drift from it — protection is biased one step stronger at render
-        // time when KEY_MOTION_WALLPAPER is set, rather than by fudging the numbers here.
         val luma = withContext(io) {
             WallpaperLuminanceProbe.survey(posterDest.absolutePath)
         }
 
-        // THE invariant, enforced at the write site: motion is never set without its poster.
         save {
             it[KEY_CUSTOM_WALLPAPER] = posterDest.absolutePath
             it[KEY_MOTION_WALLPAPER] = motionDest.absolutePath
@@ -674,12 +542,6 @@ class DisplaySettingsViewModel @Inject constructor(
         _wallpaperMessage.value = "Motion wallpaper applied"
     }
 
-    /**
-     * Runs the import gate on the copied file. Videos are probed with MediaMetadataRetriever;
-     * GIF/animated-WebP via BitmapFactory bounds (duration is unknowable cheaply for them and
-     * animated images are looped short-form content by nature — the size and resolution caps
-     * are doing the guarding).
-     */
     private fun probeMotionFile(file: File, mime: String): MotionLimits.Probe? = runCatching {
         if (mime == "image/gif" || mime == "image/webp") {
             val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -705,11 +567,6 @@ class DisplaySettingsViewModel @Inject constructor(
         }
     }.getOrNull()
 
-    /**
-     * Poster still for the freeze paths. Videos: frame at ~1 s (the first frame of a fade-in
-     * loop is often black), falling back to frame 0 for very short clips. GIF/animated WebP:
-     * decode the first frame through ImageDecoder.
-     */
     private fun extractPoster(motionFile: File, mime: String): Bitmap? = runCatching {
         if (mime == "image/gif" || mime == "image/webp") {
             val source = ImageDecoder.createSource(motionFile)
@@ -727,7 +584,6 @@ class DisplaySettingsViewModel @Inject constructor(
         }
     }.getOrNull()
 
-    /** Cheap decode check so a corrupt still degrades to a message, not a broken image. */
     private fun isDecodableImage(file: File): Boolean {
         val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
         android.graphics.BitmapFactory.decodeFile(file.absolutePath, opts)
@@ -736,7 +592,6 @@ class DisplaySettingsViewModel @Inject constructor(
 
     private fun wallpaperDir(): File = File(context.filesDir, "wallpaper").apply { mkdirs() }
 
-    /** Deletes every file in the wallpaper dir except the ones just applied (pair-safe). */
     private suspend fun pruneWallpaperDir(keep: List<File>) {
         val keepNames = keep.map { it.name }.toSet()
         withContext(io) {
@@ -751,15 +606,13 @@ class DisplaySettingsViewModel @Inject constructor(
             val current = context.pfpDataStore.data.first()
             val poster = current[KEY_CUSTOM_WALLPAPER]
             val motion = current[KEY_MOTION_WALLPAPER]
-            // Clear BOTH keys — a leftover motion path with a cleared poster is the invalid
-            // state the poster invariant exists to prevent — and the survey with them, since a
-            // map describing a deleted wallpaper is worse than no map at all.
+
             save {
                 it.remove(KEY_CUSTOM_WALLPAPER)
                 it.remove(KEY_MOTION_WALLPAPER)
                 it.clearWallpaperLuma()
             }
-            // Then the files (prefs gone first, so nothing references them while they delete).
+
             withContext(io) {
                 poster?.let { runCatching { File(it).delete() } }
                 motion?.let { runCatching { File(it).delete() } }
@@ -767,9 +620,6 @@ class DisplaySettingsViewModel @Inject constructor(
             _wallpaperMessage.value = "Wallpaper reset to default"
         }
     }
-
-    // Hidden-app management now lives in its own screen (AppVisibilityViewModel), reached from
-    // Display ▸ Hidden Apps — it lists every app with a per-app show/hide toggle.
 
     fun dismissWallpaperMessage() {
         _wallpaperMessage.value = null

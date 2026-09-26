@@ -1,23 +1,11 @@
 package com.psplauncher.themekit
 
-/**
- * Unpacks every resource of an official PSP theme, not just the wallpaper [PtfParser]
- * extracts: each slot's payload is a chain of records — a 32-byte header (sequence, type,
- * compression method, compressed/uncompressed sizes) followed by the compressed bytes —
- * and old themes hide their category ribbons, item icons (normal + focused variants), and
- * the embedded preview in those chains as GIM textures.
- *
- * Read-only reference extraction: callers get the decompressed payloads plus decoded
- * pixels where the payload is a known image format ([Gim], [Bmp]).
- */
 object PtfUnpacker {
-
-    /** One decompressed slot record. [image] is set when the payload decodes as GIM/BMP. */
     class Resource(
         val slotId: Int,
         val sequence: Int,
         val kind: Kind,
-        /** Decompressed payload; null when the record's data could not be decompressed. */
+
         val payload: ByteArray?,
         val image: BmpImage?,
     ) {
@@ -34,14 +22,8 @@ object PtfUnpacker {
     private const val METHOD_LZR = 1
     private const val METHOD_ZLIB = 2
 
-    /**
-     * Total decompressed budget across ALL records. Real themes unpack to ~1 MB; each
-     * record is individually capped at 32 MB, but a crafted file could chain thousands of
-     * high-ratio records and expand a 64 MB input into gigabytes without this ceiling.
-     */
     private const val MAX_TOTAL_OUTPUT_BYTES = 256L * 1024 * 1024
 
-    /** Null when [bytes] is not an official PTF ([PtfParser.detect] semantics). */
     fun unpack(bytes: ByteArray): Dump? {
         val theme = PtfParser.parse(bytes) ?: return null
         val resources = mutableListOf<Resource>()
@@ -57,18 +39,16 @@ object PtfUnpacker {
                 val method = bytes.u16(cursor + 6)
                 val compressed = bytes.i32(cursor + 8)
                 val uncompressed = bytes.i32(cursor + 12)
-                // A record that doesn't look like one ends the chain (trailing padding).
+
                 if (type !in 4..5 || compressed <= 0 || compressed > end - cursor - RECORD_HEADER) break
                 if (uncompressed !in 1..PtfParser.MAX_INFLATED_BYTES) break
                 totalOutput += uncompressed
                 if (totalOutput > MAX_TOTAL_OUTPUT_BYTES) {
-                    // Decompression-bomb chain: stop cleanly with what we have.
                     return Dump(name = theme.name, firmware = theme.firmware, resources = resources)
                 }
 
                 val dataAt = cursor + RECORD_HEADER
                 val payload = when {
-                    // Tiny flag records store their bytes raw, without a compression wrapper.
                     compressed == uncompressed -> bytes.copyOfRange(dataAt, dataAt + compressed)
                     method == METHOD_LZR -> Lzr.decompress(bytes, dataAt, compressed, uncompressed)
                     method == METHOD_ZLIB -> PtfParser.inflate(bytes, dataAt, compressed)

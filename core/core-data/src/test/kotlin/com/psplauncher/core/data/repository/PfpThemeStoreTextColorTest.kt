@@ -22,14 +22,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The theme bundle's `textColor` field, and specifically the case that is easy to get wrong:
- * applying a theme that says *nothing* about text must REMOVE the pref, not inherit the previous
- * theme's colour. Same set-or-remove contract the accent and icon colour already follow.
- */
 @RunWith(RobolectricTestRunner::class)
 class PfpThemeStoreTextColorTest {
-
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Before
@@ -50,7 +44,7 @@ class PfpThemeStoreTextColorTest {
     @Test
     fun `applying a bundle without a text colour removes the previous theme's`() = runTest {
         val store = PfpThemeStore(context)
-        // Stand in for a previously-applied theme that set one.
+
         context.pfpDataStore.edit { it[KEY_TEXT_COLOR] = 0xFFFF8800L }
 
         val saved = requireNotNull(store.importBundle(register(bundle())))

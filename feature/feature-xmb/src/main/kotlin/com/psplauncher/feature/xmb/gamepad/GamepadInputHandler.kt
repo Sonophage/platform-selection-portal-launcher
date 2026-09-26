@@ -22,39 +22,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 
-// Floor for the analog stick's dead zone. The USER's StickSensitivity normally decides it; this
-// is only the lower bound, so no setting can make the stick hair-triggered. Device-reported flat
-// (MotionRange.getFlat) can raise it further; see stickDirection().
 private const val STICK_DEAD_ZONE_FLOOR = 0.35f
 
-// A stick direction engaged past activation stays engaged until deflection falls below
-// activation * STICK_RELEASE_FACTOR — hysteresis so noise around the activation edge cannot
-// flap press/release/re-press.
 private const val STICK_RELEASE_FACTOR = 0.6f
 
-// HAT (D-pad) deflection threshold. HAT axes are usually discrete (-1/0/1) but may be analog.
 private const val HAT_DEAD_ZONE = 0.5f
 
-// One physical D-pad press can arrive as KEYCODE_DPAD_* and a HAT/axis deflection within the
-// same frame. Same-direction presses from another source inside this window are consumed without
-// emitting so navigation never double-steps. Kept well under the fastest repeat interval so a
-// held direction never suppresses its own legitimate repeats.
 private const val DUPLICATE_WINDOW_MS = 80L
 
-// How much faster a full-tilt stick climbs the acceleration ramp.
-//
-// It used to SKIP the ramp: full tilt jumped straight to fastIntervalMs. Combined with the old
-// 0.90 full-tilt threshold -- trivially easy to reach on a handheld thumbstick -- that meant
-// essentially every stick push repeated at maximum speed from its very first repeat, twice as
-// fast as the D-pad's first repeat for the same intent. That is what "joystick sensitivity is too
-// high" was. Full tilt now climbs the same ramp at double rate, so it is still an explicit "go
-// faster" gesture the D-pad cannot make, and still arrives at the same top speed, without
-// teleporting there.
 private const val STICK_FULL_TILT_RAMP_FACTOR = 2
 
-// Held-navigation repeat tuning: after [initialDelayMs] the action repeats starting at
-// [baseIntervalMs], tightening linearly to [fastIntervalMs] over [rampSteps] repeats — short
-// holds stay precise, long holds accelerate instead of plodding at one fixed rate.
 private data class RepeatTuning(
     val initialDelayMs: Long,
     val baseIntervalMs: Long,
@@ -68,20 +45,12 @@ private fun ScrollSpeed.tuning(): RepeatTuning = when (this) {
     ScrollSpeed.FAST     -> RepeatTuning(initialDelayMs = 180, baseIntervalMs = 90,  fastIntervalMs = 35, rampSteps = 4)
 }
 
-/** A shoulder held past [SHOULDER_HOLD_MS], and the release that ends it. */
 sealed interface ShoulderHold {
     val action: GamepadAction
     data class Start(override val action: GamepadAction) : ShoulderHold
     data class End(override val action: GamepadAction) : ShoulderHold
 }
 
-/**
- * How long a shoulder must be down before it stops being a category step and becomes a rail.
- *
- * Long enough that a firm tap never trips it, short enough that the rail feels like it was
- * waiting. The repeat tunings above start at 180-350ms for a held direction; this sits past all
- * of them so the two gestures are never confusable by feel.
- */
 internal const val SHOULDER_HOLD_MS = 400L
 
 @Singleton
@@ -92,71 +61,35 @@ class GamepadInputHandler @Inject constructor(
     private val _actions = MutableSharedFlow<GamepadAction>(extraBufferCapacity = 16)
     val actions: SharedFlow<GamepadAction> = _actions.asSharedFlow()
 
-    // ── Shoulder holds ────────────────────────────────────────────────────────
-    //
-    // A held shoulder is the letter rail's way in, and it is NOT a new GamepadAction. Mappings
-    // persist as enum names with a legacy-alias table behind them, so a constant added here would
-    // land in every saved layout, in the remap screen and in the backup's key set — three places
-    // that must then agree — to express "the same button, held". A hold is a modifier on a press,
-    // so it travels beside the presses instead of among them.
-    //
-    // The press itself therefore waits for the release: one button cannot both fire on the way
-    // down and mean something else by staying down. On the crossbar a shoulder tap walks the
-    // hover panel's pages (XMBViewModel dispatches PREV/NEXT_CATEGORY to stepHoverPanelPage —
-    // they have not stepped the category there for some time, whatever the names say), and that
-    // still happens, on the release instead of the press. Shoulders do not auto-repeat (they are
-    // not directional, so no repeat job is ever armed for one), so nothing depended on the down
-    // edge.
-    // Whoever collects this owns the fallback: [ShoulderHold.End] on a list with no rail is a tap
-    // that still has to step, and only the collector knows whether a rail came up.
     private val _shoulderHolds = MutableSharedFlow<ShoulderHold>(extraBufferCapacity = 8)
     val shoulderHolds: SharedFlow<ShoulderHold> = _shoulderHolds.asSharedFlow()
 
     private var shoulderJob: Job? = null
     private var shoulderHeld: GamepadAction? = null
 
-    // Current live mappings — updated from the repository flow by the ViewModel
     var currentMappings: GamepadMappings = GamepadMappings()
 
-    // Held-scroll speed preference — updated from ControllerLayoutRepository by the ViewModel.
     var scrollSpeed: ScrollSpeed = ScrollSpeed.STANDARD
 
-    // How far the stick must move to register, and to count as full tilt. Same source.
     var stickSensitivity: StickSensitivity = StickSensitivity.STANDARD
 
-    // Scope for repeat jobs — set by XMBViewModel on init so repeats survive config changes
     var scope: CoroutineScope? = null
 
-    // When true (settings overlay active), only BACK is intercepted here; everything else
-    // falls through to super.dispatchKeyEvent() so Compose handles D-pad focus traversal.
     var bypassToComposeFocus: Boolean = false
 
-    // Repeat job for held directional input
     private var repeatJob: Job? = null
     private var lastStickAction: GamepadAction? = null
 
-    // Live stick deflection while a stick direction is held — read by the repeat loop each step
-    // so pushing to full tilt speeds up mid-hold without restarting the repeat. 0 for D-pad holds.
     @Volatile private var stickMagnitude: Float = 0f
 
-    // Previous frame's HAT deflection, so [hatDirectionNewestFirst] can tell which axis JUST
-    // became deflected. Updated on every motion event that reaches the axis read below.
     private var prevHatX: Float = 0f
     private var prevHatY: Float = 0f
 
-    // Last emit time per directional action, for same-source duplicate suppression. Stamped by
-    // emit(); read by isDuplicateDirection() before a new edge is emitted.
     private val lastDirectionalEmitAt = mutableMapOf<GamepadAction, Long>()
 
-    // Test seam: injectable clock so duplicate-window tests are deterministic. Production uses
-    // the system uptime clock.
     internal var clock: () -> Long = SystemClock::uptimeMillis
 
-    // Called by MainActivity.dispatchKeyEvent
     fun onKeyEvent(event: KeyEvent): Boolean {
-        // During button remapping: capture the raw keyCode before any action translation.
-        // This ensures every button — including the one mapped to BACK — can be assigned.
-        // Both ACTION_DOWN and ACTION_UP are consumed so nothing leaks into normal handling.
         remapCoordinator.captureNextKey?.let { capture ->
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 remapCoordinator.captureNextKey = null
@@ -165,32 +98,20 @@ class GamepadInputHandler @Inject constructor(
             return true
         }
 
-        // Accept any keycode we have a binding for — don't filter by source because
-        // Android handhelds (Ayn Thor, Retroid, etc.) sometimes report SOURCE_KEYBOARD
-        // for built-in controller buttons even when they're physically a gamepad.
         val action = currentMappings.actionFor(event.keyCode) ?: return false
         registry.markActive(event.deviceId)
 
-        // Settings overlay: only BACK is ours — let Compose handle D-pad/select natively
         if (bypassToComposeFocus && action != GamepadAction.BACK) return false
 
         return when (event.action) {
             KeyEvent.ACTION_DOWN -> {
                 if (event.repeatCount == 0) {
-                    // First press — emit immediately. A directional press from a redundant source
-                    // (HAT + DPAD keys on one physical button) is consumed without emitting so
-                    // navigation never double-steps.
                     if (action.isDirectional() && isDuplicateDirection(action)) return true
 
-                    // Armed BEFORE emitting. emit() reaches the ViewModel's collector
-                    // synchronously (Dispatchers.Main.immediate), and at a navigation boundary
-                    // that collector calls cancelRepeat() — which, if we armed afterwards, would
-                    // be cancelling a job that did not exist yet, leaving one running behind it.
                     if (action.isDirectional()) {
                         startRepeat(action)
                     }
-                    // A shoulder's step is deferred to ACTION_UP — see the note on
-                    // [shoulderHolds]. Everything else emits on the down edge as before.
+
                     if (action.isShoulder()) {
                         armShoulderHold(action)
                         return true
@@ -208,7 +129,6 @@ class GamepadInputHandler @Inject constructor(
         }
     }
 
-    // Called by MainActivity.onGenericMotionEvent
     fun onMotionEvent(event: MotionEvent): Boolean {
         if (event.source and InputDevice.SOURCE_JOYSTICK != InputDevice.SOURCE_JOYSTICK) {
             return false
@@ -224,19 +144,14 @@ class GamepadInputHandler @Inject constructor(
         val stickAction = stickDirection(x, y, stickFlatFor(event.deviceId))
         val hatAction = hatDirection(hatX, hatY)
 
-        // HAT wins over the stick when both report a direction: HAT is the discrete D-pad, and a
-        // stick deflection near a HAT press is usually the same physical gesture leaking onto both.
         val motionAction = hatAction ?: stickAction
 
-        // Track deflection on every event (not just direction changes) so easing into or out of
-        // full tilt adjusts the repeat speed of the hold already in progress.
         stickMagnitude = if (motionAction != null) maxOf(abs(x), abs(y), abs(hatX), abs(hatY)) else 0f
 
         if (motionAction != lastStickAction) {
             cancelRepeat()
             lastStickAction = motionAction
             if (motionAction != null && !isDuplicateDirection(motionAction)) {
-                // Arm before emitting — see the note in onKeyEvent above.
                 startRepeat(motionAction)
                 emit(motionAction, physical = true)
             }
@@ -247,19 +162,8 @@ class GamepadInputHandler @Inject constructor(
         return motionAction != null
     }
 
-    // Used to inject actions from the ViewModel for button remapping preview
     fun emitAction(action: GamepadAction) = emit(action)
 
-    /**
-     * [physical] marks an emission caused by the user actually pressing something, which is the
-     * only kind that may stamp the duplicate-suppression window.
-     *
-     * That window exists to swallow ONE physical press arriving twice (HAT axis + the DPAD keycode
-     * Android synthesizes from it). Auto-repeat ticks are not presses, and while a hold was
-     * scrolling they re-stamped the window every ~50-80ms — so every genuine press made during a
-     * scroll looked like a redundant duplicate and was silently dropped, exactly when the user was
-     * pressing hardest.
-     */
     private fun emit(action: GamepadAction, physical: Boolean = false) {
         if (physical && action.isDirectional()) lastDirectionalEmitAt[action] = clock()
         _actions.tryEmit(action)
@@ -271,7 +175,6 @@ class GamepadInputHandler @Inject constructor(
         startRepeating(action, s)
     }
 
-    // Called by XMBViewModel.init with viewModelScope so repeat jobs survive config changes
     fun startRepeating(action: GamepadAction, s: CoroutineScope) {
         repeatJob?.cancel()
         repeatJob = s.launch {
@@ -281,43 +184,18 @@ class GamepadInputHandler @Inject constructor(
             while (true) {
                 emit(action)
                 step++
-                // Linear ramp from base to fast over rampSteps; a full-tilt stick jumps straight
-                // to the fast interval regardless of how far into the ramp the hold is.
+
                 val climbed = rampStepFor(step, stickMagnitude, stickSensitivity.fullTilt)
                 delay(rampedInterval(climbed, t.baseIntervalMs, t.fastIntervalMs, t.rampSteps))
             }
         }
     }
 
-    /**
-     * Stops auto-repeat. Deliberately does NOT forget which direction is physically held.
-     *
-     * [lastStickAction] is the *edge detector* for the analog/HAT path: [onMotionEvent] only acts
-     * when the reported direction differs from it, so clearing it while a finger is still on the
-     * D-pad makes the eventual release look like "no change" — the release is then skipped, the
-     * repeat job is never cancelled, and one tap emits a second action 250ms later.
-     *
-     * That is not hypothetical: the ViewModel calls this at every navigation boundary, and the
-     * actions SharedFlow is collected on Dispatchers.Main.immediate, so the collector runs
-     * RE-ENTRANTLY inside emit() — mid-press, between this handler setting [lastStickAction] and
-     * arming the repeat. Roughly one press in five was landing twice.
-     *
-     * So: the repeat job is this function's business; the held direction belongs to
-     * [onMotionEvent], which owns it from press to release. [stickMagnitude] is likewise
-     * recomputed on every motion event and needs no clearing here.
-     */
     fun cancelRepeat() {
         repeatJob?.cancel()
         repeatJob = null
     }
 
-    // ── Normalization helpers ──────────────────────────────────────────────────────────────
-
-    /**
-     * Left-stick direction with hysteresis. Activation is the device-reported neutral flat (or the
-     * [STICK_DEAD_ZONE_FLOOR]); a direction engaged past activation stays engaged until deflection
-     * falls below the lower release threshold.
-     */
     private fun stickDirection(x: Float, y: Float, flat: Float): GamepadAction? {
         val activation = maxOf(stickSensitivity.deadZone, STICK_DEAD_ZONE_FLOOR, flat)
         val release = activation * STICK_RELEASE_FACTOR
@@ -345,15 +223,10 @@ class GamepadInputHandler @Inject constructor(
     private fun hatDirection(hatX: Float, hatY: Float): GamepadAction? =
         hatDirectionNewestFirst(hatX, hatY, prevHatX, prevHatY, lastStickAction)
 
-    /** Device-reported neutral flat for the left stick; 0 when unavailable (JVM tests, odd devices). */
     private fun stickFlatFor(deviceId: Int): Float =
         runCatching { InputDevice.getDevice(deviceId)?.getMotionRange(MotionEvent.AXIS_X)?.flat }
             .getOrNull() ?: 0f
 
-    /**
-     * True when the same directional action was emitted from another source inside
-     * [DUPLICATE_WINDOW_MS] — a redundant physical representation of one press, not a new intent.
-     */
     private fun isDuplicateDirection(action: GamepadAction): Boolean {
         if (!action.isDirectional()) return false
         val now = clock()
@@ -361,13 +234,6 @@ class GamepadInputHandler @Inject constructor(
         return last != null && now - last < DUPLICATE_WINDOW_MS
     }
 
-    /**
-     * Arms the hold timer and swallows the down edge.
-     *
-     * With no [scope] — which is every unit test that has not been given one — the timer never
-     * runs, the hold never fires, and the release below emits the press. That is the behaviour
-     * this had before holds existed, which is what makes the fallback safe rather than lucky.
-     */
     private fun armShoulderHold(action: GamepadAction) {
         shoulderJob?.cancel()
         shoulderHeld = null
@@ -378,7 +244,6 @@ class GamepadInputHandler @Inject constructor(
         }
     }
 
-    /** Release: a hold ends, anything shorter was a tap and steps now. */
     private fun releaseShoulder(action: GamepadAction) {
         shoulderJob?.cancel()
         shoulderJob = null
@@ -398,25 +263,6 @@ class GamepadInputHandler @Inject constructor(
     )
 }
 
-/**
- * Which single direction a D-pad reports when both axes are deflected — "the axis you just pressed
- * wins".
- *
- * The XMB cursor is discrete and never moves diagonally, so exactly one direction has to come out
- * of a diagonal. Priority used to be fixed (Y before X), which meant a horizontal press was
- * unreachable for as long as a vertical was held: rolling through a diagonal, a LEFT tap went
- * unheard for 274ms until UP was released. Since a D-pad is rolled through diagonals constantly,
- * that read as input lag.
- *
- * The rule, in order:
- *  1. Only one axis deflected — that axis, unchanged from before.
- *  2. Both deflected, one of them only as of THIS event — the new one. This is the fix: the press
- *     the user just made outranks the one they are still holding.
- *  3. Both deflected and neither is new — whichever the user is already navigating with ([held]),
- *     so a hold keeps repeating in its own direction instead of flapping.
- *  4. Both became deflected in the same event (a true simultaneous diagonal) — Y, the old
- *     tie-break, kept so a genuinely ambiguous press behaves as it always did.
- */
 internal fun hatDirectionNewestFirst(
     hatX: Float,
     hatY: Float,
@@ -449,16 +295,8 @@ internal fun hatDirectionNewestFirst(
     }
 }
 
-/**
- * How far up the acceleration ramp a hold has climbed after [repeats] repeats.
- *
- * A full-tilt stick climbs [STICK_FULL_TILT_RAMP_FACTOR] rungs per repeat instead of one, so it
- * reaches top speed in half the repeats -- rather than skipping the ramp outright, which is what
- * made the stick feel twitchy. Pure so the feel can be pinned without a device.
- */
 internal fun rampStepFor(repeats: Int, stickMagnitude: Float, fullTilt: Float): Int =
     if (stickMagnitude >= fullTilt) repeats * STICK_FULL_TILT_RAMP_FACTOR else repeats
 
-/** The delay before the next repeat, linear from [base] down to [fast] over [rampSteps] rungs. */
 internal fun rampedInterval(step: Int, base: Long, fast: Long, rampSteps: Int): Long =
     if (step >= rampSteps) fast else base - (base - fast) * step / rampSteps

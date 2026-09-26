@@ -21,13 +21,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * The shared shortcut-import funnel (docs/windows-library-refactor-plan.md section 3): entity-
- * first writes, three-shape dedupe, certain-appid STEAM linking, and the setup-prompt flag.
- */
 @RunWith(RobolectricTestRunner::class)
 class PcShortcutImporterTest {
-
     private val gameRepository = mockk<GameRepository>()
     private val memoryCards = mockk<MemoryCardRepository>(relaxed = true)
     private val windowsLibrary = mockk<WindowsLibrarySetup>(relaxed = true)
@@ -37,7 +32,7 @@ class PcShortcutImporterTest {
 
     private fun ready() {
         coEvery { windowsLibrary.ensure() } returns WindowsSetupState.Ready("/storage/emulated/0/Roms/windows")
-        // Storefront capture (C16 task 0.5) rides every import path that has a store id.
+
         coEvery { gameRepository.updateStorefrontIdentity(any(), any(), any()) } returns Unit
     }
 
@@ -45,8 +40,6 @@ class PcShortcutImporterTest {
         id = id, title = title, platformId = "windows",
         isManualEntry = true, contentType = GameContentType.GAME,
     )
-
-    // ── Pins ──────────────────────────────────────────────────────────────────
 
     @Test
     fun `gamenative pin creates the game and links steam from the shortcut id`() = runTest {
@@ -82,7 +75,7 @@ class PcShortcutImporterTest {
     @Test
     fun `a pin merges into the folder-imported game by normalized title, attaching its handle`() = runTest {
         ready()
-        // Folder import created "MARVEL Cosmic Invasion"; the Ludashi pin arrives squashed.
+
         val folderGame = windowsGame(9L, "MARVEL Cosmic Invasion")
         coEvery { gameRepository.getLauncherShortcut("com.ludashi.aibench", "MARVELCosmicInvasion") } returns null
         coEvery { gameRepository.getByPlatform("windows") } returns listOf(folderGame)
@@ -100,12 +93,9 @@ class PcShortcutImporterTest {
         assertEquals(9L, handleId.captured)
         assertEquals("MARVELCosmicInvasion", handleShortcut.captured)
         assertEquals("com.ludashi.aibench", handlePkg.captured)
-        // NEVER upsert onto an existing row. GameDao.upsert is @Insert(onConflict = REPLACE),
-        // which SQLite runs as DELETE-then-INSERT, so this game's play sessions and collection
-        // membership would go with it -- proven by GameUpsertCascadeTest. Pin reconcile runs at
-        // every app start, so this ran on every launch.
+
         coVerify(exactly = 0) { gameRepository.upsert(any()) }
-        // The Ludashi shortcut id carries no appid — no STEAM identity may be invented.
+
         coVerify(exactly = 0) { gameRepository.updateStorefrontIdentity(any(), any(), any()) }
     }
 
@@ -122,8 +112,6 @@ class PcShortcutImporterTest {
         assertTrue(result.needsSetup)
         coVerify { windowsLibrary.flagSetupPrompt() }
     }
-
-    // ── Legacy captures ───────────────────────────────────────────────────────
 
     private fun legacyUri(vararg extras: Pair<String, Any>): String =
         Intent("com.xiaoji.egggame.LAUNCH_GAME").apply {
@@ -155,7 +143,7 @@ class PcShortcutImporterTest {
     @Test
     fun `legacy capture with only a localGameId never invents a steam link`() = runTest {
         ready()
-        // GameHub internal ids are NOT Steam appids (live case: RESONANCE game_id=86019).
+
         val uri = legacyUri("localGameId" to "86019", "autoStartGame" to true)
         coEvery { gameRepository.getByIntentUri(uri) } returns null
         coEvery { gameRepository.getByPlatform("windows") } returns emptyList()
@@ -163,7 +151,6 @@ class PcShortcutImporterTest {
 
         importer().importLegacyShortcut("com.xiaoji.egggame", "Resonance of Fate", uri)
 
-        // A localGameId is the launcher's internal id, so there is no storefront identity to record.
         coVerify(exactly = 0) { gameRepository.updateStorefrontIdentity(any(), any(), any()) }
     }
 

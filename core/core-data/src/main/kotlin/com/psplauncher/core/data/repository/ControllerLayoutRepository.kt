@@ -31,7 +31,6 @@ class ControllerLayoutRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val mappingRepository: ControllerMappingRepository,
 ) {
-
     val prefs: Flow<ControllerLayoutPrefs> = context.pfpDataStore.data.map { store ->
         ControllerLayoutPrefs(
             confirmBackLayout = store[KEY_CONFIRM_BACK]
@@ -48,12 +47,10 @@ class ControllerLayoutRepository @Inject constructor(
                 ?: ScrollSpeed.STANDARD,
             stickSensitivity = com.psplauncher.core.domain.model.StickSensitivity
                 .fromName(store[KEY_STICK_SENSITIVITY]),
-            // Absent key reads as the default (on) — no migration needed for existing installs.
+
             leftBacksOut = store[KEY_LEFT_BACKS_OUT] ?: true,
         )
     }
-
-    // ── Confirm / Back swap ───────────────────────────────────────────────────
 
     suspend fun setConfirmBackLayout(layout: ConfirmBackLayout) {
         context.pfpDataStore.edit { it[KEY_CONFIRM_BACK] = layout.name }
@@ -61,18 +58,12 @@ class ControllerLayoutRepository @Inject constructor(
         Timber.i("ConfirmBackLayout set: $layout")
     }
 
-    // ── X / Y swap ────────────────────────────────────────────────────────────
-
     suspend fun setXYLayout(layout: XYLayout) {
         context.pfpDataStore.edit { it[KEY_XY_LAYOUT] = layout.name }
         applyLayout(confirmBack = currentConfirmBackLayout(), xy = layout)
         Timber.i("XYLayout set: $layout")
     }
 
-    // ── Binding rebuild ─────────────────────────────────────────────────────────
-    //
-    // The table itself is built by gamepadMappingsFor() in core-domain, so the
-    // rebuild rule is pure and unit-tested rather than living behind DataStore.
     private suspend fun applyLayout(confirmBack: ConfirmBackLayout, xy: XYLayout) {
         mappingRepository.saveMappings(gamepadMappingsFor(confirmBack, xy))
     }
@@ -87,14 +78,10 @@ class ControllerLayoutRepository @Inject constructor(
             ?.let { runCatching { XYLayout.valueOf(it) }.getOrNull() }
             ?: XYLayout.STANDARD
 
-    // ── Display type ──────────────────────────────────────────────────────────
-
     suspend fun setDisplayType(type: ControllerDisplayType) {
         context.pfpDataStore.edit { it[KEY_DISPLAY_TYPE] = type.name }
         Timber.i("ControllerDisplayType set: $type")
     }
-
-    // ── Scroll speed ──────────────────────────────────────────────────────────
 
     suspend fun setStickSensitivity(value: com.psplauncher.core.domain.model.StickSensitivity) {
         context.pfpDataStore.edit { it[KEY_STICK_SENSITIVITY] = value.name }
@@ -106,14 +93,10 @@ class ControllerLayoutRepository @Inject constructor(
         Timber.i("ScrollSpeed set: $speed")
     }
 
-    // ── LEFT backs out ────────────────────────────────────────────────────────
-
     suspend fun setLeftBacksOut(enabled: Boolean) {
         context.pfpDataStore.edit { it[KEY_LEFT_BACKS_OUT] = enabled }
         Timber.i("LeftBacksOut set: $enabled")
     }
-
-    // ── Reset ─────────────────────────────────────────────────────────────────
 
     suspend fun resetAllPrefs() {
         context.pfpDataStore.edit { store ->

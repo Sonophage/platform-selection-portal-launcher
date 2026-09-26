@@ -10,15 +10,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.psplauncher.core.domain.model.IconLegibilityStyle
 
-/** Renders the category icon for [iconKey] from its individual drawable (no sprite sheet, no
- *  Canvas). The catalog art is white/monochrome silhouettes, rendered through [PortalIcon] so
- *  the theme's unified icon color applies (white default = visually unchanged). Unknown keys
- *  fall back to the games glyph. Size via [modifier].
- *
- *  Crossbar glyphs are themeable icon slots: two-tier lookup — the user's pick wins, then the
- *  applied theme's custom icon for the slot, drawn as-authored through [CustomIconSurface]
- *  (which carries the legibility matte on the still frame). Console-art categories (no slot)
- *  route through [ConsoleIcon], which runs the same two-tier check on their sysicon key. */
 @Composable
 fun CategoryIconGlyph(
     iconKey: String,
@@ -27,8 +18,6 @@ fun CategoryIconGlyph(
 ) {
     val slotKey = catbarSlotKeyFor(iconKey)
     if (slotKey == null) {
-        // Console art (not a themeable slot): same two-tier check on its sysicon key.
-        // Unknown keys keep today's fallback — the games glyph, via the fall-through below.
         val platformId = consolePlatformIdFor(iconKey)
         if (platformId != null) {
             ConsoleIcon(
@@ -51,15 +40,6 @@ fun CategoryIconGlyph(
     )
 }
 
-/**
- * The theme-override half of the matte treatment: a decoded `.pfptheme` bitmap with the
- * configured matte behind it. The bitmap draws untinted (as-authored — the matte never
- * recolors custom art; it only borrows the bitmap's alpha for its shape), so the glyph color
- * handed to [IconMatteSurface] is null.
- *
- * Public because the item column's inline override branches (memory-card art, the settings
- * wrench) live in feature-xmb and need the same treatment as [CategoryIconGlyph].
- */
 @Composable
 fun OverrideGlyphSurface(
     bitmap: ImageBitmap,
@@ -69,7 +49,6 @@ fun OverrideGlyphSurface(
     val style = LocalIconLegibility.current
     val matte = matteColorFor(style, DEFAULT_OVERRIDE_GLYPH_COLOR)
     if (matte == null) {
-        // NONE — today's rendering, unchanged.
         androidx.compose.foundation.Image(
             bitmap = bitmap,
             contentDescription = contentDescription,
@@ -91,9 +70,4 @@ fun OverrideGlyphSurface(
     )
 }
 
-// Luminance input for the override branch's matteColorFor call: theme bitmaps are full-color
-// art whose own colors vary, so there is no single "glyph color" — CONTOUR_AUTO therefore
-// resolves through this neutral mid-gray, which returns the dark matte. Auto is documented
-// as a silhouette-art option; for full-color art the explicit Dark/Light styles are the
-// honest picks. (No tone-mapping of the bitmap: that would recolor it.)
 private val DEFAULT_OVERRIDE_GLYPH_COLOR = Color(0xFF9E9E9E)

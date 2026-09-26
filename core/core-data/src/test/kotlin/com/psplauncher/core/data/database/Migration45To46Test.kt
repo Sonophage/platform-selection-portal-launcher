@@ -9,21 +9,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-/**
- * v46 — the achievement tables are dropped.
- *
- * This is the only irreversible step in removing achievements: every other part of it was code,
- * which git can restore. So the claim that matters is not that the six tables are gone, it is that
- * **nothing else went with them**. A `DROP TABLE` naming the wrong table, or a cascade reaching
- * further than intended, would take a user's library and report success.
- *
- * The test therefore seeds a v45 database with games, platforms and achievement rows, and asserts
- * the library survived intact while only the achievement tables disappeared.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration45To46Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
@@ -41,7 +29,7 @@ class Migration45To46Test {
                     "content_type, is_missing) " +
                     "VALUES (1, 'Chrono Trigger', 'snes', 1, 1, 7, 4200, 0, 100, 'GAME', 0)"
             )
-            // Rows in two of the doomed tables, so the drop has something real to remove.
+
             db.execSQL(
                 "INSERT INTO provider_game_links (game_id, provider, provider_game_id, source, resolved_at) " +
                     "VALUES (1, 'RETRO_ACHIEVEMENTS', '319', 'AUTO', 100)"
@@ -52,7 +40,7 @@ class Migration45To46Test {
         }
 
         helper.runMigrationsAndValidate(46, MIGRATIONS).use { db ->
-            // The library is untouched: the row, and the values on it.
+
             assertEquals(1, db.count("SELECT COUNT(*) FROM games"))
             db.singleRow(
                 "SELECT title, platform_id, is_favorite, total_play_time_millis FROM games WHERE id = 1"
@@ -64,7 +52,6 @@ class Migration45To46Test {
             }
             assertEquals(1, db.count("SELECT COUNT(*) FROM platforms"))
 
-            // And every achievement table is gone by name.
             val tables = db.rows("SELECT name FROM sqlite_master WHERE type = 'table'") { it.getText(0) }
             for (gone in DROPPED) {
                 assertFalse(gone in tables, "$gone should have been dropped")

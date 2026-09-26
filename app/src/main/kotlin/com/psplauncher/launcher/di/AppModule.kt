@@ -19,8 +19,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-
-    // System services used across features
     @Provides
     @Singleton
     fun provideLauncherApps(@ApplicationContext context: Context): LauncherApps =
@@ -37,9 +35,6 @@ object AppModule {
     fun provideRescanApplicationScope(): CoroutineScope =
         CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // CustomIconStore (core-data) must evict Coil's path-keyed cache when a replaced GIF lands
-    // at a stable path — but core-data can't see feature-artwork's ArtworkImageCache. The app
-    // module is the one place that sees both, so the seam is bound here.
     @Provides
     @Singleton
     fun provideCustomIconCacheEvictor(imageCache: ArtworkImageCache): CustomIconCacheEvictor =

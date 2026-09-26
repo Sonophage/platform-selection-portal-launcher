@@ -5,27 +5,6 @@ import kotlinx.serialization.Serializable
 
 const val THEME_FORMAT_VERSION = 1
 
-/**
- * Parsed representation of theme.json inside a .xmbtheme ZIP package.
- *
- * Colors are stored as hex strings (#RRGGBB or #AARRGGBB) in the JSON so that
- * theme authors can write human-readable values. Call [parseHexColor] to convert
- * to the packed Long format used by [com.psplauncher.core.data.database.entity.ThemeEntity].
- *
- * **ZIP layout expected by [XmbThemeLoader]:**
- * ```
- * theme.json           ← this manifest (required)
- * background.jpg       ← optional; extracted only when hasBackground = true
- * boot_animation.mp4   ← optional; extracted only when hasBootAnimation = true
- * sounds/
- *   navigate_h.ogg     ← horizontal navigation
- *   navigate_v.ogg     ← vertical navigation
- *   select.ogg
- *   back.ogg
- *   category_change.ogg
- *   boot.ogg
- * ```
- */
 @Serializable
 data class XmbThemeManifest(
     @SerialName("format_version")    val formatVersion:    Int     = THEME_FORMAT_VERSION,
@@ -45,17 +24,6 @@ data class XmbThemeManifest(
     @SerialName("font_key")          val fontKey:          String  = "system_default",
 )
 
-/**
- * Converts a CSS-style hex color string to a packed ARGB Long.
- *
- * Accepts:
- * - `#RRGGBB`  → `0xFF______L` (opaque)
- * - `#AARRGGBB` → `0xAA______L`
- * - Variants without the `#` prefix
- * - Lowercase and uppercase hex digits
- *
- * Returns `null` for any other input (wrong length, non-hex characters, etc.).
- */
 fun parseHexColor(hex: String): Long? {
     val clean = hex.trimStart('#')
     return when (clean.length) {

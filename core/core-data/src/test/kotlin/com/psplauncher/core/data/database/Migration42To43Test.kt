@@ -8,27 +8,19 @@ import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * v43 — Windows storefront identity, backfilled in place from `launch_intent_uri`.
- *
- * The backfill is the whole point of the migration: existing libraries must gain the identity
- * without a re-scan, and rows whose intent names no trustworthy store must be left null rather
- * than guessed at.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration42To43Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
     @Test
     fun `the intent-uri backfill produces the right store and id pairs`() {
         helper.createDatabase(41).use { db ->
-            // GameNative — store named explicitly in game_source.
+
             insertPcGame(db, "Portal 2", GAME_NATIVE_STEAM)
             insertPcGame(db, "Cyberpunk 2077", GAME_NATIVE_GOG)
-            // GameHub family — steamAppId is explicitly a Steam appid.
+
             insertPcGame(db, "Hades", GAME_HUB_STEAM)
         }
 
@@ -53,11 +45,11 @@ class Migration42To43Test {
     @Test
     fun `an intent with no trustworthy store identity is left null`() {
         helper.createDatabase(41).use { db ->
-            // Winlator: a shortcut path into a Wine prefix — no store, no app id.
+
             insertPcGame(db, "Some EXE", WINLATOR_DESKTOP)
-            // GameHub's localGameId is the launcher's internal id, never a storefront id.
+
             insertPcGame(db, "Local Game", GAME_HUB_LOCAL)
-            // A ROM game has no launch intent at all.
+
             db.execSQL(
                 "INSERT INTO games (title, platform_id, rom_path, is_favorite, favorite_sort_order, " +
                     "total_play_time_millis, content_type, is_missing, is_disc_primary, " +
@@ -80,8 +72,7 @@ class Migration42To43Test {
     @Test
     fun `the same app id on two different stores is not a collision`() {
         helper.createDatabase(41).use { db ->
-            // A real backfill candidate rides alongside the directly-inserted pair below, so the
-            // index assertion covers both the backfill and the pair it protects.
+
             insertPcGame(db, "Portal 2", GAME_NATIVE_STEAM)
         }
 
@@ -100,9 +91,6 @@ class Migration42To43Test {
                 assertEquals("620", it.getText(1))
             }
 
-            // The index is on the PAIR, not on the id alone — a one-column index (either column,
-            // or the columns in the wrong order) would let this assertion pass under the old
-            // name-only check but fail here.
             val indexColumns = db.rows(
                 "PRAGMA index_info('index_games_storefront_storefront_game_id')"
             ) { it.getText(2) }
@@ -139,7 +127,6 @@ class Migration42To43Test {
     private companion object {
         const val DB = "migration-43-test"
 
-        // Intent.toUri(URI_INTENT_SCHEME) output, as PcLauncherAdapter builds it.
         const val GAME_NATIVE_STEAM =
             "intent:#Intent;component=app.gamenative/app.gamenative.MainActivity;" +
                 "action=app.gamenative.LAUNCH_GAME;launchFlags=0x10000000;" +

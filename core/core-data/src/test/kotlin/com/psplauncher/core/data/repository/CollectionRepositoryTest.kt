@@ -13,14 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Repository-level behaviour for user collections. Membership is keyed by gameId, so a game's
- * platform is irrelevant here — adding "an NES game" and "a PSP game" is just two gameIds.
- * SQL-level concerns (content_type filtering for All Games, cascade deletes) live in the DAO/SQL
- * and are exercised by the queries themselves.
- */
 class CollectionRepositoryTest {
-
     private fun repo(dao: CollectionDao = FakeCollectionDao()) = CollectionRepository(dao)
 
     @Test
@@ -58,8 +51,8 @@ class CollectionRepositoryTest {
     fun `add games from different platforms to the same collection`() = runTest {
         val repo = repo()
         val id = repo.create("Best Games")
-        repo.addGame(id, gameId = 1)   // e.g. an NES game
-        repo.addGame(id, gameId = 2)   // e.g. a PSP game
+        repo.addGame(id, gameId = 1)
+        repo.addGame(id, gameId = 2)
 
         assertEquals(2, repo.getAll().first { it.id == id }.gameCount)
         assertTrue(repo.getCollectionIdsForGame(1).contains(id))
@@ -95,9 +88,9 @@ class CollectionRepositoryTest {
         val repo = repo()
         val id = repo.create("Currently Playing")
 
-        assertTrue(repo.toggleGame(id, gameId = 9))   // now a member
+        assertTrue(repo.toggleGame(id, gameId = 9))
         assertTrue(repo.getCollectionIdsForGame(9).contains(id))
-        assertFalse(repo.toggleGame(id, gameId = 9))  // toggled back off
+        assertFalse(repo.toggleGame(id, gameId = 9))
         assertTrue(repo.getCollectionIdsForGame(9).isEmpty())
     }
 
@@ -123,7 +116,6 @@ class CollectionRepositoryTest {
     }
 }
 
-// In-memory fake — faithfully models membership semantics without Room.
 private class FakeCollectionDao : CollectionDao {
     private var nextId = 1L
     private val collections = linkedMapOf<Long, CollectionEntity>()

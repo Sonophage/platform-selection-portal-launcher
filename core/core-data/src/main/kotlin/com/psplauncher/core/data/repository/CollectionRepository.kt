@@ -12,11 +12,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Single source of truth for user-created collections. Collections behave like Favorites but
- * are user-defined and many-to-many; membership lives in [CollectionGameEntity] so game records
- * are never duplicated. Everything here is driven by explicit user action.
- */
 @Singleton
 class CollectionRepository @Inject constructor(
     private val collectionDao: CollectionDao,
@@ -38,7 +33,6 @@ class CollectionRepository @Inject constructor(
     suspend fun getCollectionIdsForGame(gameId: Long): List<Long> =
         collectionDao.getCollectionIdsForGame(gameId)
 
-    /** Creates a collection appended to the end of the list. Returns the new id. */
     suspend fun create(name: String, categoryId: String = "games"): Long {
         val now = System.currentTimeMillis()
         val id = collectionDao.insert(
@@ -57,28 +51,23 @@ class CollectionRepository @Inject constructor(
     suspend fun rename(id: Long, name: String) =
         collectionDao.rename(id, name.trim().ifBlank { "Untitled Collection" }, System.currentTimeMillis())
 
-    /** Reassigns a collection to a different gaming category. categoryId is the single source
-     *  of truth for where a collection appears (collections belong to exactly one category). */
     suspend fun setCategory(id: Long, categoryId: String) {
         collectionDao.setCategory(id, categoryId, System.currentTimeMillis())
         Timber.i("Collection $id moved to category $categoryId")
     }
 
-    /** Pins/unpins a collection to the top of its category. */
     suspend fun setPinned(id: Long, pinned: Boolean) {
         collectionDao.setPinned(id, pinned, System.currentTimeMillis())
         Timber.i("Collection $id pinned=$pinned")
     }
 
-    /** Sets the collection's icon key (from the category icon catalog). Null clears it back to the
-     *  default memory-card art. */
     suspend fun setIcon(id: Long, iconKey: String?) {
         collectionDao.setIcon(id, iconKey, System.currentTimeMillis())
         Timber.i("Collection $id icon=$iconKey")
     }
 
     suspend fun delete(id: Long) {
-        collectionDao.delete(id) // cascades membership rows; game records are untouched
+        collectionDao.delete(id)
         Timber.i("Collection deleted: id=$id")
     }
 
@@ -92,7 +81,6 @@ class CollectionRepository @Inject constructor(
         collectionDao.touch(collectionId, System.currentTimeMillis())
     }
 
-    /** Adds the game if absent, removes it if present. Returns true if it is now a member. */
     suspend fun toggleGame(collectionId: Long, gameId: Long): Boolean {
         return if (collectionDao.isGameInCollection(collectionId, gameId) > 0) {
             removeGame(collectionId, gameId)
@@ -103,7 +91,6 @@ class CollectionRepository @Inject constructor(
         }
     }
 
-    /** Swaps sort_order with the adjacent collection. Returns true when a move happened. */
     suspend fun move(id: Long, up: Boolean): Boolean {
         val ordered = collectionDao.getAll()
         val index = ordered.indexOfFirst { it.id == id }

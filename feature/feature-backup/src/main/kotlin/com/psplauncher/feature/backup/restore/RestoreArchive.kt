@@ -12,41 +12,11 @@ import timber.log.Timber
 import java.io.File
 import java.io.InputStream
 
-/**
- * The trust seam for `.pfpbackup` restore.
- *
- * A backup file is untrusted input that reaches further than anything else the app opens: it
- * writes into `filesDir` and it supplies emulator profiles, which choose the `ComponentName` an
- * intent is aimed at and whose package later receives `grantUriPermission(...)` for a ROM.
- *
- * The confinement policy used to exist as a comment and a delete loop rather than as an enforced
- * interface: `BUNDLED_FILE_ROOTS` was used only to clear directories, and the copy that followed
- * resolved `File(filesDir, rel)` with `rel` never checked against those roots. Anything under
- * `filesDir` was therefore writable — including the DataStore preference file, which corrupts the
- * live preference store into a crash loop.
- *
- * Here the invariants live in one module and callers cannot opt out of them: an entry that is not
- * under a declared root never reaches staging, so [RestoredBundle.commitFiles] has nothing unsafe
- * left to copy. Bounds come from [BoundedZipReader], but NOT with its defaults: those are sized
- * for a `.pfptheme` from a stranger, and a real library's backup is thousands of files and
- * gigabytes. Callers pass [com.psplauncher.feature.backup.BACKUP_ZIP_LIMITS]; the default
- * parameter here stays theme-sized so a caller that forgets is refused loudly rather than
- * unbounded.
- */
 object RestoreArchive {
-
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    /** The one profile file a backup may carry, relative to `filesDir`. */
     private const val PROFILES_PATH = "emulator_profiles/custom_profiles.json"
 
-    /**
-     * Reads and validates [source]. Bundled files land in [staging]; JSON tables come back in
-     * memory. Throws [com.psplauncher.core.archive.ZipLimitExceededException] if the archive
-     * exceeds [limits] — a bomb is refused rather than partially applied.
-     *
-     * @param bundledRoots the `filesDir` sub-trees a backup is allowed to own.
-     */
     fun read(
         source: InputStream,
         staging: File,
@@ -70,9 +40,7 @@ object RestoreArchive {
             }
 
             val relative = entry.name.removePrefix(BACKUP_FILES_PREFIX)
-            // One call answers both "does it escape?" and "is it under a root we own?". Returning
-            // a File? rather than a boolean is what stops the check being made and then ignored,
-            // which is precisely what happened before.
+
             val dest = SafeArchivePath.resolveWithinRoots(staging, relative, bundledRoots)
             if (dest == null) {
                 refusals += "Refused '$relative': not inside a restorable folder"
@@ -84,17 +52,11 @@ object RestoreArchive {
             staged++
         }
 
-        // Profiles are validated before anything is committed, so an inadmissible one never
-        // reaches disk — not even briefly.
         staged -= sanitizeProfiles(staging, refusals, selfPackage)
 
         return RestoredBundle(jsonEntries, staging, bundledRoots, refusals, staged)
     }
 
-    /**
-     * Filters the staged profile file through [EmulatorProfileAdmission], rewriting it in place.
-     * Returns how many staged files were removed entirely (0 or 1).
-     */
     private fun sanitizeProfiles(
         staging: File,
         refusals: MutableList<String>,
@@ -106,9 +68,7 @@ object RestoreArchive {
         val parsed = runCatching {
             json.decodeFromString(ListSerializer(EmulatorProfile.serializer()), file.readText())
         }.getOrElse { e ->
-            // An unreadable profile file is dropped rather than committed verbatim: the repository
-            // that reads it later would swallow the parse failure and the user would see profiles
-            // silently missing with no explanation of why.
+
             refusals += "Refused emulator profiles: file could not be parsed"
             Timber.w(e, "Restore refused unparseable emulator profiles")
             file.delete()
@@ -133,29 +93,17 @@ object RestoreArchive {
     }
 }
 
-/**
- * A backup that has already been checked. Every value here is admissible by construction, so a
- * caller cannot reintroduce the class of bug this seam exists to prevent.
- */
 class RestoredBundle internal constructor(
-    /** Non-file entries, keyed by archive entry name. */
+
     val jsonEntries: Map<String, String>,
-    /** Where validated files are staged until [commitFiles]. */
+
     val stagingDir: File,
     private val bundledRoots: List<String>,
-    /** Human-readable notes about what was turned away, for the restore summary. */
+
     val refusals: List<String>,
-    /** How many files survived validation. */
+
     val stagedCount: Int,
 ) {
-
-    /**
-     * Moves the staged files into [filesDir], replacing the managed roots wholesale.
-     *
-     * The roots are cleared first so a restore is a replace rather than a merge — but only when
-     * the backup actually carried files, so restoring a settings-only backup does not wipe the
-     * user's artwork.
-     */
     fun commitFiles(filesDir: File) {
         val staged = stagingDir.takeIf { it.exists() }
             ?.walkTopDown()?.filter { it.isFile }?.toList().orEmpty()
@@ -166,8 +114,7 @@ class RestoredBundle internal constructor(
         bundledRoots.forEach { root -> File(filesDir, root).deleteRecursively() }
         staged.forEach { src ->
             val relative = src.relativeTo(stagingDir).invariantSeparatorsPath
-            // Belt and braces: staging already contains only root members, so this cannot fail —
-            // but the copy is the dangerous step, and it now refuses rather than trusting its input.
+
             val dest = com.psplauncher.core.archive.SafeArchivePath
                 .resolveWithinRoots(filesDir, relative, bundledRoots)
             if (dest == null) {
@@ -180,7 +127,6 @@ class RestoredBundle internal constructor(
         discard()
     }
 
-    /** Deletes the staging directory without committing anything. */
     fun discard() {
         stagingDir.deleteRecursively()
     }

@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LogRedactionTest {
-
     @Test
     fun `screenscraper credentials and account name never survive`() {
         val line = "GET https://api.screenscraper.fr/api2/jeuInfos.php?devid=PFP&devpassword=hunter2" +
@@ -15,12 +14,11 @@ class LogRedactionTest {
         assertFalse(out.contains("hunter2"))
         assertFalse(out.contains("s3cret"))
         assertFalse(out.contains("johnny"))
-        // Non-sensitive params survive for debuggability.
+
         assertTrue(out.contains("crc=AABBCCDD"))
         assertTrue(out.contains("romnom=Game.gba"))
     }
 
-    /** The shape that leaked on device: Ktor puts the full request URL in a timeout's message. */
     @Test
     fun `a request URL inside an exception message loses its credentials`() {
         val line = "io.ktor.client.network.sockets.ConnectTimeoutException: Connect timeout has expired " +

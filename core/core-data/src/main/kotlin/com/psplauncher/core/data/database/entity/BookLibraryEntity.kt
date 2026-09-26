@@ -6,9 +6,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.BookLibrary
 
-// One row per user-added SAF book library. id is a generated UUID; tree_uri is the persisted
-// ACTION_OPEN_DOCUMENT_TREE uri. book_count / last_scanned_at mirror the photo-library pattern so
-// the library list stays reactive with counts without an extra join.
 @Serializable
 @Entity(tableName = "book_libraries")
 data class BookLibraryEntity(

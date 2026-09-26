@@ -1,16 +1,5 @@
 package com.psplauncher.themekit
 
-/**
- * Platform ids that have dedicated console art, kept in lockstep with the R8-safe static
- * `when` in core-ui's `systemIconRes()` — core-ui's SystemIconsTest is the guard that the
- * list and the `when` never drift apart.
- *
- * Pure JVM here so [CustomizableIcons] (and therefore the v3 codec's `sysicons/` gating)
- * stays buildable by the desktop Theme Studio. The list deliberately EXCLUDES
- * `sysicon_default` (the built-in fallback art) and the UI-identifying entries
- * `favorites`/`settings`/`desktop`: those name content buckets, not platforms a user would
- * recognise as "replace the SNES icon".
- */
 val SYSICON_PLATFORM_IDS: List<String> = listOf(
     "allgames",
     "android",
@@ -54,10 +43,6 @@ val SYSICON_PLATFORM_IDS: List<String> = listOf(
     "x360",
 )
 
-/**
- * Human label for a console slot in the customizer. Raw platform ids are asset keys
- * (`n3ds`, `segacd`) — editors must never show them verbatim.
- */
 fun consoleDisplayName(platformId: String): String = when (platformId) {
     "allgames" -> "All Games"
     "atari2600" -> "Atari 2600"
@@ -95,20 +80,7 @@ fun consoleDisplayName(platformId: String): String = when (platformId) {
     else -> platformId.uppercase()
 }
 
-/**
- * The superset registry the icon customizer edits and the v3 codec gates on: every theme
- * slot plus the console icons, under forever-stable `sysicon_<platformId>` keys.
- *
- * `IconSlots.ALL` is the bundle contract (keys are zip entry names) and its KDoc states
- * console art is deliberately not a slot — so this registry EXTENDS it without touching it:
- * [ALL] keeps `IconSlots.ALL` as a verbatim prefix, and the codec still gates `icons/`
- * entries on `IconSlots.isValidKey` while `sysicons/` entries gate on [isValidKey]'s
- * console arm. Slot keys are used verbatim as file names, which makes [isValidKey]
- * load-bearing: it is what stops a crafted key escaping its directory.
- */
 object CustomizableIcons {
-
-    /** Template size for console art, matching the catbar/item templates. */
     private const val CONSOLE_TEMPLATE_PX = 256
 
     val ALL: List<IconSlot> = IconSlots.ALL + SYSICON_PLATFORM_IDS.map { id ->

@@ -6,16 +6,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Pure fingerprint/brand logic, pinned to the live-device evidence of 2026-07-16:
- * xiaoji 6.0.9 carries `com.xiaoji.egggame.DeepLinkActivity`; the Ludashi 5.1.7 variant carries
- * the `com.xj.*` classes instead; the genuine spoofed-name apps carry neither.
- */
 class PcLauncherCatalogTest {
-
     private fun classesOf(vararg present: String): (String) -> Boolean = { it in present.toSet() }
-
-    // ── resolveGeneration ─────────────────────────────────────────────────────
 
     @Test
     fun `v6 lineage component wins`() {
@@ -51,8 +43,6 @@ class PcLauncherCatalogTest {
 
     @Test
     fun `component beats version when both lineages would disagree`() {
-        // A v5-major install carrying the v6 dispatcher resolves by its components, not its label
-        // or version string.
         assertEquals(
             GameHubGeneration.V6,
             PcLauncherCatalog.resolveGeneration(
@@ -77,14 +67,11 @@ class PcLauncherCatalogTest {
 
     @Test
     fun `spoofed-name genuine app resolves to null`() {
-        // The real AnTuTu: no lineage components, no launcher-naming label.
         assertNull(
             PcLauncherCatalog.resolveGeneration(versionNameMajor = 10, label = "AnTuTu Benchmark") { false },
         )
         assertNull(PcLauncherCatalog.resolveGeneration(versionNameMajor = null, label = null) { false })
     }
-
-    // ── brandMatches ──────────────────────────────────────────────────────────
 
     @Test
     fun `banner labels claim the BannerHub def`() {
@@ -94,15 +81,12 @@ class PcLauncherCatalogTest {
 
     @Test
     fun `any other verified variant claims GameHub Lite, arbitrary labels included`() {
-        // Live case: the Ludashi variant's label names neither brand — it must still verify.
         assertTrue(PcLauncherCatalog.brandMatches(PcLauncherType.GAMEHUB_LITE, "AI Bench"))
         assertTrue(PcLauncherCatalog.brandMatches(PcLauncherType.GAMEHUB_LITE, "GameHub"))
         assertTrue(PcLauncherCatalog.brandMatches(PcLauncherType.GAMEHUB_LITE, null))
         assertFalse(PcLauncherCatalog.brandMatches(PcLauncherType.BANNERHUB_V6, "AI Bench"))
         assertFalse(PcLauncherCatalog.brandMatches(PcLauncherType.BANNERHUB_V6, null))
     }
-
-    // ── catalog lookups ───────────────────────────────────────────────────────
 
     @Test
     fun `family pool membership is unchanged by the fingerprint rework`() {

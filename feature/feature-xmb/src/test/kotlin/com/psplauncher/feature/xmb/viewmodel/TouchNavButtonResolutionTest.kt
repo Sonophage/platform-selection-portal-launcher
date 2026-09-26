@@ -6,9 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Covers how the on-screen touch button visibility resolves from mode + last input source. */
 class TouchNavButtonResolutionTest {
-
     @Test fun `auto follows the last input source`() {
         val base = XMBUiState(touchNavButtonMode = TouchNavButtonMode.AUTO)
         assertFalse("controller → hidden", base.copy(lastInputWasTouch = false).resolvedShowTouchButton)

@@ -20,14 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
-/**
- * Drives the REAL ViewModel through the motion flow: import video → confirm crop → export →
- * the motion entry round-trips byte-for-byte — and the scratch-file lifecycle leaves nothing
- * behind. Regression tests for the two ways a motion theme can silently lose its video:
- * a state transition that drops the scratch file, and an export that names the entry wrong.
- */
 class ViewModelMotionRoundTripTest {
-
     private suspend fun StudioViewModel.awaitIdle() {
         withTimeout(30_000) {
             delay(50)
@@ -43,12 +36,10 @@ class ViewModelMotionRoundTripTest {
             val video = File(dir, "clip.mp4")
             MotionTestMedia.writeTestMp4(video)
 
-            // Import: the gate accepts, and frame 1 is staged as the pending wallpaper.
             vm.importVideo(video)
             vm.awaitIdle()
             assertTrue(vm.state.value.pendingWallpaper != null, "video import must stage a poster for the crop dialog")
 
-            // Confirm the crop: BOTH the still and the motion land together.
             vm.confirmWallpaper(WallpaperPreset.ORIGINAL)
             vm.awaitIdle()
             val state = vm.state.value
@@ -56,7 +47,6 @@ class ViewModelMotionRoundTripTest {
             assertTrue(state.motionFile?.isFile == true, "motion must be set on confirm")
             assertEquals("clip.mp4", state.motionFileName)
 
-            // Export and inspect the zip through the codec.
             val bundleFile = File(dir, "out.pfptheme")
             vm.exportTo(bundleFile) { null }
             vm.awaitIdle()
@@ -72,7 +62,6 @@ class ViewModelMotionRoundTripTest {
                 "exported motion entry must be byte-identical to the source video",
             )
 
-            // Open the bundle back, then re-export: the entry must survive both hops.
             vm.newTheme()
             vm.openFile(bundleFile)
             vm.awaitIdle()
@@ -97,9 +86,6 @@ class ViewModelMotionRoundTripTest {
 
     @Test
     fun `a video picked at the wallpaper picker enters the motion flow`() = runBlocking {
-        // The launcher's Display settings invite "an image or a short video"; the Studio's
-        // wallpaper pick must behave the same. Regression for picking an MP4 at the wallpaper
-        // row and dead-ending in "not a readable image".
         val vm = StudioViewModel(CoroutineScope(Dispatchers.Default))
         val dir = createTempDirectory("studio-motion-route").toFile()
         try {
@@ -126,8 +112,6 @@ class ViewModelMotionRoundTripTest {
         val vm = StudioViewModel(CoroutineScope(Dispatchers.Default))
         val dir = createTempDirectory("studio-motion-route-reject").toFile()
         try {
-            // Real MP4 bytes under a .webm name: exercises the routing and the gate's own
-            // rejection, not ImageIO's "not a readable image" dead end.
             val webm = File(dir, "clip.webm")
             MotionTestMedia.writeTestMp4(webm)
 
@@ -209,14 +193,13 @@ class ViewModelMotionRoundTripTest {
             val clip2 = File(dir, "two.mp4")
             MotionTestMedia.writeTestMp4(clip2)
 
-            // Import twice (the second while the first's crop dialog is still open)...
             vm.importVideo(clip1)
             vm.awaitIdle()
             vm.importVideo(clip2)
             vm.awaitIdle()
             vm.confirmWallpaper(WallpaperPreset.ORIGINAL)
             vm.awaitIdle()
-            // ...clear motion, clear wallpaper, then New.
+
             vm.clearMotion()
             vm.awaitIdle()
             vm.clearWallpaper()
@@ -230,11 +213,6 @@ class ViewModelMotionRoundTripTest {
 
     @Test
     fun `a 40 MB motion entry opens and survives re-export byte-for-byte`() = runBlocking {
-        // The size regression this pins: opening used to go through a 64 MB in-memory byte cap
-        // while a legitimate motion bundle (60 MB video alone) can exceed that, so the file was
-        // rejected as "too large to be a theme bundle". Reading via PfpThemeCodec.read(File)
-        // streams instead — proven here at a size no in-memory path would survive gracefully.
-        // ofBytes is the sanctioned synthetic-bundle constructor; the real VM never holds bytes.
         val vm = StudioViewModel(CoroutineScope(Dispatchers.Default))
         val dir = createTempDirectory("studio-motion-big").toFile()
         try {
@@ -257,8 +235,6 @@ class ViewModelMotionRoundTripTest {
             assertNull(vm.state.value.dialog, "a 40 MB motion bundle must open: ${vm.state.value.dialog}")
             assertTrue(vm.state.value.motionFile?.isFile == true, "motion must be spilled to a scratch file")
 
-            // The poster rule: motion without a still must not re-export. Give it the still,
-            // then verify the entry survives the open → export round trip.
             vm.update { it.copy(wallpaperPng = ByteArray(16)) }
             val reExport = File(dir, "big-re.pfptheme")
             vm.exportTo(reExport) { null }
@@ -287,8 +263,6 @@ class ViewModelMotionRoundTripTest {
             vm.awaitIdle()
             assertTrue(vm.state.value.motionFile != null)
 
-            // Motion's poster IS the still — a bundle with motion and no wallpaper is invalid,
-            // so clearing the still clears the video.
             vm.clearWallpaper()
             assertNull(vm.state.value.motionFile)
             assertNull(vm.state.value.motionFileName)

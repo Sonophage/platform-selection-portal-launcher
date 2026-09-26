@@ -4,11 +4,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
-/**
- * The single source of the `medias[]` → per-kind URL selection rules, shared by three
- * consumers so they can never drift: the live `jeuInfos` parse, the ss_media_cache read path
- * (scrapes that skip the metadata call), and the Artwork Studio's browse grid.
- */
 @Serializable
 data class SsCachedMedia(
     val type: String,
@@ -17,7 +12,6 @@ data class SsCachedMedia(
     val format: String? = null,
 )
 
-/** Per-kind winners resolved from a medias list — mirrors SsGameInfo's URL fields. */
 data class SsMediaUrls(
     val artworkUrl: String?,
     val boxArtUrl: String?,
@@ -32,17 +26,14 @@ data class SsMediaUrls(
 )
 
 object SsMediaSelection {
-
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val listSerializer = ListSerializer(SsCachedMedia.serializer())
 
-    /** Best URL of [type]: prefer region=us, fall back to wor/none/any. */
     fun bestUrl(medias: List<SsCachedMedia>, type: String): String? = medias
         .filter { it.type == type && it.url != null }
         .sortedWith(compareBy { when (it.region) { "us" -> 0; "wor" -> 1; null -> 2; else -> 3 } })
         .firstOrNull()?.url
 
-    /** Resolves every kind's winner with the canonical type/fallback preferences. */
     fun urls(medias: List<SsCachedMedia>): SsMediaUrls {
         val box2d = bestUrl(medias, "box-2D")
         val box3d = bestUrl(medias, "box-3D")
@@ -60,11 +51,6 @@ object SsMediaSelection {
         )
     }
 
-    /**
-     * An [SsGameInfo] carrying only URLs (all text fields null), built from a cached medias
-     * list — the cache-hit scrape path. COALESCE persistence means the null text fields never
-     * clobber what a real jeuInfos already stored.
-     */
     fun infoFromCache(ssId: Long, medias: List<SsCachedMedia>): SsGameInfo {
         val u = urls(medias)
         return SsGameInfo(

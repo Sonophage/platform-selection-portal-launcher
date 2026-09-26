@@ -33,7 +33,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EmulatorAssignmentViewModelTest {
-
     private val dispatcher = StandardTestDispatcher()
 
     private val memoryCardRepository = mockk<MemoryCardRepository>(relaxed = true)
@@ -81,8 +80,7 @@ class EmulatorAssignmentViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        // Empty defaults for every observed flow: a test overrides only what it needs, and the
-        // ViewModel's combine() only starts emitting once ALL four have produced a value.
+
         every { memoryCardRepository.observeAll() } returns flowOf(emptyList())
         every { platformDao.observeAll() } returns flowOf(emptyList())
         every { gameRepository.observeAllGames() } returns flowOf(emptyList())
@@ -93,8 +91,6 @@ class EmulatorAssignmentViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    // The ViewModel subscribes to its flows at construction, so it must be built AFTER the test's
-    // stubs are in place (a stub changed later is invisible to the already-started collector).
     private fun createVm() {
         vm = EmulatorAssignmentViewModel(
             memoryCardRepository,
@@ -110,8 +106,6 @@ class EmulatorAssignmentViewModelTest {
 
     private val psxPlatform = PlatformEntity(id = "psx", name = "PlayStation", shortName = "PS1", iconRes = null, accentColor = 0)
     private val snesPlatform = PlatformEntity(id = "snes", name = "Super Nintendo", shortName = "SNES", iconRes = null, accentColor = 0)
-
-    // ── Row derivation ──────────────────────────────────────────────────────
 
     @Test
     fun `rows aggregate game count and per-game override count per platform`() = runTest(dispatcher) {
@@ -199,7 +193,7 @@ class EmulatorAssignmentViewModelTest {
         val psx = row("psx")
         assertEquals("mgba", psx!!.resolvedProfile?.id)
         assertEquals(LaunchSource.CATALOG_DEFAULT, psx.source)
-        // The remembered core leads the candidate list and is what the console resolves to.
+
         assertEquals("mgba", psx.candidates.first().profile.id)
         assertTrue(psx.candidates.first { it.profile.id == "mgba" }.isDefault)
     }
@@ -215,7 +209,7 @@ class EmulatorAssignmentViewModelTest {
         assertEquals("duckstation", psx!!.resolvedProfile?.id)
         assertEquals(LaunchSource.CATALOG_DEFAULT, psx.source)
         assertTrue(psx.isAutomatic)
-        // The standalone is the catalog recommendation even though RetroArch was listed first.
+
         assertEquals("duckstation", psx.candidates.first { it.isRecommended }.profile.id)
         assertTrue(psx.candidates.first { it.profile.id == "duckstation" }.isDefault)
     }
@@ -248,8 +242,6 @@ class EmulatorAssignmentViewModelTest {
 
         assertTrue(vm.uiState.value.platforms.isEmpty())
     }
-
-    // ── Navigation + default writes ─────────────────────────────────────────
 
     @Test
     fun `openDetail and back are consumed internally and restore the list row`() = runTest(dispatcher) {
@@ -297,8 +289,6 @@ class EmulatorAssignmentViewModelTest {
         coVerify(exactly = 1) { memoryCardRepository.setEmulator("psx", null) }
     }
 
-    // ── Bulk clear ──────────────────────────────────────────────────────────
-
     @Test
     fun `confirming the bulk clear resets only that platform's overrides`() = runTest(dispatcher) {
         every { memoryCardRepository.observeAll() } returns flowOf(
@@ -326,7 +316,6 @@ class EmulatorAssignmentViewModelTest {
         vm.confirmClearOverrides()
         advanceUntilIdle()
 
-        // Scoped to ONE platform: snes overrides stay untouched.
         coVerify(exactly = 1) { gameRepository.clearPreferredEmulatorForPlatform("psx") }
         assertNull(vm.uiState.value.confirmClearPlatformId)
         assertTrue(vm.uiState.value.message!!.contains("cleared 1 per-game override"))

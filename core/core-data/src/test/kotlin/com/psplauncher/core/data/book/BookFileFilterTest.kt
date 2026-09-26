@@ -4,17 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * SAF providers report `application/octet-stream` for `.epub` more often than they report the real
- * type, so a MIME-only gate finds an empty library and reads to the user as a broken scan. The
- * extension fallback is the reason this object exists, not a nicety, which is why it has more
- * cases here than the happy path does.
- *
- * Mirrors the shape [com.psplauncher.core.data.photo.PhotoFileFilter] already uses for the same
- * problem with images.
- */
 class BookFileFilterTest {
-
     @Test
     fun `the real epub mime is accepted`() =
         assertTrue(BookFileFilter.isBook("Dune.epub", "application/epub+zip"))

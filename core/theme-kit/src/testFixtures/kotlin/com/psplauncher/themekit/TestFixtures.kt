@@ -3,10 +3,7 @@ package com.psplauncher.themekit
 import java.io.ByteArrayOutputStream
 import java.util.zip.Deflater
 
-/** Builders for synthetic theme files so format tests run hermetically on CI. */
 object TestFixtures {
-
-    /** Uncompressed 24-bit bottom-up BMP with pixels from [argbAt] (x, y are top-down). */
     fun buildBmp(width: Int, height: Int, argbAt: (x: Int, y: Int) -> Int): ByteArray {
         val rowStride = (width * 3 + 3) and 0x3.inv()
         val pixelBytes = rowStride * height
@@ -15,32 +12,26 @@ object TestFixtures {
 
         out[0] = 'B'.code.toByte(); out[1] = 'M'.code.toByte()
         out.putU32(2, fileSize)
-        out.putU32(10, 54)          // pixel data offset
-        out.putU32(14, 40)          // BITMAPINFOHEADER size
+        out.putU32(10, 54)
+        out.putU32(14, 40)
         out.putU32(18, width)
-        out.putU32(22, height)      // positive -> bottom-up
-        out.putU16(26, 1)           // planes
-        out.putU16(28, 24)          // bpp
+        out.putU32(22, height)
+        out.putU16(26, 1)
+        out.putU16(28, 24)
         out.putU32(34, pixelBytes)
 
         for (y in 0 until height) {
-            val dstRow = 54 + (height - 1 - y) * rowStride // bottom-up storage
+            val dstRow = 54 + (height - 1 - y) * rowStride
             for (x in 0 until width) {
                 val argb = argbAt(x, y)
-                out[dstRow + x * 3] = (argb and 0xFF).toByte()          // B
-                out[dstRow + x * 3 + 1] = (argb shr 8 and 0xFF).toByte()  // G
-                out[dstRow + x * 3 + 2] = (argb shr 16 and 0xFF).toByte() // R
+                out[dstRow + x * 3] = (argb and 0xFF).toByte()
+                out[dstRow + x * 3 + 1] = (argb shr 8 and 0xFF).toByte()
+                out[dstRow + x * 3 + 2] = (argb shr 16 and 0xFF).toByte()
             }
         }
         return out
     }
 
-    /**
-     * Minimal GIM container: root/picture chunks, an optional RGBA8888 palette, and one
-     * image block. [argbAt] supplies pixels; [indexed] stores them as index8 through a
-     * palette built from the distinct colors, otherwise as direct RGBA8888. [swizzle]
-     * stores pixel data in the PSP's 16-byte x 8-row block order.
-     */
     fun buildGim(
         width: Int,
         height: Int,
@@ -60,10 +51,10 @@ object TestFixtures {
                 data[y * pitch + x] = palette.indexOf(pixels[y * width + x]).toByte()
             } else {
                 val p = pixels[y * width + x]
-                data[y * pitch + x * 4] = (p shr 16).toByte()      // R
-                data[y * pitch + x * 4 + 1] = (p shr 8).toByte()   // G
-                data[y * pitch + x * 4 + 2] = p.toByte()           // B
-                data[y * pitch + x * 4 + 3] = (p shr 24).toByte()  // A
+                data[y * pitch + x * 4] = (p shr 16).toByte()
+                data[y * pitch + x * 4 + 1] = (p shr 8).toByte()
+                data[y * pitch + x * 4 + 2] = p.toByte()
+                data[y * pitch + x * 4 + 3] = (p shr 24).toByte()
             }
         }
         if (swizzle) data = swizzle(data, pitch)
@@ -73,13 +64,13 @@ object TestFixtures {
             chunk.putU16(0, id)
             chunk.putU32(4, chunk.size)
             chunk.putU32(8, chunk.size)
-            chunk.putU16(16, 48)              // data-header size
+            chunk.putU16(16, 48)
             chunk.putU16(20, format)
             chunk.putU16(22, if (id == 0x04 && swizzle) 1 else 0)
             chunk.putU16(24, w)
             chunk.putU16(26, h)
             chunk.putU16(28, blockBpp)
-            chunk.putU16(44, 64)              // pixel-data offset from chunk+16
+            chunk.putU16(44, 64)
             payload.copyInto(chunk, 16 + 64)
             return chunk
         }
@@ -97,14 +88,13 @@ object TestFixtures {
         val total = 16 + 16 + 16 + paletteChunk.size + imageChunk.size
         val out = ByteArray(total)
         "MIG.00.1PSP".toByteArray(Charsets.US_ASCII).copyInto(out)
-        out.putU16(16, 0x02); out.putU32(20, total - 16)          // root
-        out.putU16(32, 0x03); out.putU32(36, total - 32)          // picture
+        out.putU16(16, 0x02); out.putU32(20, total - 16)
+        out.putU16(32, 0x03); out.putU32(36, total - 32)
         paletteChunk.copyInto(out, 48)
         imageChunk.copyInto(out, 48 + paletteChunk.size)
         return out
     }
 
-    /** PSP texture swizzle (inverse of the decoder's unswizzle). */
     private fun swizzle(data: ByteArray, pitch: Int): ByteArray {
         val height = data.size / pitch
         val out = ByteArray(data.size)
@@ -115,12 +105,6 @@ object TestFixtures {
         return out
     }
 
-    /**
-     * Stored-mode LZR stream (negative type byte): 5-byte header + raw data + 1 pad byte.
-     * Sony's LZR range-coder has no public compressor, but the stored mode exercises the
-     * same entry point and header handling, keeping method-1 PTF tests hermetic; real
-     * compressed streams are covered by the golden-file tests.
-     */
     fun lzrStored(data: ByteArray): ByteArray {
         val out = ByteArray(5 + data.size + 1)
         out[0] = (-1).toByte()
@@ -132,7 +116,6 @@ object TestFixtures {
         return out
     }
 
-    /** zlib-compress (default settings produce the 0x78 0x9C header real PTFs carry). */
     fun zlib(data: ByteArray): ByteArray {
         val deflater = Deflater()
         deflater.setInput(data)
@@ -144,12 +127,6 @@ object TestFixtures {
         return out.toByteArray()
     }
 
-    /**
-     * Minimal structurally-valid official PTF: header, one wallpaper slot (ID 1) whose
-     * payload is the real 32-byte payload header (resource type 4, [compressionMethod],
-     * compressed/uncompressed sizes) followed by the compressed [wallpaperBmp] —
-     * zlib for method 2 (fw 3.80+), a stored-mode LZR stream for method 1 (fw 3.70).
-     */
     fun buildPtf(
         name: String,
         firmware: String,
@@ -163,20 +140,18 @@ object TestFixtures {
         val slotSize = headerSize + compressed.size
         val file = ByteArray(dataOffset + slotSize)
 
-        // magic "\0PTF"
         file[1] = 'P'.code.toByte(); file[2] = 'T'.code.toByte(); file[3] = 'F'.code.toByte()
         name.toByteArray(Charsets.ISO_8859_1).copyInto(file, 0x08, 0, minOf(name.length, 16))
         firmware.toByteArray(Charsets.ISO_8859_1).copyInto(file, 0xB8, 0, minOf(firmware.length, 8))
 
-        file.putU32(0x100, descriptorOffset)             // slot table: one pointer, zero-terminated
-        file.putU16(descriptorOffset, 1)                  // slot id 1 = wallpaper
-        file.putU16(descriptorOffset + 2, 1)              // subtype (as real files use)
+        file.putU32(0x100, descriptorOffset)
+        file.putU16(descriptorOffset, 1)
+        file.putU16(descriptorOffset + 2, 1)
         file.putU32(descriptorOffset + 4, slotSize)
         file.putU32(descriptorOffset + 8, dataOffset)
 
-        // 32-byte payload header, as in real slot payloads.
-        file.putU16(dataOffset + 4, 4)                    // resource type 4 = wallpaper
-        file.putU16(dataOffset + 6, compressionMethod)    // 1 = LZR, 2 = zlib
+        file.putU16(dataOffset + 4, 4)
+        file.putU16(dataOffset + 6, compressionMethod)
         file.putU32(dataOffset + 8, compressed.size)
         file.putU32(dataOffset + 12, wallpaperBmp.size)
 

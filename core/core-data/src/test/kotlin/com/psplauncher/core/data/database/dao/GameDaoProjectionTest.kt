@@ -17,16 +17,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * Multi-disc projection (docs/plans/README.md (C1)): the display queries show one
- * row per disc set — the primary — so platform lists, All Games, Favorites and platform counts
- * count a set once, while the unprojected queries still return every row for scan baselines and
- * per-disc achievement matching.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class GameDaoProjectionTest {
-
     private lateinit var db: PFPDatabase
     private lateinit var dao: GameDao
     private lateinit var collectionDao: CollectionDao
@@ -192,7 +185,7 @@ class GameDaoProjectionTest {
         dao.upsert(
             game("Final Fantasy VII", "psx", "/roms/psx/ff7.cue", emulatorPackage = "retroarch")
         )
-        dao.upsert(game("Chrono Trigger", "psx", "/roms/psx/ct.cue"))   // no override
+        dao.upsert(game("Chrono Trigger", "psx", "/roms/psx/ct.cue"))
         dao.upsert(game("Panzer Dragoon", "saturn", "/roms/saturn/pd.cue", emulatorPackage = "retroarch"))
         val appRow = dao.upsert(
             game("Angry Birds", "android", "/app/angry", contentType = "ANDROID_APP", emulatorPackage = "some.app")
@@ -200,15 +193,14 @@ class GameDaoProjectionTest {
 
         dao.clearPreferredEmulatorForPlatform("psx")
 
-        // Real psx game rows with an override are reset to the platform default (null override)…
         assertNull(dao.getById(psxOverride)?.emulatorPackage)
         assertEquals(
             null,
             dao.observeByPlatform("psx").first().first { it.title == "Final Fantasy VII" }.emulatorPackage,
         )
-        // …a game with no override is untouched (still null)…
+
         assertNull(dao.observeByPlatform("psx").first().first { it.title == "Chrono Trigger" }.emulatorPackage)
-        // …and another platform's rows and app rows are never touched.
+
         assertEquals(
             "retroarch",
             dao.observeByPlatform("saturn").first().single().emulatorPackage,
@@ -222,9 +214,8 @@ class GameDaoProjectionTest {
         dao.upsert(game("Final Fantasy VII (Disc 2)", "psx", "/roms/psx/ff7-2.cue", psxSetKey, 2, false))
         dao.upsert(game("Chrono Trigger", "psx", "/roms/psx/ct.cue"))
 
-        // Scan baselines / existing-path resolution must see every disc.
         assertEquals(3, dao.observeByPlatform("psx").first().size)
-        // Per-disc achievement matching must see every game row.
+
         assertEquals(
             setOf("Chrono Trigger", "Final Fantasy VII (Disc 1)", "Final Fantasy VII (Disc 2)"),
             dao.observeGamesOnly().first().map { it.title }.toSet(),

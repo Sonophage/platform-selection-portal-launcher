@@ -36,45 +36,31 @@ import com.psplauncher.feature.settings.viewmodel.InitialSetupViewModel
 import com.psplauncher.feature.settings.viewmodel.RootFolderRow
 import com.psplauncher.feature.settings.viewmodel.SetupStep
 
-// Which root-kind the single "add" SAF picker is currently serving.
 private enum class AddSlot { ROM, MUSIC, VIDEO, PHOTO, BOOK }
 
-/**
- * First-run setup wizard, now one task per page (per the approved plan): Welcome → ROM Roots →
- * Music → Video → Photo → Artwork (with import offer) → Online Services → RetroArch* → Finish
- * (* only when RetroArch is installed). Channels the mockup's PSP skin via [WizardScaffold] —
- * strongly controller driven (Back steps out, Confirm activates the focused row / ▶ or Continue to advance),
- * touch everywhere (rows, fields tap to edit). Everything is optional and written through the
- * same stores as Settings, so this is a guided front door, not a second configuration system.
- */
 @Composable
 fun InitialSetupScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    // First (automatic) run: Back cannot exit — leaving is explicit (Skip Setup or Finish).
+
     firstRun: Boolean = false,
     onOpenLibraryManager: () -> Unit = {},
-    // B3: FINISH "Go to your library" — lands on the All Games folder, first playable game.
+
     onGoToLibrary: () -> Unit = {},
     viewModel: InitialSetupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // The front door, first run only — see [WizardSplash]. rememberSaveable so a rotation or a
-    // process restart mid-wizard does not put the ceremony back in front of a half-finished run.
     var splashDone by rememberSaveable { mutableStateOf(!firstRun) }
     if (!splashDone) {
         WizardSplash(onBegin = { splashDone = true })
         return
     }
 
-    // The ViewModel outlives this overlay — snap back to page one when the wizard closes, so a
-    // later re-run from Settings starts at the beginning instead of resuming mid-flow.
     DisposableEffect(Unit) {
         onDispose { viewModel.resetWizard() }
     }
 
-    // ── SAF pickers ─────────────────────────────────────────────────────────────
     var pendingAdd by remember { mutableStateOf<AddSlot?>(null) }
     val addPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -120,11 +106,6 @@ fun InitialSetupScreen(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> if (uri != null) viewModel.linkVitaFolder(uri) }
 
-    // ── Permission grants ───────────────────────────────────────────────────────
-    //
-    // All three come back with no usable result — a permission dialog's answer is the grant
-    // itself, and the two system screens return nothing at all — so every one of them re-reads
-    // the grant rather than trusting what it was handed.
     val notificationRequest = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { viewModel.refreshGrants() }
@@ -132,11 +113,8 @@ fun InitialSetupScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { viewModel.refreshGrants() }
 
-    // How Personalize hands you to a real settings screen and back. Provided by SettingsNavHost
-    // for every screen it hosts; the wizard is one of them, so there is nothing to thread.
     val openSettingsScreen = LocalSettingsOpenScreen.current
 
-    // ── Page chrome driven by the current step ─────────────────────────────────
     val step = state.step
     val stepNumber = state.stepNumber
     val canGoBack = step != SetupStep.WELCOME
@@ -146,8 +124,7 @@ fun InitialSetupScreen(
         stepCount = state.stepCount,
         title = "Initial Setup",
         onBack = { if (!viewModel.previousStep() && !firstRun) onBack() },
-        // Leaving by Skip is leaving deliberately, which is what stamps the wizard as seen — the
-        // same door Finish uses, so a first run that is skipped does not come back on next launch.
+
         onSkip = onBack,
         backEnabled = canGoBack,
         message = state.message,
@@ -181,7 +158,7 @@ fun InitialSetupScreen(
                 addSublabel = "Grant a root folder with one subfolder per console",
                 rescanLabel = "Rescan ROM Roots",
                 rescanSublabel = "Auto-detect consoles and scan their games",
-                // B3: "where do I put my ROMs?" — scaffold one ES-DE folder per platform.
+
                 onCreateFolders = viewModel::createStandardRomFolders,
                 onAdd = { pendingAdd = AddSlot.ROM; addPicker.launch(null) },
                 onRelink = { row -> pendingRelinkRom = row.treeUri; relinkRomPicker.launch(runCatching { Uri.parse(row.treeUri) }.getOrNull()) },
@@ -296,8 +273,7 @@ fun InitialSetupScreen(
                 autoFit = state.autoFitXmbLayout,
                 onToggleAutoFit = viewModel::toggleAutoFitXmbLayout,
                 onOpenScreen = { id ->
-                    // Park first: opening the screen disposes this one, and the dispose is what
-                    // would otherwise reset the run to page one.
+
                     viewModel.parkForExcursion()
                     openSettingsScreen(id)
                 },
@@ -316,13 +292,6 @@ fun InitialSetupScreen(
     }
 }
 
-/**
- * The one sentence that tells you where the cores actually are.
- *
- * Shared because the wizard and Settings ▸ Emulators both ask for this grant, and the wrong
- * instruction in one of them is the whole failure: /RetroArch on internal storage is named
- * RetroArch, is easy to find, and contains no cores at all.
- */
 private const val RETROARCH_PICK_HINT =
     "Open the picker's sidebar and choose RetroArch itself, not the /RetroArch folder"
 
@@ -358,18 +327,6 @@ private fun hintFor(step: SetupStep): String? = when (step) {
     SetupStep.FINISH    -> "Everything below can be adjusted anytime in Settings."
 }
 
-/**
- * The three grants the launcher asks for, and none of them is required.
- *
- * Every one is a capability rather than a gate: without notifications a background scan finishes
- * silently, without usage access the app drawer's Recently Used tab has nothing to sort by, and
- * without the Home role the launcher is an app you open rather than the thing you come back to.
- * They are asked for here, together, because all three are system screens — meeting them one at a
- * time scattered through the wizard is what makes a first run feel like an interrogation.
- *
- * The rows re-read on every resume: the user leaves for a system screen and comes back, and a row
- * still reading "Not granted" after they granted it is the whole failure mode of a page like this.
- */
 @Composable
 private fun PermissionsPage(
     state: InitialSetupUiState,
@@ -384,8 +341,6 @@ private fun PermissionsPage(
         onPauseOrDispose { }
     }
 
-    // Below API 33 there is no runtime notification permission to ask for, so the row would be a
-    // control that cannot do anything.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         WizardValueRow(
             label = "Notifications",
@@ -414,15 +369,6 @@ private fun PermissionsPage(
     WizardContinueRow("ROM Folders", onContinue)
 }
 
-/**
- * Look and sound, as four doors rather than four pages.
- *
- * Each row opens the settings screen that owns the thing and comes back to this page. That is the
- * whole design: a wizard copy of the theme picker or the sound assignments would be a second
- * version of each to keep in step, and the rows below are the four the answers to "make it mine"
- * actually live behind. The one control that IS here is the XMB's sizing, because it is a single
- * checkbox and opening a screen for one checkbox is worse than showing it.
- */
 @Composable
 private fun PersonalizePage(
     autoFit: Boolean,
@@ -470,12 +416,6 @@ private fun WizardContinueRow(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun WelcomePage(onStart: () -> Unit) {
-    // One row.
-    //
-    // This page used to carry a paragraph that restated the heading, a second that restated the
-    // hint, and a Skip row — for a page whose only job is to start. Skip is a footer prompt on
-    // every page now, so keeping a row for it here made the way out look like a page-one choice
-    // rather than something always available.
     WizardRow(
         label = "Get Started",
         sublabel = "Permissions first, then your folders",
@@ -515,7 +455,6 @@ private fun RootsPage(
     }
     WizardRow(label = addLabel, sublabel = addSublabel, onClick = onAdd)
     if (roots.isNotEmpty()) {
-        // B3: answer "where do I put my ROMs?" — one folder per supported console, ready to fill.
         WizardRow(
             label = "Create Standard Folders",
             sublabel = "One subfolder per console, named for your games",
@@ -641,7 +580,6 @@ private fun ServicesPage(
             "fetch game artwork and metadata for your library."
     )
 
-    // ── SteamGridDB ───────────────────────────────────────────────────────────
     WizardSectionHeader("SteamGridDB")
     WizardTextField(
         label = if (state.hasSgdb) "API Key (saved)" else "API Key",
@@ -669,14 +607,13 @@ private fun ServicesPage(
         isPassword = true,
     )
     state.igdbStatus?.let {
-        WizardInfoText(it)  // transient validation result
+        WizardInfoText(it)
     }
     if (igdbIdDraft.isNotBlank() && igdbSecretDraft.isNotBlank()) {
         WizardRow(label = "Test Credentials", onClick = { onTestIgdb(igdbIdDraft, igdbSecretDraft) })
         WizardRow(label = "Connect IGDB", onClick = { onConnectIgdb(igdbIdDraft, igdbSecretDraft) })
     }
 
-    // ── ScreenScraper (only when the build ships dev credentials) ─────────────
     if (state.ssEnabled) {
         WizardSectionHeader("ScreenScraper")
         if (state.hasScreenScraper) {
@@ -760,8 +697,7 @@ private fun RetroArchPage(
                 state.retroArchCoreCount == 0 -> "No cores found"
                 else -> "${state.retroArchCoreCount} cores detected"
             },
-            // Zero is the mis-pick, not an empty RetroArch: see the same message in
-            // Settings ▸ Emulators ▸ RetroArch.
+
             sublabel = "Wrong folder? $RETROARCH_PICK_HINT".takeIf { state.retroArchCoreCount == 0 },
         )
         WizardRow(
@@ -822,7 +758,7 @@ private fun FinishPage(
             sublabel = "Add consoles and scan the ROM roots you just set",
             onClick = onOpenLibraryManager,
         )
-        // B3: end on a real launch — All Games with the cursor on the first playable game.
+
         WizardRow(
             label = "Go to your library",
             sublabel = "Jump straight to All Games",
@@ -844,11 +780,6 @@ private fun rootsShortLabel(roots: List<RootFolderRow>): String =
         roots.size == 1 -> roots.first().name
         else -> "${roots.first().name} +${roots.size - 1} more"
     }
-
-// ── Preview scaffolding ────────────────────────────────────────────────────────
-// The PSP skin is previewable statelessly (page composables take state + lambdas, never the
-// ViewModel) — see [PfpScreenPreview]. Each preview renders a whole page inside [WizardScaffold]
-// chrome using the [InitialSetupScreen] copy, exactly as the real screen layers it.
 
 @Composable
 private fun WizardPagePreview(
@@ -1031,7 +962,6 @@ private fun ServicesPagePreview() {
         )
     }
 }
-
 
 @CombinedPreviews
 @Composable

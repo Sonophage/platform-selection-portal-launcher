@@ -41,13 +41,12 @@ fun EmulatorsSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // SAF tree picker for linking RetroArch's folder so PFP can enumerate installed cores.
     val retroArchPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? -> uri?.let { viewModel.linkRetroArch(it) } }
 
     state.editorState?.let { editor ->
-        // Test-launch flow renders over the editor when active.
+
         state.testLaunch?.let { test ->
             TestLaunchFlow(
                 test       = test,
@@ -90,7 +89,6 @@ fun EmulatorsSettingsScreen(
         return
     }
 
-    // Wizard step 1 — pick an installed app.
     state.wizardApps?.let { apps ->
         WizardPickAppStep(
             apps     = apps,
@@ -101,7 +99,6 @@ fun EmulatorsSettingsScreen(
         return
     }
 
-    // Brief loading windows: scanning apps, or inspecting the chosen app.
     if (state.isInspecting) {
         SettingsPageScaffold(heading = "Add Emulator", subtitle = "Detecting…", onBack = viewModel::cancelWizard, modifier = modifier) {
             EmulatorHint("Inspecting installed apps…")
@@ -143,10 +140,6 @@ fun EmulatorsSettingsScreen(
                 }
             }
 
-            // PC runtimes, when any are installed. They have no profile to edit and take no
-            // ROM -- a PC game is imported into the Windows Memory Card and launched from
-            // there -- so this is an acknowledgement plus a signpost, not a settings group.
-            // Without it the honest answer to "where is GameNative" was nowhere.
             if ((section == null || section == EmulatorSettingsSection.INSTALLED) && state.pcRuntimes.isNotEmpty()) {
                 SettingsGroup("PC Runtimes")
                 state.pcRuntimes.forEach { name ->
@@ -200,8 +193,7 @@ fun EmulatorsSettingsScreen(
                 when {
                     state.isDetectingCores ->
                         "Scanning RetroArch for installed cores…"
-                    // Before the count, because EmptyTree HAS a count — zero — and reporting it
-                    // as "0 core(s) detected" blames the user's RetroArch for a bad pick.
+
                     state.retroArchTreeHasNoCores ->
                         "Linked, but there are no cores under the folder you picked. That is almost " +
                             "always /RetroArch on internal storage — it holds config and saves, never " +
@@ -244,7 +236,6 @@ fun EmulatorsSettingsScreen(
                     onClick  = { viewModel.unlinkRetroArch() },
                 )
             }
-
             }
 
             if (section == null) SettingsGroup("Maintenance")
@@ -284,8 +275,6 @@ private fun WizardPickAppStep(
         onBack   = onBack,
         modifier = modifier,
     ) {
-        // Registered like the list screen above: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(
@@ -318,11 +307,8 @@ private fun TestLaunchFlow(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Step A — pick a ROM from the scanned library.
     if (test.selectedRom == null) {
         SettingsPageScaffold(heading = "Test Launch", subtitle = "Pick a ROM", onBack = onBack, modifier = modifier) {
-            // Registered like the list screen above: the scaffold needs a scroll owner here for its
-            // chrome drag-to-scroll and for controller keep-in-view.
             val scrollState = rememberScrollState()
             LocalSettingsScrollStateRegistrar.current(scrollState)
             Column(
@@ -345,10 +331,7 @@ private fun TestLaunchFlow(
         return
     }
 
-    // Step B — intent preview + launch + result.
     SettingsPageScaffold(heading = "Test Launch", subtitle = test.selectedRom.title, onBack = onBack, modifier = modifier) {
-        // Registered like the list screen above: the scaffold needs a scroll owner here for its
-        // chrome drag-to-scroll and for controller keep-in-view.
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
         Column(

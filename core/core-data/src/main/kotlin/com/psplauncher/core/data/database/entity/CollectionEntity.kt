@@ -15,10 +15,10 @@ data class CollectionEntity(
     val name: String,
 
     @ColumnInfo(name = "category_id")
-    val categoryId: String = "games",  // Default to Main Game category
+    val categoryId: String = "games",
 
     @ColumnInfo(name = "is_pinned")
-    val isPinned: Boolean = false,  // Pinned to the top of its category
+    val isPinned: Boolean = false,
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
@@ -29,7 +29,6 @@ data class CollectionEntity(
     @ColumnInfo(name = "sort_order")
     val sortOrder: Int = 0,
 
-    // User-picked icon key (from the shared category icon catalog). Null = the default memory-card art.
     @ColumnInfo(name = "icon_key")
     val iconKey: String? = null,
 )

@@ -6,14 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The customizer previews every slot's built-in art. A slot with no default degrades to a
- * placeholder letter in the strip — which is what these tests exist to prevent: add a slot to
- * [CustomizableIcons] without teaching [defaultGlyphFor] about it and the build fails here,
- * not silently in the UI.
- */
 class DefaultSlotGlyphTest {
-
     @Test
     fun `every customizable slot has a built-in glyph`() {
         val missing = CustomizableIcons.ALL

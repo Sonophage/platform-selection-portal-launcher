@@ -29,35 +29,6 @@ import coil3.gif.repeatCount
 import coil3.request.ImageRequest
 import timber.log.Timber
 
-/**
- * The motion-wallpaper layer: the poster still rendered underneath, with the looping video
- * (or animated GIF/WebP) composited above it once its first frame lands.
- *
- * Power discipline — this composable exists to implement one rule:
- *
- * > When the wave would be frozen, the motion wallpaper is not merely paused — no decoder exists.
- *
- *  • [decision] POSTER is honored by NOT composing this composable at all (the caller switches
- *    branches), so a frozen background holds neither a player nor a codec. The poster parameter
- *    is still rendered here for the PLAY paths, where it sits under the video until the first
- *    frame arrives (no black flash) and remains if decoding fails.
- *  • GIF/animated WebP never construct a player at all: they are a *separate composable*
- *    ([AnimatedImageSurface]), because ExoPlayer has no GIF extractor and a player built on one
- *    fails to sniff, logs a `Source error`, and holds a codec that can never render a frame.
- *  • ONE player, constructed per [motionPath] inside [MotionVideoSurface] — and only for real
- *    video — released — never paused — in [DisposableEffect.onDispose]. A paused ExoPlayer still
- *    holds a codec instance, a surface, and buffers.
- *  • Audio never decoded: the audio track is disabled at the track-selection level AND the
- *    volume is muted (the same two-belt approach as the ICON1 overlay). A wallpaper with sound
- *    would also fight the music player.
- *  • Loops forever (REPEAT_MODE_ALL) — a background loops by definition, which is why the
- *    import gate caps duration at 60 s.
- *  • TextureView, not SurfaceView: the layer sits under the whole Compose tree and must
- *    composite with the fade-in (a SurfaceView behind the window needs a punched-through hole
- *    in an opaque window and breaks the crossfade).
- *  • The app-visible gate is [rememberAppVisible], folded into the decision upstream, so
- *    backgrounding the launcher (every game launch) lands in POSTER and releases the player.
- */
 @Composable
 fun MotionWallpaperBackground(
     posterPath: String,
@@ -66,11 +37,6 @@ fun MotionWallpaperBackground(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        // Poster always composed underneath: shows until the first video frame lands, and is
-        // simply what remains whenever the decoder goes away (freeze, failure, backgrounding).
-        // The request pins repeatCount(1): for stills it is a no-op, and if a poster path ever
-        // pointed at an animated container the poster would hold its first frame rather than
-        // silently run a second CPU decoder behind the animation layer above.
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(posterPath)
@@ -87,12 +53,6 @@ fun MotionWallpaperBackground(
     }
 }
 
-/**
- * The looping video surface. Separated from the poster so its player state (remember keys,
- * listeners, dispose) lives in the smallest possible restart scope. Only real video reaches
- * this composable — animated images are routed to [AnimatedImageSurface] by the caller's
- * format switch.
- */
 @Composable
 private fun MotionVideoSurface(motionPath: String, decision: MotionWallpaperPolicy.Decision) {
     val context = LocalContext.current
@@ -101,17 +61,14 @@ private fun MotionVideoSurface(motionPath: String, decision: MotionWallpaperPoli
 
     val player = remember(motionPath) {
         ExoPlayer.Builder(context).build().apply {
-            // Audio is never selected and never decoded; volume stays 0f on principle.
             trackSelectionParameters = trackSelectionParameters.buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
                 .build()
             volume = 0f
             setMediaItem(MediaItem.fromUri(motionPath))
-            // A background loops by definition. (Icon1VideoOverlay deliberately does NOT loop;
-            // this is the one place the rule diverges — and the reason the 60 s cap matters.)
+
             repeatMode = Player.REPEAT_MODE_ALL
-            // REDUCED halves perceived motion (no frame-rate knob exists); the caller raises
-            // the scrim to match the wave's dimming. POSTER never reaches this composable.
+
             setPlaybackSpeed(if (decision == MotionWallpaperPolicy.Decision.PLAY_REDUCED) 0.5f else 1f)
             playWhenReady = true
             prepare()
@@ -131,16 +88,11 @@ private fun MotionVideoSurface(motionPath: String, decision: MotionWallpaperPoli
         }
         player.addListener(listener)
         onDispose {
-            // Released, not paused — the mechanism that implements the governing rule.
             player.removeListener(listener)
             player.release()
         }
     }
 
-    // Fade the video in over the poster on the first frame — the same pattern Icon1VideoOverlay
-    // uses. When the decision returns to POSTER the player is released and the poster is what
-    // remains: a hard cut is CORRECT there (an overlay just opened or the device just started
-    // conserving — an animated exit would be the one thing still animating).
     val alpha by animateFloatAsState(
         targetValue = if (firstFrameRendered) 1f else 0f,
         animationSpec = tween(durationMillis = 400),
@@ -163,23 +115,6 @@ private fun MotionVideoSurface(motionPath: String, decision: MotionWallpaperPoli
     )
 }
 
-/**
- * The GIF/animated-WebP surface: a second AsyncImage over the poster loads the animated file
- * itself, decoded by Coil's AnimatedImageDecoder (registered on the app-wide ImageLoader in
- * feature-artwork). A sibling of [MotionVideoSurface], not a branch inside it — the split makes
- * "a GIF wallpaper constructs no ExoPlayer" structural: no code path even builds the player for
- * an animated image.
- *
- * Coil decodes animated images honoring the file's OWN repeat metadata by default — a GIF whose
- * loop flag is absent (or 0) renders its first frame and stops, i.e. an animated image with
- * repeatCount 1 is visually a still. The request therefore carries an explicit infinite repeat
- * count (forcing a fresh animated decode that actually loops — the count rides the memory-cache
- * key, so it is a distinct decode from any still request of the same file). The caller only
- * routes non-POSTER decisions into this background, so the request is unconditional. (REDUCED is
- * a no-op here: there is no frame-rate knob; the video's 0.5f playback-speed analogue would be
- * arbitrary.) If the animated decode fails outright, this layer renders nothing and the poster
- * beneath is simply what shows — the same degradation a corrupt video gets.
- */
 @Composable
 private fun AnimatedImageSurface(motionPath: String) {
     AsyncImage(
@@ -195,10 +130,6 @@ private fun AnimatedImageSurface(motionPath: String) {
 
 private const val TAG = "MotionWallpaper"
 
-// TextureView stretches the frame to its bounds; this rescales to center-crop so the video fills
-// the screen at its own aspect — matching the ContentScale.Crop poster underneath it, so the
-// fade-in never visibly distorts the picture the poster established. (Same approach as
-// Icon1VideoOverlay.)
 private fun applyCenterCrop(view: TextureView, size: VideoSize?) {
     val vw = size?.width?.toFloat() ?: return
     val vh = size.height.toFloat()
@@ -212,12 +143,6 @@ private fun applyCenterCrop(view: TextureView, size: VideoSize?) {
     view.setTransform(matrix)
 }
 
-/**
- * Folds the app's ON_START..ON_STOP window into the motion decision. The [covered]/[throttled]
- * inputs come from XMBShell's existing pipeline, but nothing there reacts to the app being
- * backgrounded — the composition survives ON_STOP, and a launcher is backgrounded constantly
- * (every game launch). Missing this would leave a decoder running behind the emulator.
- */
 @Composable
 fun rememberAppVisible(): Boolean {
     val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current

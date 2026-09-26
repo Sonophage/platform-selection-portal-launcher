@@ -30,17 +30,8 @@ import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 import com.psplauncher.core.ui.theme.LocalPFPColors
 
-// The one touch-button treatment shared across XMB screens: a transparent square that blends into
-// the wave, with a thin accent ring tying it to the active theme and a soft dark halo on the glyph
-// so it stays legible over both the dark top and bright bottom of the background gradient.
-
-/** Soft dark halo applied to glyph text so it reads on any part of the wave gradient. */
 val XmbGlyphShadow = Shadow(Color(0xB3000000), Offset.Zero, 10f)
 
-/**
- * Base themed touch button: transparent background, rounded accent ring, centered [content].
- * The square [size] keeps hit targets comfortable (52dp default, matching the app-drawer button).
- */
 @Composable
 fun XmbTouchButton(
     onClick: () -> Unit,
@@ -60,7 +51,6 @@ fun XmbTouchButton(
     )
 }
 
-/** Back button — "◀" glyph in the shared themed frame. */
 @Composable
 fun XmbBackTouchButton(
     onClick: () -> Unit,
@@ -78,7 +68,6 @@ fun XmbBackTouchButton(
     }
 }
 
-/** Single-glyph button (e.g. "⋯" for Options) in the shared themed frame. */
 @Composable
 fun XmbGlyphTouchButton(
     glyph: String,
@@ -97,12 +86,6 @@ fun XmbGlyphTouchButton(
     }
 }
 
-/**
- * Flat translucent header chip — the full-screen-menu header style shared by the Music browser and
- * the detail screens (Back / Options). A white 12% fill (no accent ring) with an optional leading
- * glyph and white label, so every full-screen menu's header reads the same. When [focused] (a
- * controller has this chip selected) a themed accent ring is drawn so d-pad users can see focus.
- */
 @Composable
 fun XmbHeaderPill(
     label: String,
@@ -110,11 +93,7 @@ fun XmbHeaderPill(
     modifier: Modifier = Modifier,
     leadingGlyph: String? = null,
     focused: Boolean = false,
-    /**
-     * The default faint white wash suits the themed gradient backdrops. Screens that float
-     * pills over arbitrary imagery (photo viewer) pass a dark scrim instead — a 12% white
-     * fill vanishes over bright content.
-     */
+
     background: Color = Color(0x1FFFFFFF),
 ) {
     val accent = LocalPFPColors.current.accentColor
@@ -150,10 +129,6 @@ fun XmbHeaderPill(
     }
 }
 
-/**
- * Wide pill variant for header rows (Back / Sort / Options labels). Same transparent-plus-ring
- * treatment as [XmbTouchButton] but sized to its label.
- */
 @Composable
 fun XmbTouchPill(
     label: String,
@@ -180,8 +155,6 @@ fun XmbTouchPill(
         )
     }
 }
-
-// ── Previews ──────────────────────────────────────────────────────────────────
 
 @CombinedPreviews
 @Composable

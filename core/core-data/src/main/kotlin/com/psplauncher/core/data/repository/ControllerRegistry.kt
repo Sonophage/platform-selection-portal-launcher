@@ -15,15 +15,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Authoritative tracking of connected controller-capable devices.
- *
- * The Android [InputManager] listener only adapts platform device add/remove/change events into
- * the [onDeviceAdded] / [onDeviceRemoved] state transitions — the state logic itself is plain and
- * unit-testable. The input bridge (GamepadInputHandler) calls [markActive] on every consumed
- * key/motion event so [lastActiveController] reflects the most recently used device without ever
- * locking input to one controller.
- */
 @Singleton
 class ControllerRegistry @Inject constructor(
     @ApplicationContext context: Context,
@@ -35,8 +26,6 @@ class ControllerRegistry @Inject constructor(
     val lastActiveController: StateFlow<ControllerDevice?> = _lastActiveController.asStateFlow()
 
     init {
-        // Guarded so JVM unit tests (which construct the registry directly) never touch platform
-        // services. In production this registers once for the app lifetime.
         runCatching {
             val inputManager = context.getSystemService(Context.INPUT_SERVICE) as? InputManager
                 ?: return@runCatching
@@ -51,7 +40,6 @@ class ControllerRegistry @Inject constructor(
         }
     }
 
-    /** Called by the input bridge on every consumed key/motion event. */
     fun markActive(deviceId: Int) {
         val device = _connectedControllers.value.firstOrNull { it.deviceId == deviceId } ?: return
         if (_lastActiveController.value?.deviceId != deviceId) {
@@ -60,7 +48,6 @@ class ControllerRegistry @Inject constructor(
         }
     }
 
-    /** Adds or refreshes a device snapshot. Re-adding an existing id keeps the original connect time. */
     fun onDeviceAdded(device: ControllerDevice) {
         _connectedControllers.update { current ->
             if (current.any { it.deviceId == device.deviceId }) current else current + device

@@ -5,7 +5,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ImageFormatTest {
-
     private fun bytes(vararg values: Int) = ByteArray(values.size) { values[it].toByte() }
 
     @Test
@@ -30,13 +29,12 @@ class ImageFormatTest {
         assertEquals(ImageFormat.BMP, ImageFormat.sniff("BM----------".toByteArray(Charsets.US_ASCII)))
     }
 
-    // An HTML error page saved by a misbehaving CDN must never pass as artwork.
     @Test
     fun `rejects html, empty and short payloads`() {
         assertNull(ImageFormat.sniff("<!DOCTYPE htm".toByteArray(Charsets.US_ASCII)))
         assertNull(ImageFormat.sniff(ByteArray(0)))
         assertNull(ImageFormat.sniff(bytes(0xFF)))
-        // RIFF container that is not WEBP (e.g. WAV) is rejected too.
+
         assertNull(ImageFormat.sniff("RIFF....WAVE".toByteArray(Charsets.US_ASCII)))
     }
 }

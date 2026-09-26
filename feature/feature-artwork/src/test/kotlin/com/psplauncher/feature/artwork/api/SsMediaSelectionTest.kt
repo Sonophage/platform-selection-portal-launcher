@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SsMediaSelectionTest {
-
     private fun m(type: String, region: String?, url: String) = SsCachedMedia(type, region, url)
 
     @Test
@@ -27,14 +26,14 @@ class SsMediaSelectionTest {
             m("ss", "us", "shot"), m("wheel-hd", "us", "whd"), m("video", "us", "raw"),
         )
         val u = SsMediaSelection.urls(medias)
-        assertEquals("b3", u.artworkUrl)       // box-2D missing → box-3D fallback
-        assertNull(u.boxArtUrl)                // strict box-2D only
+        assertEquals("b3", u.artworkUrl)
+        assertNull(u.boxArtUrl)
         assertEquals("b3", u.box3dUrl)
-        assertEquals("st", u.physicalMediaUrl) // support-2D missing → texture fallback
+        assertEquals("st", u.physicalMediaUrl)
         assertEquals("shot", u.screenshotUrl)
-        assertEquals("shot", u.heroUrl)        // fanart missing → ss fallback
-        assertEquals("whd", u.logoUrl)         // wheel missing → wheel-hd fallback
-        assertNull(u.videoUrl)                 // normalized only
+        assertEquals("shot", u.heroUrl)
+        assertEquals("whd", u.logoUrl)
+        assertNull(u.videoUrl)
         assertEquals("raw", u.videoRawUrl)
     }
 
@@ -44,7 +43,7 @@ class SsMediaSelectionTest {
         val decoded = SsMediaSelection.decode(SsMediaSelection.encode(medias))
         assertEquals(medias, decoded)
         assertNull(SsMediaSelection.decode("not json"))
-        assertNull(SsMediaSelection.decode("[]"))   // empty list = useless cache row
+        assertNull(SsMediaSelection.decode("[]"))
     }
 
     @Test

@@ -22,12 +22,6 @@ import com.psplauncher.feature.settings.viewmodel.EmulatorAssignmentUiState
 import com.psplauncher.feature.settings.viewmodel.EmulatorAssignmentViewModel
 import com.psplauncher.feature.settings.viewmodel.PlatformAssignRow
 
-// The per-system half of B4 ("emulator and core assignment clarity"): one row per platform with
-// games, showing which emulator + core its games resolve to today and how many games override
-// that choice. Drilling in lists every installed emulator that can run the platform (catalog
-// recommendation flagged), lets the user set the console default without touching any game, and
-// bulk-clears per-game overrides — scoped to this one platform and always confirmed.
-
 private val RecommendedBadgeColor = Color(0xFF4A9EFF)
 private val DefaultBadgeColor = Color(0xFF45C46A)
 private val WarnColor = Color(0xFFFF6B6B)
@@ -66,8 +60,6 @@ fun EmulatorAssignmentScreen(
         )
     }
 }
-
-// ── Platform list ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun AssignmentListContent(
@@ -130,15 +122,13 @@ private fun listSublabel(platform: PlatformAssignRow): String {
     return "$default$core · $games"
 }
 
-// ── Per-platform detail ───────────────────────────────────────────────────────
-
 @Composable
 private fun AssignmentDetailContent(
     row: PlatformAssignRow,
     onBack: () -> Unit,
     onSelectDefault: (platformId: String, profileId: String) -> Unit,
     onUseAutomatic: (platformId: String) -> Unit,
-    // Non-null while the bulk-clear confirm dialog is up (the count it will clear).
+
     confirmClearCount: Int?,
     onRequestClearOverrides: () -> Unit,
     onCancelClear: () -> Unit,
@@ -259,7 +249,7 @@ private fun Badge(label: String, color: Color) {
 private fun sourceLine(row: PlatformAssignRow): String = when (row.source) {
     LaunchSource.MEMORY_CARD      -> "Console default — set here or in Library Manager"
     LaunchSource.PLATFORM_DEFAULT -> "Platform default"
-    // Never produced on this screen (per-game overrides are excluded from the ladder inputs).
+
     LaunchSource.PER_GAME_OVERRIDE -> "Per-game override"
     LaunchSource.CATALOG_DEFAULT  -> "Automatic — first installed emulator"
     null -> when {

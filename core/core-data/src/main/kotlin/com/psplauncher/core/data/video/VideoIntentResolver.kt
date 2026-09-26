@@ -9,20 +9,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** An installed app able to handle ACTION_VIEW for video — a candidate external video player. */
 data class VideoPlayerApp(
     val packageName: String,
     val label: String,
 )
 
-/**
- * Builds and launches the external-player intent for a video.
- *
- * The Android half lives in [MediaOpenIntent], shared with music and books: the read grant, the
- * pin-only-when-chosen rule, and the chooser retry. What stays here is what is about video — the
- * generic video type, the error wording, and [validate], the pre-launch check that has no
- * equivalent on the other paths.
- */
 @Singleton
 class VideoIntentResolver @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -34,11 +25,6 @@ class VideoIntentResolver @Inject constructor(
             pinnedPackage = playerPackage,
         )
 
-    /**
-     * Launches [video] in an external player, optionally pinned to [playerPackage]. Returns a
-     * user-readable error on failure, or null on success. A pinned player that can't handle it
-     * retries once via the chooser.
-     */
     fun launch(video: Video, playerPackage: String?): String? =
         MediaOpenIntent.launch(
             context = context,
@@ -49,7 +35,6 @@ class VideoIntentResolver @Inject constructor(
             logLabel = "video \"${video.displayTitle}\"",
         )
 
-    /** Shows the system chooser for [video] ("Ask Every Time"). */
     fun launchChooser(video: Video): String? =
         MediaOpenIntent.launchChooser(
             context = context,
@@ -59,16 +44,10 @@ class VideoIntentResolver @Inject constructor(
             logLabel = "video \"${video.displayTitle}\"",
         )
 
-    /**
-     * Pre-launch safety check. Returns a user-readable error when the video can't be handed off, or
-     * null when it's safe to launch: the uri parses, the file still exists, and an activity resolves
-     * for the chosen player (or any player when [playerPackage] is null). Never throws.
-     */
     fun validate(video: Video, playerPackage: String?): String? {
         val uri = runCatching { Uri.parse(video.uri) }.getOrNull()
             ?: return "This video's location is invalid."
-        // Existence/accessibility proxy: a live SAF document reports a MIME type; a deleted file or
-        // revoked grant yields null. Only block on a definite null (never on a query error).
+
         val reachable = runCatching { context.contentResolver.getType(uri) }
         if (reachable.isSuccess && reachable.getOrNull() == null) {
             return "This video file could not be found or access was lost. Try re-scanning the library."
@@ -83,10 +62,8 @@ class VideoIntentResolver @Inject constructor(
         return null
     }
 
-    /** Display label for an installed package, or null if not installed. */
     fun playerLabel(packageName: String): String? = MediaOpenIntent.label(context, packageName)
 
-    /** Installed apps that can handle ACTION_VIEW for video, de-duplicated by package and sorted. */
     fun availablePlayers(): List<VideoPlayerApp> =
         MediaOpenIntent.handlers(context, VIDEO_MIME)
             .map { VideoPlayerApp(packageName = it.packageName, label = it.label) }

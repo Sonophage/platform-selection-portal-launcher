@@ -7,12 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Covers the upgrader gate for the first-run wizard: any pre-existing configuration means the
- * install is an upgrade and the wizard must be seeded as seen instead of shown.
- */
 class InitialSetupGateTest {
-
     @Test fun `a fresh install has no existing config`() {
         assertFalse(XMBViewModel.hasExistingSetupConfig(preferencesOf()))
     }

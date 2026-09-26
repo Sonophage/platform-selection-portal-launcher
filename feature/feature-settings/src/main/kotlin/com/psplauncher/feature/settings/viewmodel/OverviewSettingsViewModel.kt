@@ -17,20 +17,13 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
-/**
- * What the launcher currently holds, all of it derived.
- *
- * Nothing here is a stored summary: every number is produced by asking the thing that owns it,
- * each time the screen opens. A counts table would be one more pair to keep in step, and it would
- * be wrong the moment a scan ran.
- */
 data class OverviewUiState(
     val games: Int = 0,
     val tracks: Int = 0,
     val books: Int = 0,
     val videos: Int = 0,
     val artwork: ArtworkStatus = ArtworkStatus(),
-    /** Null until the size has been measured — it walks the cache directory, so it is not instant. */
+
     val artworkCacheBytes: Long? = null,
     val loading: Boolean = true,
 )
@@ -43,13 +36,10 @@ class OverviewSettingsViewModel @Inject constructor(
     videoRepository: VideoRepository,
     private val artworkRepository: ArtworkRepository,
 ) : ViewModel() {
-
     private val _state = MutableStateFlow(OverviewUiState())
     val state: StateFlow<OverviewUiState> = _state
 
     init {
-        // The four library counts come off flows, so the page stays right while a scan finishes
-        // behind it rather than showing whatever was true when it opened.
         viewModelScope.launch {
             combine(
                 gameRepository.observeAll(),
@@ -64,8 +54,7 @@ class OverviewSettingsViewModel @Inject constructor(
                 }
             }
         }
-        // Artwork status and cache size both walk the disk, so they are one-shot rather than
-        // flows, and each is allowed to fail without taking the rest of the page with it.
+
         viewModelScope.launch {
             runCatching { artworkRepository.computeStatus() }
                 .onSuccess { status -> _state.update { it.copy(artwork = status) } }

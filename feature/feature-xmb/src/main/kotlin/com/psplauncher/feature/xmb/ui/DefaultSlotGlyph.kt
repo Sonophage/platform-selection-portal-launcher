@@ -34,66 +34,37 @@ import com.psplauncher.core.ui.icons.categoryIconFor
 import com.psplauncher.core.ui.icons.systemIconRes
 import com.psplauncher.themekit.IconSlot
 
-/**
- * What a themeable slot draws when neither a user pick nor the applied theme replaces it —
- * the built-in glyph, named in one place so an editor can preview it away from the render
- * site that owns it.
- *
- * The launcher's defaults are deliberately heterogeneous (drawables for the crossbar and
- * status strip, a bundled asset for the memory card, Material vectors for the item rows), so
- * this is a description of WHICH art, not a painter: resolving it is pure and therefore
- * testable, and only [DefaultSlotGlyph] needs a composition.
- *
- * Mirrors the Theme Studio's `StudioIconSet` — same slot, same glyph on both sides.
- */
 internal sealed interface SlotGlyphDefault {
-    /** Console art, resolved through [ConsoleIcon]'s own `sysicon_*` override lookup. */
     data class Console(val platformId: String) : SlotGlyphDefault
 
-    /** A bundled drawable (crossbar art, the status strip, the settings wrench). */
     data class Drawable(@DrawableRes val resId: Int) : SlotGlyphDefault
 
-    /** A `file:///android_asset/...` silhouette — the physical-media memory card. */
     data class BundledAsset(val assetUri: String) : SlotGlyphDefault
 
-    /** A Material vector, as the item rows draw it. */
     data class Vector(val image: ImageVector) : SlotGlyphDefault
 
-    /** No built-in art for this key. Unreachable for a registered slot — see the test. */
     data object None : SlotGlyphDefault
 }
 
-/**
- * The built-in glyph behind [slotKey], or [SlotGlyphDefault.None] for an unregistered key.
- *
- * Every key in `CustomizableIcons.ALL` resolves to real art; `DefaultSlotGlyphTest` is the
- * guard, so a slot added without a default fails the build instead of silently degrading to
- * a placeholder letter in the customizer.
- */
 internal fun defaultGlyphFor(slot: IconSlot): SlotGlyphDefault {
     if (slot.group == IconSlot.Group.CONSOLE) {
         return SlotGlyphDefault.Console(slot.key.removePrefix("sysicon_"))
     }
-    // Crossbar art, via the catalog — catbarSlotKeyFor's inverse keeps the pairing single-sourced.
+
     catbarIconKeyFor(slot.key)?.let { iconKey ->
         return SlotGlyphDefault.Drawable(categoryIconFor(iconKey).resId)
     }
-    // Status strip; the resource IDs themselves stay private to XmbStatusStrip.kt.
+
     XmbStatusIcons.forSlotKey(slot.key)?.let { return SlotGlyphDefault.Drawable(it) }
     return when (slot.key) {
-        // The default memory-card art.
         "item_memcard_games", "item_memcard_music", "item_memcard_video", "item_memcard_photos",
         -> SlotGlyphDefault.BundledAsset(MEMORY_CARD_DEFAULT_ART)
-        // The Settings rows' wrench badge is console art, not a Material glyph.
+
         "item_settings" -> SlotGlyphDefault.Drawable(systemIconRes("settings"))
         else -> ITEM_VECTORS[slot.key]?.let { SlotGlyphDefault.Vector(it) } ?: SlotGlyphDefault.None
     }
 }
 
-/**
- * Material glyphs for the item slots — keep in lockstep with the leading icons in
- * [XmbItemLeadingIcon] (same vector per slot) and with the Studio's `StudioIconSet`.
- */
 private val ITEM_VECTORS: Map<String, ImageVector> = mapOf(
     "item_add" to Icons.Filled.Add,
     "item_missing" to Icons.AutoMirrored.Filled.HelpOutline,
@@ -119,14 +90,6 @@ private val ITEM_VECTORS: Map<String, ImageVector> = mapOf(
     "item_playlist" to Icons.AutoMirrored.Filled.QueueMusic,
 )
 
-/**
- * Draws [slot]'s built-in glyph — what the XMB shows when nothing overrides the slot.
- *
- * Every branch goes through [PortalIcon] (or [ConsoleIcon], which does the same internally),
- * so a preview carries the theme's unified icon tint and the icon-legibility matte exactly as
- * the real render site does. Returns false without drawing when the key has no built-in,
- * leaving the caller to decide what a slot with no art should look like.
- */
 @Composable
 internal fun DefaultSlotGlyph(
     slot: IconSlot,

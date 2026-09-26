@@ -24,62 +24,21 @@ import com.psplauncher.core.ui.theme.LocalPFPColors
 import timber.log.Timber
 import kotlin.math.sin
 
-/**
- * The XMB wave — the PlayStation 3 crossbar's background ribbon.
- *
- * It lives in core-ui rather than with the XMB because it is no longer only the XMB's: the setup
- * wizard draws the same wave behind its own full-screen surface, and feature-settings cannot see
- * feature-xmb (feature-xmb depends on feature-settings, so the arrow only goes one way). A second
- * copy would be two shaders to keep in step and only one of them would ever get the next fix —
- * the same argument that already made [WaveLayers] one renderer for two call sites.
- *
- * Attribution and the porting notes are further down, at the AGSL source they belong to.
- */
-
-// Frozen "time" (seconds) used to pose the wave when animation is disabled.
 private const val STATIC_TIME = 2.0f
 private const val TAU = 6.2831853f
 
-
-/**
- * The wave itself: the strands and the bloom, with NO background of its own — for drawing over
- * something that is already there (a wallpaper, or the wizard's black).
- *
- * Split out so every place that draws a wave is one renderer with one frame clock. Copies would
- * be several things to keep in step and only one of them would ever get the next fix.
- */
 @Composable
 fun WaveLayers(
     waveStyle: WaveStyle,
     tint: Color = Color.White,
-    /**
-     * A multiplier on how fast the surface moves, for callers that want it to react.
-     *
-     * The crossbar slows it while nothing is happening and quickens it while a game is being
-     * launched. It multiplies rather than replaces the style's own speed, so Reduced stays
-     * proportionally slower than Animated whatever the caller asks for.
-     */
+
     speedScale: Float = 1f,
-    /**
-     * A multiplier on how brightly the surface lights, for a caller that wants it to swell.
-     *
-     * The crossbar raises it while a game is launching, so the wave brightens rather than merely
-     * moving faster — a speed change alone is only legible if you are watching the strands, and a
-     * glow is legible from the corner of the eye, which is where the screen is while you press the
-     * button to leave it.
-     *
-     * Multiplies the style's own alpha, so Reduced stays proportionally dimmer than Animated
-     * whatever is asked for, and the result is clamped: the shader's Fresnel term already ends in
-     * an alpha, and pushing past 1 would flatten the whole surface to the tint colour.
-     */
+
     glowScale: Float = 1f,
 ) {
     val alphaScale = (if (waveStyle.reduced) 0.5f else 1f) * glowScale
     val ampScale   = if (waveStyle.reduced) 0.65f else 1f
 
-    // Continuously-increasing time in seconds since the first frame (so float precision stays sharp),
-    // scaled by style speed. Frozen at STATIC_TIME when the wave shouldn't animate — no frame loop,
-    // no per-frame recomposition. Only advances while this background is on screen.
     val animated = waveStyle.animated
     val speed = (if (waveStyle.reduced) 0.5f else 1f) * speedScale
     val time by produceState(STATIC_TIME, animated, speed) {
@@ -101,7 +60,7 @@ fun WaveLayers(
     } else {
         FallbackWave(time, alphaScale.coerceAtMost(1f), ampScale, tint)
     }
-    // Soft off-centre light bloom — the same gentle highlight the XMB has near the crossbar.
+
     Canvas(modifier = Modifier.fillMaxSize()) {
         drawRect(
             brush = Brush.radialGradient(
@@ -117,20 +76,11 @@ fun WaveLayers(
 fun WaveBackground(
     waveStyle: WaveStyle,
     modifier: Modifier,
-    /**
-     * False draws the gradient alone.
-     *
-     * For the caller that wants the wave ON TOP of something — the crossbar draws the focused
-     * item's artwork between the gradient and the wave — and needs the base without it. Drawing
-     * the wave here as well would put a second one under the art, and since the art fades out
-     * across the middle of the screen the two would both be visible, at different alphas.
-     */
+
     drawWave: Boolean = true,
 ) {
     val colors = LocalPFPColors.current
 
-    // Monthly-tinted vertical gradient: deep top (keeps the status strip legible) easing to the pale
-    // bottom the wave sits against.
     val gradient = Brush.linearGradient(
         colorStops = arrayOf(
             0.00f to colors.backgroundTop,
@@ -145,34 +95,6 @@ fun WaveBackground(
     }
 }
 
-// ── AGSL wave (API 33+) ──────────────────────────────────────────────────────
-//
-// The PlayStation 3 XMB wave, ported from linkev/PlayStation-3-XMB (MIT, (c) 2025 Mart), whose
-// author reverse-engineered it from the PS3's own spline.elf. Their permission notice is kept in
-// LICENSES/PlayStation-3-XMB-MIT.txt.
-//
-// What is ported is the MOTION — the height field below is their vertex shader's arithmetic, with
-// their reverse-engineered constants — and the shading idea: a Fresnel term that lights the parts
-// of the surface turning edge-on, drawn as white with alpha. That last part is why this fits here
-// at all. Their fragment shader ends in `vec4(vec3(1.0), F * opacity * brightness)`: white over a
-// coloured gradient, which is exactly how this file already composites, so the wave stays a
-// lightening pass and the COLOUR still comes entirely from the theme. The monthly hue, a category
-// tinting the wave, a user's chosen scheme — all of it behaves as before.
-//
-// What is NOT ported is the rendering model, and it could not be. Theirs displaces a 100x100 grid
-// mesh in WebGL2 from a spline texture the CPU regenerates each frame, and reads its normal from
-// screen-space derivatives. This is one fullscreen AGSL pass with no mesh and no texture, so the
-// surface is evaluated analytically per pixel and the overlapping sheets the mesh gets for free —
-// its far edge folding over its near edge, which is most of the PS3 look — are summed explicitly
-// as SHEETS slices through z. Four, because each slice costs six sines per pixel and this draws
-// behind the entire UI on a handheld.
-//
-// The slope stands in for their normal: a surface turning edge-on to the viewer is a surface whose
-// height is changing fastest, so |dh/dx| drives the same highlight their dot(view, N) does.
-// Fourteen hairlines bunched into one ribbon, which is what the reference image shows: not a
-// stack of shaded sheets but a bundle of fine strands following one long S. Affordable only
-// because each strand costs ONE height evaluation and no pow() — see the notes in main(). Every
-// change here has been measured with `dumpsys gfxinfo`.
 private const val SHEETS = 14
 private const val AGSL_WAVE = """
 uniform float2 iResolution;
@@ -408,16 +330,6 @@ half4 main(float2 fragCoord) {
 }
 """
 
-/**
- * The AGSL wave, or null when this device's SkSL will not compile it.
- *
- * RuntimeShader validates at CONSTRUCTION and throws IllegalArgumentException, so an unsupported
- * builtin is not a build error, it is a crash — and this draws behind the launcher's home screen,
- * so the crash is at boot, every boot. That is not hypothetical: this shader called tanh, which
- * GLSL has and SkSL does not, and the launcher died on launch until it was written out by hand.
- * SkSL is not uniform across vendors and Android versions, so the next one will be found the same
- * way. Falling back to the Canvas wave loses the Fresnel edge and keeps the launcher.
- */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 private fun rememberWaveShader(): RuntimeShader? = remember {
@@ -433,7 +345,7 @@ private fun ShaderWave(time: Float, alphaScale: Float, ampScale: Float, tint: Co
     val brush = remember(shader) { ShaderBrush(shader) }
     Canvas(modifier = Modifier.fillMaxSize()) {
         shader.setFloatUniform("iResolution", size.width, size.height)
-        shader.setFloatUniform("iTime", time)   // reading `time` here drives the per-frame redraw
+        shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("ampScale", ampScale)
         shader.setFloatUniform("alphaScale", alphaScale)
         shader.setFloatUniform("waveTint", tint.red, tint.green, tint.blue)
@@ -441,8 +353,6 @@ private fun ShaderWave(time: Float, alphaScale: Float, ampScale: Float, tint: Co
     }
 }
 
-// ── Canvas fallback (API < 33) ───────────────────────────────────────────────
-// Same soft folds approximated with low-alpha white fills (the sheet) + faint crest strokes.
 @Composable
 private fun FallbackWave(time: Float, alphaScale: Float, ampScale: Float, tint: Color) {
     val amp = 0.05f * ampScale
@@ -472,8 +382,6 @@ private fun DrawScope.drawFold(
     fillPath.lineTo(w, h)
     fillPath.close()
 
-    // Sheet: a flat, faint white wash from the crest down — stacking the folds brightens the lower
-    // screen like the reference. Crest: two soft white strokes for the gentle fold highlight.
     drawPath(fillPath, color = tint.copy(alpha = sheet))
     drawPath(crestPath, color = tint.copy(alpha = edge * 0.5f), style = Stroke(width = h * 0.022f))
     drawPath(crestPath, color = tint.copy(alpha = edge), style = Stroke(width = h * 0.006f))

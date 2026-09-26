@@ -44,64 +44,32 @@ import com.psplauncher.feature.settings.ui.LocalSettingsPromptAction
 import com.psplauncher.feature.settings.ui.LocalSettingsScrollStateRegistrar
 import com.psplauncher.feature.settings.ui.SettingsScaffold
 
-// ── Wizard chrome ─────────────────────────────────────────────────────────────
-//
-// This screen used to wear a PSP skin taken from the "Create New …" captures: a green-ringed
-// navy step badge, blue and red prompt labels, a centred heading, and a "Press the ◀▶ buttons"
-// note. Every other settings screen has since moved to the PlayStation 5 language — large
-// heading top left, content in a column beneath it, one white prompt row at the foot — and the
-// first thing a new user saw was the one screen still speaking the old one.
-//
-// What is left here is the progress rule. Everything else now comes from the settings scaffold,
-// which is the point: the wizard is Settings before you have any, not a separate app.
-
-/** The filled part of the step rule. Accent rather than a fixed colour: the wizard is themed too. */
 private val WizardProgressTrack = Color.White.copy(alpha = 0.16f)
 
-/** Amber status/validation text (the wizard's transient messages). */
 internal val WizardAmber = Color(0xFFFFC857)
 
-/**
- * The first-run wizard's PSP skin, layered on [SettingsScaffold] — the same controller focus
- * engine, focus restoration, touch re-anchoring, and keep-in-view clamping, but with the
- * mockup's chrome: a green-ringed step badge + title header, a centered task heading with an
- * optional constraint hint, and the Enter / Back prompt footer pinned under the content. The scrim
- * is light so the XMB wave reads through, like the PSP original's rich blue backdrop.
- *
- * Strongly controller driven: BACK steps to the previous page, SELECT activates the
- * focused row to advance/confirm. Touch works everywhere — rows tap, fields tap to edit, and
- * pages may expose their own ▶ affordance.
- */
 @Composable
 fun WizardScaffold(
-    /** 1-based page number; null hides the progress rule entirely. */
+
     stepNumber: Int?,
-    /** How many pages this run has. The denominator — see InitialSetupUiState.reachableSteps. */
+
     stepCount: Int = 0,
     title: String,
-    /** Centered task heading, e.g. "Choose your ROM folders." */
+
     heading: String,
-    /** Centered constraint/hint line under the heading, e.g. "Add one or more root folders." */
+
     hint: String? = null,
     onBack: () -> Unit,
-    /** Dimmed, inert Back on the first page (no earlier step exists). */
+
     backEnabled: Boolean = true,
-    /**
-     * Leave the whole wizard, from any page. Null hides the prompt entirely.
-     *
-     * A footer prompt rather than a row, because a row is a thing you scroll to and this is a
-     * thing you want when you have decided you are not doing this now — which on a page whose
-     * rows run past the fold means scrolling to the bottom of a page you are trying to leave.
-     * It used to exist only on Welcome, so the moment you pressed Get Started the way out was
-     * eleven pages of Back.
-     */
+
     onSkip: (() -> Unit)? = null,
-    /** Transient wizard message — rendered as an amber row under the heading. */
+
     message: String? = null,
     onDismissMessage: (() -> Unit)? = null,
-    /** Overrides the footer's guidance line (defaults to the PSP ◀▶/▶ wording). */
+
     footerNote: String? = null,
-    /** The page [content] currently shows. Changing it returns the page to the top. */
+
     contentKey: Any? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -113,18 +81,13 @@ fun WizardScaffold(
         subtitle = "",
         onBack = onBack,
         modifier = modifier,
-        // Its own backdrop rather than a scrim over the crossbar. A scrim is a panel opened on
-        // top of the launcher; the wizard is not that. It is the first thing a new install shows
-        // and the last place that should depend on what wallpaper happens to be set — so it
-        // brings black and the wave and owes the screen behind it nothing.
+
         backdrop = { WizardBackdrop() },
-        // No rail. The wizard is a flow with one way forward; a column of the System section's
-        // other screens beside it is an invitation to leave halfway through.
+
         showRail = false,
         header = { WizardHeader(stepNumber, stepCount, title) },
         footer = { WizardFooter(backEnabled, onSkip != null, footerNote) },
-        // Intercepted before navigation, so it works with a row focused, a field being edited or
-        // nothing focused at all — the states a wizard is most likely to be abandoned from.
+
         onInterceptAction = { action ->
             if (action == GamepadAction.OPEN_CONTEXT_MENU && skip != null) {
                 menuSounds(MenuSound.BACK)
@@ -136,28 +99,11 @@ fun WizardScaffold(
         },
         contentKey = contentKey,
     ) {
-        // The wizard owns the shared scrollable column (registered with the scaffold so
-        // controller boundary navigation and keep-in-view share one scroll owner).
         val scrollState = rememberScrollState()
         LocalSettingsScrollStateRegistrar.current(scrollState)
-        // One scroll state serves all eleven pages, so without this a tall page's offset carries
-        // into the short page after it and opens it scrolled past its own content. Every page
-        // starts at the top, going forward and back alike.
-        //
-        // scrollTo, not animateScrollTo: a page turn is a cut, not a movement, and animating it
-        // would race the scaffold's keep-in-view clamp as the new page's focus lands.
+
         LaunchedEffect(contentKey) { scrollState.scrollTo(0) }
 
-        // A page turn makes a noise of its own.
-        //
-        // The scaffold already ticks for cursor movement and clicks for the row you pressed, but
-        // the row's click and the page arriving are two different events and only the first was
-        // audible — so the longest beat in the wizard, the one where the screen actually changes,
-        // was the silent one. SYSTEM_BROWSE is the crossbar's "you are somewhere else now" cue,
-        // which is exactly what a page turn is.
-        //
-        // Skipped on the first composition: opening the wizard is not a page turn, and the boot
-        // of the flow already has the splash's own confirm behind it.
         var pagesSeen by remember { mutableIntStateOf(0) }
         LaunchedEffect(contentKey) {
             if (pagesSeen > 0) menuSounds(MenuSound.SYSTEM_BROWSE)
@@ -179,16 +125,6 @@ fun WizardScaffold(
     }
 }
 
-/**
- * Black, and the wave on it.
- *
- * Not the theme gradient: the wizard runs before the user has picked a theme, and on a fresh
- * install that gradient is whatever the month happens to make it. Black is the one backdrop that
- * is the same on every install, and it is what the wave was drawn to sit on.
- *
- * The wave is always [WaveStyle.ANIMATED] here. The power-throttle settings it normally obeys are
- * two screens the user has not seen yet, and the wizard is minutes long, not hours.
- */
 @Composable
 private fun WizardBackdrop() {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -201,7 +137,7 @@ private fun WizardHeader(stepNumber: Int?, stepCount: Int, title: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // Header chrome is display-only — UP on the first row must never land here.
+
             .focusProperties { canFocus = false }
             .padding(start = 48.dp, end = 48.dp, top = 18.dp, bottom = 8.dp),
     ) {
@@ -209,9 +145,7 @@ private fun WizardHeader(stepNumber: Int?, stepCount: Int, title: String) {
             text = title,
             color = Color.White,
             fontSize = 30.sp,
-            // Light, not Normal. At 30sp over a black backdrop Normal reads heavy — the PS5
-            // reference this chrome came from sets its page titles in a thin face, and the
-            // weight was the last thing still speaking the older, denser skin.
+
             fontWeight = FontWeight.Light,
         )
         if (stepNumber != null && stepCount > 0) {
@@ -221,13 +155,6 @@ private fun WizardHeader(stepNumber: Int?, stepCount: Int, title: String) {
     }
 }
 
-/**
- * Where you are, as a line rather than a badge.
- *
- * The badge said which page this was and nothing else; a first-run flow's real question is how
- * much of it is left. The rule answers that at a glance and the count answers it exactly, and
- * neither needs a colour of its own to do it.
- */
 @Composable
 private fun WizardProgress(stepNumber: Int, stepCount: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -259,8 +186,6 @@ private fun WizardProgress(stepNumber: Int, stepCount: Int) {
 
 @Composable
 private fun WizardHeading(heading: String, hint: String?) {
-    // Left-aligned, like every other settings page. Centred text reads as a splash screen, and
-    // the eye has to find the start of each line again on a page that is mostly a form.
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -285,18 +210,6 @@ private fun WizardHeading(heading: String, hint: String?) {
     }
 }
 
-/**
- * The same prompt row every other settings screen carries.
- *
- * It used to be a bespoke band: a sentence of instructions and two prompts in PSP blue and red.
- * The sentence said what the glyphs beside it already showed, and the colours said this was not
- * a settings screen — on the one screen whose whole job is to introduce the settings screens.
- *
- * On the first page there is no earlier step, so Back is not listed at all. Dimming the row was
- * the first attempt and it was wrong twice over: a prompt naming a button that does nothing is
- * worse than no prompt, and the alpha applied to the ROW, so Enter — which works perfectly well
- * on page one — came out greyed beside it.
- */
 @Composable
 private fun WizardFooter(backEnabled: Boolean, skippable: Boolean, note: String?) {
     Column(
@@ -319,30 +232,16 @@ private fun WizardFooter(backEnabled: Boolean, skippable: Boolean, note: String?
                     .takeIf { skippable },
             ),
             style = ControllerHintStyle.INLINE,
-            // The same dispatcher every other settings footer uses, so the prompt is a control by
-            // touch as well as a label for a button.
+
             onAction = LocalSettingsPromptAction.current,
         )
     }
 }
 
-/**
- * How far the focused row's plate stops short of the screen edge.
- *
- * Zero until the rail was taken away: with the rail there, the content column began after it and
- * the plate had a margin for free. Without one the plate ran to x=0 and its left corner was
- * clipped off the screen, which reads as a rendering fault rather than as a full-bleed row.
- *
- * It is subtracted from the gutters below rather than added to them, so the TEXT still lands on
- * the same 48dp line as the page title in the header — the inset moves the plate, not the words.
- */
 private val WizardEdgeInset = 16.dp
 
-/** The settings gutter. Header, heading and every page's rows start on the same line. */
 private val WizardGutter = 48.dp - WizardEdgeInset
 
-/** [WizardGutter] for a row that draws its own plate — the same line, inside the inset column. */
 internal val WizardRowGutter = 48.dp - WizardEdgeInset
 
-/** How wide the step rule runs. Long enough to read as progress, short enough to stay chrome. */
 private val WizardProgressWidth = 160.dp

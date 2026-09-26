@@ -16,23 +16,8 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.XYLayout
 import com.psplauncher.core.ui.components.ControllerPromptItem
 
-// Destructive actions rest muted and only turn red once focused: with the row bands gone,
-// a saturated red glyph was the loudest thing on every screen it appeared on.
 private val DangerRed = Color(0xFFE55353)
 
-/**
- * One user-media assignment row: what it is, what is currently assigned, and the two
- * controller-reachable actions that act on it. Selecting the row opens the system picker.
- *
- * Extracted from Interface ▸ Sound so Display ▸ Boot Sequence and Display ▸ GameBoot are the SAME
- * row rather than a copy of it — the three screens differ only in which slot they hand it. A user
- * who has learned the shortcuts on one screen already knows them on the others.
- *
- * [onUseDefault]'s action only appears while something custom is assigned: an action that would do
- * nothing is worse than no action for controller navigation, which has to step through every one.
- * [onPreview] is always offered, because previewing the bundled default is exactly how a user
- * decides whether they want to replace it.
- */
 @Composable
 fun MediaAssignmentRow(
     label: String,
@@ -41,17 +26,11 @@ fun MediaAssignmentRow(
     isAssigned: Boolean,
     onPick: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
-    /**
-     * Null on a slot with nothing to audition — Menu Music, whose assignment is a five-minute
-     * loop. An action that is drawn and does nothing is the thing this null exists to avoid.
-     */
+
     onPreview: (() -> Unit)? = null,
-    /** Null on a slot with no reset. See [resetLabel] for slots whose reset is not a default. */
+
     onUseDefault: (() -> Unit)? = null,
-    /**
-     * What the reset action says it does. "Use the PSP default" is right for a slot that HAS one;
-     * Menu Music does not, so for it the same action is honestly a removal.
-     */
+
     resetLabel: String = "Use the PSP default for $label",
     sublabel: String? = null,
 ) {
@@ -99,27 +78,12 @@ fun MediaAssignmentRow(
     )
 }
 
-/**
- * The face-button shortcuts that act on a focused [MediaAssignmentRow], bound to PHYSICAL
- * positions so they survive the user's X/Y layout setting: the **north**-facing button (Y on
- * Xbox/PS pads, X on Nintendo) resets the row to the PFP default, and the **west**-facing button
- * (X on Xbox/PS, Y on Nintendo) plays its preview. Neither button has another role on the screens
- * that use these rows, so no layout can collide with one.
- *
- * Mechanically: XMBViewModel forwards both presses into the settings layer as
- * OPEN_CONTEXT_MENU / CHANGE_SORT ("treated identically", per its own comment), and these map them
- * back to physical positions through the user's [XYLayout]. Kept here beside the row so the three
- * screens using it cannot drift into different bindings.
- */
 object MediaRowShortcuts {
-
-    /** The action the NORTH-facing button emits under [layout] — "use the default". */
     fun northFace(layout: XYLayout): GamepadAction = when (layout) {
         XYLayout.STANDARD -> GamepadAction.OPEN_CONTEXT_MENU
         XYLayout.SWAPPED -> GamepadAction.CHANGE_SORT
     }
 
-    /** The action the WEST-facing button emits under [layout] — "preview". */
     fun westFace(layout: XYLayout): GamepadAction = when (layout) {
         XYLayout.STANDARD -> GamepadAction.CHANGE_SORT
         XYLayout.SWAPPED -> GamepadAction.OPEN_CONTEXT_MENU
@@ -129,14 +93,6 @@ object MediaRowShortcuts {
 
     fun isWestFace(action: GamepadAction, layout: XYLayout): Boolean = action == westFace(layout)
 
-    /**
-     * The prompt-bar entries for a focused row. [isAssigned] gates the reset prompt so the bar
-     * never advertises an action the row would ignore.
-     *
-     * The actions handed to the prompts are the SAME position-resolved ones the interceptor
-     * matches on, so the glyph the user sees is the button they actually have to press under
-     * their current X/Y layout.
-     */
     fun promptsFor(
         layout: XYLayout,
         isAssigned: Boolean,

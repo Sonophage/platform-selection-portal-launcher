@@ -3,17 +3,7 @@ package com.psplauncher.feature.backup
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * BackupManager carries preferences by an explicit key list, so a key that is not named there
- * simply does not survive a restore — with no error, no log line and nothing to notice until a
- * user finds a setting missing on a new device. This test is the tripwire.
- *
- * Every key below was verified against its declaration site. Keys deliberately NOT carried are
- * listed at the bottom with the reason, so an omission reads as a decision rather than an
- * oversight.
- */
 class BackupKeyCoverageTest {
-
     private val covered = BackupManager.BACKED_UP_KEY_NAMES
 
     private fun assertCovered(vararg keys: String) {
@@ -34,9 +24,6 @@ class BackupKeyCoverageTest {
 
     @Test
     fun `the XMB's own display switches are backed up`() {
-        // Both halves of the crossbar's look: the focused row's info line, and whether its
-        // artwork and colour take over the shell at all. A cosmetic choice the user made, with
-        // no file behind it, so it restores cleanly onto any device.
         assertCovered("pref_xmb_game_metadata", "pref_xmb_item_backdrop")
     }
 
@@ -86,24 +73,17 @@ class BackupKeyCoverageTest {
         )
     }
 
-
     @Test
     fun `the Library section's reader choice is backed up`() {
-        // Book libraries and their rows ride backup as tables. This is the one Library setting
-        // that lives in preferences, so it is the one that can go missing on a restored device
-        // without anything failing: the folders come back and every book opens the wrong app.
         assertCovered(
             "books_default_reader",
-            // The root folders too: they are where the books are, so losing them is losing the
-            // section. They ride the same per-kind key the other three media sections use.
+
             "book_root_tree_uris",
         )
     }
 
     @Test
     fun `controller preferences are backed up`() {
-        // Every controller preference rides backup; a new one that misses this list silently
-        // reverts to its default on a restored device.
         assertCovered(
             "controller_confirm_back_layout",
             "controller_xy_layout",
@@ -116,28 +96,19 @@ class BackupKeyCoverageTest {
 
     @Test
     fun `the wallpaper and scheme the font colour is measured against are backed up`() {
-        // A picked colour is only meaningful against the backdrop it was chosen for, so a restore
-        // that carries one without the other is a half-restore.
         assertCovered("display_custom_wallpaper", "display_color_scheme")
     }
 
     @Test
     fun `keys excluded on purpose stay excluded`() {
-        // Migration and seed markers describe THIS install's schema progress. Restoring them onto
-        // a fresh device would convince it that migrations already ran.
         val migrationMarkers = listOf(
             "debug_seeded_v1", "themes_seeded_v1", "library_consolidated_v22", "data_prep_version",
         )
-        // Points at an extracted theme-icons directory that is not in BUNDLED_FILE_ROOTS, so
-        // restoring the stamp would send observers to files that aren't there.
+
         val danglingStamp = listOf("theme_icons_stamp")
-        // Device- or session-bound, not settings.
+
         val sessionState = listOf("achievements_sync_last", "session_blob")
-        // Derived, not chosen. The wallpaper luminance survey embeds the absolute path it was
-        // computed from, so a restored copy names the SOURCE device's filesDir and is rejected as
-        // stale the first time it is read. StartupDataPrep recomputes it from the restored
-        // wallpaper on the next cold start, which is both cheaper and correct — carrying it would
-        // be dead weight that is discarded on arrival.
+
         val derivedCaches = listOf("display_wallpaper_luma", "wallpaper_accent")
 
         (migrationMarkers + danglingStamp + sessionState + derivedCaches).forEach { key ->

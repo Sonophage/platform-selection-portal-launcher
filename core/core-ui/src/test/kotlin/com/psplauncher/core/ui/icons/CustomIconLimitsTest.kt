@@ -4,17 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * Pins the import gate for user-picked custom XMB icons, mirroring MotionLimitsTest:
- * every rejection names its reason, and the boundary at each cap lands on the accepting side
- * exactly at the limit.
- *
- * The still/animated asymmetry is deliberate and load-bearing: oversized STILLS are downscaled
- * at decode time (decodeFileCapped), never rejected, so only animated probes trip the
- * resolution cap here.
- */
 class CustomIconLimitsTest {
-
     private val still = CustomIconLimits.Probe(
         mime = "image/png",
         width = 256,
@@ -33,8 +23,6 @@ class CustomIconLimitsTest {
         bytes = 512L * 1024,
     )
 
-    // ── format ────────────────────────────────────────────────────────────────
-
     @Test
     fun `every supported mime is accepted`() {
         for (mime in CustomIconLimits.SUPPORTED_MIME) {
@@ -47,8 +35,6 @@ class CustomIconLimitsTest {
         assertEquals(CustomIconLimits.MSG_UNSUPPORTED_FORMAT, CustomIconLimits.validate(animated.copy(mime = "video/mp4")))
         assertEquals(CustomIconLimits.MSG_UNSUPPORTED_FORMAT, CustomIconLimits.validate(animated.copy(mime = null)))
     }
-
-    // ── bytes (both kinds) ────────────────────────────────────────────────────
 
     @Test
     fun `file size boundary - exactly 8MB accepted, one byte over rejected`() {
@@ -63,8 +49,6 @@ class CustomIconLimitsTest {
             CustomIconLimits.validate(animated.copy(bytes = CustomIconLimits.MAX_BYTES + 1)),
         )
     }
-
-    // ── animated-only checks ──────────────────────────────────────────────────
 
     @Test
     fun `gif dimension boundary - exactly 512 accepted, 513 rejected`() {
@@ -104,8 +88,6 @@ class CustomIconLimitsTest {
 
     @Test
     fun `unknown frame count or duration skips those checks`() {
-        // The store cannot cheaply probe a GIF's frame count/duration pre-decode; the probe
-        // fields are nullable and the checks degrade to the ones it does know.
         assertNull(CustomIconLimits.validate(animated.copy(frameCount = null, durationMs = null)))
     }
 

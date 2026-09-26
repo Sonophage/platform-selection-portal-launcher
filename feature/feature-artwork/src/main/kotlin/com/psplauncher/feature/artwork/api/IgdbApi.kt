@@ -19,8 +19,6 @@ import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import javax.inject.Singleton
 
-// ── Response models ────────────────────────────────────────────────────────────
-
 @Serializable
 data class IgdbTokenResponse(
     @SerialName("access_token") val accessToken: String,
@@ -34,7 +32,7 @@ data class IgdbGame(
     val name: String? = null,
     val cover: IgdbImage? = null,
     val artworks: List<IgdbImage> = emptyList(),
-    // Unix seconds. Requested only by searchGames, where it tells two same-named editions apart.
+
     @SerialName("first_release_date") val firstReleaseDate: Long? = null,
 )
 
@@ -44,44 +42,29 @@ data class IgdbImage(
     @SerialName("image_id") val imageId: String? = null,
 )
 
-// ── Parsed result ──────────────────────────────────────────────────────────────
-
 data class IgdbGameInfo(
-    val artworkUrl: String?,   // cover → box art proxy
-    val heroUrl: String?,      // first artwork image → hero proxy
-    val logoUrl: String?,      // IGDB has no clear logos, always null
+    val artworkUrl: String?,
+    val heroUrl: String?,
+    val logoUrl: String?,
 )
 
-// ── Token cache ────────────────────────────────────────────────────────────────
-
 private data class IgdbToken(val accessToken: String, val expiresAtMs: Long)
-
-// ── API client ─────────────────────────────────────────────────────────────────
 
 @Singleton
 class IgdbApi @Inject constructor(
     private val httpClient: HttpClient,
     private val keyProvider: MetadataApiKeyProvider,
 ) {
-    // In-memory token cache — valid for the process lifetime.
-    // Token TTL from Twitch is ~60 days; we re-fetch 60s before expiry.
     private var cachedToken: IgdbToken? = null
 
     suspend fun hasCredentials(): Boolean = keyProvider.hasIgdbCredentials()
 
-    /** IGDB's single best title hit — the batch scraper's and the unmatched Studio browse's call. */
     suspend fun fetchGameInfo(platformId: String, title: String): IgdbGameInfo? =
         query(bestMatchBody(title), "'$title'")?.firstOrNull()?.toInfo()
 
-    /**
-     * Up to [limit] games for [title] (C16). IGDB's `search` is a real multi-result endpoint — what
-     * the tiered matcher's Tier 3 and Change Match need. Not platform-scoped: the tree has no IGDB
-     * platform-id table, so uniqueness is established on normalized title alone.
-     */
     suspend fun searchGames(title: String, limit: Int = SEARCH_LIMIT): List<IgdbGame> =
         query(searchBody(title, limit), "search '$title'").orEmpty()
 
-    /** The art of one known IGDB game — the Studio's browse once a match exists. */
     suspend fun fetchGameInfoById(igdbId: Long): IgdbGameInfo? =
         query(byIdBody(igdbId), "id $igdbId")?.firstOrNull()?.toInfo()
 
@@ -98,8 +81,6 @@ class IgdbApi @Inject constructor(
                 setBody(body)
             }.body<List<IgdbGame>>()
         } catch (e: CancellationException) {
-            // A cancelled browse is not "IGDB has nothing". Swallowing it here is what let a source
-            // switch cache an empty result page in the Artwork Studio.
             throw e
         } catch (e: Exception) {
             Timber.w(e, "IGDB request failed for $what")
@@ -113,20 +94,6 @@ class IgdbApi @Inject constructor(
         logoUrl    = null,
     )
 
-    /**
-     * Test credentials without caching the resulting token.
-     *
-     * The token request is a FORM POST, which is what OAuth2 specifies and what Twitch answers.
-     * It used to hang the three values off the URL as query parameters on a POST with no body,
-     * and ContentNegotiation then labelled that bodyless request as JSON. Twitch's reply could
-     * not be read as an IgdbTokenResponse, the exception was swallowed into `false`, and the
-     * screen said "Invalid — check Client ID and Secret" about credentials that were perfectly
-     * good: verified against Twitch with curl, which returned a token for the very pair the app
-     * was rejecting.
-     *
-     * [obtainToken] made the identical call, so this was never only a broken test button. IGDB
-     * could not authenticate at all, which is why it has never returned anything.
-     */
     suspend fun testCredentials(clientId: String, clientSecret: String): Boolean = try {
         val http = httpClient.submitForm(
             url = "$AUTH_BASE/token",
@@ -137,9 +104,6 @@ class IgdbApi @Inject constructor(
             },
         )
         if (!http.status.isSuccess()) {
-            // Twitch says WHY in the body. This used to be swallowed into a bare false, and the
-            // screen then blamed the credentials for every possible cause -- including two that
-            // had nothing to do with them.
             Timber.w("IGDB token request refused: " + http.status + " " + http.bodyAsText())
             false
         } else {
@@ -155,7 +119,6 @@ class IgdbApi @Inject constructor(
         if (cached != null && cached.expiresAtMs > System.currentTimeMillis()) return cached
 
         return try {
-            // Form POST, for the reason spelled out on testCredentials.
             val response: IgdbTokenResponse =
             httpClient.submitForm(
                 url = "$AUTH_BASE/token",
@@ -180,8 +143,6 @@ class IgdbApi @Inject constructor(
         private const val AUTH_BASE = "https://id.twitch.tv/oauth2"
         private const val SEARCH_LIMIT = 10
 
-        // Apicalypse bodies. Pure, so the query text is testable without a network client. A double
-        // quote in a title becomes a single quote — it would otherwise close the search string.
         private fun quoted(title: String) = "\"" + title.replace("\"", "'") + "\""
 
         internal fun bestMatchBody(title: String) =

@@ -11,9 +11,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CategoryDao {
-
-    // ── Categories ─────────────────────────────────────────────────────
-
     @Query("SELECT * FROM categories WHERE is_visible = 1 ORDER BY position ASC")
     fun observeVisible(): Flow<List<CategoryEntity>>
 
@@ -47,12 +44,8 @@ interface CategoryDao {
     @Query("UPDATE categories SET is_visible = :visible WHERE id = :id")
     suspend fun setVisible(id: String, visible: Boolean)
 
-    // Corrects only the system-defined gaming flag on an existing row, leaving
-    // user-editable fields (name, position, visibility, icon) untouched. No-op if absent.
     @Query("UPDATE categories SET is_gaming_category = :gaming WHERE id = :id")
     suspend fun setGamingFlag(id: String, gaming: Boolean)
-
-    // ── Category Items (junction table) ────────────────────────────────
 
     @Query("SELECT * FROM category_items WHERE category_id = :categoryId ORDER BY pinned DESC, sort_order ASC")
     fun observeItemsForCategory(categoryId: String): Flow<List<CategoryItemEntity>>
@@ -60,7 +53,6 @@ interface CategoryDao {
     @Query("SELECT * FROM category_items WHERE category_id = :categoryId ORDER BY pinned DESC, sort_order ASC")
     suspend fun getItemsForCategory(categoryId: String): List<CategoryItemEntity>
 
-    // All app-assignment rows, streamed — drives the App categories' membership.
     @Query("SELECT * FROM category_items WHERE item_type = 'app'")
     fun observeAppItems(): Flow<List<CategoryItemEntity>>
 

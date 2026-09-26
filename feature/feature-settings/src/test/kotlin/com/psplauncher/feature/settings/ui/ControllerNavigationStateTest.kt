@@ -7,7 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ControllerNavigationStateTest {
-
     private fun item(
         key: String,
         focusable: Boolean = true,
@@ -53,23 +52,22 @@ class ControllerNavigationStateTest {
     fun `movement clamps at both boundaries`() {
         val state = ControllerNavigationState()
         state.updateItems(listOf(item("a"), item("b")))
-        // Already at the first item — Up stays put.
+
         assertEquals("a", state.move(-1))
         assertEquals("b", state.move(1))
-        // Already at the last item — Down stays put.
+
         assertEquals("b", state.move(1))
     }
 
     @Test
     fun `navigation skips section headers`() {
         val state = ControllerNavigationState()
-        // Section headers are non-focusable landmarks: the cursor never lands on them and
-        // movement flows straight between the rows around them.
+
         state.updateItems(listOf(item("hdr", focusable = false), item("a"), item("b")))
         assertEquals("a", state.focusedKey)
         assertEquals("b", state.move(1))
         assertEquals("a", state.move(-1))
-        // Clamped at the first row — the header is not a navigation target.
+
         assertEquals("a", state.move(-1))
     }
 
@@ -158,11 +156,11 @@ class ControllerNavigationStateTest {
             listOf(item("a"), item("b"), item("c"), item("d")),
             geometry = mapOf("a" to 100f, "b" to 300f, "c" to 500f, "d" to 700f),
         )
-        // Pre-drag focus was on the first row; the viewport centre now sits between b and c.
+
         state.setFocused("a")
         assertEquals("c", state.focusNearestTo(460f))
         assertEquals("c", state.focusedKey)
-        // Movement continues from the re-anchored row, not the stale pre-drag one.
+
         assertEquals("d", state.move(1))
         assertEquals("b", state.move(-2))
     }
@@ -218,17 +216,17 @@ class ControllerNavigationStateTest {
         )
         state.updateItems(listOf(row))
         assertEquals("row", state.focusedKey)
-        // RIGHT enters the first action.
+
         assertEquals("row:a", state.moveHorizontal(1))
-        // RIGHT steps to the next action, clamped at the last.
+
         assertEquals("row:b", state.moveHorizontal(1))
         assertEquals("row:b", state.moveHorizontal(1))
-        // LEFT walks back, then past the first action returns to the row.
+
         assertEquals("row:a", state.moveHorizontal(-1))
         assertEquals("row", state.moveHorizontal(-1))
-        // LEFT on the row stays put.
+
         assertEquals("row", state.moveHorizontal(-1))
-        // SELECT dispatches the focused inline action.
+
         assertEquals("row:a", state.moveHorizontal(1))
         assertTrue(state.select())
         assertTrue(actionSelected)

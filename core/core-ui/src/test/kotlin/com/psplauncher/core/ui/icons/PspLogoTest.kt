@@ -14,26 +14,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The two brand marks, and the one way each fails silently on a device while looking fine in a
- * preview.
- *
- *  - `psp_icon_mark` is the adaptive icon's foreground AND its Android 13+ monochrome layer. Every
- *    launcher mask crops to at most the SAFE ZONE — the 66dp circle inside the 108dp canvas — so
- *    ink outside it is ink the user never sees. A re-cut that fills the canvas still builds, still
- *    previews correctly, and loses the ends of the wordmark on a round-mask launcher.
- *
- *  - `psp_logo` is the boot mark, drawn through [PortalIcon], which tints with `BlendMode.SrcIn`:
- *    the ALPHA carries the shape and the tint replaces the colour. So the asset has to be a
- *    silhouette on transparency. Swap in a flat opaque image — a JPEG, say, which cannot hold
- *    alpha at all — and SrcIn paints a solid tinted rectangle over the boot wave. Nothing throws.
- */
 @RunWith(RobolectricTestRunner::class)
-// Legacy graphics is a no-op canvas: every draw would report zero ink and these tests
-// would pass while proving nothing. NATIVE actually rasterises.
+
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PspLogoTest {
-
     private fun render(resId: Int, size: Int): Bitmap {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val drawable = requireNotNull(ContextCompat.getDrawable(context, resId)) { "did not load" }
@@ -45,11 +29,11 @@ class PspLogoTest {
 
     @Test
     fun `the icon mark draws, and all of its ink lands inside the adaptive icon safe zone`() {
-        val size = 432                       // the 108dp canvas at 4x, so thin strokes still land
+        val size = 432
         val bitmap = render(R.drawable.psp_icon_mark, size)
 
         val centre = size / 2f
-        val safeRadius = size * 33f / 108f   // the 66dp safe circle, at the bitmap's scale
+        val safeRadius = size * 33f / 108f
         var ink = 0
         var outside = 0
         for (y in 0 until size) {
@@ -73,8 +57,6 @@ class PspLogoTest {
         val size = 256
         val bitmap = render(R.drawable.psp_logo, size)
 
-        // Not `alpha == 255`: the supplied art tops out at 254, which SrcIn renders identically.
-        // "Solid enough to be the shape" is the property that matters, so the threshold is a band.
         var solid = 0
         var transparent = 0
         for (y in 0 until size) {

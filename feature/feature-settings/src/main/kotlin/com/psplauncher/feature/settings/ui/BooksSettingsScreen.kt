@@ -27,10 +27,6 @@ import com.psplauncher.feature.settings.viewmodel.BooksSettingsUiState
 import com.psplauncher.feature.settings.viewmodel.BooksSettingsViewModel
 import com.psplauncher.feature.settings.viewmodel.RootFolderRow
 
-/**
- * Stateful entry point: owns the ViewModel, collects its state, and wires the folder pickers.
- * Thin on purpose, so the previewable UI lives in [BooksSettingsContent].
- */
 @Composable
 fun BooksSettingsScreen(
     onBack: () -> Unit,
@@ -70,7 +66,6 @@ fun BooksSettingsScreen(
     )
 }
 
-/** Stateless UI, driven purely by [state] and callbacks, so it renders in `@Preview`. */
 @Composable
 fun BooksSettingsContent(
     state: BooksSettingsUiState,
@@ -121,9 +116,6 @@ fun BooksSettingsContent(
                 onClick  = if (state.scanning || !state.hasRoots) null else onRescan,
             )
 
-            // Reading a book's series and cover means opening the archive, so a normal rescan
-            // skips books whose file has not changed. This is the way back in when the metadata
-            // was edited without the timestamp moving, or when a cover looks wrong.
             SettingsRow(
                 label    = "Deep Rescan",
                 sublabel = "Reopen every book and rebuild every cover. Slow on a large library.",
@@ -160,11 +152,7 @@ fun BooksSettingsContent(
         }
     }
 
-    // ── Reader picker: Ask Every Time, or an installed reader ──────────────────
-    // No built-in choice, unlike Music and Video: this launcher does not read EPUBs.
     if (state.showReaderPicker) {
-        // Label and value together, so the index the overlay reports cannot address one list
-        // while meaning the other.
         val choices: List<Pair<String, String?>> = buildList {
             add("Ask Every Time" to null)
             state.availableReaders.forEach { add(it.label to it.packageName) }

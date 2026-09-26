@@ -6,14 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Pins [IconGifSupport] — the structural GIF probe and the animated-icon gate BOTH importers
- * share. The Studio validates against these numbers before a bundle ships; the handheld's own
- * gate (core-ui CustomIconLimits) enforces the same on device. These tests are the reason the
- * two cannot drift.
- */
 class IconGifSupportTest {
-
     private fun gif(frames: Int, delayCs: Int = 10): ByteArray {
         val out = java.io.ByteArrayOutputStream()
         out.write("GIF89a".toByteArray(Charsets.US_ASCII))
@@ -79,7 +72,6 @@ class IconGifSupportTest {
 
     @Test
     fun `single-frame gifs classify as stills by the same probe the launcher uses`() {
-        // The >1 rule is the still/animated boundary on both sides.
         val single = gif(1)
         assertTrue(IconGifSupport.countFrames(single) <= 1)
     }

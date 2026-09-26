@@ -23,41 +23,25 @@ data class ArtworkFetchResult(
     val errorMessage: String? = null,
 )
 
-// Real, file-aware artwork status for the whole library.
 data class ArtworkStatus(
     val total: Int = 0,
-    val complete: Int = 0,   // has valid box art (file present / remote URL)
-    val missing: Int = 0,    // no artwork reference at all
-    val stale: Int = 0,      // reference exists but the local file is gone/empty
+    val complete: Int = 0,
+    val missing: Int = 0,
+    val stale: Int = 0,
 )
 
-// Live progress during a scrape run.
 data class ScrapeProgress(
     val current: Int,
     val total: Int,
     val succeeded: Int,
     val failed: Int,
     val title: String,
-    val scrapeSource: String = "",   // e.g. "IGDB", "SteamGridDB"
-    val scrapeAsset: String = "",    // e.g. "Box Art", "Hero", "Logo"
-    /**
-     * Why ScreenScraper stopped part-way, when it did, ready to show.
-     *
-     * Only set on the final progress a batch emits. A run that ends with a pile of failures and
-     * no reason is indistinguishable from a library of games nobody has ever heard of, and the
-     * two call for opposite responses from the person reading the screen.
-     */
+    val scrapeSource: String = "",
+    val scrapeAsset: String = "",
+
     val stoppedReason: String? = null,
 )
 
-/**
- * A stop reason in the words the person who hit it needs (pure — unit-tested).
- *
- * Each one says what happened AND what to do about it, because the difference between these is
- * entirely in what the user should do next: wait a day, fix a credential, or nothing at all.
- * Reasons that stop a single lookup rather than the run return null -- they are already counted
- * as failures and explaining them per game would be noise.
- */
 fun scrapeStopMessage(reason: SsFailureReason?): String? = when (reason) {
     SsFailureReason.DAILY_QUOTA_EXCEEDED ->
         "ScreenScraper's daily quota for this account ran out, so the rest was skipped. It resets tomorrow."
@@ -80,7 +64,6 @@ class ArtworkRepository @Inject constructor(
     private val internalStore: com.psplauncher.feature.artwork.store.InternalArtworkStore,
     private val ssMediaCacheDao: com.psplauncher.core.data.database.dao.SsMediaCacheDao,
 ) {
-    // Fetch artwork + metadata for all games that don't have any artwork yet.
     suspend fun fetchMissingArtwork(
         onProgress: (current: Int, total: Int, title: String) -> Unit,
     ): List<ArtworkFetchResult> = withContext(Dispatchers.IO) {
@@ -93,7 +76,6 @@ class ArtworkRepository @Inject constructor(
             onProgress(current, total, title)
         }
 
-        // Build results list from what we now have in the DB
         games.forEach { game ->
             val updated = gameDao.getById(game.id)
             val success = updated?.artworkUri != null
@@ -105,8 +87,6 @@ class ArtworkRepository @Inject constructor(
         results
     }
 
-    // Single-game entry point — used by GameDetailViewModel.
-    // Looks up platformId + romPath from DB so the call-site signature stays stable.
     suspend fun fetchArtworkForGame(gameId: Long, title: String): ArtworkFetchResult {
         val game = gameDao.getById(gameId)
             ?: return ArtworkFetchResult(gameId, title, false, errorMessage = "Game not found")
@@ -120,15 +100,6 @@ class ArtworkRepository @Inject constructor(
         return ArtworkFetchResult(gameId, title, result.success, errorMessage = result.message.takeIf { !result.success })
     }
 
-    // ── Metadata presets (C16 task 3.2) ──────────────────────────────────────────
-
-    /**
-     * Current-vs-Incoming for one game. Writes no `games` column (AD-7).
-     *
-     * Bypasses the ScreenScraper media-URL cache on purpose: a cache hit is URL-only
-     * (`SsMediaSelection.infoFromCache`), so it would never offer a ScreenScraper preset. That costs
-     * one jeuInfos call per explicit open, never per scrape.
-     */
     suspend fun fetchMetadataPreview(gameId: Long): MetadataPreview? = withContext(Dispatchers.IO) {
         val game = gameDao.getById(gameId) ?: return@withContext null
         val candidates = metadataRepository.fetchCandidates(
@@ -141,12 +112,6 @@ class ArtworkRepository @Inject constructor(
         MetadataPreview(MetadataApply.currentOf(game), MetadataApply.presetsFrom(candidates))
     }
 
-    /**
-     * Applies [incoming] under [policy] against the game's CURRENT row (re-read here, so a preview
-     * left open never writes against stale values). Returns the fields written; empty means the
-     * table was not touched. Only text columns are passed — no artwork column, provider id or
-     * user title override can change through this path.
-     */
     suspend fun applyMetadata(
         gameId: Long,
         incoming: MetadataPreset,
@@ -176,8 +141,6 @@ class ArtworkRepository @Inject constructor(
                 releaseDate = releaseDate,
             )
         } else {
-            // COALESCE(:new, old): the plan holds only non-blank incoming values, so this overwrites
-            // exactly the planned fields and leaves every other column as it is.
             gameDao.updateMetadata(
                 id = gameId, description = description, developer = developer, publisher = publisher,
                 releaseYear = releaseYear, genre = genre, scrapedTitle = scrapedTitle,
@@ -188,44 +151,24 @@ class ArtworkRepository @Inject constructor(
         plan.keys
     }
 
-    /** Drops every cached ScreenScraper media-URL list — next scrape refreshes per game. */
     suspend fun clearSsMediaCache() = ssMediaCacheDao.clearAll()
 
-    /** Evicts just [uris] from the display caches — see [ArtworkImageCache.evict]. */
     fun evictFromImageCache(uris: Collection<String>) = imageCache.evict(uris)
 
-    /**
-     * App-side artwork footprint in bytes: Coil's disk cache + the internal artwork store.
-     * Files in the user's portable library are the user's own and are never counted.
-     */
     suspend fun cacheSizeBytes(): Long = withContext(Dispatchers.IO) {
         imageCache.diskSizeBytes() + internalStore.footprint().second
     }
 
-    /**
-     * Full artwork reset for a fresh start: Coil caches, every internally stored file, all
-     * artwork_records, and every game's artwork columns. Files in the user's portable
-     * library are NEVER deleted — Relink/re-scrape rebuilds from them at any time.
-     */
     suspend fun clearCache() {
         imageCache.clear()
-        artworkStore.deleteAll()          // internal files + artwork_records (never library files)
+        artworkStore.deleteAll()
         gameDao.clearAllArtworkRefs()
         ssMediaCacheDao.clearAll()
         Timber.i("Artwork cache + stored artwork state cleared")
     }
 
-    // ── Accurate, file-aware artwork status ──────────────────────────────────────
-
-    // A reference is valid if it's a remote URL, or a stored file that still resolves to bytes.
     private fun isValidArtworkRef(uri: String?): Boolean = artworkStore.isValidRef(uri)
 
-    // The primary display artwork a matched game can reliably obtain from the scrapers: the
-    // full-screen background, the box-art tile, and the clear logo. A game counts as complete
-    // (and is skipped by Scrape Missing) only when ALL of these resolve. Physical media, 3D
-    // boxes, hero fanart, and the SGDB-grid icon are intentionally excluded — ScreenScraper
-    // lacks them for many titles, so requiring them would re-target those games forever. They
-    // are still filled opportunistically whenever a game IS scraped.
     private fun primaryArtRefs(g: com.psplauncher.core.data.database.entity.GameEntity) =
         listOf(g.artworkUri, g.boxArtUri, g.logoUri)
 
@@ -241,17 +184,14 @@ class ArtworkRepository @Inject constructor(
             val refs = primaryArtRefs(g)
             when {
                 refs.all { isValidArtworkRef(it) }                        -> complete++
-                refs.any { !it.isNullOrBlank() && !isValidArtworkRef(it) } -> stale++   // a set path broke
-                else                                                     -> missing++  // simply absent
+                refs.any { !it.isNullOrBlank() && !isValidArtworkRef(it) } -> stale++
+                else                                                     -> missing++
             }
         }
         ArtworkStatus(total = games.size, complete = complete, missing = missing, stale = stale)
             .also { Timber.i("Artwork status: $it") }
     }
 
-    // ── Clearing ─────────────────────────────────────────────────────────────────
-
-    // Clears all DB artwork references AND the stored artwork files so nothing stale remains.
     suspend fun clearAllArtwork() = withContext(Dispatchers.IO) {
         gameDao.clearAllArtwork()
         artworkStore.deleteAll()
@@ -259,34 +199,22 @@ class ArtworkRepository @Inject constructor(
         Timber.i("All artwork cleared (db refs + files + cache)")
     }
 
-    // ── Scrape modes ──────────────────────────────────────────────────────────────
-
-    // Re-scrape every game: clears existing artwork first, then fetches fresh art for all.
     suspend fun reScrapeAllGames(onProgress: (ScrapeProgress) -> Unit): ScrapeProgress =
         withContext(Dispatchers.IO) {
             clearAllArtwork()
-            // Re-scrape-all exists to pick up upstream changes — bypass the SS URL cache.
+
             fetchForGames(gameDao.getAll().map { it.id to Triple(it.title, it.platformId, it.romPath) }, onProgress, bypassSsCache = true)
         }
 
-    // Scrape every game still missing any primary artwork — not just those missing a background.
-    // A game with, say, a valid background but no box art or logo is now included and its gaps
-    // are filled (the store's conflict gate leaves already-valid assets untouched, so nothing
-    // that exists is re-downloaded or overwritten).
     suspend fun scrapeMissingOnly(onProgress: (ScrapeProgress) -> Unit): ScrapeProgress =
         withContext(Dispatchers.IO) {
             val targets = gameDao.getAll().filter { needsArtwork(it) }
-            // Only games whose BACKGROUND ref is itself stale get the slate cleared before the
-            // re-fetch (clearArtworkForGame also nulls hero/logo/icon). Games pulled in only for
-            // a missing box art keep their valid background — COALESCE fills the gaps in place.
+
             targets.filter { !it.artworkUri.isNullOrBlank() && !isValidArtworkRef(it.artworkUri) }
                 .forEach { gameDao.clearArtworkForGame(it.id) }
             fetchForGames(targets.map { it.id to Triple(it.title, it.platformId, it.romPath) }, onProgress)
         }
 
-    // Scrape only [platformId]'s games still missing primary artwork — the per-card menu action.
-    // Same rules as scrapeMissingOnly: complete games are skipped, stale backgrounds cleared,
-    // gaps filled in place without re-downloading anything valid.
     suspend fun scrapeMissingForPlatform(platformId: String, onProgress: (ScrapeProgress) -> Unit): ScrapeProgress =
         withContext(Dispatchers.IO) {
             val targets = gameDao.getAll().filter { it.platformId == platformId && needsArtwork(it) }
@@ -295,15 +223,12 @@ class ArtworkRepository @Inject constructor(
             fetchForGames(targets.map { it.id to Triple(it.title, it.platformId, it.romPath) }, onProgress)
         }
 
-    // Text-only metadata pass over every game on [platformId] — no artwork is downloaded and no
-    // artwork column is written (COALESCE fills missing text fields, existing values stay).
     suspend fun updateMetadataForPlatform(platformId: String, onProgress: (ScrapeProgress) -> Unit): ScrapeProgress =
         withContext(Dispatchers.IO) {
             val games = gameDao.getAll().filter { it.platformId == platformId }
             fetchForGames(games.map { it.id to Triple(it.title, it.platformId, it.romPath) }, onProgress, metadataOnly = true)
         }
 
-    // Shared scrape loop with rich progress and per-game error isolation.
     private suspend fun fetchForGames(
         games: List<Pair<Long, Triple<String, String, String?>>>,
         onProgress: (ScrapeProgress) -> Unit,

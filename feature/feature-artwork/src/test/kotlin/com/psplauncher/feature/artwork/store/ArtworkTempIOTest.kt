@@ -10,11 +10,9 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 
 class ArtworkTempIOTest {
-
     @get:Rule
     val tmp = TemporaryFolder()
 
-    // Minimal valid PNG header (magic bytes) followed by payload filler.
     private fun pngBytes(size: Int): ByteArray = ByteArray(size).also {
         byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A).copyInto(it)
     }
@@ -29,7 +27,7 @@ class ArtworkTempIOTest {
     @Test
     fun `stream over the per-kind cap is rejected without draining`() {
         var served = 0L
-        // Endless PNG-prefixed stream — terminates only if the cap aborts the copy.
+
         val endless = object : InputStream() {
             private val header = pngBytes(8)
             override fun read(): Int = (if (served < 8) header[served.toInt()].toInt() else 0).also { served++ }
@@ -41,7 +39,7 @@ class ArtworkTempIOTest {
         }
         val file = ArtworkTempIO.copyToTemp(endless, tmp.root, ArtworkKind.ICON)
         assertNull(file)
-        // Aborted just past the 50 MB image cap — not gigabytes later.
+
         val cap = ArtworkTempIO.maxBytesFor(ArtworkKind.ICON)
         assert(served <= cap + (128 * 1024)) { "stream drained $served bytes past the cap" }
     }

@@ -38,69 +38,42 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
     @Inject
     lateinit var gamepadInputHandler: GamepadInputHandler
 
-    // Provided into the composition (LocalMenuSounds) so shared chrome with no ViewModel of its
-    // own -- the settings scaffold, which is one navigation dispatch for every settings screen --
-    // can make the same noises the XMB does.
     @Inject
     lateinit var menuSoundPlayer: com.psplauncher.core.ui.sound.MenuSoundPlayer
 
-    // Menu music, and the two things that decide whether it plays: the user's switch and whether
-    // the launcher is the thing on screen. Driven from here rather than from a ViewModel because
-    // the second of those is an Activity fact — a ViewModel survives the launcher being covered
-    // by a game, which is exactly when the music must stop.
     @Inject
     lateinit var menuMusicPlayer: com.psplauncher.core.ui.media.MenuMusicPlayer
 
     @Inject
     lateinit var menuMusicPreferences: com.psplauncher.core.data.media.MenuMusicPreferences
 
-    // The launch disc's opening cue, and the GameBoot cue that takes over from it partway
-    // through — one shared one-shot player, which is what makes the second one replace the first
-    // rather than sound over it.
     @Inject
     lateinit var uiMediaAudioPlayer: com.psplauncher.core.ui.media.UiMediaAudioPlayer
 
     @Inject
     lateinit var libraryRescanCoordinator: LibraryRescanCoordinator
 
-    // Owns the user's ui-media assignments; a cold start prunes anything left by slots the
-    // current build no longer has (removed sound slots, crashed-import staging files).
     @Inject
     lateinit var uiMediaStore: com.psplauncher.core.data.repository.UiMediaStore
 
-    // B1 launch verification: the home-launcher handshake. A dispatched game launch is only
-    // "real" if another activity covers this launcher (onStop) and the user comes back after a
-    // real session (onResume). Nothing else in the app reports lifecycle to the dispatcher.
     @Inject
     lateinit var launchDispatcher: com.psplauncher.feature.launcher.LaunchDispatcher
 
-    // Same activity-scoped instance the shell's hiltViewModel() resolves — used to report when
-    // the notification-permission dialog is out of the way so the boot sequence can start.
     private val xmbViewModel: XMBViewModel by viewModels()
 
-    // True once the launcher has actually been stopped, so onResume can tell "back from a game"
-    // apart from the cold start's own first onResume.
     private var wasStopped = false
 
-    // Runtime-registered so it actually fires on Android 8+ (manifest receivers are blocked for
-    // this implicit broadcast). Lives for the activity's lifetime.
     private val installShortcutReceiver = InstallShortcutReceiver()
 
-    // Also runtime-registered: ACTION_MEDIA_MOUNTED is an implicit broadcast, so a manifest entry
-    // would never fire on Android 8+. Lives for the activity's lifetime.
     private val mediaMountReceiver = MediaMountReceiver()
 
-    // Covers the USB-cable case the mount receiver can't: an MTP transfer never unmounts storage,
-    // so unplugging fires no MEDIA_MOUNTED. USB_STATE's disconnect edge is the actual unplug signal.
     private val usbDisconnectReceiver = UsbDisconnectReceiver()
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            // Best-effort grant; either way the dialog is resolved and startup can continue.
             xmbViewModel.onStartupPermissionsSettled()
         }
 
@@ -121,8 +94,7 @@ class MainActivity : ComponentActivity() {
         ContextCompat.registerReceiver(
             this,
             mediaMountReceiver,
-            // The "file" data scheme is required — ACTION_MEDIA_MOUNTED carries a file:// URI for
-            // the mounted volume, and a filter without a scheme never matches it.
+
             IntentFilter(Intent.ACTION_MEDIA_MOUNTED).apply { addDataScheme("file") },
             ContextCompat.RECEIVER_EXPORTED,
         )
@@ -130,23 +102,17 @@ class MainActivity : ComponentActivity() {
             this,
             usbDisconnectReceiver,
             IntentFilter(UsbDisconnectReceiver.ACTION_USB_STATE),
-            // NOT_EXPORTED: USB_STATE is a protected system broadcast, so only the OS can send it —
-            // no need to accept it from other apps, and this is the flag Android recommends for a
-            // receiver registered purely for system broadcasts.
+
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
 
         val callback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                //Left blank so that it can be ignored, preventing users from exiting the launcher.
-                //Back is already handled by the gamepad input handler.
             }
         }
 
         onBackPressedDispatcher.addCallback(this, callback)
 
-        // Orphan sweep for the user's ui-media directory (removed slots, stale staging files).
-        // Off the main thread; cheap (one directory listing) when there is nothing to remove.
         lifecycleScope.launch {
             runCatching { uiMediaStore.pruneOrphans() }
                 .onFailure { Timber.w(it, "Startup UI-media prune failed") }
@@ -154,22 +120,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PFPTheme {
-                // Controller prompts are ambient: every footer resolves its glyphs from the
-                // live bindings supplied here, so none of them can contradict the pad.
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.psplauncher.core.ui.sound.LocalMenuSounds provides { sound -> menuSoundPlayer.play(sound) },
                     com.psplauncher.core.ui.sound.LocalLaunchDiscCue provides {
-                        // pathFor is one stat call against the ui-media directory, once per
-                        // launch; not worth a coroutine hop that would let the disc's first
-                        // frame beat its own sound onto the screen. No path means no sound: the
-                        // slot has no bundled sample, so the ceremony opens in silence as before.
                         uiMediaStore.pathFor(
                             com.psplauncher.core.domain.model.UiMediaSlot.LAUNCH_DISC_AUDIO,
                         )?.let { track ->
-                            // Clipped to the hand-off, not to the slot's import ceiling. The cue
-                            // is scenery for the disc; on a launch with no GameBoot sound to take
-                            // over from it, an 8-second file would otherwise play on underneath
-                            // the app that just opened.
+
                             uiMediaAudioPlayer.play(
                                 uri = track,
                                 clipEndMs =
@@ -180,9 +137,6 @@ class MainActivity : ComponentActivity() {
                     },
                 ) {
                 ProvideControllerPrompts {
-                    // AppXmbHost is defined per build variant: the debug source set wraps the shell so
-                    // long-pressing Settings opens DebugMenuScreen; the release source set calls
-                    // XMBShellContainer directly, keeping debug code out of the APK.
                     AppXmbHost()
                 }
                 }
@@ -193,44 +147,23 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         hideSystemBars()
-        // B1: PFP is foreground again — classify any pending launch hand-off (success if the
-        // emulator held the foreground for a real session, never-foregrounded otherwise).
+
         launchDispatcher.onHostResumed()
-        // Only a RETURN counts for "Show Boot Sequence on Resume" — the very first onResume after
-        // onCreate is the cold start, which already plays its own boot.
+
         if (wasStopped) {
             wasStopped = false
             xmbViewModel.onHostResumed()
         }
-        // Same "back from a game" moment is the weak rescan signal: it catches ROMs downloaded or
-        // deleted while PFP was backgrounded. The coordinator throttles this internally (5 min), so
-        // calling it on every resume costs nothing when it fires in quick succession.
+
         lifecycleScope.launch {
             runCatching { libraryRescanCoordinator.onResume() }
                 .onFailure { Timber.e(it, "Resume-triggered library rescan failed") }
         }
     }
 
-    /**
-     * Starts the music if the user wants it and has given it something to play.
-     *
-     * Collected for the whole time the launcher is resumed rather than read once, so toggling the
-     * switch or assigning a track in Settings takes effect where you did it instead of on the
-     * next cold start.
-     *
-     * CALLED FROM onCreate, not onResume. repeatOnLifecycle suspends until the lifecycle is
-     * DESTROYED and restarts its block on every RESUMED — so one call covers every resume for the
-     * life of the activity, and calling it from onResume started a SECOND collector on the second
-     * resume, a third on the third, each collecting the same flow and racing the others to start
-     * the music. The old comment here said the scope was torn down at onStop; lifecycleScope is
-     * cancelled at onDestroy.
-     */
     private fun startMenuMusicIfWanted() {
         lifecycleScope.launch {
             repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-                // The switch, and the store's change stamp. pathFor is a synchronous read, so
-                // the stamp is what turns "the user just assigned a different track" into an
-                // emission — the same signal every other ui-media consumer re-reads on.
                 kotlinx.coroutines.flow.combine(
                     menuMusicPreferences.enabledFlow,
                     uiMediaStore.stamp,
@@ -246,11 +179,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        // Whatever covered the launcher gets the speaker. The repeatOnLifecycle collection above
-        // ends with RESUMED, but the player is told explicitly rather than left to a cancellation
-        // — a cancelled collector stops OBSERVING, it does not stop the music.
         menuMusicPlayer.setWanted(wanted = false, track = null)
-        // B1: another activity covered the launcher — the dispatched emulator came to front.
+
         launchDispatcher.onHostStopped()
         wasStopped = true
         super.onStop()
@@ -263,9 +193,6 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    // Background-task notifications need the POST_NOTIFICATIONS runtime grant on API 33+.
-    // Every early-return path reports the permission flow settled so the boot sequence
-    // (which holds until then) can start.
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             xmbViewModel.onStartupPermissionsSettled()
@@ -289,41 +216,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ── Controller input forwarding ───────────────────────────────────────────
-
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (minimalKeyboardKey(event)) return true
-        // Let the gamepad handler process it first; fall back to normal dispatch
+
         if (gamepadInputHandler.onKeyEvent(event)) return true
         if (openSearchOnTypedCharacter(event)) return true
         return super.dispatchKeyEvent(event)
     }
 
-    /**
-     * The keys a minimal keyboard actually has, claimed without binding them.
-     *
-     * The owner's keyboard is QWERTY plus Enter, Space, Shift and Back — no Escape, no function
-     * row, no PageUp. Five of the six keyboard bindings name keys that are not on it, so they
-     * never fire, and the two keys that ARE free cannot simply be bound: DEFAULT_BINDINGS is
-     * guarded against claiming anything that types a character, because GamepadInputHandler takes
-     * a bound keycode before any text field sees it. Space in that table is Space you can never
-     * type into the search box.
-     *
-     * So they are claimed HERE, before the handler, and only while nothing is being typed into.
-     * `typeToSearchAllowed()` is exactly that question and is reused rather than restated: if a
-     * letter would have started a search, the launcher owns the keyboard and these two are its
-     * keys; if it would have gone into a field, so do these.
-     *
-     *  - **Enter** opens the App Drawer, on the crossbar only — see [XMBUiState.enterOpensAppDrawer]
-     *    for why it keeps confirming everywhere else.
-     *  - **Space** opens the options for whatever has the cursor, wherever a row has any.
-     *
-     * SHIFT AND THE LETTERS ARE NOT AVAILABLE and there is no way to make them so. A letter is
-     * type-to-search. Shift produces no character of its own, so the guard above would not catch
-     * it, but claiming it would stop the letter after it being capitalised — the same fault one
-     * level down, and one no test currently looks for.
-     */
     private fun minimalKeyboardKey(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return false
         if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
@@ -338,38 +239,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Enter opens the App Drawer, on the crossbar and nowhere else.
-     *
-     * BEFORE the gamepad handler, unlike type-to-search, and that order is the point: ENTER is
-     * bound to SELECT, so letting the handler see it first would confirm whatever the cursor is
-     * on before this ever ran. Claiming it here is what "unbind it, on this screen" means when
-     * the binding table has one row per keycode and no idea which screen is showing.
-     *
-     * Everywhere else the handler gets it and Enter is confirm exactly as before. The ViewModel
-     * owns the "is this the crossbar" question — see XMBViewModel.enterOpensAppDrawer.
-     */
     private fun enterOpensAppDrawer(event: KeyEvent): Boolean {
         if (!xmbViewModel.enterOpensAppDrawer()) return false
         xmbViewModel.onOpenAppDrawer()
         return true
     }
 
-    /**
-     * Start typing anywhere on the XMB and you are searching.
-     *
-     * AFTER the gamepad handler, never before: the bound keys are actions first. Escape backs out
-     * and Space opens options, and a keyboard user pressing them is pressing a button, not writing
-     * the letter " ". Anything the handler did not claim and that produces a character is text.
-     *
-     * The guards are all about not stealing a letter someone meant to type. [unicodeChar] is 0 for
-     * a key with no character — the arrows, the function row, a bare modifier — and the control
-     * range covers Enter, Tab and Backspace, which arrive with a character but are not typing. Ctrl
-     * and Alt mean a shortcut is being attempted, whether or not this app has one. Shift alone does
-     * not, because a capital letter is still a letter.
-     *
-     * The ViewModel decides whether anything else owns the keyboard right now.
-     */
     private fun openSearchOnTypedCharacter(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return false
         if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
@@ -377,9 +252,7 @@ class MainActivity : ComponentActivity() {
         if (typed == 0) return false
         val ch = typed.toChar()
         if (ch.isISOControl()) return false
-        // The ViewModel decides WHICH search: the App Drawer's own box while it is open, the
-        // global one otherwise. It answers false when neither wants the character, and then this
-        // falls through to whatever field is really focused.
+
         return xmbViewModel.onTypedCharacter(ch.toString())
     }
 

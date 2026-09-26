@@ -6,7 +6,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class PtfParserTest {
-
     private val pink = 0xFFFF72B1.toInt()
 
     private fun syntheticPtf(name: String = "Test Theme", fw: String = "6.20"): ByteArray {
@@ -42,9 +41,9 @@ class PtfParserTest {
         val wallpaper = assertNotNull(theme.wallpaper)
         assertEquals(8, wallpaper.width)
         assertEquals(4, wallpaper.height)
-        assertEquals(pink, wallpaper[0, 0])           // checkerboard corner
+        assertEquals(pink, wallpaper[0, 0])
         assertEquals(0xFF102030.toInt(), wallpaper[1, 0])
-        assertEquals(pink, wallpaper[7, 3])           // bottom-right: bottom-up rows decoded correctly
+        assertEquals(pink, wallpaper[7, 3])
     }
 
     @Test
@@ -67,7 +66,7 @@ class PtfParserTest {
     @Test
     fun `truncated wallpaper stream yields theme without wallpaper, not a crash`() {
         val full = syntheticPtf()
-        val truncated = full.copyOf(full.size - 16) // cut into the zlib stream
+        val truncated = full.copyOf(full.size - 16)
         val theme = assertNotNull(PtfParser.parse(truncated))
         assertNull(theme.wallpaper)
         assertEquals(PtfParser.WallpaperStatus.CORRUPT, theme.wallpaperStatus)
@@ -94,7 +93,7 @@ class PtfParserTest {
     fun `damaged LZR wallpaper reports CORRUPT`() {
         val bmp = TestFixtures.buildBmp(8, 4) { _, _ -> pink }
         val ptf = TestFixtures.buildPtf("Old Theme", "3.70", bmp, compressionMethod = 1)
-        // Trash the LZR stream body (past the 32-byte payload header + 5-byte LZR header).
+
         for (i in 0x140 + 37 until ptf.size) ptf[i] = 0x5A
         val theme = assertNotNull(PtfParser.parse(ptf))
         assertNull(theme.wallpaper)
@@ -113,7 +112,7 @@ class PtfParserTest {
     @Test
     fun `theme without a wallpaper slot reports MISSING`() {
         val full = syntheticPtf()
-        full[0x120] = 9 // rewrite the slot descriptor's id (u16 at 0x120) to a non-wallpaper id
+        full[0x120] = 9
         val theme = assertNotNull(PtfParser.parse(full))
         assertNull(theme.wallpaper)
         assertEquals(PtfParser.WallpaperStatus.MISSING, theme.wallpaperStatus)
@@ -123,7 +122,7 @@ class PtfParserTest {
     fun `payload header with a lying compressed size still decodes via the scan fallback`() {
         val full = syntheticPtf()
         val dataOffset = 0x140
-        // Claim a compressed size far past the slot: header is implausible, scan takes over.
+
         full[dataOffset + 8] = 0xFF.toByte()
         full[dataOffset + 9] = 0xFF.toByte()
         full[dataOffset + 10] = 0x7F.toByte()

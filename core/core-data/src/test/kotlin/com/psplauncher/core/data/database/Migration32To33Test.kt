@@ -9,15 +9,9 @@ import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Validates the v33 move to account-keyed achievement storage against the exported v32 schema:
- * library sets/coins land in the account tables with titles joined from games, duplicates on one
- * provider identity merge, orphan sets survive, and provider_game_links widens its key.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE)
 class Migration32To33Test {
-
     @get:Rule
     val helper = migrationTestHelper(DB)
 
@@ -100,17 +94,16 @@ class Migration32To33Test {
         }
 
         helper.runMigrationsAndValidate(33, listOf(PFPDatabase.MIGRATION_32_33)).use { db ->
-            assertEquals(1, db.count("SELECT COUNT(*) FROM account_achievement_sets")) // dedupe by construction
+            assertEquals(1, db.count("SELECT COUNT(*) FROM account_achievement_sets"))
             assertEquals(1, db.count("SELECT COUNT(*) FROM account_achievements"))
-            assertEquals(2, db.count("SELECT COUNT(*) FROM provider_game_links")) // both games keep their link to the shared entry
+            assertEquals(2, db.count("SELECT COUNT(*) FROM provider_game_links"))
         }
     }
 
     @Test
     fun `an orphan set with no game and no link still migrates`() {
         helper.createDatabase(32).use { db ->
-            // A set whose game was unlinked after syncing: rows persist keyed by a game id
-            // that has no link. The game itself exists (FK), but nothing points at the set.
+
             db.seedGame(9, "Formerly Linked")
             db.seedSet(9, "STEAM", "440", bronzeEarned = 1)
         }

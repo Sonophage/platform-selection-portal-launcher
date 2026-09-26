@@ -37,8 +37,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 
-// ── Response models (JSON output of jeuInfos.php) ─────────────────────────────
-
 @Serializable
 data class SsResponse(
     val response: SsGameResponse? = null,
@@ -50,8 +48,6 @@ data class SsGameResponse(
     @SerialName("ssuser") val user: SsUser? = null,
 )
 
-// jeuRecherche.php: up to 30 games ranked by likelihood. A miss is often padded with an empty
-// object, so every entry is parsed leniently and id-less ones are dropped.
 @Serializable
 data class SsSearchResponse(
     val response: SsSearchBody? = null,
@@ -63,22 +59,18 @@ data class SsSearchBody(
     @SerialName("ssuser") val user: SsUser? = null,
 )
 
-/** One jeuRecherche hit, reduced to what a match needs. */
 data class SsSearchHit(
     val ssId: Long,
     val title: String,
     val releaseYear: Int?,
     val systemId: Int? = null,
     val systemName: String? = null,
-    // Media of the game itself (`parent: jeu`). A hit's other media are publisher, genre and rating
-    // pictograms, so a release can list a hundred media and still have no artwork at all.
+
     val gameArtCount: Int = 0,
 )
 
-/** A ScreenScraper name search that failed, as opposed to one that found nothing. */
 class SsSearchFailedException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-// Account/quota block returned with every authenticated response. All values arrive as strings.
 @Serializable
 data class SsUser(
     val id: String? = null,
@@ -95,7 +87,7 @@ data class SsGame(
     @SerialName("synopsis") val synopsis: List<SsLocalizedText> = emptyList(),
     @SerialName("dates") val dates: List<SsLocalizedText> = emptyList(),
     @SerialName("genres") val genres: List<SsGenre> = emptyList(),
-    // Franchise/series ("famille") — same localized-name shape as genres.
+
     @SerialName("familles") val families: List<SsGenre> = emptyList(),
     @SerialName("classifications") val classifications: List<SsClassification> = emptyList(),
     @SerialName("developpeur") val developer: SsText? = null,
@@ -103,15 +95,13 @@ data class SsGame(
     @SerialName("joueurs") val players: SsText? = null,
     @SerialName("note") val rating: SsRating? = null,
     @SerialName("medias") val medias: List<SsMedia> = emptyList(),
-    // The release's system, {"id","text"}. Read only from name-search hits: a search across every
-    // system has to say which release each hit is.
+
     @SerialName("systeme") val system: SsSystem? = null,
 )
 
 @Serializable
 data class SsSystem(val id: String? = null, val text: String? = null)
 
-// Age classification: type is the rating board ("ESRB", "PEGI", …), text the grade ("E10+", "12").
 @Serializable
 data class SsClassification(val type: String? = null, val text: String? = null)
 
@@ -137,14 +127,12 @@ data class SsGenre(
 @Serializable
 data class SsMedia(
     val type: String,
-    // What the media belongs to: "jeu" for the game's own art, else "editeur", "genre", "classification"…
+
     val parent: String? = null,
     val region: String? = null,
     val url: String? = null,
     val format: String? = null,
 )
-
-// ── Parsed result ──────────────────────────────────────────────────────────────
 
 data class SsGameInfo(
     val ssId: Long?,
@@ -155,36 +143,33 @@ data class SsGameInfo(
     val releaseYear: Int?,
     val genre: String?,
     val players: String?,
-    val ageRating: String?,        // "ESRB E10+" / "PEGI 12" (ESRB preferred, PEGI fallback)
-    val franchise: String?,        // famille, English name preferred
-    val communityRating: Float?,   // note normalized /20 → 0..1
-    val releaseDate: String?,      // best region date, as served (usually ISO yyyy-MM-dd)
-    val artworkUrl: String?,   // box-2D front (box-3D fallback) — background fallback source
-    val boxArtUrl: String?,    // strict box-2D front (BOX_ART tile)
-    val box3dUrl: String?,     // angled 3D box render (BOX_3D tile)
-    val physicalMediaUrl: String?, // cartridge/disc shot, support-2D (PHYSICAL_MEDIA tile)
-    val screenshotUrl: String?,    // in-game screenshot ("ss") — Game Detail's SCREENSHOT panel
-    val heroUrl: String?,      // fanart / wide banner
-    val logoUrl: String?,      // wheel / clear logo
-    val manualUrl: String?,    // PDF manual
-    val videoUrl: String?,     // normalized video snap (already trimmed/scaled by SS)
-    val videoRawUrl: String?,  // full gameplay video — transcoded locally when no snap exists
-    // The full trimmed medias list as served — persisted to ss_media_cache so later scrapes
-    // and the Artwork Studio can browse every kind without re-asking jeuInfos.
+    val ageRating: String?,
+    val franchise: String?,
+    val communityRating: Float?,
+    val releaseDate: String?,
+    val artworkUrl: String?,
+    val boxArtUrl: String?,
+    val box3dUrl: String?,
+    val physicalMediaUrl: String?,
+    val screenshotUrl: String?,
+    val heroUrl: String?,
+    val logoUrl: String?,
+    val manualUrl: String?,
+    val videoUrl: String?,
+    val videoRawUrl: String?,
+
     val medias: List<SsCachedMedia> = emptyList(),
 )
 
-// ── Diagnostics ────────────────────────────────────────────────────────────────
-
 enum class SsFailureReason {
-    DISABLED,                 // no developer credentials configured — SS is off entirely
+    DISABLED,
     NO_SYSTEM_ID_MAPPING,
-    BAD_DEV_CREDENTIALS,      // 403 — our devid/devpassword rejected
-    API_CLOSED,               // 401 — API closed for non-members / inactive account
-    RATE_LIMITED,             // 429 — thread / per-minute limit
-    DAILY_QUOTA_EXCEEDED,     // 430 — stop SS for the rest of the run
-    TOO_MANY_UNRECOGNIZED,    // 431 — stop unhashed lookups for the rest of the run
-    NO_MATCH,                 // 404 or empty response
+    BAD_DEV_CREDENTIALS,
+    API_CLOSED,
+    RATE_LIMITED,
+    DAILY_QUOTA_EXCEEDED,
+    TOO_MANY_UNRECOGNIZED,
+    NO_MATCH,
     NETWORK_ERROR,
     PARSE_ERROR,
 }
@@ -207,7 +192,6 @@ data class SsLookupResult(
 ) {
     val success: Boolean get() = info != null
 
-    /** True when the whole batch should stop querying ScreenScraper (quota/credential states). */
     val isBatchStopper: Boolean get() = diagnostics.failureReason in setOf(
         SsFailureReason.DISABLED,
         SsFailureReason.BAD_DEV_CREDENTIALS,
@@ -215,25 +199,10 @@ data class SsLookupResult(
         SsFailureReason.DAILY_QUOTA_EXCEEDED,
     )
 
-    /** True when only hash-less lookups should stop (431 protects the account from penalties). */
     val stopsUnhashedLookups: Boolean get() =
         diagnostics.failureReason == SsFailureReason.TOO_MANY_UNRECOGNIZED
 }
 
-// ── API client ─────────────────────────────────────────────────────────────────
-
-/**
- * ScreenScraper WebAPI v2 client (jeuInfos.php).
- *
- * Requires developer credentials, supplied by [MetadataCredentialSource] from what the user
- * entered in Settings ▸ Artwork; without them [isEnabled] is false and every lookup
- * short-circuits to [SsFailureReason.DISABLED]. A user account (ssid/sspassword) is optional
- * but raises thread count and daily quota.
- *
- * Matching tuple: hash (crc) + size (romtaille) + filename (romnom), per the official docs.
- * When [ssGameId] is already known (a previous match), the lookup goes by `gameid` and skips
- * matching entirely. Error bodies are frequently plain text — never assume JSON.
- */
 @Singleton
 class ScreenScraperApi @Inject constructor(
     @ApplicationContext private val appContext: Context,
@@ -242,43 +211,18 @@ class ScreenScraperApi @Inject constructor(
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    // Two separate limits, enforced separately, because they are separate things.
-    //
-    // THREADS -- how many requests may be in the air at once. [requestSlots] holds one permit per
-    // thread the account allows. It starts at one, because before the first response we have no
-    // idea what the account is, and grows when a response says so.
-    //
-    // SPACING -- how far apart requests may START. Account-wide, so it stays one mutex however
-    // many threads are running: a coroutine takes it only long enough to wait its turn and stamp
-    // its start, then lets the next one in while its own request is still in flight.
-    //
-    // Before this the two were one mutex, with the comment "the one thread an account has
-    // (maxthreads 1)" -- a guess that was wired in as a constant. The account block has carried
-    // `maxthreads` all along; it was parsed, printed in Settings, and never used for anything.
     @Volatile private var requestSlots = Semaphore(1)
     @Volatile private var maxThreads = 1
     private val spacingGate = Mutex()
     private var lastRequestStartedAt = 0L
 
-    // The account's `maxrequestspermin`, from the latest response that carried one. Null until then.
     @Volatile private var maxRequestsPerMinute: Int? = null
 
-    /**
-     * The account's last-seen `ssuser` block, or null before any authenticated response.
-     *
-     * A StateFlow rather than a suspend read: it changes as a side effect of scraping, and the
-     * surface that shows it stays open across a whole run. ScreenScraper has a hard daily cap —
-     * `scrapeStopMessage` and SsFailureReason.DAILY_QUOTA_EXCEEDED both exist because it gets hit
-     * — and this block was parsed on every response and then dropped, so the one screen where you
-     * would hit it had no way to say how close you were.
-     */
     private val _quota = kotlinx.coroutines.flow.MutableStateFlow<SsUser?>(null)
     val quota: kotlinx.coroutines.flow.StateFlow<SsUser?> get() = _quota
 
-    /** True once the user has supplied a developer account. Reads storage, hence suspend. */
     suspend fun isEnabled(): Boolean = credentials.screenScraperNow() != null
 
-    /** [isEnabled] as a stream, for settings screens that mirror it into UI state. */
     val isEnabledFlow: Flow<Boolean> = credentials.screenScraper.map { it != null }
 
     suspend fun fetchGameInfo(
@@ -309,8 +253,6 @@ class ScreenScraperApi @Inject constructor(
             ))
         }
         if (!canLookUp(rom, ssGameId)) {
-            // A Windows install (or any game with no ROM file) has nothing jeuInfos can match on.
-            // Sending the bare systemeid only earned an HTTP 400 and spent a request of the quota.
             return SsLookupResult(null, baseDiag.copy(
                 failureReason = SsFailureReason.NO_MATCH,
                 failureDetail = "No ScreenScraper id and no ROM file to identify '$platformId' game by — match it by title",
@@ -337,8 +279,6 @@ class ScreenScraperApi @Inject constructor(
                 return SsLookupResult(null, diag.copy(failureReason = reason, failureDetail = detail))
             }
 
-            // Parse from text — SS serves error strings with 200s often enough that a typed
-            // body{} call would turn quota messages into opaque parse crashes.
             val bodyText = response.bodyAsText()
             logAccountLimitsOnce(bodyText)
             captureBodyInDebug("jeuInfos-${ssGameId ?: slugOf(rom?.fileName ?: "rom")}", bodyText)
@@ -375,17 +315,6 @@ class ScreenScraperApi @Inject constructor(
         }
     }
 
-    /**
-     * ScreenScraper's name search (`jeuRecherche.php`, up to 30 games ranked by likelihood) — the
-     * matcher's Tier 3 and Change Match, and the only way to identify a game with no ROM file, such
-     * as a Windows install. Scoped to [platformId]'s system when it is mapped; a null [platformId]
-     * searches every system.
-     *
-     * A search that fails — no answer, an HTTP error, or an error message instead of JSON — throws
-     * [SsSearchFailedException] rather than returning no hits, so a caller never remembers a failure
-     * as "nothing found". ScreenScraper's genuine empty answer (`"jeux":[{}]`) is an empty list, as
-     * is having no account to ask with. A cancelled request still propagates.
-     */
     suspend fun searchGames(platformId: String?, title: String): List<SsSearchHit> {
         val creds = credentials.screenScraperNow() ?: return emptyList()
         if (title.isBlank()) return emptyList()
@@ -395,9 +324,7 @@ class ScreenScraperApi @Inject constructor(
                 credentialParams(creds)
                 parameter("recherche", title)
                 systemId?.let { parameter("systemeid", it) }
-                // ScreenScraper sends nothing until the search is done, and an every-platform search
-                // took 9–15 s on device and once longer. The client's 15 s read timeout cut that
-                // off, so the user had to search twice. Only name searches get the longer wait.
+
                 timeout { socketTimeoutMillis = SEARCH_SOCKET_TIMEOUT_MS }
             } }.let { it.status.value to it.bodyAsText() }
         } catch (e: CancellationException) {
@@ -420,13 +347,6 @@ class ScreenScraperApi @Inject constructor(
         return hits
     }
 
-    /**
-     * Debug builds only: saves a ScreenScraper response body to the app cache as [name].json, so a
-     * real response can be pulled off the device and pinned as a test fixture. Scrubbed first
-     * ([scrubCapture]): the body names the account and echoes the request URL, and the media URLs
-     * that remain carry credentials for [LogRedaction] to blank. Only the
-     * newest [MAX_CAPTURES] files are kept, so a batch scrape cannot fill the cache.
-     */
     private suspend fun captureBodyInDebug(name: String, body: String) {
         if (!BuildConfig.DEBUG) return
         withContext(Dispatchers.IO) {
@@ -445,11 +365,6 @@ class ScreenScraperApi @Inject constructor(
     private fun slugOf(text: String): String =
         text.lowercase(Locale.ROOT).replace(NON_SLUG, "-").trim('-').take(40)
 
-    /**
-     * A jeuRecherche body → hits, or null when the body is not a search response at all:
-     * ScreenScraper serves error messages as plain text, often with HTTP 200. Pure, so parsing is
-     * testable without a network.
-     */
     internal fun parseSearch(body: String): List<SsSearchHit>? = decodeSearch(body)?.let(::hitsOf)
 
     private fun decodeSearch(body: String): SsSearchResponse? =
@@ -472,23 +387,15 @@ class ScreenScraperApi @Inject constructor(
             )
         }
 
-    /** Validates user credentials via ssuserInfos.php; returns the quota block, or null. */
     suspend fun fetchUserInfo(username: String, password: String): SsUser? = runCatching {
         val creds = credentials.screenScraperNow() ?: return null
         val response = rateLimited("ssuserInfos") { httpClient.get("$BASE/ssuserInfos.php") {
-            // The account being tested is the one passed in, not the stored one.
             credentialParams(creds.copy(userId = username, userPassword = password))
         } }
         if (response.status.value != 200) return null
         json.decodeFromString(SsUserInfoResponse.serializer(), response.bodyAsText()).response?.user
     }.onFailure { Timber.w(it, "ScreenScraper: ssuserInfos failed") }.getOrNull()
 
-    // ── Internals ─────────────────────────────────────────────────────────────
-
-    /**
-     * The developer pair every endpoint requires, plus the optional user account. Kept in one
-     * place so a new endpoint cannot forget half of it.
-     */
     private fun HttpRequestBuilder.credentialParams(creds: ScreenScraperCredentials) {
         parameter("devid",       creds.devId)
         parameter("devpassword", creds.devPassword)
@@ -500,25 +407,9 @@ class ScreenScraperApi @Inject constructor(
         }
     }
 
-    /**
-     * Runs [block] through the gate: at most [maxThreads] at once, and starting no sooner than the
-     * account's interval after the previous request STARTED. Spacing from the previous request's
-     * end made a request wait 1.1 s even after a 10 s search had already used up far more than the
-     * interval.
-     *
-     * The spacing lock is released before [block] runs, not after. Holding it across the request
-     * is what made this single-flight in the first place -- with it released, four permits mean
-     * four requests genuinely overlapping while their starts stay 1.1 s apart.
-     *
-     * Logs, per [endpoint], how long the request waited — queued for a thread, then spaced — and
-     * how long ScreenScraper took, so queueing can be told apart from server time on a device.
-     */
-    // internal, not private, so a test can prove the thing this change is FOR: that two requests
-    // are in the air at once when the account allows two. Nothing outside this class calls it.
     internal suspend fun <T> rateLimited(endpoint: String, block: suspend () -> T): T {
         val askedAt = System.currentTimeMillis()
-        // Read once: a response can swap the semaphore mid-flight, and releasing a permit to a
-        // different object than the one it was taken from would quietly inflate the permit count.
+
         val slots = requestSlots
         slots.acquire()
         try {
@@ -544,18 +435,6 @@ class ScreenScraperApi @Inject constructor(
         }
     }
 
-    /**
-     * Keeps what a response's `ssuser` block says: the thread count, the pacing limit, and the
-     * daily counter.
-     *
-     * Widening the thread count REPLACES the semaphore rather than adding permits to it, because
-     * kotlinx's has no way to add any. The cost is that requests already in the air hold permits
-     * on the old one, so for the moment of the swap the real count can exceed the new limit by
-     * however many those were -- in practice one, since the swap is driven by a response and the
-     * limit before the first response is one. A single extra request on the first swap of a run is
-     * a smaller error than the one this replaces, which was every run capped at one thread
-     * forever.
-     */
     internal fun rememberRequestLimit(user: SsUser?) {
         user ?: return
         user.maxRequestsPerMinute?.toIntOrNull()?.let { maxRequestsPerMinute = it }
@@ -568,11 +447,6 @@ class ScreenScraperApi @Inject constructor(
         if (user.requestsToday != null || user.maxRequestsPerDay != null) _quota.value = user
     }
 
-    /**
-     * Logs the account's numeric limits the first time a response carries them. The field that
-     * holds the per-minute limit has not been confirmed on a real body, so every numeric field is
-     * logged rather than a guessed name. A body with no `ssuser` block does not use up the one log.
-     */
     private fun logAccountLimitsOnce(body: String) {
         if (accountLimitsLogged.get()) return
         val limits = accountLimits(body) ?: return
@@ -591,7 +465,6 @@ class ScreenScraperApi @Inject constructor(
         else -> SsFailureReason.NETWORK_ERROR to "HTTP $status"
     }
 
-    // Some deployments return 200 with a plain-text error body; classify the common ones.
     internal fun failureForTextBody(prefix: String): SsFailureReason = when {
         prefix.contains("API closed", ignoreCase = true)        -> SsFailureReason.API_CLOSED
         prefix.contains("quota", ignoreCase = true)             -> SsFailureReason.DAILY_QUOTA_EXCEEDED
@@ -620,18 +493,14 @@ class ScreenScraperApi @Inject constructor(
             ?.firstOrNull { it.language == "en" }?.text
             ?: families.firstOrNull()?.names?.firstOrNull()?.text
 
-        // Age rating: ESRB first (US-market app), PEGI fallback, else whatever board is present.
         val ageRating = (
             classifications.firstOrNull { it.type.equals("ESRB", ignoreCase = true) }
                 ?: classifications.firstOrNull { it.type.equals("PEGI", ignoreCase = true) }
                 ?: classifications.firstOrNull()
             )?.let { c -> c.text?.takeIf { it.isNotBlank() }?.let { "${c.type.orEmpty()} $it".trim() } }
 
-        // SS note is out of 20 — normalize to 0..1 so the UI can render any scale it likes.
         val communityRating = rating?.text?.toFloatOrNull()?.div(20f)?.coerceIn(0f, 1f)
 
-        // Per-kind winners come from the shared selector so the live parse, the media-URL
-        // cache and the Artwork Studio all pick identically (SsMediaSelection).
         val cachedMedias = medias.mapNotNull { m ->
             m.url?.let { SsCachedMedia(type = m.type, region = m.region, url = it, format = m.format) }
         }
@@ -649,7 +518,7 @@ class ScreenScraperApi @Inject constructor(
             ageRating   = ageRating,
             franchise   = franchise,
             communityRating = communityRating,
-            releaseDate = yearStr?.takeIf { it.length >= 8 },   // full dates only; bare years stay in releaseYear
+            releaseDate = yearStr?.takeIf { it.length >= 8 },
             artworkUrl  = urls.artworkUrl,
             boxArtUrl   = urls.boxArtUrl,
             box3dUrl    = urls.box3dUrl,
@@ -668,49 +537,24 @@ class ScreenScraperApi @Inject constructor(
         private const val BASE = "https://api.screenscraper.fr/api2"
         private const val MIN_REQUEST_INTERVAL_MS = 1_100L
 
-        /** The most requests we will ever have in the air, whatever the account claims. */
         internal const val MAX_THREADS = 8
         private const val SEARCH_SOCKET_TIMEOUT_MS = 40_000L
 
-        /**
-         * The gap between request starts for an account allowed [maxRequestsPerMinute]: an even
-         * spread across the minute, never below [MIN_REQUEST_INTERVAL_MS]. A generous account is
-         * therefore never faster than 1.1 s apart, and a strict one never goes over its limit. An
-         * unknown or nonsensical limit keeps the floor.
-         */
         internal fun requestIntervalMs(maxRequestsPerMinute: Int?): Long {
             val perMinute = maxRequestsPerMinute?.takeIf { it > 0 } ?: return MIN_REQUEST_INTERVAL_MS
             return maxOf(MIN_REQUEST_INTERVAL_MS, (60_000L + perMinute - 1) / perMinute)
         }
 
-        /**
-         * How many requests this account may have in the air at once, from its `maxthreads`.
-         *
-         * Clamped into [1, [MAX_THREADS]]. One at the bottom because zero threads is not a rate
-         * limit, it is a deadlock, and ScreenScraper has been seen to send "0" for an account
-         * whose allowance is simply not set. A ceiling at the top because this number arrives from
-         * a server: a wrong or hostile one must not be able to open an unbounded number of
-         * sockets on a handheld, and no real allowance is near it.
-         *
-         * Anything unparseable keeps one, which is exactly the behaviour that was hard-coded here
-         * before — so an account that reports nothing is no worse off than it was.
-         */
         internal fun effectiveThreads(maxThreads: String?): Int =
             maxThreads?.trim()?.toIntOrNull()?.coerceIn(1, MAX_THREADS) ?: 1
 
-        /** How long a request must wait at [nowMs] when the previous one started at [lastStartMs]. */
         internal fun waitBeforeNextRequest(nowMs: Long, lastStartMs: Long, intervalMs: Long): Long =
             (intervalMs - (nowMs - lastStartMs)).coerceAtLeast(0L)
 
         private val accountLimitsLogged = AtomicBoolean(false)
 
-        // `id` is the account name and `numid` its number; either one identifies the user.
         private val ACCOUNT_IDENTIFIERS = setOf("id", "numid")
 
-        /**
-         * The numeric fields of [body]'s `response.ssuser` block, without the ones that identify the
-         * account. Null when the body has no such block (a plain-text error, or no account).
-         */
         internal fun accountLimits(body: String): Map<String, String>? {
             val root = runCatching { Json.parseToJsonElement(body) }.getOrNull() as? JsonObject ?: return null
             val user = (root["response"] as? JsonObject)?.get("ssuser") as? JsonObject ?: return null
@@ -726,12 +570,6 @@ class ScreenScraperApi @Inject constructor(
         private const val MAX_CAPTURES = 20
         private val CAPTURE_JSON = Json { prettyPrint = true }
 
-        /**
-         * [body] without the parts that name the account: `response.ssuser` holds the account name
-         * as a plain JSON value, which [LogRedaction] cannot recognise, and `header.commandRequested`
-         * echoes the whole request URL. A body that is not a JSON object (ScreenScraper's plain-text
-         * errors) comes back unchanged.
-         */
         internal fun scrubCapture(body: String): String {
             val root = runCatching { Json.parseToJsonElement(body) }.getOrNull() as? JsonObject ?: return body
             val scrubbed = JsonObject(
@@ -746,11 +584,9 @@ class ScreenScraperApi @Inject constructor(
             return CAPTURE_JSON.encodeToString(JsonElement.serializer(), scrubbed)
         }
 
-        /** jeuInfos needs a known game id, or at least a ROM checksum or file name to match on. */
         internal fun canLookUp(rom: RomIdentity?, ssGameId: Long?): Boolean =
             ssGameId != null || rom?.crc32 != null || rom?.fileName != null
 
-        // ScreenScraper system ids → PFP platform ids.
         val PLATFORM_IDS = mapOf(
             "psx"            to 57,
             "ps2"            to 58,

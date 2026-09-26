@@ -17,7 +17,6 @@ import javax.inject.Inject
 
 @HiltAndroidApp
 class PFPApplication : Application(), Configuration.Provider {
-
     @Inject lateinit var workerFactory: androidx.hilt.work.HiltWorkerFactory
     @Inject lateinit var databaseInitializer: DatabaseInitializer
     @Inject lateinit var startupDataPrep: StartupDataPrep
@@ -30,8 +29,7 @@ class PFPApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         initLogging()
-        // Must run before anything can request an image: Coil builds its singleton loader on
-        // first use and will not swap one out afterwards.
+
         artworkImageCache.installAsSingleton()
         initDatabase()
         initEmulators()
@@ -41,14 +39,13 @@ class PFPApplication : Application(), Configuration.Provider {
         appScope.launch {
             runCatching {
                 databaseInitializer.initialize()
-                // Repair file-path drift from upgrades / restores before the UI reads the library.
+
                 startupDataPrep.run(appVersionCode())
             }.onFailure { Timber.e(it, "Database initialization failed") }
         }
     }
 
     private fun appVersionCode(): Int = runCatching {
-        // longVersionCode is available from API 28; minSdk is 29.
         packageManager.getPackageInfo(packageName, 0).longVersionCode.toInt()
     }.getOrDefault(0)
 
@@ -63,17 +60,12 @@ class PFPApplication : Application(), Configuration.Provider {
 
     private fun initLogging() {
         if (BuildConfig.DEBUG) {
-            // Logcat gets the same redaction as the file log. A throwable's message can carry the
-            // request URL (a ScreenScraper timeout printed both passwords), and Timber has already
-            // appended the stack trace to the message by the time log() runs.
             Timber.plant(object : Timber.DebugTree() {
                 override fun log(priority: Int, tag: String?, message: String, t: Throwable?) =
                     super.log(priority, tag, com.psplauncher.core.common.logging.LogRedaction.redact(message), t)
             })
         }
-        // File log (Settings ▸ Logs) on every build: INFO+ only, redacted (credentials,
-        // account names, emails never reach disk), size-capped — users can share these
-        // files to report problems from the field.
+
         Timber.plant(
             com.psplauncher.core.common.logging.PfpFileLoggingTree(
                 java.io.File(filesDir, "logs")

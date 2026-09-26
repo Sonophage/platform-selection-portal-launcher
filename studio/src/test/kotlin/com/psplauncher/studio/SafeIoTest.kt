@@ -9,7 +9,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class SafeIoTest {
-
     private fun tempFile(bytes: ByteArray): File =
         File.createTempFile("safeio", ".bin").apply { writeBytes(bytes); deleteOnExit() }
 
@@ -34,16 +33,14 @@ class SafeIoTest {
 
     @Test
     fun `image decode rejects crafted huge-dimension headers before allocation`() {
-        // A minimal PNG header claiming 100000x100000: signature + IHDR chunk. The
-        // dimension pre-check must reject it without ever attempting a full decode.
         val png = buildList<Byte> {
-            addAll(listOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)) // signature
-            addAll(listOf(0x00, 0x00, 0x00, 0x0D)) // IHDR length
+            addAll(listOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))
+            addAll(listOf(0x00, 0x00, 0x00, 0x0D))
             addAll("IHDR".map { it.code.toByte() })
-            addAll(listOf(0x00, 0x01, 0x86.toByte(), 0xA0.toByte())) // width  100000
-            addAll(listOf(0x00, 0x01, 0x86.toByte(), 0xA0.toByte())) // height 100000
-            addAll(listOf(0x08, 0x06, 0x00, 0x00, 0x00)) // bit depth / color / etc.
-            addAll(listOf(0x00, 0x00, 0x00, 0x00)) // (wrong) CRC — readers still report dims
+            addAll(listOf(0x00, 0x01, 0x86.toByte(), 0xA0.toByte()))
+            addAll(listOf(0x00, 0x01, 0x86.toByte(), 0xA0.toByte()))
+            addAll(listOf(0x08, 0x06, 0x00, 0x00, 0x00))
+            addAll(listOf(0x00, 0x00, 0x00, 0x00))
         }.toByteArray()
         assertNull(ImageCodecs.decodeImage(png))
     }

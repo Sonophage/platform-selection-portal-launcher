@@ -8,16 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.sqrt
 
-/**
- * Pins the matte contract ([matteOffsets] / [matteColorFor]) and the tolerant preference parse
- * ([IconLegibilityStyle.fromName]). The CONTOUR_AUTO cases are the defect this whole feature
- * exists to avoid: the theme's iconColor is not always light, so a hardcoded dark matte behind
- * the owner's dark red glyphs on a dark sky would add nothing — Auto must pick the luminance
- * OPPOSITE of the glyph.
- */
 class IconMatteTest {
-
-    private val darkGlyph = Color(0xFFD52E1F)   // the owner's theme iconColor from the reference frame
+    private val darkGlyph = Color(0xFFD52E1F)
     private val lightGlyph = Color(0xFFFFFFFF)
 
     @Test
@@ -41,7 +33,6 @@ class IconMatteTest {
 
     @Test
     fun `contour offsets are unit-length so diagonals read as a round contour`() {
-        // Catches a diagonal written as Offset(1f, 1f) (√2 long — a square, not a circle).
         val epsilon = 1e-4f
         listOf(
             IconLegibilityStyle.CONTOUR_DARK,
@@ -84,8 +75,6 @@ class IconMatteTest {
 
     @Test
     fun `AUTO agrees with the explicit picks on either side of the threshold`() {
-        // Dark glyph → light matte → matches CONTOUR_LIGHT; light glyph → dark matte → matches
-        // CONTOUR_DARK. If these ever disagree, Auto and the explicit styles have drifted.
         assertEquals(
             matteColorFor(IconLegibilityStyle.CONTOUR_LIGHT, darkGlyph),
             matteColorFor(IconLegibilityStyle.CONTOUR_AUTO, darkGlyph),

@@ -23,8 +23,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class PhotoSettingsUiState(
-    // Every configured root, with its live SAF-grant status (same rows as Library Manager's
-    // ROM Root Access — a photo library can span internal storage plus an SD card).
+
     val roots: List<RootFolderRow> = emptyList(),
     val scanning: Boolean = false,
     val scanMessage: String? = null,
@@ -32,11 +31,6 @@ data class PhotoSettingsUiState(
     val hasRoots: Boolean get() = roots.isNotEmpty()
 }
 
-/**
- * Multi-root Photo settings, mirroring Library Manager's ROM Root Access: several root folders
- * (each a persisted SAF grant whose subfolders become libraries) and a rescan that reconciles the
- * library rows with the configured roots and scans each root.
- */
 @HiltViewModel
 class PhotoSettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -44,15 +38,12 @@ class PhotoSettingsViewModel @Inject constructor(
     private val photoScanner: PhotoScanner,
     private val mediaRootRepository: MediaRootRepository,
 ) : ViewModel() {
-
     private val notifier = BackgroundTaskNotifier(context)
     private val _ui = MutableStateFlow(PhotoSettingsUiState())
     val uiState: StateFlow<PhotoSettingsUiState> = _ui
 
     init {
         viewModelScope.launch {
-            // distinctUntilChanged: the backing DataStore is app-wide; without it every unrelated
-            // preference write would re-run the persisted-grant snapshot below.
             mediaRootRepository.roots(MediaRootKind.PHOTO).distinctUntilChanged().collect { roots ->
                 val persisted = SafGrants.persistedReadUris(context.contentResolver)
                 _ui.value = _ui.value.copy(roots = roots.map { uri ->
@@ -66,7 +57,6 @@ class PhotoSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Grants (and persists) a new root, adds it to the list, and rescans. */
     fun addRoot(treeUri: Uri) {
         viewModelScope.launch {
             mediaRootRepository.persist(treeUri)
@@ -75,7 +65,6 @@ class PhotoSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Removes a root; its library row is dropped on the next rescan. */
     fun removeRoot(treeUri: String) {
         viewModelScope.launch {
             mediaRootRepository.remove(MediaRootKind.PHOTO, treeUri)
@@ -83,7 +72,6 @@ class PhotoSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Replaces one root's URI (re-link after a lost grant, or picking a different folder). */
     fun relinkRoot(oldTreeUri: String, newUri: Uri) {
         viewModelScope.launch {
             mediaRootRepository.persist(newUri)
@@ -92,10 +80,6 @@ class PhotoSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Reconciles the library rows with the configured roots (dropping rows whose root is gone)
-     * and scans every root incrementally.
-     */
     fun rescan() {
         viewModelScope.launch {
             val roots = mediaRootRepository.getAll(MediaRootKind.PHOTO)
@@ -105,7 +89,6 @@ class PhotoSettingsViewModel @Inject constructor(
             }
             _ui.value = _ui.value.copy(scanning = true, scanMessage = "Scanning…")
 
-            // Roots removed in the wizard or here take their library rows with them.
             photoRepository.getLibraries()
                 .filter { it.treeUri !in roots }
                 .forEach { photoRepository.removeLibrary(it.id) }
@@ -146,7 +129,6 @@ class PhotoSettingsViewModel @Inject constructor(
 
     fun dismissMessage() { _ui.value = _ui.value.copy(scanMessage = null) }
 
-    // Ensures one PhotoLibrary exists for [root] (recursive) — other roots keep their own rows.
     private suspend fun syncLibraryForRoot(root: String): PhotoLibrary {
         val existing = photoRepository.getLibraries().firstOrNull { it.treeUri == root }
         val library = existing ?: photoRepository.addLibrary(displayName(root), root, scanRecursively = true)

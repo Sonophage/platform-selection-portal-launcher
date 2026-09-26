@@ -36,64 +36,23 @@ import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 import com.psplauncher.core.ui.theme.menuCursorEdge
 
-/**
- * One thing in the library, drawn as a portrait card: its art, its name, and what it is.
- *
- * ONE component for every surface that shows a grid or rail of library items — the Last Played
- * shelf, search results, and the app menu. Each of those had grown its own card, which is three
- * renderers for one idea: three focus treatments to keep matching, three fallbacks for missing
- * art, and a change that lands in whichever one the author happened to be looking at.
- *
- * Portrait throughout, including for the square things. Box art, film posters and book covers are
- * all roughly 2:3, and app icons and album art are square; a grid that changed shape per row
- * would read as broken alignment rather than as variety.
- *
- * The art is FITTED, never cropped. A 2:3 cover fills a 2:3 tile either way, so cropping would
- * only ever damage the odd ones out — a square app icon would lose its edges and a 16:9 video
- * still would lose most of its frame.
- *
- * What fitting costs is the tile around those odd ones out, and left flat that cost was too high:
- * a square app icon and a landscape GBA cover both sat as a band in a black void, which reads as
- * a failed image. So the same art is ALSO drawn cropped-to-fill and blurred underneath, and the
- * empty tile takes the colour of the thing it belongs to.
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PfpMediaCard(
     title: String,
-    /**
-     * The art: a `String` uri for anything on disk, or a `Drawable` for an installed app's icon,
-     * which comes from PackageManager and has no uri at all.
-     *
-     * Typed as Any? because that is what Coil takes. A uri goes through rememberArtworkModel so
-     * it picks up the cache key that makes a re-scraped picture actually refresh; anything else
-     * is handed over as-is.
-     */
+
     art: Any?,
     focused: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    /** What it is — "Game · Game Boy Advance", an artist, a year. Null draws no second line. */
+
     subtitle: String? = null,
-    /**
-     * With no art, draw the INITIAL rather than the whole name.
-     *
-     * For an app. An app has no cover and never will — a game without art is waiting to be
-     * scraped, an app is simply not that kind of thing — so the tile is permanent and wants to
-     * read as a mark rather than as a label repeating the name written under it. The App Drawer
-     * made this call first: "a letter on a tile", so a list of them reads as one set rather than
-     * as a pile of other people's branding.
-     */
+
     initialOnly: Boolean = false,
-    /** Y / long-press. Null leaves the card with no menu, which is not the same as an empty one. */
+
     onLongClick: (() -> Unit)? = null,
     width: Dp = PfpMediaCardDefaults.Width,
-    /**
-     * How far through this thing you are, 0..1, or null for something with no notion of it.
-     *
-     * Drawn as a bar across the FOOT OF THE ART rather than a line under the card, which is
-     * where every video app puts it and where it cannot be mistaken for the focus edge.
-     */
+
     progress: Float? = null,
 ) {
     val palette = detailPalette()
@@ -123,11 +82,6 @@ fun PfpMediaCard(
             contentAlignment = Alignment.Center,
         ) {
             if (model != null && art != "") {
-                // The same art, cropped to fill and blurred, UNDER the fitted copy — see the
-                // class comment for why the tile can't just be left black.
-                //
-                // Android 12+ only. Modifier.blur is a silent no-op below it, which would leave a
-                // sharp zoomed crop behind the art: worse than the black it replaces.
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     AsyncImage(
                         model = model,
@@ -144,13 +98,8 @@ fun PfpMediaCard(
                     modifier = Modifier.fillMaxSize().padding(2.dp),
                 )
             } else {
-                // The name, in the tile. A blank tile with the title underneath reads as a failed
-                // image; a tile that says what it is reads as a thing without a picture.
-                //
-                // ...or just the initial, for something that will never have art. See initialOnly.
                 Text(
-                    // The first character whatever it is — an app called "8 Ball Pool" gets an 8,
-                    // which is the letter it sorts under anyway.
+
                     text = if (initialOnly) title.trim().firstOrNull()?.uppercase() ?: "?" else title,
                     color = palette.textMuted,
                     fontSize = if (initialOnly) 28.sp else 12.sp,
@@ -161,8 +110,7 @@ fun PfpMediaCard(
                     modifier = Modifier.padding(10.dp),
                 )
             }
-            // Only a STARTED and unfinished thing gets a bar: a full-width bar on something
-            // finished and an invisible one on something untouched are both noise.
+
             progress?.takeIf { it > 0.01f && it < 0.995f }?.let { fraction ->
                 Box(
                     modifier = Modifier
@@ -207,9 +155,7 @@ fun PfpMediaCard(
 }
 
 object PfpMediaCardDefaults {
-    /** 2:3, the shape box art, film posters and book covers already are. */
     const val ArtRatio = 2f / 3f
 
-    /** The rail's width. Grids pass their own so a row divides the screen evenly. */
     val Width: Dp = 104.dp
 }

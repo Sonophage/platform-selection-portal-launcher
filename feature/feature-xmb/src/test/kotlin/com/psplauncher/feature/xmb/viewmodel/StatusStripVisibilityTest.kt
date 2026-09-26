@@ -4,34 +4,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Where the status strip is drawn, and where its words still describe what is under it.
- *
- * The strip used to be part of the crossbar's foreground, so every screen that covered the
- * crossbar took the clock, the battery and the notification corner with it: walking into the App
- * Drawer lost the time and walking out found it again. It is the launcher's own chrome now and
- * stays on top of the launcher's own screens.
- *
- * TWO QUESTIONS, and they are different, which is why there are two properties:
- *
- *  - IS IT DRAWN. No on a full-screen overlay — the video player, the photo viewer, the boot and
- *    disc ceremonies, the dialogs and the small boxes you answer and dismiss. Yes everywhere
- *    else, including the two pickers: filling the screen is not the same as owning it.
- *  - DO ITS WORDS STILL APPLY. The clock and the battery are facts about the device and are true
- *    anywhere. The sort label, the shoulder and left/right hints and the home shelf's filter row
- *    are facts about the CROSSBAR, and on a chrome screen they describe a list the user is no
- *    longer looking at. The drawer showed "Title" over a grid it does not sort.
- *
- * The pair being guarded is the partition itself. `otherBlockingOverlay` is the OR of the two
- * halves, so a screen cannot be in neither — but it can be in the WRONG one, and that is a
- * failure nobody reports: the screen works and the clock is quietly missing, or quietly lying.
- * Every screen below is one row of that decision, written down.
- */
 class StatusStripVisibilityTest {
-
     private fun crossbar() = XMBUiState(showBootSequence = false)
-
-    // ── Is it drawn ───────────────────────────────────────────────────────
 
     @Test
     fun `on the crossbar it is drawn`() {
@@ -47,10 +21,7 @@ class StatusStripVisibilityTest {
             "Search" to crossbar().copy(search = SearchState(scope = SearchScope.ALL)),
             "Game detail" to crossbar().copy(activeGameId = 1L),
             "App detail" to crossbar().copy(activeAppId = 1L),
-            // Both pickers fill the screen, which is what used to put them in the other half.
-            // They are lists you browse, not boxes you answer, so they keep the launcher's chrome
-            // exactly as the drawer does. Written down here because the partition is 25 conditions
-            // and this file is the only place the intent behind each one is recorded.
+
             "App picker" to crossbar().copy(
                 appPicker = AppPickerState(
                     title = "Add Apps",
@@ -63,7 +34,7 @@ class StatusStripVisibilityTest {
         chrome.forEach { (name, state) ->
             assertTrue("$name must still cover the crossbar", state.hasBlockingOverlay)
             assertTrue("$name lost the clock", state.statusStripVisible)
-            // The other half of the decision: it is drawn, and it goes quiet about the crossbar.
+
             assertFalse(
                 "$name is not the crossbar, so the sort label must not claim to describe it",
                 state.stripShowsXmbContext,
@@ -87,15 +58,6 @@ class StatusStripVisibilityTest {
         }
     }
 
-    // ── Do its words still apply ──────────────────────────────────────────
-
-    /**
-     * The rail and the notification sheet are not covers in the sense that matters here.
-     *
-     * You are still standing on the crossbar with something open in front of it, so the sort label
-     * and the hints are still about the list you can see behind the menu. Getting this wrong in
-     * the other direction would blank the strip's centre every time the options rail opened.
-     */
     @Test
     fun `the rail and the sheet keep both the strip and its crossbar context`() {
         val rail = crossbar().copy(
@@ -109,13 +71,6 @@ class StatusStripVisibilityTest {
         assertTrue(sheet.stripShowsXmbContext)
     }
 
-    /**
-     * A rail opened FROM a chrome screen does not hand the crossbar's context back.
-     *
-     * This is the case the two properties would disagree on if either were a copy of the other:
-     * overlayKeepsChrome is "a rail is open AND nothing else is", so a rail over the App Drawer is
-     * still the App Drawer, and the sort label must stay quiet.
-     */
     @Test
     fun `a rail over a chrome screen does not restore the crossbar's context`() {
         val state = crossbar().copy(

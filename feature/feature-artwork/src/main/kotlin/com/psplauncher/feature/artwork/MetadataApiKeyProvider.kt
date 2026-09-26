@@ -17,10 +17,6 @@ import javax.inject.Singleton
 class MetadataApiKeyProvider @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    // The IGDB client secret is encrypted at rest via the Keystore-backed cipher; the client id
-    // is a public identifier and stays plaintext. decryptOrLegacy keeps any pre-encryption values
-    // working until they're re-saved.
-    // ── IGDB ──────────────────────────────────────────────────────────────────
     val igdbClientIdFlow: Flow<String?> = context.pfpDataStore.data.map { it[KEY_IGDB_CLIENT_ID] }
 
     suspend fun getIgdbClientId(): String? = igdbClientIdFlow.first()
@@ -43,16 +39,6 @@ class MetadataApiKeyProvider @Inject constructor(
         }
     }
 
-    /**
-     * "IGDB is configured" as a flow, so a screen cannot answer it differently from the scraper.
-     *
-     * These pairs are a public half and a secret half, and the secret half can go missing on its
-     * own: a restore carries `igdb_client_id` but DROPS `igdb_client_secret` when the archive came
-     * from another device, because it cannot be decrypted here (BackupManager's
-     * ENCRYPTED_CREDENTIAL_KEYS). A predicate that only checks the public half then reports a
-     * configured provider that cannot authenticate, which is the most expensive way to be wrong
-     * about a credential: everything looks right and nothing works.
-     */
     val hasIgdbCredentialsFlow: Flow<Boolean> = context.pfpDataStore.data.map { prefs ->
         !prefs[KEY_IGDB_CLIENT_ID].isNullOrBlank() &&
             !prefs[KEY_IGDB_CLIENT_SECRET]?.let { KeystoreSecretCipher.decryptOrLegacy(it) }.isNullOrBlank()
@@ -60,9 +46,6 @@ class MetadataApiKeyProvider @Inject constructor(
 
     suspend fun hasIgdbCredentials(): Boolean = hasIgdbCredentialsFlow.first()
 
-    // ── ScreenScraper (user account — raises thread count & daily quota) ──────
-    // The username is a public handle (plaintext); the password is encrypted at rest like the
-    // other scraper secrets and dropped on cross-device restore by BackupManager.
     val ssUsernameFlow: Flow<String?> = context.pfpDataStore.data.map { it[KEY_SS_USERNAME] }
 
     suspend fun getSsUsername(): String? = ssUsernameFlow.first()
@@ -85,18 +68,12 @@ class MetadataApiKeyProvider @Inject constructor(
         }
     }
 
-    /** "The ScreenScraper account is usable" — one definition, for the same reason as IGDB above. */
     val hasSsCredentialsFlow: Flow<Boolean> = context.pfpDataStore.data.map { prefs ->
         !prefs[KEY_SS_USERNAME].isNullOrBlank() &&
             !prefs[KEY_SS_PASSWORD]?.let { KeystoreSecretCipher.decryptOrLegacy(it) }.isNullOrBlank()
     }
 
     suspend fun hasSsCredentials(): Boolean = hasSsCredentialsFlow.first()
-
-    // Note on the ScreenScraper developer pair: it is required for the API to answer at all, but
-    // it is not user-entered — it ships obfuscated inside the APK (see the buildConfigField byte
-    // arrays in feature-artwork/build.gradle.kts and credentials/DevPairDecoder). Only the
-    // optional user account above is stored here.
 
     companion object {
         private val KEY_IGDB_CLIENT_ID     = stringPreferencesKey("igdb_client_id")

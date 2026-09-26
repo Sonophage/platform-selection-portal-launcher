@@ -13,10 +13,6 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * The global default [IconDisplayMode], plus per-console overrides. Per-game overrides live on
- * the game row and beat both; resolution order is game > console > global.
- */
 @Singleton
 class IconDisplayPreferences @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -27,59 +23,39 @@ class IconDisplayPreferences @Inject constructor(
     suspend fun setMode(mode: IconDisplayMode) =
         context.pfpDataStore.edit { it[KEY_MODE] = mode.name }
 
-    // Per-console overrides, keyed by platform id. A console absent from the map follows the
-    // global mode. Kept as ONE encoded string rather than a key per console so the backup key
-    // list can carry them by name (see BackupKeyCoverageTest).
     val platformModesFlow: Flow<Map<String, IconDisplayMode>> = context.pfpDataStore.data
         .map { decodePlatformModes(it[KEY_PLATFORM_MODES]) }
 
-    /** [mode] = null clears the console's override so it follows the global setting again. */
     suspend fun setPlatformMode(platformId: String, mode: IconDisplayMode?) =
         context.pfpDataStore.edit { prefs ->
             val updated = withPlatformMode(decodePlatformModes(prefs[KEY_PLATFORM_MODES]), platformId, mode)
             prefs[KEY_PLATFORM_MODES] = encodePlatformModes(updated)
         }
 
-    // "Animated icons" master switch for ICON1 video snaps. Whether one plays at all; where it
-    // plays is [snapPlacementFlow].
     val animatedIconsFlow: Flow<Boolean> = context.pfpDataStore.data
         .map { it[KEY_ANIMATED_ICONS] ?: true }
 
     suspend fun setAnimatedIcons(enabled: Boolean) =
         context.pfpDataStore.edit { it[KEY_ANIMATED_ICONS] = enabled }
 
-    // Where an approved snap plays: in the tile, or full-bleed behind the crossbar. Separate from
-    // the master switch because it is a placement and not a second on/off, and because folding
-    // the two together would mean migrating a preference that is already persisted and restored.
     val snapPlacementFlow: Flow<VideoSnapPlacement> = context.pfpDataStore.data
         .map { VideoSnapPlacement.fromName(it[KEY_SNAP_PLACEMENT]) ?: VideoSnapPlacement.DEFAULT }
 
     suspend fun setSnapPlacement(placement: VideoSnapPlacement) =
         context.pfpDataStore.edit { it[KEY_SNAP_PLACEMENT] = placement.name }
 
-    // Whether the focused game's scraped one-liner (year, genre, developer, players) is drawn
-    // under its logo. On by default: a scraped library has the data and the XMB never showed it.
     val gameMetadataFlow: Flow<Boolean> = context.pfpDataStore.data
         .map { it[KEY_GAME_METADATA] ?: true }
 
     suspend fun setGameMetadata(enabled: Boolean) =
         context.pfpDataStore.edit { it[KEY_GAME_METADATA] = enabled }
 
-    // Whether the focused row's own artwork fills the shell's background and its colour retints
-    // the wave. On by default, because that is what it did before this switch existed.
-    //
-    // It needs a switch because it is the one thing in the launcher that argues with the XMB's
-    // own visual thesis: the system has ONE calm colour, taken from the month, and the content
-    // sits quietly on it. A background and a palette that change on every cursor step is the
-    // PS4/PS5 idea, and some people will want the crossbar to hold still.
     val itemBackdropFlow: Flow<Boolean> = context.pfpDataStore.data
         .map { it[KEY_ITEM_BACKDROP] ?: true }
 
     suspend fun setItemBackdrop(enabled: Boolean) =
         context.pfpDataStore.edit { it[KEY_ITEM_BACKDROP] = enabled }
 
-    // How long the cursor must rest on a game (ICON0 tile) before its ICON1 video snap plays.
-    // Seconds, clamped to 1..5; the 1.5 s default keeps the PSP's rest-then-animate cadence.
     val lingerDelaySecondsFlow: Flow<Float> = context.pfpDataStore.data
         .map { (it[KEY_ICON1_LINGER_DELAY_SECONDS] ?: 1.5f).coerceIn(1f, 5f) }
 
@@ -98,9 +74,6 @@ class IconDisplayPreferences @Inject constructor(
         private val KEY_ITEM_BACKDROP =
             androidx.datastore.preferences.core.booleanPreferencesKey("pref_xmb_item_backdrop")
 
-        // "platformId=MODE" per line. Pure and internal-free so the encoding is unit-testable;
-        // anything unparseable is dropped rather than failing the whole read, so one bad entry
-        // never costs the user every other console's choice.
         fun encodePlatformModes(modes: Map<String, IconDisplayMode>): String =
             modes.entries.joinToString("\n") { "${it.key}=${it.value.name}" }
 

@@ -29,22 +29,20 @@ import timber.log.Timber
 import javax.inject.Inject
 
 data class ThemesSettingsUiState(
-    // Name of the theme applied through PfpThemeStore ("Default" = stock look).
+
     val activeThemeName: String = "Default",
     val isInstalling: Boolean = false,
     val installMessage: String? = null,
-    // Custom-theme cascade state (docs/xmb-theme-creator-plan.md): the imported/custom accent
-    // that supersedes the preset scheme, and the unified icon tint (null = default white).
+
     val accentOverrideArgb: Long? = null,
-    // "Color from Wallpaper": the accent is re-derived from the wallpaper rather than picked.
+
     val accentFromWallpaper: Boolean = false,
-    // Whether there is a wallpaper for it to come from. The toggle stays usable without one --
-    // it simply has nothing to derive yet -- but the row says so instead of looking broken.
+
     val hasWallpaper: Boolean = false,
     val iconColorArgb: Long? = null,
-    // The user's saved .pfptheme library (imports + Quick Create).
+
     val savedThemes: List<PfpThemeStore.SavedTheme> = emptyList(),
-    // Installed .xmbtheme themes from the ThemeRepository (built-in + user-installed).
+
     val installedThemes: List<PFPTheme> = emptyList(),
 )
 
@@ -54,7 +52,6 @@ class ThemesSettingsViewModel @Inject constructor(
     private val ptfImporter: PtfThemeImporter,
     private val themeStore: PfpThemeStore,
 ) : ViewModel() {
-
     private val _extra = MutableStateFlow(ThemesSettingsUiState())
 
     val uiState: StateFlow<ThemesSettingsUiState> = combine(
@@ -74,9 +71,6 @@ class ThemesSettingsViewModel @Inject constructor(
 
     fun dismissMessage() = _extra.update { it.copy(installMessage = null) }
 
-    // ── Custom theme cascade ─────────────────────────────────────────────────
-
-    /** Imports a user-picked official PSP theme (.ptf): wallpaper + derived accent. */
     fun importPtfTheme(uri: Uri) {
         viewModelScope.launch {
             _extra.update { it.copy(isInstalling = true, installMessage = null) }
@@ -93,7 +87,6 @@ class ThemesSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Sets the unified icon tint; null restores the default (white / icon art's own color). */
     fun setIconColor(argb: Long?) {
         viewModelScope.launch {
             context.pfpDataStore.edit { prefs ->
@@ -102,7 +95,6 @@ class ThemesSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Sets a custom accent color override; null clears it and returns to the preset scheme. */
     fun setAccentColor(argb: Long?) {
         viewModelScope.launch {
             context.pfpDataStore.edit { prefs ->
@@ -111,16 +103,6 @@ class ThemesSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Turns "Color from Wallpaper" on or off.
-     *
-     * Applies immediately rather than waiting for the next wallpaper change: a toggle that does
-     * nothing until you go and change something else reads as broken. Turning it OFF clears the
-     * override outright — what is there was derived, not chosen, so there is nothing to keep.
-     *
-     * The ON branch goes through the same [followWallpaperAccent] the wallpaper writer uses, so
-     * "what this setting does" has one definition and cannot drift between the two entry points.
-     */
     fun setAccentFromWallpaper(enabled: Boolean) {
         viewModelScope.launch {
             context.pfpDataStore.edit { prefs ->
@@ -131,12 +113,10 @@ class ThemesSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Clears an imported/custom accent so the preset color scheme applies again. */
     fun clearAccentOverride() {
         viewModelScope.launch { context.pfpDataStore.edit { it.remove(KEY_ACCENT_OVERRIDE) } }
     }
 
-    /** Full reset of the applied theme: wallpaper, colors, icons, and layout back to stock. */
     fun resetTheme() {
         viewModelScope.launch {
             themeStore.resetApplied()
@@ -145,9 +125,6 @@ class ThemesSettingsViewModel @Inject constructor(
         }
     }
 
-    // ── Saved-theme library (Quick Create + imports) ─────────────────────────
-
-    /** Quick Create: a picked photo becomes a saved+applied theme, accent auto-derived. */
     fun createThemeFromPhoto(uri: Uri) {
         viewModelScope.launch {
             _extra.update { it.copy(isInstalling = true, installMessage = null) }
@@ -168,11 +145,6 @@ class ThemesSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Exports the device's current look (icons, wallpaper, colors, motion, geometry) into the
-     * library as a user-created theme — the Themes-side entry point beside the icon editor's
-     * "Save as Theme…". One implementation: PfpThemeStore.saveCurrentLook.
-     */
     fun saveCurrentLookAsTheme(name: String) {
         viewModelScope.launch {
             val saved = themeStore.saveCurrentLook(name)
@@ -189,7 +161,6 @@ class ThemesSettingsViewModel @Inject constructor(
         viewModelScope.launch { themeStore.delete(id) }
     }
 
-    /** Exports the bundle to shareable cache and opens the system share sheet. */
     fun shareSavedTheme(id: String) {
         viewModelScope.launch {
             val file = themeStore.exportForShare(id)
@@ -209,7 +180,6 @@ class ThemesSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Imports a shared `.pfptheme` bundle into the library and applies it. */
     fun importPfpTheme(uri: Uri) {
         viewModelScope.launch {
             _extra.update { it.copy(isInstalling = true, installMessage = null) }
@@ -219,15 +189,6 @@ class ThemesSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * User-facing copy for each import outcome.
-     *
-     * The store deliberately does not carry these strings — it reports what happened, the UI
-     * decides how to say it. Note that "too large" and "out of memory" are different failures
-     * and must not be merged: the first is a file this build refuses outright, the second is a
-     * legitimate bundle this device could not hold, which is fixable by shrinking the motion
-     * wallpaper rather than by re-exporting.
-     */
     private fun messageFor(result: PfpThemeStore.ImportResult): String = when (result) {
         is PfpThemeStore.ImportResult.Success -> "Imported \"${result.theme.name}\""
         is PfpThemeStore.ImportResult.Unreadable -> "Could not open that file"
@@ -240,7 +201,6 @@ class ThemesSettingsViewModel @Inject constructor(
     }
 
     private companion object {
-        // Must match XMBViewModel — shared prefs contract for the theme cascade.
         val KEY_ICON_COLOR      = longPreferencesKey("theme_icon_color")
     }
 }

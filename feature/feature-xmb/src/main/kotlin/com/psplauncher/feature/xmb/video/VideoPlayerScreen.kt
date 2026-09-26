@@ -55,9 +55,7 @@ import kotlinx.coroutines.delay
 import timber.log.Timber
 
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
-// AspectRatioFrameLayout's resize modes are media3 @UnstableApi. Suppressed rather than opted
-// into, for the reason spelled out on VideoSnapTranscoder: the annotation propagates and a
-// suppression does not.
+
 @Suppress("UnsafeOptInUsageError")
 private val SCREEN_MODES = listOf(
     AspectRatioFrameLayout.RESIZE_MODE_FIT to "Fit",
@@ -67,12 +65,6 @@ private val SCREEN_MODES = listOf(
 private const val SEEK_STEP_MS = 10_000L
 private const val CONTROLS_TIMEOUT_MS = 3_500L
 
-/**
- * Built-in fullscreen video player (Media3 ExoPlayer). Fully controller-driven — no touch required:
- *  A = play/pause · B = back (saves resume) · ◀/▶ = seek ∓10s · L1/R1 = prev/next · Y = options
- *  (speed / subtitle / audio / screen mode). Options is a controller-navigable overlay so nothing
- *  ever traps focus. The player is released and the resume position saved on exit.
- */
 @UnstableApi
 @Composable
 fun VideoPlayerScreen(
@@ -102,7 +94,6 @@ fun VideoPlayerScreen(
     var optionsRow by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // The very first video seeks to the requested resume position; later prev/next start at 0.
     val initialSeek = remember { startPositionMs }
 
     val player = remember {
@@ -126,8 +117,6 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Load whichever video is current. Validates the URI up front so a bad file shows a friendly
-    // error instead of crashing. The first load honours the resume position.
     LaunchedEffect(index) {
         errorMessage = null
         val uri = runCatching { Uri.parse(current.uri) }.getOrNull()
@@ -139,7 +128,6 @@ fun VideoPlayerScreen(
         player.playWhenReady = true
     }
 
-    // Poll the position while playing so the scrubber/label stay live.
     LaunchedEffect(isPlaying) {
         while (isPlaying) {
             positionMs = player.currentPosition.coerceAtLeast(0L)
@@ -148,7 +136,6 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Auto-hide the controls a few seconds after the last interaction (unless the options menu is up).
     LaunchedEffect(controlsPoke, optionsOpen) {
         if (optionsOpen) { controlsVisible = true; return@LaunchedEffect }
         controlsVisible = true
@@ -156,7 +143,6 @@ fun VideoPlayerScreen(
         controlsVisible = false
     }
 
-    // Persist resume position on dispose (back-out or process teardown) and release the player.
     val currentRef by rememberUpdatedState(current)
     DisposableEffect(Unit) {
         onDispose {
@@ -170,13 +156,12 @@ fun VideoPlayerScreen(
     fun poke() { controlsPoke++ }
     fun switchTo(newIndex: Int) {
         if (newIndex !in videos.indices) return
-        // Save the outgoing video's position before moving on.
+
         onSaveResume(current.id, player.currentPosition.coerceAtLeast(0L), player.duration.coerceAtLeast(0L))
         index = newIndex
         poke()
     }
 
-    // ── Controller handling ───────────────────────────────────────────────────
     LaunchedEffect(pendingGamepadAction) {
         val action = pendingGamepadAction ?: return@LaunchedEffect
         if (optionsOpen) {
@@ -292,7 +277,6 @@ private fun ControlsOverlay(
         Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
 
         Column {
-            // Scrubber
             val frac = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
             Box(
                 modifier = Modifier
@@ -340,7 +324,7 @@ private fun ControlsOverlay(
                         ),
                         style = ControllerHintStyle.OVERLAY,
                     )
-                    // Status, not a prompt — no button changes it from here.
+
                     Text("${speed}× · $screenMode", color = Color(0xFFCCCCCC), fontSize = 12.sp)
                 }
             }
@@ -408,19 +392,17 @@ private fun OptionsOverlay(
     }
 }
 
-// ── Track selection helpers ──────────────────────────────────────────────────
-
 @UnstableApi
 private fun cycleTrack(player: Player, trackType: Int, allowOff: Boolean) {
     val groups = player.currentTracks.groups.filter { it.type == trackType && it.isSupported }
     if (groups.isEmpty()) return
-    // Build the ordered choices: [off?] + one entry per (group, trackIndex).
+
     val choices = buildList {
         if (allowOff) add(null)
         groups.forEach { g -> for (t in 0 until g.length) if (g.isTrackSupported(t)) add(g to t) }
     }
     if (choices.isEmpty()) return
-    // Find the currently-selected choice.
+
     val currentIdx = choices.indexOfFirst { choice ->
         choice != null && choice.first.isTrackSelected(choice.second)
     }.let { if (it < 0 && allowOff) 0 else it }

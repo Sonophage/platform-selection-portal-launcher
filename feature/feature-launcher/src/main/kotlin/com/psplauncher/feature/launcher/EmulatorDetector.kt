@@ -10,30 +10,15 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Discovers installed emulators and turns them into launchable [EmulatorProfile]s.
- *
- * Two sources: the curated [KnownEmulatorCatalog] (one profile per installed package) and RetroArch
- * (one profile per installed libretro core). Run on startup by [EmulatorAutoConfigService], which
- * persists the results without clobbering the user's own edits.
- */
 @Singleton
 class EmulatorDetector @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-
-    /**
-     * @param inventory what is known about RetroArch's installed cores. Only the cores it names are
-     *   offered; when it names none, no RetroArch profile is produced at all. PFP used to invent a
-     *   curated list here whenever the inventory was unknown, which is what defaulted users onto
-     *   cores they had never installed.
-     */
     fun detect(inventory: CoreInventory = CoreInventory.Unlinked): List<EmulatorProfile> {
         val pm = context.packageManager
         val results = mutableListOf<EmulatorProfile>()
         val now = System.currentTimeMillis()
 
-        // Scan for standard emulators from the catalog
         for (known in KnownEmulatorCatalog.entries) {
             val installedPkg = known.packageNames.firstOrNull { pkg ->
                 try { pm.getPackageInfo(pkg, 0); true }
@@ -63,17 +48,11 @@ class EmulatorDetector @Inject constructor(
             )
         }
 
-        // RetroArch: one profile per core the inventory proves is installed.
         val retroarchPkg = RetroArchCoreScanner.RETROARCH_PACKAGES.firstOrNull { pkg ->
             try { pm.getPackageInfo(pkg, 0); true }
             catch (_: PackageManager.NameNotFoundException) { false }
         }
         if (retroarchPkg != null) {
-            // RetroArch reads ROMs by raw path via its own legacy storage (targetSdk 28), so ROM
-            // access is fine — the only prerequisite is the core being installed, which is exactly
-            // what the inventory establishes. An empty inventory yields no profiles rather than a
-            // guess: the user is prompted to link their cores folder instead of hitting a black
-            // screen on a core that was never there.
             val cores = RetroArchCoreScanner.coresFor(retroarchPkg, inventory.coreFiles)
             Timber.i(
                 "RetroArch detected ($retroarchPkg): ${cores.size} core profiles " +
@@ -105,43 +84,12 @@ class EmulatorDetector @Inject constructor(
         return results
     }
 
-    /**
-     * The extras RetroArch's OWN launcher sends, not just the two that name the content.
-     *
-     * We sent ROM and LIBRETRO and nothing else, and RetroArch started with no config file and no
-     * idea where anything lived. Its log is the whole story — ours produced:
-     *
-     *     [ENV] Libretro path: "…/mgba_libretro_android.so".
-     *     [ENV] Auto-start game "…/Pokemon Unbound (v2.1.1.1).gba".
-     *
-     * and stopped there, while the same intent carrying the set below produced those two lines
-     * plus its config file, its app dir, and its default savefile, savestate, system and
-     * screenshot folders. A frontend that does not know where its system folder is cannot find a
-     * BIOS, and one with no config runs on compiled defaults — which is the black screen that
-     * launching the identical game from inside RetroArch never shows.
-     *
-     * Values are read off the installed package rather than assumed, because the package itself
-     * varies by ABI (com.retroarch.aarch64 here) and so therefore does every path derived from it.
-     * CONFIGFILE is the EXTERNAL config, `<sdcard>/Android/data/<pkg>/files/retroarch.cfg` — the
-     * file RetroArch's own launcher uses. `<dataDir>/retroarch.cfg` does NOT exist on this build
-     * and passing it boots to black; see the note in the function body, which cost an afternoon.
-     */
     private fun retroArchExtras(packageName: String, corePath: String): Map<String, String> {
         val app = runCatching { context.packageManager.getApplicationInfo(packageName, 0) }.getOrNull()
         val dataDir = app?.dataDir
         val apk = app?.sourceDir
         val sdcard = android.os.Environment.getExternalStorageDirectory().absolutePath
-        // RetroArch's config lives in its EXTERNAL files directory, not its private data dir.
-        //
-        // This is the whole bug and it cost an afternoon. We pointed CONFIGFILE at
-        // <dataDir>/retroarch.cfg, which on this build does not exist — so RetroArch started on
-        // compiled defaults with none of the user's settings and rendered nothing at all. Its
-        // real config is the 114 KB file under Android/data/<pkg>/files, which is also where its
-        // own launcher and every other frontend point. Passing that, the same intent boots
-        // straight into the game.
-        //
-        // Omitting CONFIGFILE is NOT the safe middle: with no config extra at all the launch is
-        // black too. The path has to be right.
+
         val external = "$sdcard/Android/data/$packageName/files"
         return buildMap {
             put("ROM", "{rom_path}")
@@ -149,18 +97,13 @@ class EmulatorDetector @Inject constructor(
             put("CONFIGFILE", "$external/retroarch.cfg")
             put("EXTERNAL", external)
             put("SDCARD", sdcard)
-            // Best-effort: these two come off the installed package and are simply omitted when
-            // it cannot be read, which is worse than sending them and far better than refusing.
+
             if (dataDir != null) put("DATADIR", dataDir)
             if (apk != null) put("APK", apk)
         }
     }
 
     companion object {
-        // RetroArch's main activity class is the same regardless of which package variant is
-        // installed (com.retroarch, com.retroarch.aarch64, com.retroarch.ra32). The package name
-        // is NOT part of the activity class — using "$package.browser.RetroActivity" is wrong
-        // and causes ActivityNotFoundException at launch time.
         const val RETROARCH_ACTIVITY_CLASS = "com.retroarch.browser.retroactivity.RetroActivityFuture"
 
         fun autoId(packageName: String): String =

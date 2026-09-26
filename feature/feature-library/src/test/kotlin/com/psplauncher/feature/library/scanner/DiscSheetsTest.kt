@@ -4,13 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The shared sheet parsers: .cue FILE references and Dreamcast .gdi track names, normalised to
- * lowercase basenames so the raw-path resolver and the SAF suppressor match companions the same
- * way. See docs/plans/README.md (C1).
- */
 class DiscSheetsTest {
-
     @Test
     fun `cue sheet quoted FILE references parse`() {
         val lines = listOf(
@@ -73,11 +67,6 @@ class DiscSheetsTest {
         assertTrue(gdiSheetTrackNames(listOf("", "   ")).isEmpty())
     }
 
-    // ── case-preserving variants ─────────────────────────────────────────────────
-    // The lowercase sets above are comparison keys: a sheet's references matched against a
-    // directory listing. A caller that must OPEN the referenced file needs the name as written, or
-    // it resolves nothing on a case-sensitive volume — the /roms/psx/Parasite Eve II failure.
-
     @Test
     fun `raw cue references preserve the case written in the sheet`() {
         assertEquals(
@@ -93,8 +82,6 @@ class DiscSheetsTest {
 
     @Test
     fun `raw cue references keep sheet order`() {
-        // DiscRegionReader opens the FIRST data track. Order is contractual here, not incidental —
-        // the lowercase overload returns a Set and only preserves order by LinkedHashSet accident.
         val lines = listOf(
             "FILE \"Game (Track 1).bin\" BINARY",
             "  TRACK 01 MODE2/2352",
@@ -110,8 +97,6 @@ class DiscSheetsTest {
 
     @Test
     fun `raw cue references collapse path components to a basename`() {
-        // This stripping is the path-traversal guard on untrusted sheet contents. It must survive
-        // dropping the .lowercase() — without it a sheet can name a file outside its own folder.
         assertEquals(
             listOf("track02.bin"),
             cueSheetReferencesRaw(listOf("FILE \"sub/track02.bin\" BINARY")),
@@ -120,7 +105,7 @@ class DiscSheetsTest {
             listOf("passwd"),
             cueSheetReferencesRaw(listOf("FILE \"../../etc/passwd\" BINARY")),
         )
-        // Windows-authored sheets use backslashes.
+
         assertEquals(
             listOf("evil.bin"),
             cueSheetReferencesRaw(listOf("FILE \"..\\..\\evil.bin\" BINARY")),
@@ -129,8 +114,6 @@ class DiscSheetsTest {
 
     @Test
     fun `the lowercase cue set still agrees with the raw parse`() {
-        // cueSheetReferences delegates to the raw parser. The existing consumers' contract —
-        // lowercase basenames, deduplicated — must survive that refactor bit-identically.
         val lines = listOf(
             "FILE \"Parasite Eve II (Disc 2).bin\" BINARY",
             "FILE \"PARASITE EVE II (DISC 2).BIN\" BINARY",

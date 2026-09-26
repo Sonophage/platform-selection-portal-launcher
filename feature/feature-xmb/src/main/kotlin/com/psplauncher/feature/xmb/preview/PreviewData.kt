@@ -7,10 +7,7 @@ import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.XMBItemType
 import com.psplauncher.feature.xmb.viewmodel.XMBUiState
 
-// Shared fake data used by Compose @Preview annotations and the debug menu.
-// Never referenced in production code paths.
 object PreviewData {
-
     val categories = listOf(
         Category(BuiltInCategory.SETTINGS, "Settings", "ic_settings", type = CategoryType.BUILT_IN, position = 0),
         Category("photos",                 "Photo",    "ic_photos",   type = CategoryType.BUILT_IN, position = 1),

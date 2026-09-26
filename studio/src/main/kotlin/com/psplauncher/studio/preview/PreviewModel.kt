@@ -10,30 +10,24 @@ import com.psplauncher.themekit.ColorCascade
 import com.psplauncher.themekit.PfpThemeManifest
 import com.psplauncher.themekit.XmbLayoutSpec
 
-/** Everything the preview canvas needs, resolved from [StudioState]. */
 data class XmbPreviewModel(
-    /** The one theme color: drives the wave / menu backdrops (launcher: PFPColors.waveColor). */
+
     val accent: Color,
     val iconTint: Color,
     val backgroundTop: Color,
     val backgroundBottom: Color,
     val wallpaper: ImageBitmap?,
     val reducedWave: Boolean,
-    /** IconSlots key → custom bitmap; slots not present draw the built-in glyph. */
+
     val iconOverrides: Map<String, ImageBitmap>,
-    /** Per-theme XMB geometry — the canvas positions everything from this, never DEFAULT. */
+
     val layout: XmbLayoutSpec = XmbLayoutSpec.DEFAULT,
     val mode: PreviewMode = PreviewMode.HOME,
 ) {
-    // Launcher parity: PFPColors.accentColor stays WHITE for presets and imports alike
-    // (XMBViewModel.toPFPColors / withWaveTint only retint waveColor + gradient), so the
-    // menu cursor formulas below lerp from white — matching MenuCursor.kt on device.
     private val pfpAccentColor = Color.White
 
-    /** MenuCursor.menuCursorEdge(): lerp(accent, White, 0.55).copy(alpha = 0.95). */
     val menuCursorEdge: Color get() = lerp(pfpAccentColor, Color.White, 0.55f).copy(alpha = 0.95f)
 
-    /** ContextMenuOverlay panel backdrop: waveColor at 75% alpha. */
     val menuPanelBackdrop: Color get() = accent.copy(alpha = 0.75f)
 }
 
@@ -42,8 +36,7 @@ fun StudioState.toPreviewModel(): XmbPreviewModel {
     val (top, bottom) = ColorCascade.lightBackgroundAnchors(accentLong)
     return XmbPreviewModel(
         accent = Color(accentArgb),
-        // "Auto" has no derivation in the launcher yet either — both render white until
-        // derive-from-accent lands (PfpThemeManifest.ICON_COLOR_AUTO contract).
+
         iconTint = when (val c = iconColor) {
             IconColorChoice.Auto -> Color.White
             is IconColorChoice.Custom -> Color(c.argb)
@@ -58,13 +51,7 @@ fun StudioState.toPreviewModel(): XmbPreviewModel {
     )
 }
 
-/**
- * The representative frame the preview shows: the Video category selected, because its
- * item rows exercise themeable item slots (folders, library, recents...) rather than the
- * non-themeable platform icons the Games column leads with.
- */
 object SampleContent {
-
     data class Category(val slotKey: String, val label: String)
     data class Row(val slotKey: String, val title: String, val subtitle: String? = null)
 
@@ -80,10 +67,10 @@ object SampleContent {
         Category("catbar_favorites", "Favorites"),
     )
 
-    const val SELECTED_CATEGORY = 3 // Video
+    const val SELECTED_CATEGORY = 3
 
     val rows: List<Row> = listOf(
-        // The launcher's "Videos" library row is a memory-card slot, not the library glyph.
+
         Row("item_memcard_video", "Videos", "132 videos"),
         Row("item_video_recent", "Recently Watched"),
         Row("item_video_favorites", "Favorites"),

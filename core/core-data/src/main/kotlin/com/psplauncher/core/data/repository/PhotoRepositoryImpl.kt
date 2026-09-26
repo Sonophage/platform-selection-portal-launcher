@@ -19,7 +19,6 @@ class PhotoRepositoryImpl @Inject constructor(
     private val libraryDao: PhotoLibraryDao,
     private val photoDao: PhotoDao,
 ) : PhotoRepository {
-
     override fun observeLibraries(): Flow<List<PhotoLibrary>> =
         libraryDao.observeAll().map { list -> list.map { it.toDomain() } }
 
@@ -59,10 +58,8 @@ class PhotoRepositoryImpl @Inject constructor(
         libraryDao.setScanRecursively(id, scanRecursively, System.currentTimeMillis())
 
     override suspend fun removeLibrary(id: String) {
-        // Capture thumbnail uris before the rows go, so their cached files can be forgotten too.
         val thumbs = photoDao.getForLibrary(id).mapNotNull { it.thumbnailUri }
-        // Photos cascade-delete via the foreign key, but delete explicitly too so behaviour is
-        // identical whether or not foreign keys are enforced on the connection.
+
         photoDao.deleteForLibrary(id)
         libraryDao.delete(id)
         deleteOrphanedThumbnails(thumbs) { photoDao.countReferencingThumbnail(it) > 0 }

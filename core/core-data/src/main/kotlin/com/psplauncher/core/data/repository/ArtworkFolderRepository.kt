@@ -14,16 +14,10 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Persisted SAF root of the user-owned artwork library. Backed up (inert without a live grant) so
-// a restore can pre-point the re-link picker at the old location.
 private val KEY_ARTWORK_FOLDER_TREE_URI = stringPreferencesKey("artwork_folder_tree_uri")
 
-// "internal" (filesDir, the default) or "portable" (the SAF tree above). Flipped only after the
-// portable library is usable, never mid-operation.
 private val KEY_ARTWORK_STORAGE_MODE = stringPreferencesKey("artwork_storage_mode")
 
-// UUID minted when a library manifest is first written; distinguishes "same library re-linked"
-// from "a different library" when a picked folder already contains a manifest.
 private val KEY_ARTWORK_LIBRARY_UUID = stringPreferencesKey("artwork_library_uuid")
 
 enum class ArtworkStorageMode { INTERNAL, PORTABLE;
@@ -33,13 +27,6 @@ enum class ArtworkStorageMode { INTERNAL, PORTABLE;
     }
 }
 
-/**
- * The user-chosen artwork library root, held as a persisted `ACTION_OPEN_DOCUMENT_TREE` grant —
- * the same SAF pattern as [BackupFolderRepository]: no storage permission, survives uninstall,
- * stays user-accessible, never a raw path. The grant is read+write (PFP writes artwork into it)
- * and is the single grant covering both the library (`games/…`) and the import drop zone
- * (`import/<Launcher>/…`).
- */
 @Singleton
 class ArtworkFolderRepository @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -78,7 +65,6 @@ class ArtworkFolderRepository @Inject constructor(
         }
     }
 
-    /** Persists a read+write grant (artwork is written into the tree and read back by the UI). */
     fun persist(uri: Uri) {
         runCatching {
             context.contentResolver.takePersistableUriPermission(
@@ -88,7 +74,6 @@ class ArtworkFolderRepository @Inject constructor(
         }.onFailure { Timber.w(it, "Could not persist artwork folder permission for $uri") }
     }
 
-    /** True when the stored tree still has a live persisted read+write grant. */
     suspend fun hasLiveGrant(): Boolean {
         val stored = getTreeUri() ?: return false
         return context.contentResolver.persistedUriPermissions.any {
@@ -96,10 +81,6 @@ class ArtworkFolderRepository @Inject constructor(
         }
     }
 
-    /**
-     * Forgets the folder: releases the persisted grant and clears the stored URI + mode. The
-     * folder's contents are never touched — the library stays user-owned on disk.
-     */
     suspend fun forget() {
         getTreeUri()?.let { stored ->
             runCatching {

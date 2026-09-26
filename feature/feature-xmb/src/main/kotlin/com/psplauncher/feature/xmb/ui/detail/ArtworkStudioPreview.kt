@@ -10,13 +10,6 @@ import com.psplauncher.feature.artwork.match.GameMatch
 import com.psplauncher.feature.artwork.match.MatchProvider
 import com.psplauncher.feature.artwork.match.MatchTier
 
-// Full-screen previews of the Artwork Studio. The screen measures its grid slot at runtime, which a
-// static preview never does, so each preview pages the sample results itself with the real
-// StudioGridCapacity. The slot sizes are the plan's worked examples (C16 "Grid capacity rules");
-// a device measures its own, so treat the column and row counts here as approximate.
-// Artwork tiles render blank: previews have no network.
-
-/** Does nothing; lists every source as available. */
 private object PreviewStudioActions : ArtworkStudioActions {
     override fun handleGamepadAction(action: GamepadAction) = Unit
     override fun selectTab(index: Int) = Unit
@@ -76,10 +69,6 @@ private object PreviewStudioActions : ArtworkStudioActions {
 
 private const val SAMPLE_TOTAL_RESULTS = 23
 
-/**
- * ICON0 on SteamGridDB with the grid focused, a confirmed-looking title match and page 1 of the
- * results, paged for a grid slot of [slotWidthDp] × [slotHeightDp].
- */
 private fun sampleStudioState(slotWidthDp: Float, slotHeightDp: Float): ArtworkStudioUiState {
     val tabIndex = 0
     val capacity = StudioGridCapacity.of(slotWidthDp, slotHeightDp, STUDIO_TABS[tabIndex].tileClass)
@@ -129,14 +118,12 @@ private fun StudioPreview(slotWidthDp: Float, slotHeightDp: Float, showTouchCont
     }
 }
 
-// The Thor's slot as measured on device (2026-09-11): ~613 × 285 dp, 5 × 3 landscape.
 @Preview(name = "AYN Thor · controller", widthDp = 833, heightDp = 468, group = "Artwork Studio")
 @Composable
 private fun ArtworkStudioThorControllerPreview() {
     StudioPreview(slotWidthDp = 613f, slotHeightDp = 285f, showTouchControls = false)
 }
 
-// Touch mode's 40 dp page line takes 24 dp from the slot.
 @Preview(name = "AYN Thor · touch", widthDp = 833, heightDp = 468, group = "Artwork Studio")
 @Composable
 private fun ArtworkStudioThorTouchPreview() {

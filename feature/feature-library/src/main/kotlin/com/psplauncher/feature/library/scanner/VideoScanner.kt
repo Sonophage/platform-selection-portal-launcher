@@ -29,7 +29,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
 
-// Average-luminance threshold (0..255) below which a sampled frame is treated as "too dark".
 private const val BRIGHT_ENOUGH = 30.0
 
 sealed interface VideoScanResult {
@@ -38,90 +37,27 @@ sealed interface VideoScanResult {
     data class Error(val libraryId: String, val message: String) : VideoScanResult
 }
 
-/**
- * Whether a quick scan can carry [prior]'s **metadata** over untouched.
- *
- * Deliberately says nothing about the thumbnail. Metadata and the frame grab are two separate
- * MediaMetadataRetriever passes here and either can fail while the other succeeds, so a single
- * verdict for both is what let a video keep an empty thumbnail slot forever: the row was reused
- * whole, null included, and no quick scan ever tried again. [thumbActionFor] answers the other
- * half.
- *
- * Metadata is carried over when the file is unchanged AND the row has actually been probed. A row
- * written before the metadata pass carries only a name and a timestamp, and reusing it would leave
- * the user's existing library showing bare file names until they found Deep Rescan.
- */
 internal fun canReuseVideoMetadata(prior: Video?, lastModified: Long?): Boolean {
     if (prior == null) return false
     if (prior.lastModified != lastModified) return false
     return prior.hasProbedMetadata()
 }
 
-/**
- * Whether this row has been through the metadata pass.
- *
- * There is no "probed" flag, so this infers it from the fields the pass fills. Four fields rather
- * than one because a container is obliged to report none of them in particular: a video that only
- * declares a duration must not be re-probed on every scan forever.
- *
- * The thumbnail is NOT one of them. A frame grab that genuinely cannot be taken leaves exactly the
- * same null as a row that was never probed, so it cannot tell the two apart.
- */
 internal fun Video.hasProbedMetadata(): Boolean =
     durationMs != null || width != null || height != null || codec != null
 
-/**
- * What a scan should do about a row's thumbnail.
- *
- * Two cases and not a nullable string, on purpose. The bug this replaces was a quick scan that
- * returned `prior.copy(...)` and simply never mentioned the thumbnail, so a null was carried
- * forward untouched on every pass. A nullable return type lets that mistake be made again and,
- * worse, lets a test of it pass: "the helper returned null" and "the scanner forgot to look" are
- * the same value. [Generate] is a value the call site has to handle, so the compiler asks the
- * question rather than a reviewer having to notice it was never asked.
- */
 internal sealed interface ThumbAction {
-    /** The cached frame named by [uri] is on disk. Carry it over; do no work. */
     data class Carry(val uri: String) : ThumbAction
 
-    /** No usable cached frame. Generate one, even on a quick scan. */
     data object Generate : ThumbAction
 }
 
-/**
- * Whether [prior]'s thumbnail can be carried over.
- *
- * [ThumbAction.Generate] for a row that never got one, and for one whose cached file has gone:
- * clearing the thumbnail cache must make the next Rescan regenerate rather than report "nothing
- * changed". Regenerating is cheap when the frame is already on disk, because
- * [VideoScanner.generateThumbnail] returns the existing file before it opens anything.
- */
 internal fun thumbActionFor(prior: Video?, thumbExists: (String) -> Boolean): ThumbAction {
     val uri = prior?.thumbnailUri
     if (uri.isNullOrBlank()) return ThumbAction.Generate
     return if (thumbExists(uri)) ThumbAction.Carry(uri) else ThumbAction.Generate
 }
 
-/**
- * Walks a [VideoLibrary]'s SAF document tree and emits the video files it finds. Always
- * user-initiated (never background/observer-driven). Mirrors [MusicScanner]; runs on
- * [Dispatchers.IO], skips unreadable/non-video files with a log rather than crashing, and is
- * cancellable via [coroutineContext.ensureActive].
- *
- * Two modes (both add new files and drop files that no longer exist — i.e. stale entries are
- * always pruned):
- *  - **Quick** ([deep] = false): for files whose `lastModified` is unchanged, the existing row's
- *    metadata, resume position and custom fields are carried over — no per-file
- *    MediaMetadataRetriever probe. Only new/modified files are probed.
- *
- *    The thumbnail is **not** carried blindly with them: a row whose cached frame is missing gets
- *    one generated even on a quick pass ([thumbActionFor]). Reusing the row whole is what left
- *    every video in a library with an empty thumbnail that no amount of rescanning could fill,
- *    because the null went round the loop untouched and only a Deep Rescan ever looked again.
- *  - **Deep** ([deep] = true): every file's metadata is re-read and any missing thumbnail is
- *    regenerated, while user data (custom title/thumbnail, resume position) and an existing valid
- *    thumbnail are preserved keyed by uri.
- */
 @Singleton
 class VideoScanner @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -144,10 +80,7 @@ class VideoScanner @Inject constructor(
         val videos = mutableListOf<Video>()
         var filesSeen = 0
 
-        // Iterative DFS over document IDs so deeply nested trees don't blow the stack. Directory
-        // listing goes through one DocumentsContract child query per directory (see SafChildren)
-        // instead of DocumentFile's per-property IPC round-trips.
-        val stack = ArrayDeque<Pair<String, String>>()   // documentId to relative path
+        val stack = ArrayDeque<Pair<String, String>>()
         stack.addLast(safScanStartDocId(context, treeUri) to "")
         while (stack.isNotEmpty()) {
             coroutineContext.ensureActive()
@@ -189,9 +122,6 @@ class VideoScanner @Inject constructor(
         val uriStr = uri.toString()
         val prior = existingByUri[uriStr]
 
-        // Quick scan: carry an unchanged file's metadata over without re-probing it, but still
-        // settle the thumbnail. Reusing the row whole is what left a video with an empty thumbnail
-        // slot that no amount of rescanning could fill.
         if (!deep && canReuseVideoMetadata(prior, lastModified)) {
             prior!!
             return prior.copy(
@@ -205,7 +135,7 @@ class VideoScanner @Inject constructor(
         }
 
         val meta = readMetadata(uri)
-        // Preserve an existing valid thumbnail; otherwise (or if it's gone) generate one.
+
         val thumb = when (val action = thumbActionFor(prior, ::fileExistsForUri)) {
             is ThumbAction.Carry -> action.uri
             ThumbAction.Generate -> generateThumbnail(uri, meta?.durationMs)
@@ -216,7 +146,7 @@ class VideoScanner @Inject constructor(
             libraryId = libraryId,
             uri = uriStr,
             displayName = name,
-            // Preserve the user's custom title/thumbnail/resume state across re-scans.
+
             title = prior?.title,
             durationMs = meta?.durationMs,
             width = meta?.width,
@@ -245,9 +175,6 @@ class VideoScanner @Inject constructor(
         val mimeType: String?,
     )
 
-    // Best-effort metadata. MediaMetadataRetriever throws on DRM/odd files — never let that abort
-    // the scan; we still keep the video using its file name. Rotation is applied so width/height
-    // reflect the displayed orientation.
     private fun readMetadata(uri: Uri): VideoMeta? = runCatching {
         MediaMetadataRetriever().use { mmr ->
             mmr.setDataSource(context, uri)
@@ -272,9 +199,6 @@ class VideoScanner @Inject constructor(
 
     private fun MediaMetadataRetriever.int(key: Int): Int? = str(key)?.toIntOrNull()
 
-    // Thumbnail cache lives in app-internal storage (no extra permission). Files are named by a
-    // hash of the video uri so re-scans reuse existing frames. Grabs a frame ~10% in (min 1s) so
-    // it isn't a black intro frame; falls back to the first sync frame.
     private val thumbCacheDir: File by lazy {
         File(context.filesDir, "video_thumbs").apply { mkdirs() }
     }
@@ -288,8 +212,7 @@ class VideoScanner @Inject constructor(
                 val dur = durationMs
                     ?: mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
                     ?: 0L
-                // Sample a few frames across the clip and keep the first that isn't near-black (skips
-                // dark intros/fades); fall back to the brightest sampled frame, then any frame.
+
                 val candidatesUs = if (dur > 0) {
                     listOf(0.20, 0.35, 0.50, 0.65, 0.10).map { ((dur * it).toLong().coerceAtLeast(1000L)) * 1000L }
                 } else {
@@ -311,7 +234,6 @@ class VideoScanner @Inject constructor(
         }.getOrElse { Timber.w(it, "Thumbnail generation failed for $uri"); null }
     }
 
-    // Rough average luminance (0..255) over a sparse grid — cheap "is this frame basically black?".
     private fun averageLuma(bmp: Bitmap): Double {
         val steps = 8
         val w = bmp.width.coerceAtLeast(1)

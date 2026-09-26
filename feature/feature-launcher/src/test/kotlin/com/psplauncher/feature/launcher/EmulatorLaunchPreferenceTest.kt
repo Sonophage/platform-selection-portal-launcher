@@ -7,12 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * A freshly detected console must default to a standalone emulator when one is installed;
- * RetroArch cores stay selectable but never win the automatic pick.
- */
 class EmulatorLaunchPreferenceTest {
-
     private fun profile(
         id: String,
         packageName: String,
@@ -30,14 +25,13 @@ class EmulatorLaunchPreferenceTest {
     fun `retroarch profiles are identified by package and auto source`() {
         assertTrue(profile("ra", "com.retroarch", "retroarch-core").isRetroArchProfile())
         assertTrue(profile("ra64", "com.retroarch.aarch64", "retroarch-core").isRetroArchProfile())
-        // Package alone is enough, even for a hand-made custom profile.
+
         assertTrue(profile("custom", "com.retroarch", autoSource = null).isRetroArchProfile())
         assertFalse(profile("snes9x_ex", "com.explusalpha.Snes9xPlus").isRetroArchProfile())
     }
 
     @Test
     fun `standalone wins the automatic pick over a retroarch core`() {
-        // RetroArch listed first on purpose — ordering must not depend on input order.
         val ordered = listOf(
             profile("ra_snes9x", "com.retroarch", "retroarch-core"),
             profile("snes9x_ex", "com.explusalpha.Snes9xPlus"),
@@ -68,8 +62,6 @@ class EmulatorLaunchPreferenceTest {
         assertEquals("ra_snes9x", ordered.first().id)
     }
 
-    // ── stabilizeCore: a console's remembered RetroArch core stays the automatic pick ──────
-
     @Test
     fun `remembered core moves to the front of the retroarch tier`() {
         val pool = listOf(
@@ -80,8 +72,6 @@ class EmulatorLaunchPreferenceTest {
 
         val stabilized = pool.stabilizeCore("ra_gambatte")
 
-        // A standalone still wins the automatic pick; among RetroArch cores the remembered one
-        // leads, so installing a new core can never silently swap the console's core.
         assertEquals(
             listOf("snes9x_ex", "ra_gambatte", "ra_mgba"),
             stabilized.map { it.id },
@@ -103,8 +93,6 @@ class EmulatorLaunchPreferenceTest {
 
     @Test
     fun `remembered core missing from the pool is ignored`() {
-        // ra_gambatte left the pool (uninstalled or marked unavailable) — the pool keeps its
-        // default order and the next successful launch refreshes the record.
         val pool = listOf(
             profile("ra_mgba", "com.retroarch", "retroarch-core"),
             profile("snes9x_ex", "com.explusalpha.Snes9xPlus"),
@@ -125,7 +113,6 @@ class EmulatorLaunchPreferenceTest {
 
     @Test
     fun `remembered standalone does not reorder the pool`() {
-        // Only RetroArch core launches write the memory, but the guard belongs here anyway.
         val pool = listOf(
             profile("ra_mgba", "com.retroarch", "retroarch-core"),
             profile("snes9x_ex", "com.explusalpha.Snes9xPlus"),

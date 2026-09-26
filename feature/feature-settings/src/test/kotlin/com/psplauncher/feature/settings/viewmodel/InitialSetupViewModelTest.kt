@@ -43,7 +43,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InitialSetupViewModelTest {
-
     private val dispatcher = StandardTestDispatcher()
     private val context = mockk<Context>(relaxed = true)
     private val packageManager = mockk<PackageManager>(relaxed = true)
@@ -69,9 +68,9 @@ class InitialSetupViewModelTest {
         context, romRoots, mediaRoots, artworkImport, retroArchLink, vita3KLibrary, autoConfig,
         sgdbKeys, metadataKeys, igdbApi, screenScraperApi,
         scanRunner, romRootScanRunner,
-        mockk(relaxed = true), // romScanner (B3 create-standard-folders)
-        mockk(relaxed = true), // folderHintResolver
-        mockk(relaxed = true), // memoryCardRepository
+        mockk(relaxed = true),
+        mockk(relaxed = true),
+        mockk(relaxed = true),
         installedApps,
         launcherShortcuts,
     )
@@ -79,7 +78,7 @@ class InitialSetupViewModelTest {
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
         every { context.packageManager } returns packageManager
-        // Default: RetroArch NOT installed (the tests below override to enable its page).
+
         every { packageManager.getPackageInfo(any<String>(), any<Int>()) } throws
             PackageManager.NameNotFoundException()
         every { packageManager.getInstalledPackages(any<Int>()) } returns emptyList()
@@ -97,20 +96,13 @@ class InitialSetupViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    // uiState is WhileSubscribed — tests that assert on it need an active collector.
     private fun TestScope.collectState() = launch { vm.uiState.collect {} }
 
     private fun packageInfoFor(name: String) =
         android.content.pm.PackageInfo().apply { packageName = name }
 
-    // ── RetroArch detection ─────────────────────────────────────────────────────
-
     @Test fun `RetroArch is detected under its ABI-suffixed package, not just the bare one`() =
         runTest(dispatcher) {
-            // This was an exact getPackageInfo("com.retroarch"), so a device with the aarch64
-            // build — which is what the great majority of them have — reported RetroArch absent
-            // and the wizard silently dropped its page. Found on a real device with the page
-            // missing and STEP n OF 11 where it should have been 12.
             every { packageManager.getInstalledPackages(any<Int>()) } returns
                 listOf(packageInfoFor("com.retroarch.aarch64"))
             vm = buildVm()
@@ -122,7 +114,6 @@ class InitialSetupViewModelTest {
 
     @Test fun `a package that merely starts with the family name is not RetroArch`() =
         runTest(dispatcher) {
-            // "com.retroarchive" is not a RetroArch build. The family match is on the dot.
             every { packageManager.getInstalledPackages(any<Int>()) } returns
                 listOf(packageInfoFor("com.retroarchive.reader"))
             vm = buildVm()
@@ -132,13 +123,7 @@ class InitialSetupViewModelTest {
             job.cancel()
         }
 
-    // ── Book roots ──────────────────────────────────────────────────────────────
-
     @Test fun `book roots reach the Books page and nothing else`() = runTest(dispatcher) {
-        // The one thing that can silently go wrong here: BOOK is joined by a SECOND combine on
-        // top of the inner five (combine's typed overload tops out at five), so a mis-wire lands
-        // the books in another section's list or drops them entirely — and either reads as an
-        // empty page rather than as an error.
         every { mediaRoots.roots(MediaRootKind.BOOK) } returns
             flowOf(listOf("content://tree/primary%3ABooks"))
         vm = buildVm()
@@ -155,12 +140,7 @@ class InitialSetupViewModelTest {
         job.cancel()
     }
 
-    // ── Permission grants ───────────────────────────────────────────────────────
-
     @Test fun `grants are re-read on demand, not cached from construction`() = runTest(dispatcher) {
-        // None of the three grants has a change broadcast, so the page re-reads them on every
-        // resume. If refreshGrants ever went back to a one-shot read, a user who granted usage
-        // access and came back would still be looking at "Grant…".
         every { installedApps.hasUsageAccess() } returns false
         every { launcherShortcuts.isDefaultLauncher() } returns false
         vm = buildVm()
@@ -169,7 +149,6 @@ class InitialSetupViewModelTest {
         assertFalse(vm.uiState.value.hasUsageAccess)
         assertFalse(vm.uiState.value.isHomeLauncher)
 
-        // The user leaves, grants both, comes back.
         every { installedApps.hasUsageAccess() } returns true
         every { launcherShortcuts.isDefaultLauncher() } returns true
         vm.refreshGrants()
@@ -179,8 +158,6 @@ class InitialSetupViewModelTest {
         assertTrue(vm.uiState.value.isHomeLauncher)
         job.cancel()
     }
-
-    // ── Step navigation ─────────────────────────────────────────────────────────
 
     @Test fun `steps advance through every page, skipping conditional emulator pages when not installed`() =
         runTest(dispatcher) {
@@ -221,8 +198,6 @@ class InitialSetupViewModelTest {
 
     @Test fun `RetroArch and Vita3K pages are included when both apps are installed`() =
         runTest(dispatcher) {
-            // Vita3K by name lookup; RetroArch by listing, and under the ABI-suffixed package
-            // that is the one nearly every device actually has.
             every { packageManager.getPackageInfo(any<String>(), any<Int>()) } returns mockk()
             every { packageManager.getInstalledPackages(any<Int>()) } returns
                 listOf(packageInfoFor("com.retroarch.aarch64"))
@@ -247,7 +222,6 @@ class InitialSetupViewModelTest {
 
     @Test fun `Vita page is gated on Vita3K installed but included even when RetroArch is not`() =
         runTest(dispatcher) {
-            // Only Vita3K installed: getPackageInfo succeeds for the vita package, throws otherwise.
             every { packageManager.getPackageInfo(any<String>(), any<Int>()) } answers {
                 if (firstArg<String>().startsWith("org.vita3k")) mockk<android.content.pm.PackageInfo>()
                 else throw PackageManager.NameNotFoundException()
@@ -268,27 +242,22 @@ class InitialSetupViewModelTest {
                 advanceUntilIdle()
                 assertEquals(step, vm.uiState.value.step)
             }
-            // The list above ends at FINISH without RETROARCH — landing here proves the RetroArch
-            // page stayed hidden (it would have been reached before FINISH if it were present).
+
             job.cancel()
         }
 
     @Test fun `parking survives exactly one reset, so an excursion keeps your place`() =
         runTest(dispatcher) {
-            // Make It Yours opens a real settings screen, which disposes the wizard overlay and
-            // fires its onDispose reset. Without the park, opening the theme picker on step 10
-            // would put you back on page one.
             val job = collectState()
             repeat(3) { vm.nextStep() }
             advanceUntilIdle()
             val where = vm.uiState.value.step
 
             vm.parkForExcursion()
-            vm.resetWizard()           // the overlay leaving for the excursion
+            vm.resetWizard()
             advanceUntilIdle()
             assertEquals("the parked reset must be a no-op", where, vm.uiState.value.step)
 
-            // And only one: the wizard genuinely closed still starts over next time.
             vm.resetWizard()
             advanceUntilIdle()
             assertEquals(SetupStep.WELCOME, vm.uiState.value.step)
@@ -307,8 +276,6 @@ class InitialSetupViewModelTest {
         assertEquals(SetupStep.WELCOME, vm.uiState.value.step)
         job.cancel()
     }
-
-    // ── Multi-root folders ──────────────────────────────────────────────────────
 
     @Test fun `rom root pick persists the grant and kicks off the scan`() = runTest(dispatcher) {
         val uri = mockk<Uri> { every { this@mockk.toString() } returns "content://tree/primary%3ARoms" }
@@ -353,8 +320,6 @@ class InitialSetupViewModelTest {
         io.mockk.verify { scanRunner.kickoff(MediaRootKind.MUSIC) }
     }
 
-    // ── Artwork ─────────────────────────────────────────────────────────────────
-
     @Test fun `artwork folder link success surfaces sources for the import offer`() =
         runTest(dispatcher) {
             val uri = mockk<Uri>()
@@ -366,8 +331,7 @@ class InitialSetupViewModelTest {
                 manifest = mockk(), existingLibrary = false,
             )
             coEvery { artworkImport.detectSources() } returns listOf(source)
-            // Rebuild a fresh VM so its rootLists combine subscribes to the re-stubbed folder flow
-            // (the setUp VM is already collecting the old null folderTreeUri).
+
             vm = buildVm()
             val job = collectState()
             advanceUntilIdle()
@@ -431,8 +395,6 @@ class InitialSetupViewModelTest {
             job.cancel()
         }
 
-    // ── RetroArch ───────────────────────────────────────────────────────────────
-
     @Test fun `linkRetroArch saves the tree and reports installed cores`() = runTest(dispatcher) {
         coEvery { retroArchLink.inventory() } returns CoreInventory.Verified(
             setOf("snes9x_libretro_android.so", "mgba_libretro_android.so")
@@ -463,8 +425,6 @@ class InitialSetupViewModelTest {
         job.cancel()
     }
 
-    // ── Vita3K data folder ─────────────────────────────────────────────────────
-
     @Test fun `linkVitaFolder grants the ux0 folder and reports it`() = runTest(dispatcher) {
         val uri = mockk<Uri> {
             every { this@mockk.toString() } returns "content://tree/primary%3ARoms%2Fvita%2Fux0"
@@ -489,8 +449,6 @@ class InitialSetupViewModelTest {
         coVerify { vita3KLibrary.clear() }
         job.cancel()
     }
-
-    // ── Services (unchanged behavior) ───────────────────────────────────────────
 
     @Test fun `testIgdbCredentials reports valid and invalid`() = runTest(dispatcher) {
         coEvery { igdbApi.testCredentials("id", "secret") } returns true

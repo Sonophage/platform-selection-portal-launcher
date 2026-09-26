@@ -1,10 +1,5 @@
 package com.psplauncher.core.domain.model
 
-/**
- * A user-added photo source: a SAF document-tree URI the user granted read access to. Mirrors
- * [VideoLibrary] (SAF-only, manual scan). Behaves like an Album under the Photo category; photos
- * are discovered by a manual quick/deep scan and stored as [Photo] rows.
- */
 data class PhotoLibrary(
     val id: String,
     val displayName: String,

@@ -9,7 +9,6 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class FileTitleSearchStoreTest {
-
     @get:Rule
     val folder = TemporaryFolder()
 
@@ -85,9 +84,7 @@ class FileTitleSearchStoreTest {
     fun `only the newest entries are kept`() = runTest {
         val store = store(maxEntries = 2)
         val dir = folder.root.resolve("match-searches")
-        // File times are set by hand, whole seconds in the past, so the order does not rest on how
-        // finely the file system records them.
-        // A search's candidates are always the searched provider's, so these are kept under ScreenScraper.
+
         store.write(MatchProvider.SCREENSCRAPER, "a", "psp", StoredTitleSearch(listOf(switch), 5_000L))
         dir.listFiles()!!.single().setLastModified(10_000L)
         store.write(MatchProvider.SCREENSCRAPER, "b", "psp", StoredTitleSearch(listOf(switch), 5_000L))

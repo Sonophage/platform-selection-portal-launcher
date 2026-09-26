@@ -20,16 +20,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Intent shapes for the launch recipes verified in docs/emulator-intent-catalog-research.md.
- * SAF games (romUri set) are used throughout so no FileProvider registration is needed.
- */
 @RunWith(RobolectricTestRunner::class)
 class EmulatorIntentResolverTest {
-
     private val context: Context = ApplicationProvider.getApplicationContext()
-    // Every game here is SAF-backed (romUri set), so the minter is never consulted — a relaxed
-    // mock keeps these tests about intent shape, which is what they are for.
+
     private val resolver = EmulatorIntentResolver(context, mockk(relaxed = true))
 
     private val romUri = "content://com.android.externalstorage.documents/document/roms%2Fgame.bin"
@@ -41,8 +35,6 @@ class EmulatorIntentResolverTest {
             .installPackage(PackageInfo().apply { this.packageName = packageName })
     }
 
-    // A COMPONENT launch targets a pinned activity by class name, and the resolver now preflights
-    // that the activity still exists (B1 — an update that drops it is caught before hand-off).
     private fun registerComponentActivity(packageName: String, activityClass: String) {
         shadowOf(context.packageManager)
             .addActivityIfNotPresent(ComponentName(packageName, activityClass))
@@ -63,8 +55,6 @@ class EmulatorIntentResolverTest {
     }
 
     private fun Intent.hasFlags(flags: Int) = this.flags and flags == flags
-
-    // ── attachRomData (yuzu-lineage TECH_DISCOVERED launch) ──────────────────
 
     @Test
     fun `attachRomData component intent carries rom as data uri with read grant`() {
@@ -92,8 +82,6 @@ class EmulatorIntentResolverTest {
         assertTrue(intent.hasFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
         assertNotNull(intent.clipData, "clipData grant missing for the ROM uri")
     }
-
-    // ── {rom_uri} string extras (DuckStation bootPath recipe) ────────────────
 
     @Test
     fun `rom_uri extra resolves to the saf uri with bool extras and clear flags`() {
@@ -148,8 +136,6 @@ class EmulatorIntentResolverTest {
         assertNull(intent.data)
     }
 
-    // ── ACTION_VIEW launches ─────────────────────────────────────────────────
-
     @Test
     fun `view intent applies profile clear flags and grants read on the content uri`() {
         installPackage("com.sky.SkyEmu")
@@ -180,10 +166,6 @@ class EmulatorIntentResolverTest {
         assertNotNull(intent.clipData)
     }
 
-    // ── validation ───────────────────────────────────────────────────────────
-
-    // ── ID-launch (Vita3K string-array extra + Title ID, no ROM file) ─────────
-
     private fun vita3kProfile() = EmulatorProfile(
         id = "test_vita3k",
         name = "Vita3K",
@@ -198,7 +180,7 @@ class EmulatorIntentResolverTest {
     fun `vita3k launches installed title by id via string-array extra, no rom data`() {
         installPackage("org.vita3k.emulator")
         registerComponentActivity("org.vita3k.emulator", "org.vita3k.emulator.Emulator")
-        // No romUri / romPath — a Vita game boots by its installed Title ID.
+
         val game = Game(title = "Disgaea 3", platformId = "psvita", launchToken = "PCSB00098")
 
         val intent = runBlocking { resolver.resolve(game, vita3kProfile()).getOrThrow() }
@@ -216,7 +198,7 @@ class EmulatorIntentResolverTest {
     fun `token launch without a launch token fails with a readable message`() {
         installPackage("org.vita3k.emulator")
         registerComponentActivity("org.vita3k.emulator", "org.vita3k.emulator.Emulator")
-        val game = Game(title = "Disgaea 3", platformId = "psvita")  // no launchToken
+        val game = Game(title = "Disgaea 3", platformId = "psvita")
 
         val result = runBlocking { resolver.resolve(game, vita3kProfile()) }
 
@@ -250,8 +232,6 @@ class EmulatorIntentResolverTest {
 
     @Test
     fun `component profile whose pinned activity vanished fails with a repair hint`() {
-        // Package installed, but the activity the profile targets no longer exists — the shape an
-        // emulator update produces when it renames/drops its launch activity.
         installPackage("dev.eden.eden_emulator")
         val profile = EmulatorProfile(
             id = "test_eden_stale",
@@ -272,5 +252,4 @@ class EmulatorIntentResolverTest {
             "Expected a repair hint naming the stale activity, got: ${result.exceptionOrNull()!!.message}",
         )
     }
-
 }

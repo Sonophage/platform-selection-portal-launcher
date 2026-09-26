@@ -6,8 +6,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.PFPTheme
 
-// Installed theme metadata — the actual assets live in
-// /storage/emulated/0/PlayFieldPortal/themes/{id}/
 @Serializable
 @Entity(tableName = "themes")
 data class ThemeEntity(

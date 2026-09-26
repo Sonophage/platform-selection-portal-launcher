@@ -18,16 +18,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
 
-/**
- * Recognizes and enumerates artwork from other launchers dropped under `import/<Launcher>`.
- * Detection is structural (folder shapes), never trusting the folder's name — the name is only
- * the label shown to the user.
- */
 interface ArtworkImportSource {
     val sourceId: String
-    /** Non-null when [folder] (a child of `import/`) has this source's layout. */
+
     suspend fun detect(treeUri: Uri, folder: SafChild): DetectedImportSource?
-    /** Every importable artwork file in the source. Cheap rows only — no image is decoded. */
+
     suspend fun enumerate(treeUri: Uri, source: DetectedImportSource): EnumerationResult
 }
 
@@ -36,27 +31,15 @@ data class EnumerationResult(
     val unknownSystemFolders: List<String>,
 )
 
-/**
- * ES-DE `downloaded_media` layout:
- *
- *   downloaded_media/{system}/{mediaType}/(subdirs mirroring the ROM tree)/Game.png
- *
- * Tolerated drops: `import/ES-DE/downloaded_media/{systems}` or the contents directly
- * (`import/ES-DE/{systems}`). System names resolve through [PlatformFolderHintResolver]
- * (PFP platform ids are ES-DE canonical names). Media folders enumerate recursively because
- * ES-DE mirrors ROM subdirectories inside each media folder.
- */
 @Singleton
 class EsDeImportSource @Inject constructor(
     @ApplicationContext private val context: Context,
     private val platformResolver: PlatformFolderHintResolver,
 ) : ArtworkImportSource {
-
     override val sourceId = "esde"
 
     override suspend fun detect(treeUri: Uri, folder: SafChild): DetectedImportSource? =
         withContext(Dispatchers.IO) {
-            // Either the folder itself holds system dirs, or a downloaded_media child does.
             val direct = systemFolders(treeUri, folder.documentId)
             val chosen = if (direct.systems.isNotEmpty()) {
                 folder.documentId to direct
@@ -94,12 +77,6 @@ class EsDeImportSource @Inject constructor(
             EnumerationResult(candidates, unknown)
         }
 
-    // ── Internals ─────────────────────────────────────────────────────────────
-
-    // ES-DE keeps text metadata in gamelists/{system}/gamelist.xml, a sibling of
-    // downloaded_media in its home folder. Accepted drop shapes, checked in order:
-    //   import/ES-DE/gamelists/{system}/gamelist.xml   (user copied the gamelists folder)
-    //   {system media dir}/gamelist.xml                (some exports keep it beside the media)
     private fun findGamelists(
         treeUri: Uri,
         folderDocId: String,
@@ -120,7 +97,7 @@ class EsDeImportSource @Inject constructor(
                     ?.let { out[platformId] = it.documentId }
             }
         }
-        // Fallback per system: a gamelist.xml sitting inside the system's media folder.
+
         for (system in systems) {
             if (system.platformId in out) continue
             context.contentResolver.querySafChildren(treeUri, system.docId)
@@ -136,9 +113,6 @@ class EsDeImportSource @Inject constructor(
         val unknownDirs: List<String>,
     )
 
-    // A directory is a system folder when its name maps to a platform AND it contains at least
-    // one known media-type folder (structural check — a stray "gba" dir with no covers/ etc.
-    // is not evidence of an ES-DE layout).
     private fun systemFolders(treeUri: Uri, parentDocId: String): SystemScan {
         val systems = mutableListOf<DetectedImportSource.SystemFolder>()
         val unknown = mutableListOf<String>()
@@ -165,7 +139,7 @@ class EsDeImportSource @Inject constructor(
         out: MutableList<ImportCandidate>,
         depth: Int,
     ) {
-        if (depth > MAX_DEPTH) return   // hostile/cyclic trees can't recurse unboundedly
+        if (depth > MAX_DEPTH) return
         coroutineContext.ensureActive()
         for (child in context.contentResolver.querySafChildren(treeUri, dirDocId)) {
             when {
@@ -187,8 +161,7 @@ class EsDeImportSource @Inject constructor(
         val ext = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
         return when (kind) {
             ArtworkKind.MANUAL -> ext == "pdf"
-            // Containers the snap transcoder's extractor handles (payload is sniffed again
-            // before anything is stored).
+
             ArtworkKind.VIDEO -> ext == "mp4" || ext == "m4v" || ext == "webm" || ext == "mkv"
             else -> ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "webp"
         }
@@ -196,7 +169,5 @@ class EsDeImportSource @Inject constructor(
 
     companion object {
         private const val MAX_DEPTH = 6
-        // The media-dir ↔ kind mapping is single-sourced in ArtworkPathResolver — ES-DE's
-        // folder names ARE the library layout v2 names.
     }
 }

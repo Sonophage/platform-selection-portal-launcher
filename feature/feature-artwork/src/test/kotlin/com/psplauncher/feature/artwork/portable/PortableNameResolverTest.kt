@@ -5,10 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Layout-v2 portable names: ROM stems preserved verbatim (they ARE the compatibility),
-// sanitized only where a filesystem would reject them.
 class PortableNameResolverTest {
-
     @Test
     fun `rom stems keep case, spaces and tags`() {
         assertEquals(
@@ -57,8 +54,7 @@ class PortableNameResolverTest {
             assertEquals(kind, ArtworkPathResolver.kindForMediaDir(dir))
             assertTrue(ArtworkPathResolver.isMediaDirName(dir))
         }
-        // covers/ belongs to BOX_ART (true ES-DE box art); ICON lives in the PFP-only
-        // pfp/icon0 namespace since the icon-display-modes split.
+
         assertEquals(
             "Artwork/ps2/covers/Final Fantasy X (USA).png",
             ArtworkPathResolver.relativePath("ps2", com.psplauncher.feature.artwork.store.ArtworkKind.BOX_ART, "Final Fantasy X (USA).png"),

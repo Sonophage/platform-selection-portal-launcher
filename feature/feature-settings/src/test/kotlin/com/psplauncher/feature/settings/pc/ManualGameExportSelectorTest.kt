@@ -6,9 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** C18 task X.2 — which Windows games Export Manual Games writes a file for. */
 class ManualGameExportSelectorTest {
-
     private fun windowsGame(
         id: Long,
         title: String = "Game $id",
@@ -76,7 +74,6 @@ class ManualGameExportSelectorTest {
 
     @Test
     fun `a GameNative game added by id is recognised by the pair in its intent`() {
-        // Add by ID records no storefront columns.
         val game = windowsGame(1, launchIntentUri = gameNativeSteam620)
 
         assertEquals(listOf(game), select(listOf(game)).exported)

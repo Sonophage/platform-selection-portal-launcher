@@ -8,8 +8,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.psplauncher.core.domain.model.VideoPlaylist
 
-// A user-created video playlist. Ordered among siblings by sort_order then created_at.
-// Mirrors PlaylistEntity (music).
 @Serializable
 @Entity(tableName = "video_playlists")
 data class VideoPlaylistEntity(
@@ -28,9 +26,6 @@ data class VideoPlaylistEntity(
     val sortOrder: Int = 0,
 )
 
-// Membership of a video in a playlist. position keeps the user's manual ordering; a video may
-// appear in many playlists. Rows cascade-delete with their playlist. Videos are referenced by id
-// (TEXT) — a video removed by a re-scan simply drops out of any join.
 @Serializable
 @Entity(
     tableName = "video_playlist_items",

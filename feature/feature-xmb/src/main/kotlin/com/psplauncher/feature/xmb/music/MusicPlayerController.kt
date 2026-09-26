@@ -18,7 +18,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Snapshot of in-app playback, observed by the UI. [track] null = nothing playing. */
 data class MusicPlaybackState(
     val track: MusicTrack? = null,
     val isPlaying: Boolean = false,
@@ -29,12 +28,6 @@ data class MusicPlaybackState(
     val isPrepared: Boolean = false,
 )
 
-/**
- * In-app audio playback over a single [MediaPlayer], with the current track list as the queue
- * (play/pause, seek, prev/next). Foreground-only by design: when the user wants background
- * playback they hand off to an external player (see MusicIntentResolver), so there's no media
- * service here. Singleton so playback survives recomposition and the player screen opening/closing.
- */
 @Singleton
 class MusicPlayerController @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -48,20 +41,8 @@ class MusicPlayerController @Inject constructor(
     private val _state = MutableStateFlow(MusicPlaybackState())
     val state: StateFlow<MusicPlaybackState> = _state
 
-    /**
-     * Called once each time a track actually begins playing.
-     *
-     * The hook is here rather than in setQueue because queueing is not playing: a 200-track album
-     * is queued in one call and played one track at a time, and the recents shelf should say what
-     * was listened to. Every path — setQueue, next, previous, and the queue advancing on
-     * completion — funnels through playCurrent, so this is the one place that sees them all. A
-     * track that fails to load never reaches it, which is correct.
-     *
-     * A callback rather than a repository dependency: this class owns a MediaPlayer, not storage.
-     */
     var onTrackStarted: ((MusicTrack) -> Unit)? = null
 
-    /** Load [tracks] as the queue and start playing at [startIndex]. */
     fun setQueue(tracks: List<MusicTrack>, startIndex: Int) {
         queue = tracks
         index = startIndex.coerceIn(0, (tracks.size - 1).coerceAtLeast(0))
@@ -71,7 +52,7 @@ class MusicPlayerController @Inject constructor(
     fun playPause() {
         val p = player ?: return
         runCatching { if (p.isPlaying) p.pause() else p.start() }
-        // Only run the 500ms position ticker while actually playing — no churn while paused.
+
         if (p.isPlaying) startTicker() else { tickJob?.cancel(); tickJob = null }
         emit()
     }
@@ -81,7 +62,6 @@ class MusicPlayerController @Inject constructor(
     }
 
     fun prev() {
-        // Standard player behaviour: restart the track unless we're near its start.
         if ((player?.currentPosition ?: 0) > 3000 || index == 0) seekTo(0)
         else { index--; playCurrent() }
     }
@@ -97,7 +77,6 @@ class MusicPlayerController @Inject constructor(
         seekTo((p.currentPosition + deltaMs))
     }
 
-    /** Stop and release everything (called when the player screen closes or on hand-off). */
     fun stop() {
         tickJob?.cancel(); tickJob = null
         releasePlayer()
@@ -105,7 +84,6 @@ class MusicPlayerController @Inject constructor(
         _state.value = MusicPlaybackState()
     }
 
-    /** The track currently loaded, for the "play in background" hand-off. */
     fun currentTrack(): MusicTrack? = queue.getOrNull(index)
 
     private fun playCurrent() {
@@ -137,7 +115,7 @@ class MusicPlayerController @Inject constructor(
                 next()
             }
         }
-        // Reflect the track immediately (duration fills in once prepared).
+
         _state.value = MusicPlaybackState(
             track = track, isPlaying = false, positionMs = 0, durationMs = 0,
             index = index, queueSize = queue.size, isPrepared = false,

@@ -28,7 +28,7 @@ data class BooksSettingsUiState(
     val roots: List<RootFolderRow> = emptyList(),
     val scanning: Boolean = false,
     val scanMessage: String? = null,
-    /** Package name of the chosen reader, or null for "ask every time". */
+
     val defaultReader: String? = null,
     val availableReaders: List<ReaderApp> = emptyList(),
     val showReaderPicker: Boolean = false,
@@ -41,14 +41,6 @@ data class BooksSettingsUiState(
             ?: "Ask Every Time"
 }
 
-/**
- * Multi-root Library settings, mirroring the Photo section: several root folders, each a persisted
- * SAF grant whose subfolders become libraries on scan, plus a rescan that reconciles the rows with
- * the configured roots.
- *
- * The one thing photos do not have is the reader. There is no in-app reader, so unlike Music and
- * Video the picker has no built-in choice: it is an installed app, or the system chooser.
- */
 @HiltViewModel
 class BooksSettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -57,15 +49,12 @@ class BooksSettingsViewModel @Inject constructor(
     private val bookIntentResolver: BookIntentResolver,
     private val mediaRootRepository: MediaRootRepository,
 ) : ViewModel() {
-
     private val notifier = BackgroundTaskNotifier(context)
     private val _ui = MutableStateFlow(BooksSettingsUiState())
     val uiState: StateFlow<BooksSettingsUiState> = _ui
 
     init {
         viewModelScope.launch {
-            // distinctUntilChanged: the backing DataStore is app-wide, so without it every
-            // unrelated preference write would re-run the persisted-grant snapshot below.
             mediaRootRepository.roots(MediaRootKind.BOOK).distinctUntilChanged().collect { roots ->
                 val persisted = SafGrants.persistedReadUris(context.contentResolver)
                 _ui.value = _ui.value.copy(roots = roots.map { uri ->
@@ -99,7 +88,6 @@ class BooksSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Replaces one root's URI (re-link after a lost grant, or picking a different folder). */
     fun relinkRoot(oldTreeUri: String, newUri: Uri) {
         viewModelScope.launch {
             mediaRootRepository.persist(newUri)
@@ -108,14 +96,6 @@ class BooksSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Reconciles the library rows with the configured roots (dropping rows whose root is gone)
-     * and scans every root.
-     *
-     * [deep] reopens every book and regenerates every cover. A normal rescan reads only files that
-     * are new or whose timestamp moved, because reading a book's series and cover means opening
-     * the archive, which a cursor-only walk never had to do.
-     */
     fun rescan(deep: Boolean = false) {
         viewModelScope.launch {
             val roots = mediaRootRepository.getAll(MediaRootKind.BOOK)
@@ -128,7 +108,6 @@ class BooksSettingsViewModel @Inject constructor(
                 scanMessage = if (deep) "Reading every book…" else "Scanning…",
             )
 
-            // Roots removed here take their library rows, and their books, with them.
             bookRepository.getLibraries()
                 .filter { it.treeUri !in roots }
                 .forEach { bookRepository.removeLibrary(it.id) }
@@ -139,8 +118,7 @@ class BooksSettingsViewModel @Inject constructor(
                 val library = syncLibraryForRoot(root)
                 val taskId = "book_scan_${library.id}"
                 notifier.running(taskId, "Scanning ${library.displayName}", null)
-                // The existing rows are what makes a quick scan quick: an unchanged book is
-                // carried forward from here rather than reopened.
+
                 val existing = bookRepository.getBooksForLibrary(library.id)
                 bookScanner.scan(library, deep = deep, existing = existing).collect { result ->
                     when (result) {
@@ -178,7 +156,6 @@ class BooksSettingsViewModel @Inject constructor(
 
     fun dismissReaderPicker() { _ui.value = _ui.value.copy(showReaderPicker = false) }
 
-    /** [packageName] null means "ask every time": the chooser runs on every book. */
     fun chooseReader(packageName: String?) {
         viewModelScope.launch {
             bookRepository.setDefaultReader(packageName)
@@ -188,10 +165,6 @@ class BooksSettingsViewModel @Inject constructor(
 
     fun dismissMessage() { _ui.value = _ui.value.copy(scanMessage = null) }
 
-    /**
-     * Deletes every cached cover. The rows keep pointing at files that are now gone, which the
-     * next rescan notices and regenerates, so this is safe to run at any time.
-     */
     fun clearCoverCache() {
         viewModelScope.launch {
             val removed = bookScanner.clearCoverCache()
@@ -199,7 +172,6 @@ class BooksSettingsViewModel @Inject constructor(
         }
     }
 
-    // Ensures one BookLibrary exists for [root] — other roots keep their own rows.
     private suspend fun syncLibraryForRoot(root: String): BookLibrary {
         val existing = bookRepository.getLibraries().firstOrNull { it.treeUri == root }
         val library = existing ?: bookRepository.addLibrary(displayName(root), root, scanRecursively = true)
