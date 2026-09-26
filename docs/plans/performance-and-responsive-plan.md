@@ -208,42 +208,39 @@ problem in Search and the App Picker via `moveSearch` / `gridMove`.
    to six). `AppPickerState.columns` carries the measurement to `gridMove`, guarded across 3..12
    columns and falsified. It also exposed that `AppPickerThreeRowsTest` could never fail, and that
    the three-row guarantee holds only above a 356dp grid viewport.
-5. **The chrome screens' base density is a DECISION already made, not an oversight.** My earlier
-   entry here said "it is neither — it is simply unwired". That was wrong, and the evidence for
-   it was wrong too: I grepped feature-appbar and `SettingsScaffold` for `uiScale` /
-   `layoutAdjust`, found nothing, and concluded the slider did not reach them. Those files have
-   no reason to read it — `LocalDensity` is ambient. The same shape of mistake as testing "has no
-   gamepad position" for "is a keyboard key".
+5. **The size slider is now global — option (b), chosen by the owner.** DONE.
 
-   What actually happens is `XMBShell.kt:1630`, a second provider spanning 1631..2034 that resets
-   to base density, with the reason written on it: *"Everything from here down is a separate
-   screen or overlay … not part of the XMB cross. Reset to the device's base density so the
-   XMB-only canvas scale above stops at the cross: scaling the XMB never rescales any of these."*
-   The control is called Adjust XMB **Layout** and it scales the crossbar.
+   The slider was reaching the crossbar and nothing else: `XMBShell.kt:1630` reset density to the
+   device's base for lines 1631..2034, which is every chrome screen, with the reason written on
+   it — "the XMB-only canvas scale above stops at the cross". That reset also held the status
+   strip and the hint bar at base, because `StatusStripHeight` is one number that BOTH the strip
+   and the six screens reserving room under it have to resolve identically. Holding everyone at
+   1.0 kept that pair in step and took the user's slider out of the chrome as a side effect.
 
-   **And the reset is load-bearing.** `StatusStripHeight` is 34dp for the strip the shell draws AND
-   for the six screens that reserve room under it — the pair `ChromeBands` exists to keep in step.
-   The strip is drawn at base density (`XMBShell.kt:1469`, itself a fix for this exact bug). Scale
-   only the screens and the two disagree:
+   The fix separates the two scales that were tangled together:
 
-   | slider | screen reserves | strip occupies | result |
-   |---|---|---|---|
-   | 0.6 | 20dp | 34dp | **strip overlaps content by 14dp** |
-   | 1.0 | 34dp | 34dp | exact |
-   | 1.8 | 61dp | 34dp | 27dp of empty band |
+   - **`layoutAdjust.scale` is the USER's size**, so it applies to the whole shell — crossbar,
+     chrome screens, status strip, hint bar. It is now `uiDensity`, and all three band sites take
+     it, so the pair resolves the same number at any scale.
+   - **`uiScale` is the crossbar's AUTO-FIT** — `min(height/468, width/832)` — and stays on the
+     cross alone, multiplying `uiDensity` in the canvas provider. Applying it to a list of apps
+     would make a tablet's chrome 28% larger for a reason about the cross.
 
-   So "wire it" is not a one-line change of scope. It is a decision about what the slider IS:
+   Guarded by `ChromeDensityPairTest`, which is a source check on purpose: what breaks this is an
+   edit re-pinning ONE band to `baseDensity`, and that shows in the text long before it shows on a
+   screen — and only for someone who has moved the slider off 1.0, which is nobody by default. A
+   rendered test at 1.0 would pass either way. Falsified: re-pinning the strip turns two of its
+   three cases red.
 
-   - **(a) Leave it.** The slider scales the XMB canvas, as its name and that comment say. The
-     chrome screens are already responsive by measurement (the drawer, Search and the picker all
-     fill now), which is the thing the dead space actually needed.
-   - **(b) Make it a global UI scale.** Then the strip and the hint bar must scale with it, both
-     base-density resets come out, and `ChromeBands`' contract becomes "34dp at the CURRENT
-     density" rather than "34dp, once". That is the honest version and it is a real piece of work
-     with a regression path straight back through the chrome-band bug.
+   **Verified at the default:** the App Drawer measures identically before and after on the Konker
+   AVD (`RECENTLY USED` top 240 height 57, search field top 117 height 57), so nobody who has not
+   touched the slider sees any change.
 
-   Not done. It needs (a) or (b) chosen, and the owner asked for "wire it" believing it was
-   unwired rather than scoped.
+   **Not verified on a device at a non-1.0 scale.** Driving the Adjust XMB Layout editor over adb
+   got the scale to 1.24x but the save never landed, and the run was inconclusive rather than
+   negative. The structural guard is what stands behind this until someone moves the slider by
+   hand and looks.
+
 6. **The XMB crossbar is left alone.** Its composition is deliberate and the slider already works
    there.
 

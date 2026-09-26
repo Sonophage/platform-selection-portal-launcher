@@ -606,8 +606,25 @@ fun XMBShell(
             CompositionLocalProvider(
                 LocalControllerConnected provides rememberSystemStatus().controllerConnected,
             ) {
+            // ── Two scales, and only one of them is the user's ────────────────────────
+            //
+            // [layoutAdjust.scale] is the size the USER chose, per form factor, with the Adjust
+            // XMB Layout slider. It applies to the whole shell: the crossbar, the chrome screens,
+            // the status strip and the hint bar. A size control that moved the cross and left the
+            // App Drawer alone was a size control for a third of the app.
+            //
+            // [uiScale] is the crossbar's AUTO-FIT — min(height/468, width/832) — and it stays on
+            // the cross alone. It exists to make an 832x468dp composition fit the panel it was
+            // given; applying it to a list of apps would make a tablet's chrome 28% larger for a
+            // reason that has nothing to do with lists.
+            //
+            // So: everything gets uiDensity, and the cross multiplies it by uiScale on top. The
+            // chrome bands then resolve their 34dp against the SAME density on both sides of the
+            // pair — the screen reserving the room and the strip filling it — which is what the
+            // two base-density resets below used to buy by holding both at 1.0.
+            val uiDensity = Density(baseDensity.density * layoutAdjust.scale, baseDensity.fontScale)
             CompositionLocalProvider(
-                LocalDensity provides Density(baseDensity.density * uiScale * layoutAdjust.scale, baseDensity.fontScale),
+                LocalDensity provides Density(uiDensity.density * uiScale, uiDensity.fontScale),
             ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Freeze the wave's per-frame animation whenever an opaque fullscreen layer fully covers
@@ -1453,20 +1470,23 @@ fun XMBShell(
             // stay, because those are true wherever you are.
             val xmbContext = uiState.stripShowsXmbContext
 
-            // DRAWN AT BASE DENSITY, like every screen that reserves room for it.
+            // DRAWN AT uiDensity, like every screen that reserves room for it.
             //
-            // This is inside the XMB's scaled canvas, so a StatusStripHeight of 34dp resolved
-            // here came out at 34 x uiScale x layoutAdjust.scale — while DetailScaffold,
+            // This sits inside the XMB's scaled canvas, so a StatusStripHeight of 34dp resolved
+            // here would come out at 34 x uiScale x the user's scale — while DetailScaffold,
             // AppDrawerScreen, SettingsScaffold, SearchScreen, AppPickerScreen and
-            // GamePickerScreen all hold back a flat 34. The two only agree at scale exactly 1.0,
-            // which is every device tested so far and no guarantee at all: the Konker clamps to
-            // 1.0 and a 16:10 tablet does not.
+            // GamePickerScreen reserve their own 34. One number at two densities is two numbers.
             //
-            // Resetting the density rather than moving the call keeps the strip exactly where it
-            // is in the tree — same parent, same z, same alignment — and changes only the number
-            // its dp resolve against. ChromeBands says the height is core-ui's and never a copy;
-            // this is what makes that true on both sides.
-            CompositionLocalProvider(LocalDensity provides baseDensity) {
+            // It used to drop to the device's BASE density, which kept the pair in step by
+            // holding both ends at 1.0 — and took the user's size slider out of the chrome with
+            // it. Now both ends take uiDensity: the user's scale reaches everything, the cross's
+            // auto-fit stops at the cross, and the two sides of the pair still resolve the same
+            // number. Resetting the density rather than moving the call keeps the strip exactly
+            // where it is in the tree — same parent, same z, same alignment.
+            //
+            // ChromeBands says the height is core-ui's and never a copy; this is what makes that
+            // true on both sides. ChromeDensityPairTest guards it.
+            CompositionLocalProvider(LocalDensity provides uiDensity) {
             XmbPspStatusStrip(
                 sortLabel = uiState.sortLabel.takeIf { xmbContext },
                 showSortButton = uiState.resolvedShowTouchButton && xmbContext,
@@ -1614,7 +1634,7 @@ fun XMBShell(
                 // Base density, for the reason on the status strip above: HintBarHeight is the
                 // bar's own height AND what SearchScreen reserves under it, and the two have to
                 // be the same number.
-                CompositionLocalProvider(LocalDensity provides baseDensity) {
+                CompositionLocalProvider(LocalDensity provides uiDensity) {
                     XmbHintBar(
                         prompts = promptsFor(uiState),
                         onAction = onPromptTapped,
@@ -1624,10 +1644,14 @@ fun XMBShell(
 
             // Everything from here down is a separate screen or overlay (Settings, app
             // drawer, music, pickers, dialogs, detail screens) — not part of the XMB cross.
-            // Reset to the device's base density so the XMB-only canvas scale above stops at
-            // the cross: scaling the XMB never rescales any of these.
+            //
+            // Dropped to uiDensity, NOT to the device's base. The crossbar's auto-fit stops at
+            // the cross, exactly as before; the user's own size choice does not, because it is a
+            // size control for the app and not for the cross. This read "reset to the device's
+            // base density" and took the slider with it, so Adjust XMB Layout moved the crossbar
+            // and left the App Drawer, Settings and every picker untouched.
             CompositionLocalProvider(
-                LocalDensity provides Density(baseDensity.density, baseDensity.fontScale),
+                LocalDensity provides uiDensity,
             ) {
 
             // The Settings screen is suppressed while the color-scheme picker is open so
