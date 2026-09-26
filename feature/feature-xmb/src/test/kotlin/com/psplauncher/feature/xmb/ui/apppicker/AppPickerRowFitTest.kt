@@ -45,31 +45,46 @@ class AppPickerRowFitTest {
     private fun threeRowsFit(v: Dp) = neededFor(v) <= v
 
     @Test
-    fun `the guarantee holds from 356dp of grid viewport upward`() {
-        assertTrue("356dp is the boundary and must fit", threeRowsFit(THREE_ROW_MIN_VIEWPORT))
-        for (h in listOf(360, 400, 428, 450, 640, 1200)) {
-            assertTrue("three rows must fit a ${h}dp viewport", threeRowsFit(h.dp))
+    fun `the guarantee holds from the boundary upward`() {
+        assertTrue("the boundary itself must fit", threeRowsFit(THREE_ROW_MIN_VIEWPORT))
+        for (over in listOf(1, 20, 80, 120, 300, 900)) {
+            val h = THREE_ROW_MIN_VIEWPORT + over.dp
+            assertTrue("three rows must fit $h", threeRowsFit(h))
         }
     }
 
     @Test
+    fun `the reference handheld is above the boundary, which it was not`() {
+        // The Konker Elite's picker grid measures 338dp once the strip, header and footer have
+        // taken theirs — AppPickerThreeRowsTest composes the real screen at 821x462dp to get it.
+        // At the old 48dp artwork floor the boundary was 356dp, so the third row was clipped by
+        // 18dp on the device this app is built for.
+        assertTrue(
+            "the handheld's 338dp must clear the boundary ($THREE_ROW_MIN_VIEWPORT)",
+            threeRowsFit(338.dp),
+        )
+    }
+
+    @Test
     fun `below the boundary the artwork floor wins and the third row overflows`() {
-        // Not a hypothetical: this is the arithmetic the rendered test is blind to. If the floor
-        // is ever lowered, or the fixed overhead trimmed, this boundary moves and the assertion
-        // below is what says so.
-        for (h in listOf(280, 300, 320, 340)) {
-            assertTrue(
-                "a ${h}dp viewport cannot honour three rows — needed ${neededFor(h.dp)}",
-                !threeRowsFit(h.dp),
-            )
+        // Sampled RELATIVE to the boundary, because the boundary moves with the floor — and it
+        // just did, from 356dp to a lower one when MIN_ARTWORK_SIZE went 48 -> 40 to stop the
+        // handheld clipping. Hard-coded viewports here would have had to be edited to match, and
+        // the edit that gets forgotten is the one that makes the test agree with the bug.
+        for (under in listOf(1, 10, 40, 90)) {
+            val h = THREE_ROW_MIN_VIEWPORT - under.dp
+            assertTrue("$h cannot honour three rows — needed ${neededFor(h)}", !threeRowsFit(h))
         }
     }
 
     @Test
     fun `the boundary is where the artwork stops shrinking, not an arbitrary number`() {
-        // Just below it the artwork is pinned at its floor; at it, the sum is exactly the viewport.
-        assertEquals("pinned at the floor below the boundary", MIN_ARTWORK_SIZE, pickerAdaptiveArtworkSize(300.dp, rows = 3))
-        assertEquals("and the need is flat there", neededFor(300.dp), neededFor(340.dp))
+        // Below it the artwork is pinned at its floor and the need stops falling; at it, the sum
+        // is exactly the viewport. That equality is what makes the boundary derivable at all.
+        val below = THREE_ROW_MIN_VIEWPORT - 20.dp
+        val lower = THREE_ROW_MIN_VIEWPORT - 50.dp
+        assertEquals("pinned at the floor below the boundary", MIN_ARTWORK_SIZE, pickerAdaptiveArtworkSize(below, rows = 3))
+        assertEquals("and the need is flat there", neededFor(below), neededFor(lower))
         assertEquals("at the boundary the sum is the viewport", THREE_ROW_MIN_VIEWPORT, neededFor(THREE_ROW_MIN_VIEWPORT))
     }
 
@@ -86,9 +101,12 @@ class AppPickerRowFitTest {
         /**
          * The shortest grid viewport in which three rows of tiles still fit.
          *
-         * Derived, not chosen: it is `(MIN_ARTWORK_SIZE + tile overhead) * 3 + two gaps + the
-         * vertical padding` — the point at which the artwork floor stops the tile shrinking.
+         * COMPUTED from the constants, not written down: the point at which the artwork floor
+         * stops the tile shrinking. A hard-coded number here would have to be edited every time
+         * the floor or the tile overhead moves, and the edit that gets forgotten is the one that
+         * makes the test agree with the bug.
          */
-        val THREE_ROW_MIN_VIEWPORT = 356.dp
+        val THREE_ROW_MIN_VIEWPORT =
+            (MIN_ARTWORK_SIZE + (FRAME_ROOM + 6.dp + 30.dp + 8.dp)) * 3 + 14.dp * 2 + 28.dp
     }
 }

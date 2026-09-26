@@ -410,11 +410,19 @@ fix — it went 10s → 60s once already and still times out.
 `10-music-browser.png` showed the status strip while `musicBrowser` sits in `fullscreenOverlay`,
 which should suppress it. Not retested — the tablet has no music library.
 
----
+### N8. The Last Played shelf's Play control — NOT MISSING, closed
 
-## What the review could not answer
+Recorded here because the earlier entry was wrong and someone will otherwise re-find it.
 
-- Whether the sound-slot split matters. Nobody has heard the app.
-- Every frame in the review set is the Konker at `uiScale` exactly 1.0, so no screenshot in it
-  could show a scale-dependent defect. The tablet pass on 2026-09-25 covered that gap for the
-  chrome bands; it did not cover the media browsers or the letter rail (no library on that device).
+`LaunchSpine` was deleted in `6e411c41` and I logged it as "the shelf now has no touch route to
+launch at all". It has both routes:
+
+- **Confirm launches.** `XMBUiState.enterOpensAppDrawer` excludes the shelf in as many words —
+  "the Last Played shelf, where confirm launches what you were playing and is the main verb on the
+  screen". Pad A, D-pad centre and Enter all land there.
+- **Touch has the footer.** `primaryVerbFor` gives the shelf's focused game "Play" (or "Details"
+  when Direct Launch is off), and the XMB hint bar is dispatched (`onAction = onPromptTapped`), so
+  the prompt is pressable.
+
+The spine was a second control for a verb the footer already carries. What the deletion actually
+left behind was stale prose, which is cleaned up.

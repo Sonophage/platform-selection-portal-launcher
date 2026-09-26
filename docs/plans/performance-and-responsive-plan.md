@@ -54,17 +54,25 @@ adb shell dumpsys battery reset
 So on any screen where nothing else moves, the glint alone is the difference between an idle app
 and a continuous 60fps redraw — roughly 19% of a core. A handheld is usually charging while in use.
 
-**This is a decision, not a cleanup, so it is not made here.** The options:
+**FIXED on 2026-09-25**, with option 2: the shimmer runs on the crossbar only.
 
-1. **Leave it.** It is a deliberate affordance and only runs while plugged in.
-2. **Only glint over the XMB.** The wave is animating there anyway, so the frames are already
-   being paid for; the drawer, Settings and the pickers would go back to 0fps. Visual change.
-3. **Keep it everywhere, make it cheaper.** `travel` is read inside `drawWithCache`'s *build*
-   block (`XmbStatusStrip.kt:436-449`), so every frame rebuilds the brush. Reading it in the draw
-   lambda instead confines the invalidation to the draw phase. Cheaper per frame — but still one
-   frame per vsync, so it does not change the 60fps.
+It is gated on `stripShowsXmbContext`, the flag the strip already uses to decide whether the sort
+label belongs to it. The reasoning is the measurement above — on the crossbar the wave is
+animating regardless, so the shimmer's frames are already being paid for; anywhere else it is the
+entire cost of a screen that is otherwise still.
 
-Nothing here has been changed. Option 2 is the only one that recovers the idle case.
+`rememberInfiniteTransition` is not merely unread when suppressed, it is not started: the whole
+`by` is inside the gate, because what costs a frame per vsync is READING an animated value in a
+draw scope.
+
+Measured after, same emulator, same method, still charging:
+
+| screen | before | after |
+|---|---|---|
+| XMB home | 723 frames / 12s | **725** — unchanged, as intended |
+| App Drawer | 723 frames, 232 jiffies | **0 frames, 17 jiffies** |
+
+A plugged-in handheld sitting on the App Drawer now idles instead of redrawing at 60fps.
 
 ### Still unmeasured
 

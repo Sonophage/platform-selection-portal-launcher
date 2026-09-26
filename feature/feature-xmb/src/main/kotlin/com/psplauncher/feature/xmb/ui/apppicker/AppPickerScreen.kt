@@ -354,7 +354,23 @@ internal val FRAME_ROOM = 8.dp
 // height are already subtracted by the time this runs — there is no second copy of either number
 // here to drift from the originals.
 
-internal val MIN_ARTWORK_SIZE = 48.dp
+/**
+ * How small a tile's artwork may get before the count gives up instead.
+ *
+ * 40dp, and the number is forced by the device rather than chosen. The screen promises three rows
+ * (see [pickerAdaptiveArtworkSize]); the reference handheld's picker grid measures 338dp once the
+ * status strip, the header and the footer have taken theirs; and three rows of
+ * `artwork + 52dp of frame, label and padding`, plus two 14dp gaps and 28dp of vertical padding,
+ * fit 338dp only while the artwork may reach 40dp.
+ *
+ * At the old 48dp floor the sum came to 356dp against 338 available, so THE THIRD ROW WAS CLIPPED
+ * ON THE KONKER — 18dp of it under the footer, on the device this app is built for. Nothing
+ * caught it: the rendered test reads `boundsInRoot`, which is clipped to the viewport and so
+ * reports a hidden row as fitting perfectly. AppPickerThreeRowsTest now composes the screen at
+ * 821x462dp and asserts the viewport against the boundary, and AppPickerRowFitTest derives that
+ * boundary from this constant rather than restating it.
+ */
+internal val MIN_ARTWORK_SIZE = 40.dp
 internal val MAX_ARTWORK_SIZE = 72.dp
 
 internal fun pickerAdaptiveArtworkSize(viewportHeight: Dp, rows: Int = 3): Dp {

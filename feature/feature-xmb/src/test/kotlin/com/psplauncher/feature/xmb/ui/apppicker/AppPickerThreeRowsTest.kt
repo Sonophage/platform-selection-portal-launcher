@@ -16,6 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import androidx.compose.ui.unit.dp
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -36,6 +37,11 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w480dp-h640dp")
 class AppPickerThreeRowsTest {
+
+    /** The same derivation AppPickerRowFitTest uses — one formula, not two copies of a number. */
+    private val THREE_ROW_MIN_VIEWPORT =
+        (MIN_ARTWORK_SIZE + (FRAME_ROOM + 6.dp + 30.dp + 8.dp)) * 3 + 14.dp * 2 + 28.dp
+
 
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -126,6 +132,49 @@ class AppPickerThreeRowsTest {
         val minFooterSlot = with(composeRule.density) { HintBarHeight.toPx() }
         assert(gridBottom <= rootBottom - minFooterSlot) {
             "grid viewport bottom $gridBottom runs into the footer slot (root bottom $rootBottom)"
+        }
+    }
+
+    /**
+     * The same screen at the REFERENCE HANDHELD's geometry, reporting the number that decides it.
+     *
+     * `AppPickerRowFitTest` proves three rows only fit above a 356dp grid viewport. Which side the
+     * Konker Elite falls on is a measurement, not arithmetic — its 462dp of height has to carry
+     * the status strip, the header with its search field, and the footer before the grid sees
+     * anything. This composes the real screen at 821x462dp and asserts the grid gets enough.
+     */
+    @Test
+    @Config(sdk = [34], qualifiers = "w821dp-h462dp")
+    fun `the reference handheld's grid viewport clears the three-row boundary`() {
+        val apps = (1..28).map { i ->
+            AppPickerEntry(
+                packageName = "com.test.app$i",
+                label = "App $i",
+                icon = android.graphics.drawable.ColorDrawable(android.graphics.Color.GRAY),
+            )
+        }
+        composeRule.setContent {
+            PfpScreenPreview {
+                AppPickerScreen(
+                    state = AppPickerState(
+                        title = "Add Apps",
+                        target = AppPickerTarget.AndroidGames(platformId = "android"),
+                        apps = apps,
+                    ),
+                    onTileTapped = {}, onTouchBrowse = {}, onHeaderBack = {},
+                    onSearchToggle = {}, onSearchChange = {}, onSearchDone = {},
+                    onApply = {}, onConfirmRemoval = {}, onCancelRemoval = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        val grid = composeRule.onNode(hasVerticalScrollAction()).fetchSemanticsNode().boundsInRoot
+        val viewportDp = with(composeRule.density) { (grid.bottom - grid.top).toDp() }
+        assert(viewportDp >= THREE_ROW_MIN_VIEWPORT) {
+            "the handheld's picker grid gets ${viewportDp} — below the ${THREE_ROW_MIN_VIEWPORT} " +
+                "that three rows need, so the third row is clipped on the device this app is " +
+                "built for. See AppPickerRowFitTest for where the boundary comes from."
         }
     }
 

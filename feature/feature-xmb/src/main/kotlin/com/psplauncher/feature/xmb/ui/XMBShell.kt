@@ -1478,6 +1478,10 @@ fun XMBShell(
                 // runs before the per-screen routing, so the drawer's cursor never sees the
                 // presses meant for it.
                 onLiveAreaTapped = onNotificationsToggled,
+                // The battery shimmer runs on the crossbar only. It is an animation, so it costs
+                // a frame every vsync while the device is charging — free here where the wave is
+                // already animating, and the whole cost of a static screen anywhere else.
+                shimmerAllowed = xmbContext,
                 // The two navigation hints, each shown only where the press does something.
                 // Shoulder: the hover panel's pages, which exist only on a game that has them.
                 // Left/right: stepping the crossbar, which a drilled-in list does not do.
