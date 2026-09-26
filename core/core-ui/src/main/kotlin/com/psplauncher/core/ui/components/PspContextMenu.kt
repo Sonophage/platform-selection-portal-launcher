@@ -77,7 +77,13 @@ fun PspContextMenuOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Brush.horizontalGradient(0f to Color.Transparent, 1f to scrim)),
+            .background(
+                Brush.horizontalGradient(
+                    0f to Color.Transparent,
+                    0.5f to scrim.copy(alpha = scrim.alpha * 0.45f),
+                    1f to scrim,
+                ),
+            ),
     ) {
         Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
 
@@ -196,7 +202,7 @@ private fun XmbRailBadge(label: String, filled: Boolean, tint: Color? = null) {
     }
 }
 
-val XmbScrim = Color(0xC4080301)
+val XmbScrim = Color(0xF7050201)
 
 internal val RailIcon = 29.dp
 internal val RailCorner = 7.dp
@@ -205,8 +211,8 @@ internal val RailRowGap = 13.dp
 private const val DimFadeMs = 160
 private val RailGlyphSize = 13.sp
 private val RailTextSize = 13.sp
-private val RailTitleSize = 17.sp
-private val RailTitleGap = 18.dp
+private val RailTitleSize = 26.sp
+private val RailTitleGap = 22.dp
 private val RailPadStart = 14.dp
 private val RailPadEnd = 4.dp
 private val RailPadV = 4.dp
