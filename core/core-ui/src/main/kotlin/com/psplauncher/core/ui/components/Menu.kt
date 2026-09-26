@@ -3,6 +3,7 @@ package com.psplauncher.core.ui.components
 enum class MenuGroup(val label: String?) {
     MAIN(null),
     LIBRARY("Library"),
+    METADATA("Metadata"),
     SETTINGS("Settings"),
     CATEGORY("Category"),
     REMOVE("Remove"),

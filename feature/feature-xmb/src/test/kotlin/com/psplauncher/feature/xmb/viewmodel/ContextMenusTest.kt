@@ -346,11 +346,27 @@ class ContextMenusTest {
     }
 
     @Test
-    fun `view game details is offered either way`() {
-        assertTrue(
-            "the menu cannot reach the game's own pages",
-            "game_details" in ids(gameContextMenuItems(game(), state(), 1, false, null)),
+    fun `the rows that were behind Details are in the menu itself, as one group`() {
+        val rows = gameContextMenuItems(game(), state(), 1, false, null)
+        val wasBehindDetails = listOf(
+            "detail_title", "detail_note", "detail_ARTWORK",
+            "detail_METADATA", "detail_MANUAL", "detail_REFRESH",
         )
+
+        wasBehindDetails.forEach { id ->
+            val row = rows.firstOrNull { it.action == id }
+            assertTrue("'$id' is no longer reachable from any menu", row != null)
+            assertEquals("$id: not in the Metadata group", MenuGroup.METADATA, row!!.group)
+        }
+
+        assertFalse(
+            "the Details submenu is still offered as well, so the rows are reachable two ways",
+            "game_details" in ids(rows),
+        )
+
+        val folded = MenuState("Gran Turismo 4", rows).rowsShown().filter { it.group == MenuGroup.METADATA }
+        assertEquals("six rows should fold to one", 1, folded.size)
+        assertEquals("Metadata", folded.single().label)
     }
 
     @Test

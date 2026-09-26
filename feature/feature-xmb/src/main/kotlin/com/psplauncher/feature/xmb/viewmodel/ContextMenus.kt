@@ -29,8 +29,6 @@ internal fun gameContextMenuItems(
     val inMissingBucket = state.selectedPlatformId == XMBViewModel.MISSING_PLATFORM_ID
 
     return buildList {
-        add(XMBContextMenuItem("game_details", "Details"))
-
         add(XMBContextMenuItem("play", "Play", hidden = true))
 
         if (discCount > 1) add(XMBContextMenuItem("choose_disc", "Choose Disc"))
@@ -73,6 +71,13 @@ internal fun gameContextMenuItems(
                 )
             }
         }
+
+        add(XMBContextMenuItem("detail_title", "Edit Title", group = MenuGroup.METADATA))
+        add(XMBContextMenuItem("detail_note", "Edit Note", group = MenuGroup.METADATA))
+        add(XMBContextMenuItem("detail_ARTWORK", "Artwork", group = MenuGroup.METADATA))
+        add(XMBContextMenuItem("detail_METADATA", "Update Metadata", group = MenuGroup.METADATA))
+        add(XMBContextMenuItem("detail_MANUAL", "Manual", group = MenuGroup.METADATA))
+        add(XMBContextMenuItem("detail_REFRESH", "Refresh Artwork", group = MenuGroup.METADATA))
 
         if (!item.isAndroidApp) add(XMBContextMenuItem("change_emulator", "Change Emulator", group = MenuGroup.SETTINGS))
         add(XMBContextMenuItem("icon_display", "Icon Display", group = MenuGroup.SETTINGS))

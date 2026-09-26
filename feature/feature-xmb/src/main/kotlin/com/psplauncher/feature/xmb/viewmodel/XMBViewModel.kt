@@ -5375,7 +5375,6 @@ class XMBViewModel @Inject constructor(
                     appAction { gameRepository.setPreferredDisc(menu.gameId, discId) }
                 }
             } else when (itemId) {
-                "game_details"           -> openGameDetailsMenu(menu.gameId)
 
                 "play"                   -> launchGameDirectly(menu.gameId)
                 "choose_disc"             -> openDiscPickerMenu(menu.gameId)
@@ -5507,17 +5506,6 @@ class XMBViewModel @Inject constructor(
 
     private fun appAction(block: suspend () -> Unit) {
         viewModelScope.launch { block() }
-    }
-
-    private fun openGameDetailsMenu(gameId: Long) {
-        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = "Details", rows = listOf(
-                XMBContextMenuItem("detail_title", "Edit Title"),
-                XMBContextMenuItem("detail_note", "Edit Note"),
-                XMBContextMenuItem("detail_ARTWORK", "Artwork"),
-                XMBContextMenuItem("detail_METADATA", "Update Metadata"),
-                XMBContextMenuItem("detail_MANUAL", "Manual"),
-                XMBContextMenuItem("detail_REFRESH", "Refresh Artwork"),
-            )), gameId = gameId))}
     }
 
     private fun openPlayStatePickerMenu(gameId: Long) {
