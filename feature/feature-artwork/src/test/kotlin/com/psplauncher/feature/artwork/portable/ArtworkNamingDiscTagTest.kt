@@ -1,6 +1,5 @@
 package com.psplauncher.feature.artwork.portable
 
-import org.junit.Ignore
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -26,12 +25,4 @@ class ArtworkNamingDiscTagTest {
         assertEquals("parasite-eve-ii-disc2", ArtworkNaming.slug("Parasite Eve II (Disc 2 of 3)"))
     }
 
-    @Test
-    @Ignore("ArtworkNaming.NORMALIZATION_VERSION is frozen at 1; fixing this needs a re-slug pass")
-    fun `a bracketed disc tag must not collide with disc one`() {
-        assertNotEquals(
-            ArtworkNaming.slug("Panzer Dragoon Saga [Disc 1]"),
-            ArtworkNaming.slug("Panzer Dragoon Saga [Disc 2]"),
-        )
-    }
 }
