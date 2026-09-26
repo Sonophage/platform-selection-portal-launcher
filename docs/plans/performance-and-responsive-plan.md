@@ -272,6 +272,11 @@ a single app-wide delegate (`core/core-data/.../datastore/PFPDataStore.kt`), so 
 it an injectable scope, not patching the test. Until then the honest options are to accept a known
 flake or to stop the test depending on a real file at all.
 
+**Third class, same day:** `AudioSettingsViewModelTest` lost four cases in one run while two
+other gradle invocations were running against the same daemon, and passed them all on a clean
+re-run. That is now `FontColorTest`, `GameBootTest` and `AudioSettingsViewModelTest` — every
+DataStore-backed settings test in the module. The race is not in any of them.
+
 **More evidence, 2026-09-25:** the flake moved to a SIBLING —
 `DisplaySettingsViewModelGameBootTest > a fresh install shows the toggle on and turning it off
 persists` timed out at the same 60s, with `UncompletedCoroutinesError: the test body did not run

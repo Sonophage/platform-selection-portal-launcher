@@ -72,7 +72,18 @@ private val TextDropShadow = Shadow(
 fun PspContextMenuOverlay(
     title: String,
     rows: List<PspMenuRow>,
-    selectedIndex: Int,
+    /**
+     * Which row has the cursor, or NULL for "the menu is open and nothing is picked".
+     *
+     * Nullable because the crossbar's options menu opens that way, and the reason is not
+     * cosmetic: it used to open on row one, which took confirm away from the row underneath —
+     * the press under your thumb went from "play this game" to "run whatever the first action
+     * happens to be". Nothing is selected until you move onto something, and while nothing is,
+     * no row may be drawn as though it were.
+     *
+     * Every other caller passes a real index and is unaffected.
+     */
+    selectedIndex: Int?,
     onRowActivated: (index: Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -86,7 +97,9 @@ fun PspContextMenuOverlay(
     val listState = rememberLazyListState()
 
     LaunchedEffect(selectedIndex) {
-        if (rows.isNotEmpty()) {
+        // Nothing to scroll to while nothing is picked — and scrolling to row one would be the
+        // same lie the highlight would tell.
+        if (rows.isNotEmpty() && selectedIndex != null) {
             listState.animateScrollToItem(selectedIndex.coerceIn(0, rows.size - 1))
         }
     }

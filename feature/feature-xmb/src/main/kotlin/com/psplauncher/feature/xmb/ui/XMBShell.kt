@@ -1773,10 +1773,26 @@ fun XMBShell(
                 // railRows, not menu.items: the rail drops what the pill row already carries and
                 // caps the rest, and the ViewModel indexes the SAME list, so the cursor and the
                 // drawing cannot disagree about which action is row three.
-                ContextMenuOverlay(
-                    rows = uiState.railRows(),
+                // The SAME panel every other menu in the app draws. The crossbar's options were
+                // the last surface with a look of their own — a rail of capsules with initial
+                // badges up the right edge — and the file behind it served this one call site.
+                //
+                // selectedIndex stays nullable through the merge, because that null is behaviour
+                // rather than a starting value: while nothing is picked, confirm still belongs to
+                // the row underneath (XMBContextMenu.confirmIdWhileNull), so no row may be drawn
+                // as though it had the cursor.
+                com.psplauncher.core.ui.components.PspContextMenuOverlay(
+                    title = menu.title,
+                    rows = uiState.railRows().map { row ->
+                        com.psplauncher.core.ui.components.PspMenuRow(
+                            label = row.label,
+                            isDestructive = row.isDestructive,
+                            checked = row.checked,
+                            heading = row.heading,
+                        )
+                    },
                     selectedIndex = menu.selectedIndex,
-                    onItemActivated = onContextMenuItemActivated,
+                    onRowActivated = onContextMenuItemActivated,
                     onDismiss = onContextMenuDismiss,
                 )
             }

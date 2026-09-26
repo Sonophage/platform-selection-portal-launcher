@@ -118,39 +118,29 @@ a key.
 ./gradlew :core:core-ui:testDebugUnitTest --tests '*KeyboardPromptsAreBound*'
 ```
 
-### 6. One action-language for the action menus — MOSTLY DONE
+### 6. One action-language for the action menus — DONE
 
-The review said three. **There were four** — it missed `core-ui`'s `PspContextMenuOverlay`, which
-already had 4 call sites (Logs, Themes, Artwork Studio) and whose own header claimed to be
-"shared by the XMB's Y/Triangle menu and any settings screen ... one source, no style drift".
-That claim was false: `DetailContextMenu` was a near-verbatim second copy of it.
+Four menus, now one. `DetailContextMenu` and `AppDrawerOptions` went earlier; the crossbar's rail
+was the last, and the owner's call was to merge it.
 
-Merged on 2026-09-25:
-- **`DetailContextMenu.kt` deleted** (203 lines). Its 6 call sites — AppDetail ×2, GameDetail ×2,
-  VideoDetail, PhotoViewer — now call `PspContextMenuOverlay`. The two were identical in row
-  metrics (15/16sp, 12dp padding, same glow gradient, same drop shadow) and title block; the
-  survivor also has `checked` rows and a preview.
-- **`AppDrawerOptions` deleted.** The drawer's 280dp centred panel is now the same right-edge
-  panel as everywhere else. Its file is renamed `UninstallConfirmDialog.kt` after what is left.
-- **One real bug fixed by the merge**: `DetailContextMenu`'s scrim was `0x40000000`, the value
-  `PspContextMenuOverlay`'s own comment records as having been raised to `0x99000000` *because
-  artwork read straight through it*. The detail pages are the screens with the most artwork and
-  were still on the old value.
-- **One fix carried the other way**: `PspContextMenuOverlay`'s `LazyColumn` had top padding only,
-  so a list longer than the panel cut its last row in half. `DetailContextMenu` had fixed that
-  with `contentPadding(bottom = 32.dp)`; that is now in core-ui.
+`ContextMenuOverlay` and `XmbRailCapsule` are deleted. The crossbar's options draw
+`PspContextMenuOverlay` like every other menu in the app, taking `menu.title` as the heading and
+mapping `XMBContextMenuItem` straight onto `PspMenuRow` — label, destructive, checked and the
+group heading all already matched.
 
-Verified on the tablet 2026-09-25: the drawer's menu draws the right-edge panel with the app's
-label as title, the glow band on the selected row and Uninstall in red.
+**The panel learned one thing rather than the rail losing it.** `selectedIndex` is now nullable.
+That null is behaviour, not a starting value: the crossbar's menu opens with nothing picked so
+that confirm still belongs to the row underneath (`XMBContextMenu.confirmIdWhileNull` — "play" on
+a game). It used to open on row one, which took A away from the game. While nothing is picked the
+panel draws no glow and scrolls nowhere; the other thirteen call sites pass a real index and are
+untouched.
 
-**Still open — the XMB rail, deliberately not merged.** `ContextMenuOverlay` + `XmbRailCapsule`
-is the crossbar's own idiom: right-aligned capsules with initial badges, no panel. Folding it into
-the panel would change how the home screen looks, which is a taste call, not a cohesion defect.
-Flagged for a decision rather than done.
+`RailCorner` and `XmbScrim` outlived the rail — the notification sheet uses both — so they moved
+to `XmbNotificationBar.kt` with docs that are true there, rather than leaving a file named after
+something that no longer exists.
 
 ```sh
-grep -rl "PspContextMenuOverlay" --include="*.kt" . | grep -v Test   # the one panel
-grep -rl "XmbRailCapsule\|ContextMenuOverlay" --include="*.kt" .    # the rail, still separate
+grep -rn "ContextMenuOverlay" --include="*.kt" . | grep -v build | grep -v Psp   # expects: no output
 ```
 
 ### 7. One search field — DONE

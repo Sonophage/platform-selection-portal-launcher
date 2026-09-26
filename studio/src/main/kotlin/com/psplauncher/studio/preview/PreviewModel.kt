@@ -33,7 +33,7 @@ data class XmbPreviewModel(
     /** MenuCursor.menuCursorEdge(): lerp(accent, White, 0.55).copy(alpha = 0.95). */
     val menuCursorEdge: Color get() = lerp(pfpAccentColor, Color.White, 0.55f).copy(alpha = 0.95f)
 
-    /** ContextMenuOverlay panel backdrop: waveColor at 75% alpha. */
+    /** Context-menu panel backdrop (core-ui's PspContextMenuOverlay): waveColor at 75% alpha. */
     val menuPanelBackdrop: Color get() = accent.copy(alpha = 0.75f)
 }
 
