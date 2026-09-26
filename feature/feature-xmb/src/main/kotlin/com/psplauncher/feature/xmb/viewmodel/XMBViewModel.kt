@@ -630,6 +630,24 @@ data class XMBUiState(
     val musicNav: MusicNav = MusicNav.Root,
     val musicFolders: List<com.psplauncher.core.domain.model.MusicFolder> = emptyList(),
     /**
+     * How many artists, albums and playlists the Music column's rows stand for.
+     *
+     * Pre-aggregated here because [musicRootSections] is a pure extension on this state and sees
+     * only the folder rows, which carry a track count and nothing else. Without these, three of
+     * the four Music rows had to say what they were FOR — "Browse by who made it" — while Songs
+     * beside them said how many, and every other media column counted throughout.
+     *
+     * The artist number is NOT `COUNT(DISTINCT artist)`. A track's artist tag is a credit line,
+     * so grouping on it counts credit COMBINATIONS — one performer scattered across a dozen rows
+     * and no row for the performer alone. It is `artistGroups().size`, the same pass the Artists
+     * screen draws, which groups on the album artist and splits joint credits on the library's
+     * own evidence. That is also why it is a count of MEMBERSHIPS: a duet is one track and two
+     * rows, and it is an artist in each.
+     */
+    val musicArtistCount: Int = 0,
+    val musicAlbumCount: Int = 0,
+    val musicPlaylistCount: Int = 0,
+    /**
      * Newest-first artwork for each media column's rows to slice, four per row.
      *
      * One pool per column rather than one list per row: a column's rows are cuts of the same
@@ -2409,11 +2427,37 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch {
             musicRepository.observeFolders().collect { folders ->
                 _uiState.update { it.copy(musicFolders = folders) }
+                // The counts the Music rows show, recomputed when the library changes.
+                //
+                // Keyed on FOLDERS rather than on the tracks themselves: a folder's trackCount
+                // moves whenever its tracks are replaced, so a scan re-emits here, while playing
+                // a song — which writes lastPlayedAt on one row — does not. Observing the tracks
+                // would regroup four thousand of them every time you pressed play.
+                //
+                // Off the main thread: this reads the whole track table and runs the same two
+                // grouping passes the browser runs, and it runs on every scan tick.
+                runCatching {
+                    withContext(Dispatchers.Default) {
+                        val tracks = musicRepository.observeAllTracks().first()
+                        tracks.artistGroups().size to tracks.albumGroups().size
+                    }
+                }.onSuccess { (artists, albums) ->
+                    _uiState.update {
+                        it.copy(musicArtistCount = artists, musicAlbumCount = albums)
+                    }
+                }
                 if (currentCategory()?.id == BuiltInCategory.MUSIC &&
                     _uiState.value.musicNav == MusicNav.Root
                 ) {
                     loadItemsForCategory(currentCategory())
                 }
+            }
+        }
+        viewModelScope.launch {
+            // Playlists are the user's own lists, so they change without the library changing —
+            // their own flow rather than a folder-keyed read.
+            musicRepository.observePlaylists().collect { playlists ->
+                _uiState.update { it.copy(musicPlaylistCount = playlists.size) }
             }
         }
         viewModelScope.launch {

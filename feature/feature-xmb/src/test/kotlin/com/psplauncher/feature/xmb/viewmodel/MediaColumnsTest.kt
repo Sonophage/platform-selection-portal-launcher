@@ -81,6 +81,34 @@ class MediaColumnsTest {
         assertEquals("42 tracks", subtitleOf(state.musicRootSections(), "all_music"))
     }
 
+    @Test
+    fun `every music row says how much is behind it, not what it is for`() {
+        // The four rows of one column used to answer two different questions. Songs said
+        // "42 tracks" and the three rows under it said "Browse by who made it", "Browse by
+        // release", "Build and play your own track lists" -- so Music was the only column in the
+        // app where a row would not tell you whether there was anything behind it, and it is the
+        // column opened most.
+        //
+        // Derived from the rows rather than checked one by one, because the thing that must hold
+        // is about the WHOLE column: a row added later is checked by this without anyone
+        // remembering to add it here.
+        val rows = XMBUiState(
+            musicFolders = listOf(musicFolder(9)),
+            musicArtistCount = 4,
+            musicAlbumCount = 3,
+            musicPlaylistCount = 2,
+        ).musicRootSections()
+        val prose = rows.filterNot { it.subtitle?.firstOrNull()?.isDigit() == true }
+        assertTrue(
+            "music rows that instruct instead of counting: ${prose.map { it.title to it.subtitle }}",
+            prose.isEmpty(),
+        )
+        assertEquals("9 tracks", subtitleOf(rows, "all_music"))
+        assertEquals("4 artists", subtitleOf(rows, "music_artists"))
+        assertEquals("3 albums", subtitleOf(rows, "music_albums"))
+        assertEquals("2 playlists", subtitleOf(rows, "playlists"))
+    }
+
     // ── Video ─────────────────────────────────────────────────────────────
 
     @Test

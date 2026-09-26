@@ -120,11 +120,17 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
                 type     = XMBItemType.MEMORY_CARD,
             )
         )
+        // Artists, Albums and Playlists carry a COUNT, like Songs above them and like every row in
+        // the Game, Video, Photo and Library columns. They used to carry an instruction -- "Browse
+        // by who made it" -- so the four rows of one column answered two different questions, and
+        // the only column in the app whose rows would not tell you how much was behind them was
+        // the one you open most. The numbers come pre-aggregated on the state because this
+        // function is pure and sees only the folder rows; see [XMBUiState.musicArtistCount].
         add(
             XMBItem(
                 id       = MUSIC_ARTISTS_ITEM_ID,
                 title    = "Artists",
-                subtitle = "Browse by who made it",
+                subtitle = countLabel(musicArtistCount, "artist", "artists"),
                 type     = XMBItemType.MUSIC_ARTISTS,
             )
         )
@@ -132,7 +138,7 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
             XMBItem(
                 id       = MUSIC_ALBUMS_ITEM_ID,
                 title    = "Albums",
-                subtitle = "Browse by release",
+                subtitle = countLabel(musicAlbumCount, "album", "albums"),
                 type     = XMBItemType.MUSIC_ALBUMS,
             )
         )
@@ -140,7 +146,7 @@ internal fun XMBUiState.musicRootSections(): List<XMBItem> {
             XMBItem(
                 id       = PLAYLISTS_ITEM_ID,
                 title    = "Playlists",
-                subtitle = "Build and play your own track lists",
+                subtitle = countLabel(musicPlaylistCount, "playlist", "playlists"),
                 type     = XMBItemType.PLAYLIST,
             )
         )
