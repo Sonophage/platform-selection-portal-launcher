@@ -330,14 +330,20 @@ same column.
 `trackCount`, so the column builder stays pure. Then all four rows say how many, like every other
 media column.
 
-### 16. The status strip's centre is unlabelled — OPEN
+### 16. The status strip's centre is unlabelled — DONE
 
-It says "All" or "Title" with no cue which knob it is, while the hint bar directly below says
-"Filter" or "Sort".
+The strip's centre said "All" or "Title" and nothing said which knob those were a setting OF,
+while the hint bar underneath said "Filter" or "Sort" without saying what it was set TO. Two
+halves of one fact in two bands, neither complete alone.
 
----
+The strip already solved it for touch — a chip reading "⇅ Title" — and only for touch, because on
+a controller it fell back to a bare label. The ⇅ now rides on the controller label too (no chip
+behind it: a background says "press me", and there it is a readout that X cycles), and the bar's
+Filter / Sort prompt is gone. One fact, stated once, where the setting lives.
 
-## New work, raised after the review
+`HintPromptsTest`'s old assertion counted the two words and allowed up to one; with neither
+offered it passed at zero, which is a test that cannot fail. It now asserts the bar names the knob
+nowhere, and is falsified by putting any such prompt back.
 
 ### N1. Wire `tools/stale-comments/check.py` — DONE
 

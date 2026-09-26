@@ -109,12 +109,16 @@ fun promptsFor(state: XMBUiState): XmbPrompts {
     }
 
     val right = buildList {
-        // Sort and Filter are the same button doing two jobs, so they are mutually exclusive by
-        // construction rather than by two callers remembering to be careful.
-        when {
-            state.canFilterRecents -> add(XmbPrompt(GamepadAction.CHANGE_SORT, "Filter"))
-            state.canSortCurrentList -> add(XmbPrompt(GamepadAction.CHANGE_SORT, "Sort"))
-        }
+        // No Sort / Filter prompt here any more, and it is not a loss.
+        //
+        // The word named the knob and the status strip's centre named its value — "Filter" down
+        // here, "All" up there — so the two halves of one fact sat in two bands and neither was
+        // complete on its own. The strip now draws "⇅ All" / "⇅ Title": the glyph is the knob,
+        // the word is the value, and X cycles it exactly as before. Repeating the knob in the bar
+        // would be the third copy of a setting that is already fully stated where it lives.
+        //
+        // canFilterRecents / canSortCurrentList still decide whether the strip shows the label at
+        // all, so nothing here needs to know which of the two jobs the button is doing.
         if (state.focusedItemHasContextMenu) add(XmbPrompt(GamepadAction.OPEN_CONTEXT_MENU, "Options"))
         if (!state.isInSubItem) add(XmbPrompt(GamepadAction.OPEN_SEARCH, "Search"))
     }
