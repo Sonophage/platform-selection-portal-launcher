@@ -497,14 +497,11 @@ private fun GameDetailOverlays(
         AnimatedVisibility(state.showOptions, enter = fadeIn(), exit = fadeOut()) {
             PspContextMenuOverlay(
                 title = "Options",
-                rows = sectionHeadings(state.visibleActions).let { headings ->
-                    state.visibleActions.mapIndexed { index, action ->
-                        PspMenuRow(
-                            label = action.dynamicLabel(game.isFavorite, state.isFetchingArtwork),
-                            isDestructive = action == DetailAction.REMOVE,
-                            heading = headings[index],
-                        )
-                    }
+                rows = state.visibleActions.map { action ->
+                    PspMenuRow(
+                        label = action.dynamicLabel(game.isFavorite, state.isFetchingArtwork),
+                        isDestructive = action == DetailAction.REMOVE,
+                    )
                 },
                 selectedIndex = state.optionsIndex,
                 onRowActivated = { viewModel.onOptionRowTapped(state.visibleActions[it]) },

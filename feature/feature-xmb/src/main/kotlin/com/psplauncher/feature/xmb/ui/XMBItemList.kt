@@ -106,6 +106,7 @@ import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.themekit.XmbLayoutSpec
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import com.psplauncher.core.ui.components.XmbDim
 
 private val GAME_ICON_WIDTH = 126.dp
 private val GAME_ICON_HEIGHT = 70.dp

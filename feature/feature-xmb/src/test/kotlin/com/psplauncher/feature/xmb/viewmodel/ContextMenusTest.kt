@@ -365,27 +365,24 @@ class ContextMenusTest {
     }
 
     @Test
-    fun `a heading belongs to a row, and every group has exactly one`() {
-        val items = gameContextMenuItems(game(), state(), 2, true, null).inMenuOrder()
-        val headings = items.mapNotNull { it.heading }
-        assertEquals("a heading is repeated", headings.distinct(), headings)
-        assertTrue("no groups at all", headings.isNotEmpty())
-        assertFalse("the first row starts a group", items.first().heading != null)
-    }
-
-    @Test
-    fun `the category group's heading survives whichever of its rows exists`() {
+    fun `a group's rows land together, whichever of them exists`() {
         val main = category(BuiltInCategory.GAMES, gaming = true)
         val shooters = category("shooters", gaming = true)
 
         val all = listOf(main, shooters, category("rpgs", gaming = true))
 
-        val fromMain = gameContextMenuItems(game(), state(all, 0), 1, false, null).inMenuOrder()
-        assertEquals("Category", fromMain.first { it.id == "add_category" }.heading)
+        listOf(0 to "add_category", 1 to "move_category").forEach { (index, id) ->
+            val rows = gameContextMenuItems(game(), state(all, index), 1, false, null).inMenuOrder()
+            val category = rows.filter { it.group == MenuGroup.CATEGORY }.map { it.id }
 
-        val fromCustom = gameContextMenuItems(game(), state(all, 1), 1, false, null).inMenuOrder()
-        assertEquals("Category", fromCustom.first { it.id == "move_category" }.heading)
-        assertEquals(null, fromCustom.first { it.id == "remove_category" }.heading)
+            assertTrue("no category rows at all from slot $index", category.isNotEmpty())
+            assertTrue("'$id' is not among the category rows", id in category)
+            assertEquals(
+                "the category rows are not contiguous",
+                category,
+                rows.map { it.id }.filter { it in category },
+            )
+        }
     }
 
     @Test

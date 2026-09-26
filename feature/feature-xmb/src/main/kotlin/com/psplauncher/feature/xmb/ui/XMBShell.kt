@@ -1175,7 +1175,6 @@ fun XMBShell(
                             label = it.label,
                             isDestructive = it.isDestructive,
                             checked = it.checked,
-                            heading = it.heading,
                         )
                     },
                     selectedIndex = menu.selectedIndex ?: NoMenuSelection,

@@ -67,30 +67,4 @@ class MenuRowsTest {
         )
     }
 
-    @Test
-    fun `each group is headed once, and the first group is not headed at all`() {
-        val menu = listOf(
-            row("play"),
-            row("favorite", MenuGroup.LIBRARY),
-            row("collection", MenuGroup.LIBRARY),
-            row("wipe", MenuGroup.REMOVE, destructive = true),
-        )
-        assertEquals(
-            listOf(null, "Library", null, "Remove"),
-            menuRows(menu, pillIds = emptySet()).map { it.heading },
-        )
-    }
-
-    @Test
-    fun `a group whose first row is filtered out keeps its heading`() {
-        val menu = listOf(
-            row("play"),
-            row("favorite", MenuGroup.LIBRARY),
-            row("collection", MenuGroup.LIBRARY),
-        )
-        assertEquals(
-            listOf(null, "Library"),
-            menuRows(menu, pillIds = setOf("favorite")).map { it.heading },
-        )
-    }
 }

@@ -41,6 +41,7 @@ import com.psplauncher.core.ui.icons.CategoryIconGlyph
 import com.psplauncher.themekit.XmbLayoutSpec
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import com.psplauncher.core.ui.components.XmbDim
 
 private val SelectedIcon = Color.White
 

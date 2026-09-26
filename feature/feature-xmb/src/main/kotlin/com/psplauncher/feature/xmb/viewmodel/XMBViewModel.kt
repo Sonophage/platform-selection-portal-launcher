@@ -177,8 +177,6 @@ data class XMBContextMenuItem(
 
     val group: MenuGroup = MenuGroup.MAIN,
 
-    val heading: String? = null,
-
     val hidden: Boolean = false,
 )
 

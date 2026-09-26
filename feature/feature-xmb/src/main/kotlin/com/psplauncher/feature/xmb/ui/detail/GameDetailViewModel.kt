@@ -229,11 +229,6 @@ enum class DetailQuickAction(val label: String) {
     OPTIONS("Options"),
 }
 
-fun sectionHeadings(actions: List<DetailAction>): List<String?> =
-    actions.mapIndexed { index, action ->
-        action.group.heading.takeIf { action.group != actions.getOrNull(index - 1)?.group }
-    }
-
 internal const val DEFAULT_EMULATOR_SENTINEL = "default"
 
 private const val DISC_KEY_PREFIX = "game-detail:disc:"

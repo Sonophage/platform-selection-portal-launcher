@@ -5,12 +5,12 @@ import com.psplauncher.core.domain.model.Category
 import com.psplauncher.core.domain.model.HideLocationType
 import com.psplauncher.core.domain.model.PlatformIds
 
-enum class MenuGroup(val heading: String?) {
-    MAIN(null),
-    LIBRARY("Library"),
-    SETTINGS("Settings"),
-    CATEGORY("Category"),
-    REMOVE("Remove"),
+enum class MenuGroup {
+    MAIN,
+    LIBRARY,
+    SETTINGS,
+    CATEGORY,
+    REMOVE,
 }
 
 internal fun XMBUiState.currentCategoryOrNull(): Category? =
@@ -257,13 +257,8 @@ internal fun collectionRowContextMenuItems(
     add(XMBContextMenuItem("delete_collection", "Delete Collection", isDestructive = true, group = MenuGroup.REMOVE))
 }
 
-internal fun List<XMBContextMenuItem>.inMenuOrder(): List<XMBContextMenuItem> {
-    val sorted = sortedBy { it.group.ordinal }
-    return sorted.mapIndexed { index, item ->
-        val opensGroup = item.group != sorted.getOrNull(index - 1)?.group
-        item.copy(heading = item.group.heading.takeIf { opensGroup })
-    }
-}
+internal fun List<XMBContextMenuItem>.inMenuOrder(): List<XMBContextMenuItem> =
+    sortedBy { it.group.ordinal }
 
 internal const val CONFIRM_YES_ID = "confirm_destructive"
 internal const val CONFIRM_NO_ID = "cancel_destructive"
