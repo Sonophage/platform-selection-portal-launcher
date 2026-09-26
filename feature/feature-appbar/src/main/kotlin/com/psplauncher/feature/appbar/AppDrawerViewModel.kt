@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,12 +22,12 @@ import com.psplauncher.core.ui.components.MenuState
 import com.psplauncher.core.ui.components.MenuSelect
 import com.psplauncher.core.ui.components.MenuRow
 import com.psplauncher.core.ui.components.MenuGroup
-import com.psplauncher.core.ui.components.LetterJumpState
-import com.psplauncher.core.ui.components.at
-import com.psplauncher.core.ui.components.letterJumpFor
-import com.psplauncher.core.ui.components.move
+import com.psplauncher.core.ui.components.initialOf
+import com.psplauncher.core.ui.components.letterMenuFor
 
 private const val APP_SHORTCUT_PLATFORM_ID = "app_shortcut"
+
+private const val ROM_KEY_PREFIX = "rom:"
 
 enum class AppFilter(val label: String, val subtitle: String) {
     RECENT("Recently Used", "Apps you've used lately"),
@@ -82,7 +83,13 @@ data class AppDrawerUiState(
 
     val sectionListRows: Int = SECTION_LIST_ROWS,
 
-    val letterJump: LetterJumpState? = null,
+    val letterMenu: List<Char> = emptyList(),
+
+    val letterCursor: Int? = null,
+
+    val letterFilter: Char? = null,
+
+    val pendingRomLaunch: Long? = null,
 
 ) {
     val visibleApps: List<InstalledApp> get() = sectionApps + otherApps
@@ -93,6 +100,7 @@ data class AppDrawerUiState(
 
     val menuActions: List<AppMenuAction>
         get() = buildList {
+            if (menuApp?.gameId != null) return@buildList
             add(AppMenuAction.ADD_TO_CROSS_BAR)
             add(AppMenuAction.APP_INFO)
             add(if (menuAppIsGame) AppMenuAction.UNMARK_GAME else AppMenuAction.MARK_GAME)
@@ -133,10 +141,10 @@ class AppDrawerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val hasUsageAccess = appRepository.hasUsageAccess()
-            val apps = appRepository.getInstalledApps()
+            val apps = appRepository.getInstalledApps() + romsInLibrary()
             _uiState.update {
                 it.copy(
-                    allApps = apps,
+                    allApps = apps.sortedBy { app -> app.label.lowercase() },
                     isLoading = false,
                     hasUsageAccess = hasUsageAccess,
                 )
@@ -145,14 +153,28 @@ class AppDrawerViewModel @Inject constructor(
         }
     }
 
+    private suspend fun romsInLibrary(): List<InstalledApp> =
+        gameRepository.observeAllGames().first()
+            .filter { it.packageName == null }
+            .map { game ->
+                InstalledApp(
+                    packageName = "$ROM_KEY_PREFIX${game.id}",
+                    label = game.title,
+                    icon = null,
+                    isGame = true,
+                    isEmulator = false,
+                    gameId = game.id,
+                )
+            }
+
     fun setFilter(filter: AppFilter) {
         if (filter != _uiState.value.activeFilter) menuSound.play(MenuSound.SYSTEM_BROWSE)
-        _uiState.update { it.copy(activeFilter = filter, selectedIndex = 0, letterJump = null) }
+        _uiState.update { it.copy(activeFilter = filter, selectedIndex = 0, letterFilter = null) }
         applyFilter()
     }
 
     fun setSearchQuery(query: String) {
-        _uiState.update { it.copy(searchQuery = query, selectedIndex = 0, letterJump = null) }
+        _uiState.update { it.copy(searchQuery = query, selectedIndex = 0, letterFilter = null) }
         applyFilter()
     }
 
@@ -177,20 +199,27 @@ class AppDrawerViewModel @Inject constructor(
     }
 
     fun launchApp(packageName: String) {
+        val app = _uiState.value.visibleApps.firstOrNull { it.packageName == packageName }
         menuSound.play(MenuSound.LAUNCH)
 
-        val icon = _uiState.value.visibleApps.firstOrNull { it.packageName == packageName }?.icon
+        if (app?.gameId != null) {
+            _uiState.update { it.copy(pendingRomLaunch = app.gameId) }
+            return
+        }
         viewModelScope.launch {
-            mediaLaunchGate.awaitHandOff(icon)
+            mediaLaunchGate.awaitHandOff(app?.icon)
             appRepository.launchApp(packageName)
         }
     }
+
+    fun onRomLaunchHandled() = _uiState.update { it.copy(pendingRomLaunch = null) }
 
     fun refresh() {
         loadApps()
     }
 
     fun openAppMenu(app: InstalledApp) {
+        if (app.gameId != null) return
         menuSound.play(MenuSound.SELECT)
         _uiState.update { it.copy(menuApp = app, menuAppIsGame = false).let { s -> s.copy(appMenu = s.menuStateFor(app)) } }
 
@@ -289,55 +318,73 @@ class AppDrawerViewModel @Inject constructor(
 
     fun openLetterJump() {
         val state = _uiState.value
-        if (state.menuApp != null || state.confirmUninstall != null || state.letterJump != null) return
-        val rail = letterJumpFor(state.otherApps.map { it.label }, state.gridIndex) ?: return
-        landOn(rail)
+        if (state.menuApp != null || state.confirmUninstall != null || state.letterCursor != null) return
+        if (state.letterMenu.isEmpty()) return
+        val start = state.letterMenu.indexOf(state.letterFilter).coerceAtLeast(0)
+        filterAtGestureStart = state.letterFilter
+        landOn(start)
     }
 
-    fun closeLetterJump() = _uiState.update { it.copy(letterJump = null) }
+    fun closeLetterJump() = _uiState.update { it.copy(letterCursor = null) }
 
     fun onLetterRailTouch(rung: Int) {
         val state = _uiState.value
         if (state.menuApp != null || state.confirmUninstall != null) return
-        val rail = state.letterJump
-            ?: letterJumpFor(state.otherApps.map { it.label }, state.gridIndex) ?: return
-        val next = rail.at(rung)
-        if (next === rail && state.letterJump != null) return
-        landOn(next)
+        if (rung !in state.letterMenu.indices) return
+        if (state.letterCursor == null) filterAtGestureStart = state.letterFilter
+        if (state.letterCursor == rung) return
+        landOn(rung)
     }
 
-    fun onLetterRailReleased() = closeLetterJump()
+    fun onLetterRailReleased() {
+        val state = _uiState.value
+        if (state.letterCursor == null) return
+        val landed = state.letterFilter
+        val keep = if (landed != null && landed == filterAtGestureStart) null else landed
+        _uiState.update { it.copy(letterCursor = null, letterFilter = keep) }
+        applyFilter()
+    }
+
+    fun clearLetterFilter() {
+        if (_uiState.value.letterFilter == null) return
+        menuSound.play(MenuSound.BACK)
+        _uiState.update { it.copy(letterFilter = null, selectedIndex = 0) }
+        applyFilter()
+    }
 
     private fun moveLetterJump(delta: Int) {
-        val rail = _uiState.value.letterJump ?: return
-        val next = rail.move(delta)
-        if (next === rail) return
+        val state = _uiState.value
+        val cursor = state.letterCursor ?: return
+        val next = (cursor + delta).coerceIn(0, state.letterMenu.lastIndex)
+        if (next == cursor) return
         landOn(next)
     }
 
-    private fun landOn(rail: LetterJumpState) {
+    private fun landOn(rung: Int) {
         menuSound.play(MenuSound.SCROLL)
         _uiState.update {
             it.copy(
-                letterJump = rail,
-                selectedIndex = it.sectionRowCount + rail.targetIndex,
+                letterCursor = rung,
+                letterFilter = it.letterMenu.getOrNull(rung),
+                selectedIndex = 0,
                 usingTouch = false,
             )
         }
+        applyFilter()
     }
+
+    private var filterAtGestureStart: Char? = null
 
     fun handleGamepadAction(action: GamepadAction) {
         val state = _uiState.value
 
-        state.letterJump?.let { rail ->
+        if (state.letterCursor != null) {
             when (action) {
-                GamepadAction.NAVIGATE_LEFT  -> moveLetterJump(-1)
-                GamepadAction.NAVIGATE_RIGHT -> moveLetterJump(+1)
-                GamepadAction.BACK -> _uiState.update {
-                    it.copy(
-                        letterJump = null,
-                        selectedIndex = it.sectionRowCount + rail.returnIndex,
-                    )
+                GamepadAction.NAVIGATE_UP   -> moveLetterJump(-1)
+                GamepadAction.NAVIGATE_DOWN -> moveLetterJump(+1)
+                GamepadAction.BACK -> {
+                    _uiState.update { it.copy(letterCursor = null, letterFilter = filterAtGestureStart) }
+                    applyFilter()
                 }
                 else -> Unit
             }
@@ -411,7 +458,7 @@ class AppDrawerViewModel @Inject constructor(
         val state = _uiState.value
         val query = state.searchQuery.trim().lowercase()
 
-        val filtered = state.allApps
+        val inTab = state.allApps
             .filter { app ->
                 state.activeFilter.matches(app)
             }
@@ -436,6 +483,18 @@ class AppDrawerViewModel @Inject constructor(
             .filter { app -> !state.activeFilter.matches(app) }
             .filter { app -> query.isEmpty() || app.label.lowercase().contains(query) }
 
-        _uiState.update { it.copy(sectionApps = filtered, otherApps = rest, filterCounts = counts, letterJump = null) }
+        val letters = letterMenuFor((inTab + rest).map { it.label })
+        val pick = state.letterFilter?.takeIf { it in letters }
+        val kept = { app: InstalledApp -> pick == null || initialOf(app.label) == pick }
+
+        _uiState.update {
+            it.copy(
+                sectionApps = inTab.filter(kept),
+                otherApps = rest.filter(kept),
+                filterCounts = counts,
+                letterMenu = letters,
+                letterFilter = pick,
+            )
+        }
     }
 }

@@ -27,7 +27,7 @@ import javax.inject.Singleton
 data class InstalledApp(
     val packageName: String,
     val label: String,
-    val icon: Drawable,
+    val icon: Drawable?,
     val isGame: Boolean,
     val isEmulator: Boolean,
     val lastUsedAt: Long = 0L,
@@ -35,6 +35,8 @@ data class InstalledApp(
     val systemCategory: Int = ApplicationInfo.CATEGORY_UNDEFINED,
 
     val isSystemApp: Boolean = false,
+
+    val gameId: Long? = null,
 )
 
 @Singleton

@@ -110,10 +110,6 @@ private const val GlyphRatio = 0.45f
 
 private const val ACTIVE_SCALE = 1.3f
 private const val INACTIVE_ALPHA = 0.55f
-private const val RESTING_FRACTION = 0.5f
-private const val RESTING_TAB_ALPHA = 0.55f
-private const val LIVE_TAB_ALPHA = 0.90f
-private val TAB_CORNER = 10.dp
 
 internal val RailEdgeZone = RailIcon + RailEdgeGap * 2
 
@@ -142,19 +138,27 @@ fun rungAt(along: Float, extent: Float, spanPx: Float, pitchPx: Float, rungCount
     return ((along - lead) / pitchPx).toInt().coerceIn(0, rungCount - 1)
 }
 
+fun letterMenuFor(titles: List<String>): List<Char> {
+    if (titles.size < LETTER_JUMP_MIN_ITEMS) return emptyList()
+    val letters = titles.map(::initialOf).distinct().sorted()
+    return if (letters.size < LETTER_JUMP_MIN_LETTERS) emptyList() else letters
+}
+
 @Composable
 fun XmbLetterRail(
-    titles: List<String>,
+    letters: List<Char>,
     cursor: Int?,
     onTouch: (Int) -> Unit,
     onReleased: () -> Unit,
     modifier: Modifier = Modifier,
+    top: Dp = StatusStripHeight,
+    bottom: Dp = HintBarHeight,
 ) {
-    val anchors = remember(titles) { letterAnchors(titles) } ?: return
+    if (letters.isEmpty()) return
 
     BoxWithConstraints(modifier.fillMaxSize()) {
-        val metrics = railMetrics(maxHeight - StatusStripHeight - HintBarHeight, anchors.size)
-        val rungs = remember(anchors.size, metrics.rungs) { bucketIndices(anchors.size, metrics.rungs) }
+        val metrics = railMetrics(maxHeight - top - bottom, letters.size)
+        val rungs = remember(letters.size, metrics.rungs) { bucketIndices(letters.size, metrics.rungs) }
 
         if (cursor != null) {
             Box(
@@ -174,9 +178,9 @@ fun XmbLetterRail(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
-                        .padding(top = StatusStripHeight, bottom = HintBarHeight, end = RailEdgeGap),
+                        .padding(top = top, bottom = bottom, end = RailEdgeGap),
                 ) {
-                    Rungs(anchors, rungs, cursor, metrics)
+                    Rungs(letters, rungs, cursor, metrics)
                 }
             }
         }
@@ -186,85 +190,29 @@ fun XmbLetterRail(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(RailEdgeZone)
-                .padding(top = StatusStripHeight, bottom = HintBarHeight)
-                .railSlide(rungs, metrics, vertical = true, onTouch = onTouch, onReleased = onReleased),
+                .padding(top = top, bottom = bottom)
+                .railSlide(rungs, metrics, onTouch = onTouch, onReleased = onReleased),
         )
     }
 }
 
 @Composable
-fun XmbLetterBar(
-    titles: List<String>,
-    cursor: Int?,
-    onTouch: (Int) -> Unit,
-    onReleased: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val anchors = remember(titles) { letterAnchors(titles) } ?: return
-
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        val metrics = railMetrics(maxWidth - RailEdgeGap * 2, anchors.size)
-        val rungs = remember(anchors.size, metrics.rungs) { bucketIndices(anchors.size, metrics.rungs) }
-        val live = railLive(cursor)
-
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(metrics.badge + BadgeSideGap * 2)
-                .railGestures(rungs, metrics, vertical = false, onTouch = onTouch, onReleased = onReleased),
-        ) {
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(metrics.gap, Alignment.CenterHorizontally),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = TAB_CORNER, topEnd = TAB_CORNER))
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.45f to XmbScrim.copy(alpha = tabAlpha(live)),
-                            1f to XmbScrim.copy(alpha = tabAlpha(live)),
-                        ),
-                    )
-                    .padding(horizontal = RailEdgeGap, vertical = BadgeSideGap),
-            ) {
-                Rungs(anchors, rungs, cursor, metrics, live)
-            }
-        }
-    }
-}
-
-@Composable
-private fun railLive(cursor: Int?): Float {
-    val live by animateFloatAsState(
-        targetValue = if (cursor != null) 1f else 0f,
-        animationSpec = tween(140),
-        label = "letterRailLive",
-    )
-    return live
-}
-
-private fun tabAlpha(live: Float) = RESTING_TAB_ALPHA + (LIVE_TAB_ALPHA - RESTING_TAB_ALPHA) * live
-
-@Composable
 private fun Rungs(
-    anchors: List<LetterAnchor>,
+    letters: List<Char>,
     rungs: List<Int>,
     cursor: Int?,
     metrics: RailMetrics,
-    live: Float = 1f,
 ) {
     val activeRung = cursor?.let { c -> rungs.indexOfLast { it <= c }.coerceAtLeast(0) }
-    rungs.forEachIndexed { rung, anchor ->
+    rungs.forEachIndexed { rung, letter ->
         val active = rung == activeRung
         RailLetterBadge(
-            letter = anchors[anchor].letter,
+            letter = letters[letter],
             active = active,
             metrics = metrics,
             modifier = Modifier
                 .zIndex(if (active) 1f else 0f)
-                .alpha(if (active) 1f else INACTIVE_ALPHA * (RESTING_FRACTION + (1f - RESTING_FRACTION) * live)),
+                .alpha(if (active) 1f else INACTIVE_ALPHA),
         )
     }
 }
@@ -300,35 +248,12 @@ private fun RailLetterBadge(
 
 private val RailCornerRatio = RailCorner.value / RailIcon.value
 
-private fun Modifier.railGestures(
-    rungs: List<Int>,
-    metrics: RailMetrics,
-    vertical: Boolean,
-    onTouch: (Int) -> Unit,
-    onReleased: () -> Unit,
-): Modifier = pointerInput(rungs, metrics, vertical) {
-    val geometry = geometryOf(metrics)
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        report(down.position, geometry, rungs, vertical, onTouch)
-        down.consume()
-        while (true) {
-            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-            if (!change.pressed) break
-            report(change.position, geometry, rungs, vertical, onTouch)
-            change.consume()
-        }
-        onReleased()
-    }
-}
-
 private fun Modifier.railSlide(
     rungs: List<Int>,
     metrics: RailMetrics,
-    vertical: Boolean,
     onTouch: (Int) -> Unit,
     onReleased: () -> Unit,
-): Modifier = pointerInput(rungs, metrics, vertical) {
+): Modifier = pointerInput(rungs, metrics) {
     val geometry = geometryOf(metrics)
     val slop = viewConfiguration.touchSlop
     awaitEachGesture {
@@ -338,14 +263,12 @@ private fun Modifier.railSlide(
             val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
             if (!change.pressed) break
             if (!sliding) {
-                val dx = change.position.x - down.position.x
                 val dy = change.position.y - down.position.y
-                val along = if (vertical) dy else dx
-                val across = if (vertical) dx else dy
-                sliding = abs(along) > slop && abs(along) > abs(across)
+                val dx = change.position.x - down.position.x
+                sliding = abs(dy) > slop && abs(dy) > abs(dx)
             }
             if (sliding) {
-                report(change.position, geometry, rungs, vertical, onTouch)
+                report(change.position, geometry, rungs, onTouch)
                 change.consume()
             }
         }
@@ -364,10 +287,7 @@ private fun PointerInputScope.report(
     at: Offset,
     geometry: RailGeometry,
     rungs: List<Int>,
-    vertical: Boolean,
     onTouch: (Int) -> Unit,
 ) {
-    val extent = (if (vertical) size.height else size.width).toFloat()
-    val along = if (vertical) at.y else at.x
-    onTouch(rungs[rungAt(along, extent, geometry.spanPx, geometry.pitchPx, rungs.size)])
+    onTouch(rungs[rungAt(at.y, size.height.toFloat(), geometry.spanPx, geometry.pitchPx, rungs.size)])
 }

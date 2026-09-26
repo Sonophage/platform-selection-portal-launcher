@@ -85,7 +85,7 @@ class AppCategoryRepository @Inject constructor(
             CategorizedApp(
                 packageName = app.packageName,
                 label       = ov?.customLabel?.takeIf { it.isNotBlank() } ?: app.label,
-                icon        = app.icon,
+                icon        = app.icon ?: return@mapNotNull null,
                 pinned      = pinned,
                 isEmulator  = app.isEmulator,
             )

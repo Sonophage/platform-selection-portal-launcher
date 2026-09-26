@@ -47,6 +47,7 @@ import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.lightBackgroundAnchors
 import com.psplauncher.core.ui.components.PspContextMenuOverlay
 import com.psplauncher.core.ui.components.StatusStripHeight
+import com.psplauncher.core.ui.components.HintBarHeight
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 import com.psplauncher.core.ui.theme.PFPColors
@@ -59,7 +60,8 @@ import com.psplauncher.feature.appbar.appdrawer.AppDrawerHeader
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHintBar
 import com.psplauncher.feature.appbar.appdrawer.UninstallConfirmDialog
 import com.psplauncher.core.ui.components.rowsShown
-import com.psplauncher.core.ui.components.XmbLetterBar
+import com.psplauncher.core.ui.components.XmbLetterRail
+import com.psplauncher.feature.appbar.appdrawer.HEADER_HEIGHT
 
 @OptIn(ExperimentalComposeUiApi::class)
 
@@ -89,6 +91,8 @@ fun AppDrawerScreen(
 
     onAddToCrossBar: (String) -> Unit = {},
 
+    onLaunchRom: (Long) -> Unit = {},
+
     onPromptTapped: ((GamepadAction) -> Unit)? = null,
     viewModel: AppDrawerViewModel = hiltViewModel(),
 ) {
@@ -100,7 +104,7 @@ fun AppDrawerScreen(
     LaunchedEffect(pendingGamepadAction) {
         if (pendingGamepadAction != null) {
             val overlayOpen = state.menuApp != null || state.confirmUninstall != null ||
-                searchActive || state.letterJump != null
+                searchActive || state.letterCursor != null
             when {
                 searchActive && pendingGamepadAction == GamepadAction.BACK -> {
                     searchActive = false
@@ -115,7 +119,8 @@ fun AppDrawerScreen(
                 }
                 overlayOpen -> viewModel.handleGamepadAction(pendingGamepadAction)
 
-                pendingGamepadAction == GamepadAction.BACK -> onBack()
+                pendingGamepadAction == GamepadAction.BACK ->
+                    if (state.letterFilter != null) viewModel.clearLetterFilter() else onBack()
                 pendingGamepadAction == GamepadAction.CHANGE_SORT -> {
                     searchActive = !searchActive
                     if (!searchActive) viewModel.setSearchQuery("")
@@ -124,6 +129,12 @@ fun AppDrawerScreen(
             }
             onGamepadActionConsumed()
         }
+    }
+
+    LaunchedEffect(state.pendingRomLaunch) {
+        val id = state.pendingRomLaunch ?: return@LaunchedEffect
+        onLaunchRom(id)
+        viewModel.onRomLaunchHandled()
     }
 
     LaunchedEffect(letterRailHeld) {
@@ -275,23 +286,6 @@ internal fun AppDrawerContent(
             ),
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(top = StatusStripHeight)) {
-            AppDrawerHeader(
-                searchQuery = state.searchQuery,
-                searchActive = searchActive,
-                searchFocus = searchFocus,
-                onSearchToggle = onSearchToggle,
-                onSearchChange = onSearchQueryChange,
-                onSearchDone = onSearchDone,
-                colors = sf,
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(sf.chromeDivider),
-            )
-
             AppDrawerCategoryTabs(
                 activeFilter = state.activeFilter,
                 filterCounts = state.filterCounts,
@@ -308,7 +302,7 @@ internal fun AppDrawerContent(
                         )
                     }
 
-                    state.sectionRowCount == 0 -> {
+                    state.visibleApps.isEmpty() -> {
                         EmptyDrawerMessage(
                             filter = state.activeFilter,
                             hasQuery = state.searchQuery.isNotBlank(),
@@ -336,14 +330,15 @@ internal fun AppDrawerContent(
                 }
             }
 
-            if (state.sectionRowCount > 0) {
-                XmbLetterBar(
-                    titles = remember(state.otherApps) { state.otherApps.map { it.label } },
-                    cursor = state.letterJump?.cursor,
-                    onTouch = onLetterRailTouch,
-                    onReleased = onLetterRailReleased,
-                )
-            }
+            AppDrawerHeader(
+                searchQuery = state.searchQuery,
+                searchActive = searchActive,
+                searchFocus = searchFocus,
+                onSearchToggle = onSearchToggle,
+                onSearchChange = onSearchQueryChange,
+                onSearchDone = onSearchDone,
+                colors = sf,
+            )
 
             val hintAlpha by animateFloatAsState(
                 targetValue = if (showControllerHint && state.confirmUninstall == null) 1f else 0f,
@@ -357,6 +352,14 @@ internal fun AppDrawerContent(
                 onAction = onPromptTapped?.takeIf { hintAlpha > 0f },
             )
         }
+
+        XmbLetterRail(
+            letters = state.letterMenu,
+            cursor = state.letterCursor,
+            onTouch = onLetterRailTouch,
+            onReleased = onLetterRailReleased,
+            bottom = HEADER_HEIGHT + HintBarHeight,
+        )
 
         state.appMenu?.let { menu ->
             PspContextMenuOverlay(

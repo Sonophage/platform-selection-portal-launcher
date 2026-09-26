@@ -24,6 +24,7 @@ import org.junit.Test
 class AppDrawerViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var repository: InstalledAppRepository
+    private lateinit var games: com.psplauncher.core.domain.repository.GameRepository
     private lateinit var viewModel: AppDrawerViewModel
 
     @Before
@@ -32,10 +33,12 @@ class AppDrawerViewModelTest {
         repository = mockk(relaxed = true)
         coEvery { repository.getInstalledApps() } returns fakeApps()
         every { repository.hasUsageAccess() } returns true
+        games = mockk(relaxed = true)
+        every { games.observeAllGames() } returns kotlinx.coroutines.flow.flowOf(emptyList())
         viewModel = AppDrawerViewModel(
             repository,
             mockk(relaxed = true),
-            mockk(relaxed = true),
+            games,
             mockk(relaxed = true),
 
             mockk(relaxed = true),
@@ -221,7 +224,7 @@ class AppDrawerViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals("PPSSPP", state.menuApp?.label)
+            assertEquals("Dolphin", state.menuApp?.label)
             cancelAndIgnoreRemainingEvents()
         }
 
@@ -243,7 +246,7 @@ class AppDrawerViewModelTest {
         viewModel = AppDrawerViewModel(
             repository,
             mockk(relaxed = true),
-            mockk(relaxed = true),
+            games,
             mockk(relaxed = true),
 
             mockk(relaxed = true),
@@ -298,7 +301,7 @@ class AppDrawerViewModelTest {
         openUninstallPrompt()
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals("PPSSPP", state.confirmUninstall?.label)
+            assertEquals("Dolphin", state.confirmUninstall?.label)
             cancelAndIgnoreRemainingEvents()
         }
 
@@ -333,7 +336,7 @@ class AppDrawerViewModelTest {
         openUninstallPrompt()
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals("PPSSPP", state.confirmUninstall?.label)
+            assertEquals("Dolphin", state.confirmUninstall?.label)
             assertFalse("prompt opened on the destructive button", state.uninstallConfirmFocused)
             cancelAndIgnoreRemainingEvents()
         }
@@ -362,7 +365,7 @@ class AppDrawerViewModelTest {
         viewModel.handleGamepadAction(GamepadAction.NAVIGATE_DOWN)
         viewModel.handleGamepadAction(GamepadAction.SELECT)
         testDispatcher.scheduler.advanceUntilIdle()
-        verify(exactly = 1) { repository.uninstallApp("org.ppsspp.ppsspp") }
+        verify(exactly = 1) { repository.uninstallApp("org.dolphinemu.dolphinemu") }
     }
 
     @Test
@@ -402,14 +405,135 @@ class AppDrawerViewModelTest {
 
     private val fakeDrawable: Drawable = mockk(relaxed = true)
 
-    private fun fakeApps() = listOf(
-        InstalledApp(packageName = "org.ppsspp.ppsspp",           label = "PPSSPP",    icon = fakeDrawable, isEmulator = true,  isGame = false),
-        InstalledApp(packageName = "com.retroarch",                label = "RetroArch", icon = fakeDrawable, isEmulator = true,  isGame = false),
+    private fun alphabetApps(): List<InstalledApp> =
+        ('A'..'J').flatMap { letter ->
+            (0 until 26).map {
+                InstalledApp(
+                    packageName = "pkg.${letter.lowercaseChar()}$it",
+                    label = "$letter app $it",
+                    icon = fakeDrawable,
+                    isEmulator = false,
+                    isGame = false,
+                )
+            }
+        }
 
+    private fun drawerOver(apps: List<InstalledApp>): AppDrawerViewModel {
+        coEvery { repository.getInstalledApps() } returns apps
+        return AppDrawerViewModel(repository, mockk(relaxed = true), games, mockk(relaxed = true), mockk(relaxed = true))
+    }
+
+    private fun pick(vm: AppDrawerViewModel, letter: Char) {
+        val rung = vm.uiState.value.letterMenu.indexOf(letter)
+        assertTrue("the strip must actually offer '$letter'", rung >= 0)
+        vm.onLetterRailTouch(rung)
+        vm.onLetterRailReleased()
+    }
+
+    @Test
+    fun `picking a letter leaves only the apps that start with it`() = runTest {
+        val vm = drawerOver(alphabetApps())
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.setFilter(AppFilter.APPS)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val before = vm.uiState.value.visibleApps
+        assertTrue(
+            "the fixture must hold apps under other letters, or filtering proves nothing",
+            before.any { !it.label.startsWith("C") },
+        )
+
+        pick(vm, 'C')
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val after = vm.uiState.value.visibleApps
+        assertTrue("something must survive the filter", after.isNotEmpty())
+        assertTrue(
+            "an app under another letter stayed in the drawer: ${after.map { it.label }}",
+            after.all { it.label.startsWith("C") },
+        )
+    }
+
+    @Test
+    fun `the strip keeps offering every letter while one of them is filtering`() = runTest {
+        val vm = drawerOver(alphabetApps())
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.setFilter(AppFilter.APPS)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val whole = vm.uiState.value.letterMenu
+
+        pick(vm, 'C')
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            "the strip reads off the filtered list, so picking C collapsed it to one rung",
+            whole,
+            vm.uiState.value.letterMenu,
+        )
+    }
+
+    @Test
+    fun `picking the letter that is already filtering clears it`() = runTest {
+        val vm = drawerOver(alphabetApps())
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.setFilter(AppFilter.APPS)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val whole = vm.uiState.value.visibleApps.size
+
+        pick(vm, 'C')
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue("first pick must narrow the drawer", vm.uiState.value.visibleApps.size < whole)
+
+        pick(vm, 'C')
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("picking C again is how you put the whole drawer back", null, vm.uiState.value.letterFilter)
+        assertEquals(whole, vm.uiState.value.visibleApps.size)
+    }
+
+    @Test
+    fun `a letter with nothing in the tab still shows what the rest of the drawer has`() = runTest {
+        val recents = alphabetApps().map { if (it.label.startsWith("A")) it.copy(lastUsedAt = 5L) else it }
+        val vm = drawerOver(recents)
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.setFilter(AppFilter.RECENT)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        pick(vm, 'C')
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertTrue("only A apps were ever used, so the tab itself must come up empty", state.sectionApps.isEmpty())
+        assertTrue(
+            "the drawer still holds C apps outside the tab, so it is not an empty drawer",
+            state.otherApps.isNotEmpty() && state.visibleApps.isNotEmpty(),
+        )
+    }
+
+    @Test
+    fun `back puts the whole drawer back instead of leaving it`() = runTest {
+        val vm = drawerOver(alphabetApps())
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.setFilter(AppFilter.APPS)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val whole = vm.uiState.value.visibleApps.size
+
+        pick(vm, 'C')
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.clearLetterFilter()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(null, vm.uiState.value.letterFilter)
+        assertEquals("back restores every app, not just the ones under C", whole, vm.uiState.value.visibleApps.size)
+    }
+
+    private fun fakeApps() = listOf(
+        InstalledApp(packageName = "com.example.browser",          label = "Browser",   icon = fakeDrawable, isEmulator = false, isGame = false, lastUsedAt = 1_000L),
         InstalledApp(packageName = "org.dolphinemu.dolphinemu",    label = "Dolphin",   icon = fakeDrawable, isEmulator = true,  isGame = true),
         InstalledApp(packageName = "com.mojang.minecraftpe",       label = "Minecraft", icon = fakeDrawable, isEmulator = false, isGame = true, lastUsedAt = 2_000L),
         InstalledApp(packageName = "com.psplauncher.launcher", label = "PFP",       icon = fakeDrawable, isEmulator = false, isGame = false),
-        InstalledApp(packageName = "com.example.browser",          label = "Browser",   icon = fakeDrawable, isEmulator = false, isGame = false, lastUsedAt = 1_000L),
+        InstalledApp(packageName = "org.ppsspp.ppsspp",           label = "PPSSPP",    icon = fakeDrawable, isEmulator = true,  isGame = false),
+        InstalledApp(packageName = "com.retroarch",                label = "RetroArch", icon = fakeDrawable, isEmulator = true,  isGame = false),
     )
 
     @Test

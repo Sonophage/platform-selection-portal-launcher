@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.psplauncher.core.ui.components.PfpSearchField
 import com.psplauncher.core.ui.theme.StorefrontColors
 
-private val HEADER_HEIGHT = 56.dp
+internal val HEADER_HEIGHT = 56.dp
 
 @Composable
 internal fun AppDrawerHeader(

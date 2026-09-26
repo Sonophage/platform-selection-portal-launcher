@@ -51,7 +51,8 @@ class AppVisibilityViewModel @Inject constructor(
         viewModelScope.launch {
             appCategoryRepository.ensureLoaded()
             installedInfo.value = appCategoryRepository.allInstalledApps()
-                .associate { it.packageName to (it.label to it.icon) }
+                .mapNotNull { app -> app.icon?.let { app.packageName to (app.label to it) } }
+                .toMap()
             loading.value = false
         }
     }

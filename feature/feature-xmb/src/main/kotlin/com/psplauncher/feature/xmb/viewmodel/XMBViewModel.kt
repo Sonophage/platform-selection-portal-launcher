@@ -6956,6 +6956,11 @@ class XMBViewModel @Inject constructor(
 
     private val MANUAL_MAX_SCROLL_STEPS_ = 20
 
+    fun launchGameFromDrawer(gameId: Long) {
+        _uiState.update { it.copy(activeAppDrawerFilter = null, pendingDrawerAction = null) }
+        launchGameDirectly(gameId)
+    }
+
     private fun launchGameDirectly(gameId: Long, discId: Long? = null) {
         viewModelScope.launch {
             val selected = gameRepository.getById(gameId) ?: run {

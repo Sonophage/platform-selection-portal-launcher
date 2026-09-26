@@ -87,6 +87,7 @@ import com.psplauncher.core.ui.components.HintBarHeight
 import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.components.DiscLaunchCeremony
 import com.psplauncher.core.ui.components.XmbLetterRail
+import com.psplauncher.core.ui.components.letterAnchors
 import com.psplauncher.core.ui.components.ControllerHintEdgeGap
 import com.psplauncher.core.ui.preview.DevicePreviews
 import com.psplauncher.core.ui.preview.PfpPreview
@@ -208,6 +209,7 @@ fun XMBShellContainer(
         focusedPillIndex = uiState.focusedPillIndex,
         onCloseAppDrawer = viewModel::onCloseAppDrawer,
         onAddAppToOpenCategory = viewModel::addAppToOpenCategory,
+        onLaunchRomFromDrawer = viewModel::launchGameFromDrawer,
         onLetterRailTouch = viewModel::onLetterRailTouch,
         onLetterRailReleased = viewModel::onLetterRailReleased,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
@@ -366,6 +368,7 @@ fun XMBShell(
     onCloseAppDrawer: () -> Unit = {},
 
     onAddAppToOpenCategory: (String) -> Unit = {},
+    onLaunchRomFromDrawer: (Long) -> Unit = {},
 
     onLetterRailTouch: (Int) -> Unit = {},
     onLetterRailReleased: () -> Unit = {},
@@ -1070,7 +1073,9 @@ fun XMBShell(
 
             if (uiState.stripShowsXmbContext && chromeFade > 0f) {
                 XmbLetterRail(
-                    titles = remember(uiState.currentItems) { uiState.currentItems.map { it.title } },
+                    letters = remember(uiState.currentItems) {
+                        letterAnchors(uiState.currentItems.map { it.title })?.map { it.letter }.orEmpty()
+                    },
                     cursor = uiState.letterJump?.cursor,
                     onTouch = onLetterRailTouch,
                     onReleased = onLetterRailReleased,
@@ -1154,6 +1159,7 @@ fun XMBShell(
 
                     onTouchInteraction = onTouchInput,
                     onAddToCrossBar = onAddAppToOpenCategory,
+                    onLaunchRom = onLaunchRomFromDrawer,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
