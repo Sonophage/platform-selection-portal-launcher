@@ -30,6 +30,12 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
+import com.psplauncher.core.ui.components.moved
+import com.psplauncher.core.ui.components.chose
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.MenuSelect
+import com.psplauncher.core.ui.components.MenuRow
+import com.psplauncher.core.ui.components.MenuGroup
 
 private val KEY_CUSTOM_WALLPAPER = stringPreferencesKey("display_custom_wallpaper")
 
@@ -45,16 +51,16 @@ private const val PAN_STEP_PX = 160f
 
 private const val WALLPAPER_MAX_DIM = 2560
 
-enum class PhotoViewerAction(val label: String) {
-    SET_WALLPAPER("Set as Launcher Wallpaper"),
+enum class PhotoViewerAction(val label: String, val group: MenuGroup = MenuGroup.MAIN) {
     ROTATE_LEFT("Rotate Left"),
     ROTATE_RIGHT("Rotate Right"),
     ZOOM_IN("Zoom In"),
     ZOOM_OUT("Zoom Out"),
     RESET_ZOOM("Reset Zoom"),
     INFO("View Information"),
-    LOCATION("Open File Location"),
-    REMOVE("Remove From Library"),
+    SET_WALLPAPER("Set as Launcher Wallpaper", MenuGroup.SETTINGS),
+    LOCATION("Open File Location", MenuGroup.SETTINGS),
+    REMOVE("Remove From Library", MenuGroup.REMOVE),
 }
 
 data class PhotoViewerUiState(
@@ -80,6 +86,15 @@ data class PhotoViewerUiState(
 ) {
     val photo: Photo? get() = photos.getOrNull(index)
     val zoomed: Boolean get() = zoom > ZOOM_MIN
+
+    val optionsMenu: MenuState<PhotoViewerAction>
+        get() = MenuState(
+            title = "Options",
+            rows = PhotoViewerAction.entries.map {
+                MenuRow(it, it.label, it.group, isDestructive = it == PhotoViewerAction.REMOVE, confirms = false)
+            },
+            selectedIndex = optionsIndex,
+        )
 }
 
 @HiltViewModel
@@ -130,9 +145,9 @@ class PhotoViewerViewModel @Inject constructor(
             s.showOptions -> {
                 val count = PhotoViewerAction.entries.size
                 when (action) {
-                    GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(optionsIndex = (it.optionsIndex - 1 + count) % count) }
-                    GamepadAction.NAVIGATE_DOWN -> _uiState.update { it.copy(optionsIndex = (it.optionsIndex + 1) % count) }
-                    GamepadAction.SELECT        -> activate(PhotoViewerAction.entries[s.optionsIndex.coerceIn(0, count - 1)])
+                    GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(optionsIndex = it.optionsMenu.moved(-1).selectedIndex ?: 0) }
+                    GamepadAction.NAVIGATE_DOWN -> _uiState.update { it.copy(optionsIndex = it.optionsMenu.moved(+1).selectedIndex ?: 0) }
+                    GamepadAction.SELECT        -> onOptionRowActivated(s.optionsIndex)
                     GamepadAction.BACK,
                     GamepadAction.OPEN_CONTEXT_MENU      -> _uiState.update { it.copy(showOptions = false) }
                     else -> Unit
@@ -154,6 +169,11 @@ class PhotoViewerViewModel @Inject constructor(
     }
 
     fun toggleControls() = _uiState.update { it.copy(controlsVisible = !it.controlsVisible) }
+    fun onOptionRowActivated(index: Int) {
+        val chosen = _uiState.value.optionsMenu.chose(index)
+        if (chosen is MenuSelect.Run) activate(chosen.action)
+    }
+
     fun openOptions() = _uiState.update { it.copy(showOptions = true, optionsIndex = 0) }
     fun closeOptions() = _uiState.update { it.copy(showOptions = false) }
     fun onClosedHandled() = _uiState.update { it.copy(closed = false) }

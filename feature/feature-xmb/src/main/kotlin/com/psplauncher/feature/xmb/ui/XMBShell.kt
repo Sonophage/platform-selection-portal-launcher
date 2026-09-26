@@ -82,6 +82,7 @@ import com.psplauncher.core.ui.motion.rememberAppVisible
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.psplauncher.core.ui.components.LocalControllerConnected
+import com.psplauncher.core.ui.components.PspContextMenuOverlay
 import com.psplauncher.core.ui.components.HintBarHeight
 import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.components.DiscLaunchCeremony
@@ -90,19 +91,23 @@ import com.psplauncher.core.ui.preview.DevicePreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 import com.psplauncher.core.ui.theme.DefaultPFPColors
 import com.psplauncher.core.ui.theme.withWaveTint
+import com.psplauncher.core.ui.theme.menuCursorFill
+import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.core.ui.theme.PFPTheme
 import com.psplauncher.feature.appbar.AppDrawerScreen
 import com.psplauncher.feature.appbar.AppFilter
 import com.psplauncher.feature.settings.ui.SettingsNavHost
 import com.psplauncher.feature.xmb.preview.PreviewData
 import com.psplauncher.feature.xmb.ui.app.AppDetailScreen
-import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
+import com.psplauncher.feature.xmb.ui.detail.ArtworkStudioScreen
+import com.psplauncher.feature.xmb.ui.detail.ManualViewerOverlay
+import com.psplauncher.feature.xmb.ui.detail.MetadataPreviewPanel
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
 import com.psplauncher.feature.xmb.viewmodel.focusedPillIndex
 import com.psplauncher.feature.xmb.viewmodel.pillRowVisible
 import com.psplauncher.feature.xmb.viewmodel.promptsFor
-import com.psplauncher.feature.xmb.viewmodel.railRows
+import com.psplauncher.feature.xmb.viewmodel.menuWithPills
 import com.psplauncher.feature.xmb.viewmodel.RecentFilter
 import com.psplauncher.feature.xmb.viewmodel.fanCoversToDraw
 import com.psplauncher.feature.xmb.viewmodel.formatDuration
@@ -205,10 +210,19 @@ fun XMBShellContainer(
         onLetterRailTouch = viewModel::onLetterRailTouch,
         onLetterRailReleased = viewModel::onLetterRailReleased,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
-        onCloseGameDetail = viewModel::onCloseGameDetail,
+        onCloseArtworkStudio = viewModel::closeArtworkStudio,
+        onArtworkStudioActionConsumed = viewModel::consumeArtworkStudioAction,
+        onManualPageCount = viewModel::setManualPageCount,
+        onManualPrevPage = viewModel::manualPrevPage,
+        onManualNextPage = viewModel::manualNextPage,
+        onCloseManual = viewModel::closeManualViewer,
+        onMetadataPolicy = viewModel::selectMetadataPolicy,
+        onMetadataSource = viewModel::cycleMetadataSource,
+        onMetadataField = viewModel::toggleMetadataField,
+        onMetadataApply = viewModel::applyMetadataPreview,
+        onCloseMetadata = viewModel::closeMetadataPreview,
         onOpenLibraryManager = viewModel::openLibraryManager,
         onGoToLibrary = viewModel::goToLibrary,
-        onGameDetailActionConsumed = viewModel::consumeGameDetailAction,
         onCloseVideoDetail = viewModel::onCloseVideoDetail,
         onVideoDetailActionConsumed = viewModel::consumeVideoDetailAction,
         onClosePhotoViewer = viewModel::onClosePhotoViewer,
@@ -355,10 +369,19 @@ fun XMBShell(
     onLetterRailTouch: (Float) -> Unit = {},
     onLetterRailReleased: () -> Unit = {},
     onDrawerActionConsumed: () -> Unit = {},
-    onCloseGameDetail: () -> Unit = {},
+    onCloseArtworkStudio: () -> Unit = {},
+    onArtworkStudioActionConsumed: () -> Unit = {},
+    onManualPageCount: (Int) -> Unit = {},
+    onManualPrevPage: () -> Unit = {},
+    onManualNextPage: () -> Unit = {},
+    onCloseManual: () -> Unit = {},
+    onMetadataPolicy: (com.psplauncher.feature.artwork.match.MetadataApplyPolicy) -> Unit = {},
+    onMetadataSource: (Int) -> Unit = {},
+    onMetadataField: (com.psplauncher.feature.artwork.match.MetadataField) -> Unit = {},
+    onMetadataApply: () -> Unit = {},
+    onCloseMetadata: () -> Unit = {},
     onOpenLibraryManager: () -> Unit = {},
     onGoToLibrary: () -> Unit = {},
-    onGameDetailActionConsumed: () -> Unit = {},
     onCloseVideoDetail: () -> Unit = {},
     onVideoDetailActionConsumed: () -> Unit = {},
     onClosePhotoViewer: () -> Unit = {},
@@ -504,7 +527,7 @@ fun XMBShell(
             ) {
         Box(modifier = Modifier.fillMaxSize()) {
             val waveCovered = uiState.showBootSequence ||
-                uiState.activeVideoId != null || uiState.activeGameId != null ||
+                uiState.activeVideoId != null ||
                 uiState.activePhotoViewer != null ||
                 uiState.activeAppId != null || uiState.activeAppDrawerFilter != null ||
                 uiState.musicPlayerVisible ||
@@ -639,6 +662,12 @@ fun XMBShell(
                 glowScale = waveGlow,
             )
 
+            val chromeFade by animateFloatAsState(
+                if (uiState.activeContextMenu != null) 0f else 1f,
+                tween(ChromeFadeMs),
+                label = "chromeFade",
+            )
+
             val aboveContextRail = when {
                 uiState.activeContextMenu != null || uiState.notificationsOpen -> 1f
                 !uiState.statusStripVisible -> 0f
@@ -666,7 +695,6 @@ fun XMBShell(
                 uiState.musicBrowser == null &&
                 uiState.search == null &&
                 uiState.activeSettingsScreen == null &&
-                uiState.activeGameId == null &&
                 uiState.activeVideoId == null &&
                 uiState.activeAppId == null &&
                 uiState.activePhotoViewer == null &&
@@ -681,7 +709,6 @@ fun XMBShell(
                     content = uiState.hoverPanelContent,
                     page = uiState.effectivePanelPage,
                     listState = recentsListState,
-                    directLaunch = uiState.directLaunch,
                     filter = uiState.recentFilter,
                     railVisible = uiState.recentRailVisible,
                     onPageTapped = onPanelPageTapped,
@@ -866,6 +893,7 @@ fun XMBShell(
                             XMBItemList(
                                 onPillActivated = onPillActivated,
                                 focusedPillIndex = focusedPillIndex,
+                                pillFade = chromeFade,
                                 items = uiState.currentItems,
                                 selectedIndex = itemSelectedIndex,
                                 onItemSelected = onItemTap,
@@ -970,7 +998,12 @@ fun XMBShell(
                 )
             }
 
+            val busyActivity = uiState.artworkFetchTitle?.let {
+                StripLiveActivity(art = null, title = "Refreshing artwork", detail = it)
+            }
+
             val liveActivity = flash?.let { StripLiveActivity(art = null, title = it.title, detail = it.message) }
+                ?: busyActivity
                 ?: musicActivity
                 ?: (notifications.size + androidNotices.size)
                     .takeIf { it > 0 }
@@ -1034,7 +1067,7 @@ fun XMBShell(
 
             val rootActionsVisible = uiState.stripShowsXmbContext && !uiState.isInSubItem
 
-            if (uiState.stripShowsXmbContext) {
+            if (uiState.stripShowsXmbContext && chromeFade > 0f) {
                 XmbLetterRail(
                     items = uiState.currentItems,
                     letterJump = uiState.letterJump,
@@ -1043,7 +1076,8 @@ fun XMBShell(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
 
-                        .padding(top = StatusStripHeight, bottom = HintBarHeight, end = 4.dp)
+                        .padding(top = StatusStripHeight, bottom = HintBarHeight)
+                        .alpha(chromeFade)
                         .zIndex(XmbChromeZ),
                 )
             }
@@ -1165,10 +1199,9 @@ fun XMBShell(
 
             uiState.activeContextMenu?.let { menu ->
 
-                ContextMenuOverlay(
-                    rows = uiState.railRows(),
-                    selectedIndex = menu.selectedIndex,
-                    onItemActivated = onContextMenuItemActivated,
+                PspContextMenuOverlay(
+                    state = uiState.menuWithPills() ?: menu.state,
+                    onRowActivated = onContextMenuItemActivated,
                     onDismiss = onContextMenuDismiss,
                 )
             }
@@ -1255,6 +1288,9 @@ fun XMBShell(
                     onCancel = onCancelCollectionName,
                     placeholder = dialog.placeholder,
                     confirmLabel = dialog.confirmLabel,
+                    subtitle = dialog.subtitle,
+                    resetLabel = dialog.resetLabel,
+                    onReset = dialog.resetLabel?.let { { onNamePromptTextChanged("") } },
                 )
             }
 
@@ -1337,19 +1373,41 @@ fun XMBShell(
                 )
             }
 
-            uiState.activeGameId?.let { gameId ->
-                GameDetailScreen(
+            uiState.artworkStudioGameId?.let { gameId ->
+                ArtworkStudioScreen(
                     gameId = gameId,
-                    onBack = onCloseGameDetail,
-                    onNotifications = onNotificationsToggled,
-                    autoLaunch = uiState.activeGameAutoLaunch,
-                    initialAction = uiState.activeGameAction,
-                    initialDiscId = uiState.activeGameDiscId,
-                    pendingGamepadAction = uiState.pendingGameDetailAction,
-                    onGamepadActionConsumed = onGameDetailActionConsumed,
+                    onClose = onCloseArtworkStudio,
+                    pendingGamepadAction = uiState.pendingArtworkStudioAction,
+                    onGamepadActionConsumed = onArtworkStudioActionConsumed,
                     showTouchControls = uiState.resolvedShowTouchButton,
                     onTouchInput = onTouchInput,
                     modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            uiState.manualViewer?.let { manual ->
+                ManualViewerOverlay(
+                    source = manual.uri,
+                    title = manual.title,
+                    page = manual.page,
+                    scrollSteps = manual.scrollSteps,
+                    onPageCount = onManualPageCount,
+                    onPrevPage = onManualPrevPage,
+                    onNextPage = onManualNextPage,
+                    onClose = onCloseManual,
+                )
+            }
+
+            uiState.metadataPreview?.let { preview ->
+                MetadataPreviewPanel(
+                    ui = preview,
+                    focusFill = menuCursorFill(),
+                    focusEdge = menuCursorEdge(),
+                    onSelectPolicy = onMetadataPolicy,
+                    onCycleSource = onMetadataSource,
+                    onToggleField = onMetadataField,
+                    onApply = onMetadataApply,
+                    onClose = onCloseMetadata,
                 )
             }
 
@@ -1446,6 +1504,9 @@ private fun CollectionNameDialog(
     onCancel: () -> Unit,
     placeholder: String = "e.g. RPGs, Currently Playing",
     confirmLabel: String = "Save",
+    subtitle: String? = null,
+    resetLabel: String? = null,
+    onReset: (() -> Unit)? = null,
 ) {
     PfpTextPromptOverlay(
         title = title,
@@ -1454,6 +1515,9 @@ private fun CollectionNameDialog(
         onValueChange = onTextChange,
         onConfirm = { onConfirm(text) },
         onCancel = onCancel,
+        subtitle = subtitle,
+        resetLabel = resetLabel,
+        onReset = onReset,
         confirmLabel = confirmLabel,
     )
 }
@@ -1543,4 +1607,6 @@ private fun PreviewXMBRedTheme() {
 private const val NotificationBarZ = 0.5f
 
 private const val XmbChromeZ = 0.6f
+
+private const val ChromeFadeMs = 160
 

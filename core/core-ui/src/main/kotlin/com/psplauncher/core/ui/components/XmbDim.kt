@@ -1,6 +1,6 @@
-package com.psplauncher.feature.xmb.ui
+package com.psplauncher.core.ui.components
 
-internal object XmbDim {
+object XmbDim {
     private val Published = floatArrayOf(1f, 0.85f, 0.55f, 0.30f)
 
     const val PanelScale = 0.68f

@@ -8,6 +8,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuGroup
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.rowsShown
+import com.psplauncher.core.ui.components.foldedIntoGroups
 
 class ContextMenuHintStateTest {
     private val gameItem = XMBItem(id = "g1", title = "Game", gameId = 1L)
@@ -98,7 +102,7 @@ class ContextMenuHintStateTest {
     fun `recomputing lowers a flag whose gate no longer holds`() {
         val stale = eligibleState().copy(
             showContextMenuHint = true,
-            activeGameId = 1L,
+            activeAppId = 1L,
         )
         assertFalse(stale.withHintsShownNow().showContextMenuHint)
     }
@@ -118,21 +122,21 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `does not show when a blocking overlay is up`() {
-        val s = eligibleState().copy(activeGameId = 1L)
+        val s = eligibleState().copy(activeAppId = 1L)
         assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
     fun `shows over the context rail, which is the one overlay it survives`() {
-        val s = eligibleState().copy(activeContextMenu = XMBContextMenu("X", emptyList()))
+        val s = eligibleState().copy(activeContextMenu = XMBContextMenu(state = MenuState(title = "X", rows = emptyList())))
         assertTrue(shouldShowContextMenuHint(s, IDLE_MS))
     }
 
     @Test
     fun `a context menu on top of a REAL blocking overlay still hides it`() {
         val s = eligibleState().copy(
-            activeContextMenu = XMBContextMenu("X", emptyList()),
-            activeGameId = 1L,
+            activeContextMenu = XMBContextMenu(state = MenuState(title = "X", rows = emptyList())),
+            activeAppId = 1L,
         )
         assertFalse(shouldShowContextMenuHint(s, IDLE_MS))
     }
@@ -240,7 +244,7 @@ class ContextMenuHintStateTest {
 
     @Test
     fun `drawer hint does not show when a context menu is open`() {
-        val s = drawerEligibleState().copy(activeContextMenu = XMBContextMenu("X", emptyList()))
+        val s = drawerEligibleState().copy(activeContextMenu = XMBContextMenu(state = MenuState(title = "X", rows = emptyList())))
         assertFalse(shouldShowAppDrawerHint(s, IDLE_MS))
     }
 

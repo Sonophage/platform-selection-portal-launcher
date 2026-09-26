@@ -20,18 +20,24 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
+import com.psplauncher.core.ui.components.moved
+import com.psplauncher.core.ui.components.chose
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.MenuSelect
+import com.psplauncher.core.ui.components.MenuRow
+import com.psplauncher.core.ui.components.MenuGroup
 
-enum class VideoDetailAction(val label: String) {
+enum class VideoDetailAction(val label: String, val group: MenuGroup = MenuGroup.MAIN) {
     PLAY("Play"),
     RESUME("Resume"),
     RESTART("Start from Beginning"),
-    FAVORITE("Favorite"),
-    PLAYLIST("Add to Playlist"),
-    RENAME("Rename Title"),
-    THUMBNAIL("Change Thumbnail"),
     INFO("Information"),
-    LOCATION("Open File Location"),
-    REMOVE("Remove From Library"),
+    FAVORITE("Favorite", MenuGroup.LIBRARY),
+    PLAYLIST("Add to Playlist", MenuGroup.LIBRARY),
+    RENAME("Rename Title", MenuGroup.SETTINGS),
+    THUMBNAIL("Change Thumbnail", MenuGroup.SETTINGS),
+    LOCATION("Open File Location", MenuGroup.SETTINGS),
+    REMOVE("Remove From Library", MenuGroup.REMOVE),
 }
 
 data class VideoPlaylistOption(val id: Long, val name: String, val checked: Boolean)
@@ -70,6 +76,23 @@ data class VideoDetailUiState(
     val primaryActions: List<VideoDetailAction>
         get() = if (hasResume) listOf(VideoDetailAction.RESUME, VideoDetailAction.RESTART)
                 else listOf(VideoDetailAction.PLAY)
+
+    val optionsMenu: MenuState<VideoDetailAction>
+        get() = MenuState(
+            title = "Options",
+            rows = optionsActions.map {
+                MenuRow(
+                    action = it,
+                    label = if (it == VideoDetailAction.FAVORITE) {
+                        if (video?.isFavorite == true) "Remove from Favorites" else "Add to Favorites"
+                    } else it.label,
+                    group = it.group,
+                    isDestructive = it == VideoDetailAction.REMOVE,
+                    confirms = false,
+                )
+            },
+            selectedIndex = optionsIndex,
+        )
 
     val optionsActions: List<VideoDetailAction>
         get() = VideoDetailAction.entries.filter {
@@ -139,11 +162,10 @@ class VideoDetailViewModel @Inject constructor(
             }
             s.isEditingTitle -> if (action == GamepadAction.BACK) cancelTitleEdit()
             s.showOptions -> {
-                val count = s.optionsActions.size
                 when (action) {
-                    GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(optionsIndex = (it.optionsIndex - 1 + count) % count) }
-                    GamepadAction.NAVIGATE_DOWN -> _uiState.update { it.copy(optionsIndex = (it.optionsIndex + 1) % count) }
-                    GamepadAction.SELECT        -> activate(s.optionsActions[s.optionsIndex.coerceIn(0, count - 1)])
+                    GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(optionsIndex = it.optionsMenu.moved(-1).selectedIndex ?: 0) }
+                    GamepadAction.NAVIGATE_DOWN -> _uiState.update { it.copy(optionsIndex = it.optionsMenu.moved(+1).selectedIndex ?: 0) }
+                    GamepadAction.SELECT        -> onOptionRowActivated(s.optionsIndex)
                     GamepadAction.BACK          -> _uiState.update { it.copy(showOptions = false) }
                     else -> Unit
                 }
@@ -164,6 +186,11 @@ class VideoDetailViewModel @Inject constructor(
 
     fun openOptions() = _uiState.update { it.copy(showOptions = true, optionsIndex = 0) }
     fun closeOptions() = _uiState.update { it.copy(showOptions = false) }
+
+    fun onOptionRowActivated(index: Int) {
+        val chosen = _uiState.value.optionsMenu.chose(index)
+        if (chosen is MenuSelect.Run) activate(chosen.action)
+    }
 
     fun activate(action: VideoDetailAction) {
         _uiState.update { it.copy(showOptions = false) }

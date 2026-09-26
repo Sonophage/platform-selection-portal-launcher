@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuState
 
 class PlayStateMenuTest {
     private fun state() = XMBUiState(
@@ -24,7 +25,7 @@ class PlayStateMenuTest {
 
     @Test
     fun `the game menu offers a way to mark it`() {
-        val ids = gameContextMenuItems(game(), state(), 1, false, null).map { it.id }
+        val ids = gameContextMenuItems(game(), state(), 1, false, null).mapNotNull { it.action }
         assertTrue("no way into the Mark As submenu: $ids", "play_state" in ids)
     }
 

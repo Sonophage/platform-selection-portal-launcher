@@ -46,7 +46,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.psplauncher.core.domain.model.GamepadAction
 import com.psplauncher.core.domain.model.lightBackgroundAnchors
 import com.psplauncher.core.ui.components.PspContextMenuOverlay
-import com.psplauncher.core.ui.components.PspMenuRow
 import com.psplauncher.core.ui.components.StatusStripHeight
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
@@ -59,6 +58,7 @@ import com.psplauncher.feature.appbar.appdrawer.AppDrawerSection
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHeader
 import com.psplauncher.feature.appbar.appdrawer.AppDrawerHintBar
 import com.psplauncher.feature.appbar.appdrawer.UninstallConfirmDialog
+import com.psplauncher.core.ui.components.rowsShown
 
 @OptIn(ExperimentalComposeUiApi::class)
 
@@ -187,6 +187,13 @@ fun AppDrawerScreen(
             }
             viewModel.onTouchBrowse(index)
         },
+        onMenuRowActivated = { index ->
+            val picked = state.appMenu?.rowsShown()?.getOrNull(index)?.action
+            if (picked == AppMenuAction.ADD_TO_CROSS_BAR) {
+                state.menuApp?.let { onAddToCrossBar(it.packageName) }
+            }
+            viewModel.onMenuRowActivated(index)
+        },
         onMenuAction = { action ->
 
             if (action == AppMenuAction.ADD_TO_CROSS_BAR) {
@@ -223,6 +230,7 @@ internal fun AppDrawerContent(
     onCancelUninstall: () -> Unit,
     onGrantUsageAccess: () -> Unit,
     modifier: Modifier = Modifier,
+    onMenuRowActivated: (Int) -> Unit = {},
 
     onPromptTapped: ((GamepadAction) -> Unit)? = null,
 
@@ -328,15 +336,10 @@ internal fun AppDrawerContent(
             )
         }
 
-        state.menuApp?.let { app ->
-
+        state.appMenu?.let { menu ->
             PspContextMenuOverlay(
-                title = app.label,
-                rows = state.menuActions.map {
-                    PspMenuRow(it.label, isDestructive = it == AppMenuAction.UNINSTALL)
-                },
-                selectedIndex = state.menuIndex,
-                onRowActivated = { onMenuAction(state.menuActions[it]) },
+                state = menu,
+                onRowActivated = onMenuRowActivated,
                 onDismiss = onCloseMenu,
             )
         }

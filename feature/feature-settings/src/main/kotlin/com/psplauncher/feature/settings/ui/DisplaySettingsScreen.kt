@@ -520,14 +520,6 @@ fun DisplaySettingsScreen(
                     onToggle = { viewModel.setRespectBatterySaver(it) },
                 )
 
-                SettingsGroup("Games")
-
-                SettingsToggleRow(
-                    label    = "Launch Games Directly",
-                    sublabel = "Confirm starts the game immediately instead of opening Game Details — use \"View Game Details\" in a game's Options menu to edit",
-                    checked  = state.directLaunch,
-                    onToggle = { viewModel.setDirectLaunch(it) },
-                )
             }
         }
     }

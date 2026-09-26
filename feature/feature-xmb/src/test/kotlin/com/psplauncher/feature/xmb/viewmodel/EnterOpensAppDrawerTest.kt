@@ -6,6 +6,7 @@ import com.psplauncher.core.domain.model.CategoryType
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuState
 
 class EnterOpensAppDrawerTest {
     private val games = Category(
@@ -53,7 +54,7 @@ class EnterOpensAppDrawerTest {
     fun `under any overlay it stays confirm`() {
         assertFalse(
             onCrossbar().copy(
-                activeContextMenu = XMBContextMenu(title = "Options", items = emptyList()),
+                activeContextMenu = XMBContextMenu(state = MenuState(title = "Options", rows = emptyList())),
             ).enterOpensAppDrawer,
         )
         assertFalse(onCrossbar().copy(notificationsOpen = true).enterOpensAppDrawer)

@@ -7,9 +7,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuGroup
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.rowsShown
+import com.psplauncher.core.ui.components.foldedIntoGroups
 
 class PillActionsTest {
-    private fun state(directLaunch: Boolean = true) = XMBUiState(
+    private fun state() = XMBUiState(
         categories = listOf(
             Category(
                 id = BuiltInCategory.GAMES, name = "Game", iconKey = "ic_games",
@@ -17,7 +21,6 @@ class PillActionsTest {
             ),
         ),
         selectedCategoryIndex = 0,
-        directLaunch = directLaunch,
     )
 
     private fun game(isFavorite: Boolean = false, androidApp: Boolean = false) = XMBItem(
@@ -30,13 +33,13 @@ class PillActionsTest {
         id = "a1", title = "Spotify", packageName = "com.spotify.music",
     )
 
-    private fun gameMenuIds(item: XMBItem, directLaunch: Boolean = true) = gameContextMenuItems(
+    private fun gameMenuIds(item: XMBItem) = gameContextMenuItems(
         item = item,
-        state = state(directLaunch),
+        state = state(),
         discCount = 1,
         onRecentShelf = false,
         hideLocation = null,
-    ).map { it.id }
+    ).mapNotNull { it.action }
 
     @Test
     fun `every game pill is a row the game menu offers`() {
@@ -53,7 +56,7 @@ class PillActionsTest {
 
     @Test
     fun `every app pill is a row the app menu offers`() {
-        val menu = appContextMenuItems(state(), categoryId = null, onRecentShelf = false).map { it.id }
+        val menu = appContextMenuItems(state(), categoryId = null, onRecentShelf = false).mapNotNull { it.action }
         pillsFor(app()).forEach { pill ->
             assertTrue(
                 "pill '${pill.label}' dispatches '${pill.id}', which the app menu does not offer: $menu",
@@ -63,19 +66,19 @@ class PillActionsTest {
     }
 
     @Test
-    fun `the rail cannot address a pill, so a menu index cannot either`() {
+    fun `the menu cannot address a pill, so a menu index cannot either`() {
         val item    = game()
         val menu    = gameContextMenuItems(item, state(), discCount = 1, onRecentShelf = false, hideLocation = null)
         val pillIds = pillsFor(item).map { it.id }.toSet()
-        val rail    = railRows(menu, pillIds)
+        val rows    = MenuState("Gran Turismo 4", menu, withheld = pillIds).rowsShown()
 
         assertTrue(
-            "the rail drew a pill's own action: ${rail.map { it.id }.filter { it in pillIds }}",
-            rail.none { it.id in pillIds },
+            "the menu drew a pill's own action: ${rows.mapNotNull { it.action }.filter { it in pillIds }}",
+            rows.none { it.action in pillIds },
         )
 
         val firstPill = pillsFor(item).first()
-        val atThatIndex = rail.getOrNull(menu.indexOfFirst { it.id == firstPill.id })?.id
+        val atThatIndex = rows.getOrNull(menu.indexOfFirst { it.action == firstPill.id })?.action
         assertTrue(
             "activating by index would have run '$atThatIndex' for the '${firstPill.label}' pill",
             atThatIndex != firstPill.id,

@@ -53,7 +53,8 @@ import com.psplauncher.core.ui.components.HsvColorPickerDialog
 import com.psplauncher.core.ui.components.PfpColorChoices
 import com.psplauncher.core.ui.components.PspContextMenuOverlay
 import com.psplauncher.core.ui.components.hsvToArgbLong
-import com.psplauncher.core.ui.components.PspMenuRow
+import com.psplauncher.core.ui.components.MenuRow
+import com.psplauncher.core.ui.components.MenuState
 import com.psplauncher.core.data.repository.PfpThemeStore
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
@@ -352,9 +353,13 @@ private fun ThemesSettingsContent(
 
         menu?.let { m ->
             PspContextMenuOverlay(
-                title          = m.title,
-                rows           = m.options.map { PspMenuRow(it.label, it.destructive) },
-                selectedIndex  = menuIndex.coerceIn(0, (m.options.size - 1).coerceAtLeast(0)),
+                state          = MenuState(
+                    title = m.title,
+                    rows = m.options.map {
+                        MenuRow(it, it.label, isDestructive = it.destructive, confirms = false)
+                    },
+                    selectedIndex = menuIndex.coerceIn(0, (m.options.size - 1).coerceAtLeast(0)),
+                ),
                 onRowActivated = { index -> m.options.getOrNull(index)?.action?.invoke(); menu = null },
                 onDismiss      = { menu = null },
             )

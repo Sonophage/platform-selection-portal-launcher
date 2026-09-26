@@ -25,19 +25,35 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
+import com.psplauncher.core.ui.components.moved
+import com.psplauncher.core.ui.components.chose
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.MenuSelect
+import com.psplauncher.core.ui.components.MenuRow
+import com.psplauncher.core.ui.components.MenuGroup
 
-enum class AppDetailOption(val label: String, val isDestructive: Boolean = false) {
-    CHANGE_NAME("Change Display Name"),
-    CHANGE_ICON("Change Game Icon"),
-    CHANGE_BACKGROUND("Change Background"),
-    ADD_TO_COLLECTION("Add to Collection"),
-    RESET_ARTWORK("Reset All Artwork", isDestructive = true),
+enum class AppDetailOption(
+    val label: String,
+    val group: MenuGroup = MenuGroup.MAIN,
+    val isDestructive: Boolean = false,
+) {
+    CHANGE_NAME("Change Display Name", MenuGroup.SETTINGS),
+    CHANGE_ICON("Change Game Icon", MenuGroup.SETTINGS),
+    CHANGE_BACKGROUND("Change Background", MenuGroup.SETTINGS),
+    ADD_TO_COLLECTION("Add to Collection", MenuGroup.LIBRARY),
+    RESET_ARTWORK("Reset All Artwork", MenuGroup.REMOVE, isDestructive = true),
     ;
 
     companion object {
         val OPTIONS_MENU = listOf(CHANGE_NAME, ADD_TO_COLLECTION)
 
         val ARTWORK_MENU = listOf(CHANGE_ICON, CHANGE_BACKGROUND, RESET_ARTWORK)
+
+        fun menu(title: String, rows: List<AppDetailOption>, selectedIndex: Int) = MenuState(
+            title = title,
+            rows = rows.map { MenuRow(it, it.label, it.group, isDestructive = it.isDestructive) },
+            selectedIndex = selectedIndex,
+        )
     }
 }
 
@@ -330,13 +346,19 @@ class AppDetailViewModel @Inject constructor(
     }
 
     private fun handleMenuGamepad(action: GamepadAction, rows: List<AppDetailOption>) {
+        val menu = AppDetailOption.menu("", rows, _uiState.value.optionsIndex)
         when (action) {
-            GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(optionsIndex = (it.optionsIndex - 1).coerceIn(0, rows.lastIndex.coerceAtLeast(0))) }
-            GamepadAction.NAVIGATE_DOWN -> _uiState.update { it.copy(optionsIndex = (it.optionsIndex + 1).coerceIn(0, rows.lastIndex.coerceAtLeast(0))) }
-            GamepadAction.SELECT        -> rows.getOrNull(_uiState.value.optionsIndex)?.let(::activateOption)
+            GamepadAction.NAVIGATE_UP   -> _uiState.update { it.copy(optionsIndex = menu.moved(-1).selectedIndex ?: 0) }
+            GamepadAction.NAVIGATE_DOWN -> _uiState.update { it.copy(optionsIndex = menu.moved(+1).selectedIndex ?: 0) }
+            GamepadAction.SELECT        -> onMenuRowActivated(rows, _uiState.value.optionsIndex)
             GamepadAction.BACK          -> closeMenus()
             else -> Unit
         }
+    }
+
+    fun onMenuRowActivated(rows: List<AppDetailOption>, index: Int) {
+        val chosen = AppDetailOption.menu("", rows, index).chose(index)
+        if (chosen is MenuSelect.Run) activateOption(chosen.action)
     }
 
     fun launchApp() {

@@ -9,6 +9,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuGroup
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.rowsShown
+import com.psplauncher.core.ui.components.foldedIntoGroups
 
 class ContextMenusTest {
     private fun category(id: String, gaming: Boolean = false) = Category(
@@ -20,13 +24,11 @@ class ContextMenusTest {
         selectedCategoryIndex: Int = 0,
         selectedCollectionId: Long? = null,
         selectedPlatformId: String? = null,
-        directLaunch: Boolean = false,
     ) = XMBUiState(
         categories = categories,
         selectedCategoryIndex = selectedCategoryIndex,
         selectedCollectionId = selectedCollectionId,
         selectedPlatformId = selectedPlatformId,
-        directLaunch = directLaunch,
     )
 
     private fun game(
@@ -40,7 +42,7 @@ class ContextMenusTest {
         subtitle = subtitle,
     )
 
-    private fun ids(items: List<XMBContextMenuItem>) = items.map { it.id }
+    private fun ids(items: List<XMBContextMenuItem>) = items.map { it.action }
 
     @Test
     fun `choose disc appears only for a multi-disc set`() {
@@ -100,7 +102,7 @@ class ContextMenusTest {
         )
         assertEquals(
             "Hide from Favorites",
-            inFavorites.first { it.id == "hide_here" }.label,
+            inFavorites.first { it.action == "hide_here" }.label,
         )
     }
 
@@ -125,7 +127,7 @@ class ContextMenusTest {
         val items = gameContextMenuItems(
             game(), state(selectedPlatformId = XMBViewModel.MISSING_PLATFORM_ID), 1, false, null,
         )
-        assertEquals(listOf("remove_missing"), items.filter { it.isDestructive }.map { it.id })
+        assertEquals(listOf("remove_missing"), items.filter { it.isDestructive }.map { it.action })
 
         assertFalse("remove_game" in ids(items))
     }
@@ -218,7 +220,7 @@ class ContextMenusTest {
     fun `hide from category names the category`() {
         val cats = listOf(category("retro"))
         val items = appContextMenuItems(state(cats), categoryId = "retro", onRecentShelf = false)
-        assertEquals("Hide from retro", items.first { it.id == "hide_from_category" }.label)
+        assertEquals("Hide from retro", items.first { it.action == "hide_from_category" }.label)
     }
 
     @Test
@@ -328,103 +330,74 @@ class ContextMenusTest {
 
     @Test
     fun `play is in every game menu and drawn in none of them`() {
-        listOf(true, false).forEach { direct ->
-            listOf(true, false).forEach { shelf ->
-                val where = "direct=$direct shelf=$shelf"
-                val items = gameContextMenuItems(game(), state(directLaunch = direct), 1, shelf, null)
-                val play = items.firstOrNull { it.id == "play" }
+        listOf(true, false).forEach { shelf ->
+            run {
+                val where = "shelf=$shelf"
+                val items = gameContextMenuItems(game(), state(), 1, shelf, null)
+                val play = items.firstOrNull { it.action == "play" }
                 assertTrue("$where: no play entry left to dispatch by id", play != null)
-                assertTrue("$where: Play is drawn in the rail", play!!.hidden)
+                assertTrue("$where: Play is drawn in the menu", play!!.hidden)
                 assertFalse(
-                    "$where: Play reached the rail anyway",
-                    "play" in railRows(items, pillIds = emptySet()).map { it.id },
+                    "$where: Play reached the menu anyway",
+                    "play" in MenuState("t", items).rowsShown().map { it.action },
                 )
             }
         }
     }
 
     @Test
-    fun `every deep-linked Details row names a real DetailAction`() {
-        val deepLinked = listOf("ARTWORK", "METADATA", "MANUAL", "REFRESH")
-        deepLinked.forEach { name ->
-            assertTrue(
-                "the Details submenu writes detail_$name, which DetailAction does not have",
-                com.psplauncher.feature.xmb.ui.detail.DetailAction.entries.any { it.name == name },
-            )
+    fun `the rows that were behind Details are in the menu itself, as one group`() {
+        val rows = gameContextMenuItems(game(), state(), 1, false, null)
+        val wasBehindDetails = listOf(
+            "detail_title", "detail_note", "detail_ARTWORK",
+            "detail_METADATA", "detail_MANUAL", "detail_REFRESH",
+        )
+
+        wasBehindDetails.forEach { id ->
+            val row = rows.firstOrNull { it.action == id }
+            assertTrue("'$id' is no longer reachable from any menu", row != null)
+            assertEquals("$id: not in the Metadata group", MenuGroup.METADATA, row!!.group)
         }
+
+        assertFalse(
+            "the Details submenu is still offered as well, so the rows are reachable two ways",
+            "game_details" in ids(rows),
+        )
+
+        val folded = MenuState("Gran Turismo 4", rows).rowsShown().filter { it.group == MenuGroup.METADATA }
+        assertEquals("six rows should fold to one", 1, folded.size)
+        assertEquals("Metadata", folded.single().label)
     }
 
     @Test
-    fun `view game details is offered either way`() {
-        listOf(true, false).forEach { direct ->
-            assertTrue(
-                "direct=$direct",
-                "game_details" in ids(gameContextMenuItems(game(), state(directLaunch = direct), 1, false, null)),
-            )
-        }
-    }
-
-    @Test
-    fun `a heading belongs to a row, and every group has exactly one`() {
-        val items = gameContextMenuItems(game(), state(), 2, true, null)
-        val headings = items.mapNotNull { it.heading }
-        assertEquals("a heading is repeated", headings.distinct(), headings)
-        assertTrue("no groups at all", headings.isNotEmpty())
-        assertFalse("the first row starts a group", items.first().heading != null)
-    }
-
-    @Test
-    fun `the category group's heading survives whichever of its rows exists`() {
+    fun `a group's rows land together, whichever of them exists`() {
         val main = category(BuiltInCategory.GAMES, gaming = true)
         val shooters = category("shooters", gaming = true)
 
         val all = listOf(main, shooters, category("rpgs", gaming = true))
 
-        val fromMain = gameContextMenuItems(game(), state(all, 0), 1, false, null)
-        assertEquals("Category", fromMain.first { it.id == "add_category" }.heading)
+        listOf(0 to "add_category", 1 to "move_category").forEach { (index, id) ->
+            val rows = gameContextMenuItems(game(), state(all, index), 1, false, null).sortedBy { it.group.ordinal }
+            val category = rows.filter { it.group == MenuGroup.CATEGORY }.map { it.action }
 
-        val fromCustom = gameContextMenuItems(game(), state(all, 1), 1, false, null)
-        assertEquals("Category", fromCustom.first { it.id == "move_category" }.heading)
-        assertEquals(null, fromCustom.first { it.id == "remove_category" }.heading)
-    }
-
-    private fun rows(n: Int, headingsAt: Set<Int> = emptySet()) =
-        (0 until n).map { XMBContextMenuItem("r$it", "Row $it", heading = "G$it".takeIf { _ -> it in headingsAt }) }
-
-    @Test
-    fun `a menu that fits is not collapsed`() {
-        val short = rows(CONTEXT_MENU_MAX_ROWS)
-        assertEquals(short to emptyList<XMBContextMenuItem>(), short.splitForOverflow())
-        assertEquals(short, short.withOverflowRow())
+            assertTrue("no category rows at all from slot $index", category.isNotEmpty())
+            assertTrue("'$id' is not among the category rows", id in category)
+            assertEquals(
+                "the category rows are not contiguous",
+                category,
+                rows.map { it.action }.filter { it in category },
+            )
+        }
     }
 
     @Test
-    fun `More costs a row of the budget, so the panel never grows`() {
-        val long = rows(20)
-        assertEquals(CONTEXT_MENU_MAX_ROWS, long.withOverflowRow().size)
-        assertEquals(MENU_MORE_ITEM_ID, long.withOverflowRow().last().id)
-    }
+    fun `the groups a game menu uses are the shared ones, in rank order`() {
+        val groups = gameContextMenuItems(game(), state(), 2, true, null)
+            .sortedBy { it.group.ordinal }
+            .map { it.group }
 
-    @Test
-    fun `the split lands on a group boundary, so no heading is stranded`() {
-        val items = rows(20, headingsAt = setOf(3, 6, 11))
-        val (visible, overflow) = items.splitForOverflow()
-        assertEquals(6, visible.size)
-        assertEquals("r6", overflow.first().id)
-        assertEquals(items.size, visible.size + overflow.size)
-    }
-
-    @Test
-    fun `with no boundary to use, it splits on the budget rather than not at all`() {
-        val (visible, overflow) = rows(20).splitForOverflow()
-        assertEquals(CONTEXT_MENU_MAX_ROWS - 1, visible.size)
-        assertEquals(20 - (CONTEXT_MENU_MAX_ROWS - 1), overflow.size)
-    }
-
-    @Test
-    fun `nothing is lost between the visible menu and More`() {
-        val items = gameContextMenuItems(game(), state(), 3, true, null)
-        val (visible, overflow) = items.splitForOverflow()
-        assertEquals(ids(items), ids(visible) + ids(overflow))
+        assertEquals("a group is split in two", groups.distinct(), groups.distinct().sortedBy { it.ordinal })
+        assertEquals("the menu does not open on its main action", MenuGroup.MAIN, groups.first())
+        assertEquals("something outranks the removals", MenuGroup.REMOVE, groups.last())
     }
 }

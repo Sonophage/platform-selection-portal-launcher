@@ -1,5 +1,11 @@
 package com.psplauncher.feature.xmb.viewmodel
 
+import com.psplauncher.core.ui.components.MenuGroup
+import com.psplauncher.core.ui.components.MenuRow
+import com.psplauncher.core.ui.components.MenuSelect
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.chose
+import com.psplauncher.core.ui.components.rowsShown
 import com.psplauncher.core.domain.model.PlatformIds.ANDROID as ANDROID_PLATFORM_ID
 
 import com.psplauncher.core.domain.model.PlatformIds.WINDOWS as WINDOWS_PLATFORM_ID
@@ -61,6 +67,12 @@ import com.psplauncher.core.ui.icons.GameIconStyle
 import com.psplauncher.core.ui.notification.AndroidNotice
 import com.psplauncher.core.ui.notification.AndroidNotifications
 import com.psplauncher.core.ui.notification.BackgroundTaskNotifier
+import com.psplauncher.feature.artwork.match.MetadataApply
+import com.psplauncher.feature.artwork.match.MetadataApplyPolicy
+import com.psplauncher.feature.artwork.match.MetadataField
+import com.psplauncher.feature.xmb.ui.detail.ManualViewerUi
+import com.psplauncher.feature.xmb.ui.detail.MetadataPreviewUi
+import com.psplauncher.feature.artwork.store.ArtworkKind
 import com.psplauncher.core.ui.notification.SystemToasts
 import com.psplauncher.core.ui.notification.ToastKind
 import com.psplauncher.core.ui.sound.MenuSound
@@ -117,12 +129,7 @@ private fun XmbPalette.toPFPColors() = PFPColors(
 )
 
 data class XMBContextMenu(
-    val title: String,
-    val items: List<XMBContextMenuItem>,
-
-    val overflow: List<XMBContextMenuItem> = emptyList(),
-
-    val selectedIndex: Int? = null,
+    val state: MenuState<String>,
 
     val primaryId: String? = null,
 
@@ -166,22 +173,25 @@ data class XMBContextMenu(
     val photoFileId: String? = null,
 
     val photoLibraryId: String? = null,
-)
+) {
+    val title: String get() = state.title
+    val items: List<XMBContextMenuItem> get() = state.rows
+    val subtitle: String? get() = state.subtitle
+    val selectedIndex: Int? get() = state.selectedIndex
+    val parent: MenuState<String>? get() = state.parent
 
-data class XMBContextMenuItem(
-    val id: String,
-    val label: String,
-    val isDestructive: Boolean = false,
+    fun withSelected(index: Int): XMBContextMenu = copy(state = state.copy(selectedIndex = index))
+}
 
-    val checked: Boolean = false,
-
-    val heading: String? = null,
-
-    val hidden: Boolean = false,
-)
+typealias XMBContextMenuItem = MenuRow<String>
 
 data class CollectionNameDialogState(
     val title: String,
+
+    val subtitle: String? = null,
+
+    val resetLabel: String? = null,
+
     val initialText: String = "",
 
     val text: String = initialText,
@@ -534,16 +544,22 @@ data class XMBUiState(
     val pendingDrawerAction: GamepadAction? = null,
 
     val pendingDrawerTypedChar: String? = null,
-    val pendingGameDetailAction: GamepadAction? = null,
-    val activeGameId: Long? = null,
+    val artworkFetchTitle: String? = null,
 
-    val activeGameAutoLaunch: Boolean = false,
+    val artworkStudioGameId: Long? = null,
 
-    val activeGameAction: String? = null,
+    val pendingArtworkStudioAction: GamepadAction? = null,
 
-    val activeGameDiscId: Long? = null,
+    val manualViewer: com.psplauncher.feature.xmb.ui.detail.ManualViewerUi? = null,
 
-    val directLaunch: Boolean = false,
+    val metadataPreview: com.psplauncher.feature.xmb.ui.detail.MetadataPreviewUi? = null,
+
+    val metadataPreviewGameId: Long? = null,
+
+
+
+
+
     val activeAppId: Long? = null,
 
     val activeAppCollectionCategoryId: String = BuiltInCategory.GAMES,
@@ -781,12 +797,14 @@ data class XMBUiState(
             appPicker != null ||
             gamePickerCategoryId != null ||
             activeAppDrawerFilter != null ||
-            activeGameId != null ||
             activeAppId != null ||
             search != null
 
     private val fullscreenOverlay: Boolean
         get() = showBootSequence ||
+            artworkStudioGameId != null ||
+            manualViewer != null ||
+            metadataPreview != null ||
             activeGameBoot != null ||
             discCeremony != null ||
             activeVideoId != null ||
@@ -1240,7 +1258,6 @@ class XMBViewModel @Inject constructor(
     private val iconDisplayPreferences: com.psplauncher.core.data.repository.IconDisplayPreferences,
     private val artworkStore: com.psplauncher.feature.artwork.store.ArtworkStore,
     private val artworkAccent: com.psplauncher.core.data.repository.ArtworkAccent,
-    private val gameLaunchPreferences: com.psplauncher.core.data.repository.GameLaunchPreferences,
     private val windowsLibrarySetup: com.psplauncher.core.data.repository.WindowsLibrarySetup,
     private val pcShortcutImporter: com.psplauncher.feature.launcher.PcShortcutImporter,
     private val pcGameScanner: com.psplauncher.feature.settings.pc.PcGameScanner,
@@ -2093,11 +2110,7 @@ class XMBViewModel @Inject constructor(
         if (actions.isEmpty()) return
         _uiState.update { state ->
             state.copy(
-                activeContextMenu = XMBContextMenu(
-                    title = "Add",
-                    items = actions.map { XMBContextMenuItem(it.id, it.title) },
-                    isAddMenu = true,
-                )
+                activeContextMenu = XMBContextMenu(state = MenuState(title = "Add", rows = actions.map { XMBContextMenuItem(it.id, it.title) }), isAddMenu = true)
             )
         }
     }
@@ -2530,7 +2543,7 @@ class XMBViewModel @Inject constructor(
 
     private fun openVideoPlaylistContextMenu(playlistId: Long, name: String) {
         val items = videoPlaylistContextMenuItems()
-        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(name, items, videoPlaylistId = playlistId)) }
+        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = name, rows = items), videoPlaylistId = playlistId)) }
     }
 
     private fun openVideoContextMenu(item: XMBItem): Boolean {
@@ -2562,7 +2575,7 @@ class XMBViewModel @Inject constructor(
                 hasWatchStamp = video.lastWatchedAt != null,
                 inPlaylist = inPlaylist,
             )
-            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(title, items, videoFileId = videoId)) }
+            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = title, rows = items), videoFileId = videoId)) }
         }
     }
 
@@ -2593,19 +2606,14 @@ class XMBViewModel @Inject constructor(
                 add(XMBContextMenuItem("vpl_new", "Create New Playlist"))
             }
             _uiState.update { it.copy(
-                activeContextMenu = XMBContextMenu(
-                    title = "Add to Playlist",
-                    items = items,
-                    selectedIndex = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
-                    videoPlaylistPickerVideoId = videoId,
-                )
+                activeContextMenu = XMBContextMenu(state = MenuState(title = "Add to Playlist", rows = items, selectedIndex = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0))), videoPlaylistPickerVideoId = videoId)
             )}
         }
     }
 
     private fun openVideoLibraryContextMenu(libraryId: String, name: String) {
         val items = videoLibraryContextMenuItems()
-        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(name, items, videoLibraryId = libraryId)) }
+        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = name, rows = items), videoLibraryId = libraryId)) }
     }
 
     private fun handleVideoLibraryAction(libraryId: String, itemId: String) {
@@ -3025,7 +3033,7 @@ class XMBViewModel @Inject constructor(
                 .getOrNull()?.lastOpenedAt != null
             val items = bookContextMenuItems(hasOpenStamp = onShelf)
             _uiState.update {
-                it.copy(activeContextMenu = XMBContextMenu(item.title, items, bookFileId = bookId))
+                it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = item.title, rows = items), bookFileId = bookId))
             }
         }
         return true
@@ -3058,7 +3066,7 @@ class XMBViewModel @Inject constructor(
 
     private fun openPhotoFileContextMenu(photoId: String, title: String) {
         val items = photoFileContextMenuItems()
-        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(title, items, photoFileId = photoId)) }
+        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = title, rows = items), photoFileId = photoId)) }
     }
 
     private fun handlePhotoFileAction(photoId: String, itemId: String) {
@@ -3072,7 +3080,7 @@ class XMBViewModel @Inject constructor(
 
     private fun openPhotoLibraryContextMenu(libraryId: String, name: String) {
         val items = photoLibraryContextMenuItems()
-        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(name, items, photoLibraryId = libraryId)) }
+        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = name, rows = items), photoLibraryId = libraryId)) }
     }
 
     private fun handlePhotoLibraryAction(libraryId: String, itemId: String) {
@@ -3670,14 +3678,10 @@ class XMBViewModel @Inject constructor(
         val title = musicPlayer.currentTrack()?.displayTitle ?: "Now Playing"
         _uiState.update {
             it.copy(
-                activeContextMenu = XMBContextMenu(
-                    title = title,
-                    items = listOf(
+                activeContextMenu = XMBContextMenu(state = MenuState(title = title, rows = listOf(
                         XMBContextMenuItem("music_background", "Play in Background"),
                         XMBContextMenuItem("music_close", "Stop & Close"),
-                    ),
-                    musicTrackId = MUSIC_PLAYER_MENU_MARKER,
-                )
+                    )), musicTrackId = MUSIC_PLAYER_MENU_MARKER)
             )
         }
     }
@@ -3687,11 +3691,7 @@ class XMBViewModel @Inject constructor(
         if (playback.track == null) return
         _uiState.update {
             it.copy(
-                activeContextMenu = XMBContextMenu(
-                    title = playback.track.displayTitle,
-                    items = nowPlayingContextMenuItems(playback.isPlaying),
-                    musicTrackId = MUSIC_PLAYER_MENU_MARKER,
-                )
+                activeContextMenu = XMBContextMenu(state = MenuState(title = playback.track.displayTitle, rows = nowPlayingContextMenuItems(playback.isPlaying)), musicTrackId = MUSIC_PLAYER_MENU_MARKER)
             )
         }
     }
@@ -3711,19 +3711,14 @@ class XMBViewModel @Inject constructor(
                 .getOrNull()?.lastPlayedAt != null
             val items = musicTrackContextMenuItems(playlistId = playlistId, hasPlayStamp = onShelf)
             _uiState.update { it.copy(
-                activeContextMenu = XMBContextMenu(
-                    title        = item.title,
-                    items        = items,
-                    musicTrackId = trackId,
-                    playlistId   = playlistId,
-                )
+                activeContextMenu = XMBContextMenu(state = MenuState(title = item.title, rows = items), musicTrackId = trackId, playlistId = playlistId)
             )}
         }
     }
 
     private fun openPlaylistRowContextMenu(playlistId: Long, name: String) {
         val items = playlistRowContextMenuItems()
-        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(name, items, playlistId = playlistId)) }
+        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = name, rows = items), playlistId = playlistId)) }
     }
 
     private fun openPlaylistPicker(trackId: String, selectIndex: Int? = 0) {
@@ -3737,12 +3732,7 @@ class XMBViewModel @Inject constructor(
                 add(XMBContextMenuItem("pl_new", "Create New Playlist"))
             }
             _uiState.update { it.copy(
-                activeContextMenu = XMBContextMenu(
-                    title                 = "Add to Playlist",
-                    items                 = items,
-                    selectedIndex         = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
-                    playlistPickerTrackId = trackId,
-                )
+                activeContextMenu = XMBContextMenu(state = MenuState(title = "Add to Playlist", rows = items, selectedIndex = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0))), playlistPickerTrackId = trackId)
             )}
         }
     }
@@ -4624,14 +4614,14 @@ class XMBViewModel @Inject constructor(
 
                 GamepadAction.SELECT        -> {
                     val menu = state.activeContextMenu
-                    val picked = menu?.selectedIndex?.let { state.railRows().getOrNull(it) }
+                    val picked = menu?.selectedIndex?.let { state.menuRows().getOrNull(it) }
                     when {
-                        picked != null -> activateContextMenuItem(picked.id)
+                        picked != null -> onContextMenuItemActivatedAt(menu.selectedIndex!!)
                         menu?.primaryId != null -> activateContextMenuItem(menu.primaryId)
                         else -> Unit
                     }
                 }
-                GamepadAction.BACK,
+                GamepadAction.BACK                   -> popContextMenu()
                 GamepadAction.OPEN_CONTEXT_MENU      -> closeContextMenu()
                 else -> Unit
             }
@@ -4791,7 +4781,7 @@ class XMBViewModel @Inject constructor(
             return
         }
 
-        if (action == GamepadAction.HOME && state.statusStripVisible && state.activeGameId == null) {
+        if (action == GamepadAction.HOME && state.statusStripVisible) {
             toggleNotifications()
             return
         }
@@ -4805,8 +4795,16 @@ class XMBViewModel @Inject constructor(
                 _uiState.update { it.copy(pendingVideoDetailAction = action) }
                 return
             }
-            state.activeGameId != null -> {
-                _uiState.update { it.copy(pendingGameDetailAction = action) }
+            state.metadataPreview != null -> {
+                handleMetadataPreviewInput(action)
+                return
+            }
+            state.manualViewer != null -> {
+                handleManualViewerInput(action)
+                return
+            }
+            state.artworkStudioGameId != null -> {
+                _uiState.update { it.copy(pendingArtworkStudioAction = action) }
                 return
             }
             state.activeAppId != null -> {
@@ -4985,21 +4983,13 @@ class XMBViewModel @Inject constructor(
         )
 
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title      = card.displayName,
-                items      = items,
-                platformId = platformId,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = card.displayName, rows = items), platformId = platformId)
         )}
     }
 
     private fun openAllGamesContextMenu() {
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title      = "All Games",
-                items      = allGamesContextMenuItems(it.iconDisplayMode.label),
-                isAllGames = true,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = "All Games", rows = allGamesContextMenuItems(it.iconDisplayMode.label)), isAllGames = true)
         )}
     }
 
@@ -5014,7 +5004,7 @@ class XMBViewModel @Inject constructor(
         val override = state.iconDisplayModeByPlatform[platformId]
         val items = buildList {
             add(XMBContextMenuItem(
-                id      = "picondisp_default",
+                action = "picondisp_default",
                 label   = "Use Global Setting (${state.iconDisplayMode.label})",
                 checked = override == null,
             ))
@@ -5023,11 +5013,7 @@ class XMBViewModel @Inject constructor(
             }
         }
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title      = "Icon Display",
-                items      = items,
-                platformId = platformId,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = "Icon Display", rows = items), platformId = platformId)
         )}
     }
 
@@ -5037,11 +5023,7 @@ class XMBViewModel @Inject constructor(
             XMBContextMenuItem("gicondisp_${mode.name}", mode.label, checked = mode == current)
         }
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title      = "Icon Display",
-                items      = items,
-                isAllGames = true,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = "Icon Display", rows = items), isAllGames = true)
         )}
     }
 
@@ -5073,21 +5055,8 @@ class XMBViewModel @Inject constructor(
             onRecentShelf = onRecentShelf,
             hideLocation = currentHideLocation(),
         )
-        val (visible, overflow) = items.splitForOverflow()
-
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title       = item.title,
-                items       = items.withOverflowRow(),
-                overflow    = overflow,
-                gameId      = item.gameId,
-                packageName = item.packageName,
-                shortcutId  = item.shortcutId,
-                launchIntentUri = item.launchIntentUri,
-                categoryContext = if (inGamingCategory) currentCat.id else null,
-
-                primaryId   = "play",
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = item.title, rows = items), gameId = item.gameId, packageName = item.packageName, shortcutId = item.shortcutId, launchIntentUri = item.launchIntentUri, categoryContext = if (inGamingCategory) currentCat.id else null, primaryId = "play")
         )}
     }
 
@@ -5098,7 +5067,7 @@ class XMBViewModel @Inject constructor(
             val items = buildList {
                 collections.forEach { c ->
                     add(XMBContextMenuItem(
-                        id      = "col_${c.id}",
+                        action = "col_${c.id}",
                         label   = c.name,
                         checked = c.id in memberOf,
                     ))
@@ -5106,13 +5075,7 @@ class XMBViewModel @Inject constructor(
                 add(XMBContextMenuItem("col_new", "Create New Collection"))
             }
             _uiState.update { it.copy(
-                activeContextMenu = XMBContextMenu(
-                    title            = "Add to Collection",
-                    items            = items,
-                    selectedIndex    = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0)),
-                    gameId           = gameId,
-                    collectionGameId = gameId,
-                )
+                activeContextMenu = XMBContextMenu(state = MenuState(title = "Add to Collection", rows = items, selectedIndex = selectIndex?.coerceIn(0, items.lastIndex.coerceAtLeast(0))), gameId = gameId, collectionGameId = gameId)
             )}
         }
     }
@@ -5122,17 +5085,8 @@ class XMBViewModel @Inject constructor(
         val categoryId = categoryIdOverride ?: currentCategory()?.id
 
         val items = appContextMenuItems(_uiState.value, categoryId, onRecentShelf = item.id.startsWith(RECENT_APP_ID_PREFIX))
-        val (_, overflow) = items.splitForOverflow()
-
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title           = item.title,
-                items           = items.withOverflowRow(),
-                overflow        = overflow,
-                gameId          = item.gameId,
-                packageName     = pkg,
-                categoryContext = categoryId,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = item.title, rows = items), gameId = item.gameId, packageName = pkg, categoryContext = categoryId)
         )}
     }
 
@@ -5145,11 +5099,7 @@ class XMBViewModel @Inject constructor(
             hasOtherCategory = hasOtherCategory,
         )
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title           = collection.name,
-                items           = items,
-                collectionRowId = collectionId,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = collection.name, rows = items), collectionRowId = collectionId)
         )}
     }
 
@@ -5166,11 +5116,7 @@ class XMBViewModel @Inject constructor(
             .map { cat -> XMBContextMenuItem("movecol_${cat.id}", cat.name) }
         if (items.isEmpty()) return
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title           = "Move Collection To",
-                items           = items,
-                collectionRowId = collectionId,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = "Move Collection To", rows = items), collectionRowId = collectionId)
         )}
     }
 
@@ -5179,13 +5125,7 @@ class XMBViewModel @Inject constructor(
             XMBContextMenuItem("pick_${cat.id}", cat.name)
         }
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title            = if (action == "move") "Move To…" else "Add To…",
-                items            = items,
-                packageName      = pkg,
-                categoryContext  = fromCategory,
-                pendingAppAction = action,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = if (action == "move") "Move To…" else "Add To…", rows = items), packageName = pkg, categoryContext = fromCategory, pendingAppAction = action)
         )}
     }
 
@@ -5193,15 +5133,15 @@ class XMBViewModel @Inject constructor(
         val state = _uiState.value
         val menu = state.activeContextMenu ?: return
 
-        val rows = state.railRows()
+        val rows = state.menuRows()
         if (rows.isEmpty()) return
 
         val current = menu.selectedIndex ?: return run {
             val entry = if (delta > 0) 0 else rows.lastIndex
-            _uiState.update { it.copy(activeContextMenu = menu.copy(selectedIndex = entry)) }
+            _uiState.update { it.copy(activeContextMenu = menu.withSelected(entry)) }
         }
         val next = (current + delta).coerceIn(0, rows.size - 1)
-        _uiState.update { it.copy(activeContextMenu = menu.copy(selectedIndex = next)) }
+        _uiState.update { it.copy(activeContextMenu = menu.withSelected(next)) }
     }
 
     private fun activateContextMenuItem(itemId: String) {
@@ -5400,6 +5340,8 @@ class XMBViewModel @Inject constructor(
                         closeContextMenu()
                         _uiState.update { it.copy(collectionNameDialog = CollectionNameDialogState(
                             title = "Edit Title",
+                            subtitle = "The name shown in the launcher and used when scraping artwork.",
+                            resetLabel = "Use Scanned Name",
                             initialText = game.displayTitle,
                             editTitleGameId = gid,
                             placeholder = "Leave blank to use the scanned name",
@@ -5410,18 +5352,17 @@ class XMBViewModel @Inject constructor(
                         closeContextMenu()
                         _uiState.update { it.copy(collectionNameDialog = CollectionNameDialogState(
                             title = "Edit Note",
+                            subtitle = "Kept with the game. Only you see it.",
                             initialText = game.userNote.orEmpty(),
                             editNoteGameId = gid,
                             placeholder = "Anything you want to remember about this game",
                         ))}
                     }
-                    "open" -> _uiState.update {
-                        it.copy(activeGameId = gid, activeGameAutoLaunch = false, activeGameAction = null)
-                    }
-
-                    else -> _uiState.update {
-                        it.copy(activeGameId = gid, activeGameAutoLaunch = false, activeGameAction = what)
-                    }
+                    "ARTWORK"  -> openArtworkStudio(gid)
+                    "MANUAL"   -> openManualFor(gid)
+                    "METADATA" -> openMetadataPreviewFor(gid)
+                    "REFRESH"  -> fetchArtworkFor(gid)
+                    else -> Timber.w("Details row '$what' has no handler")
                 }
             } else if (itemId.startsWith("pstate_")) {
                 val gid = menu.gameId
@@ -5442,7 +5383,6 @@ class XMBViewModel @Inject constructor(
                     appAction { gameRepository.setPreferredDisc(menu.gameId, discId) }
                 }
             } else when (itemId) {
-                "game_details"           -> openGameDetailsMenu(menu.gameId)
 
                 "play"                   -> launchGameDirectly(menu.gameId)
                 "choose_disc"             -> openDiscPickerMenu(menu.gameId)
@@ -5491,28 +5431,10 @@ class XMBViewModel @Inject constructor(
                 "icon_display"           -> openIconDisplayPickerMenu(menu.gameId)
                 "play_state"             -> openPlayStatePickerMenu(menu.gameId)
 
-                "remove_game"            -> _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-                    title  = "Remove \"${menu.title}\" from Library?",
-                    items  = removeGameConfirmItems(),
-                    gameId = menu.gameId,
-                ))}
-                "confirm_remove_game"    -> {
+                "remove_game", "remove_missing" -> {
                     val gid = menu.gameId
                     appAction { removeGameFromLibrary(gid) }
                 }
-                "cancel_remove_game"     -> Unit
-
-                "remove_missing"         -> _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-                    title  = "Permanently remove \"${menu.title}\"?",
-                    items  = removeMissingConfirmItems(),
-                    gameId = menu.gameId,
-                ))}
-                "confirm_remove_missing" -> {
-                    val gid = menu.gameId
-
-                    appAction { removeGameFromLibrary(gid) }
-                }
-                "cancel_remove_missing"  -> Unit
                 "hide_here"              -> currentHideLocation()?.let { (type, id, label) ->
                     persistHide(HiddenPlacement.gameKey(menu.gameId), menu.title, type, id, label)
                 }
@@ -5594,22 +5516,6 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch { block() }
     }
 
-    private fun openGameDetailsMenu(gameId: Long) {
-        _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-            title = "Details",
-            items = listOf(
-                XMBContextMenuItem("detail_title", "Edit Title"),
-                XMBContextMenuItem("detail_note", "Edit Note"),
-                XMBContextMenuItem("detail_ARTWORK", "Artwork"),
-                XMBContextMenuItem("detail_METADATA", "Update Metadata"),
-                XMBContextMenuItem("detail_MANUAL", "Manual"),
-                XMBContextMenuItem("detail_REFRESH", "Refresh Artwork"),
-                XMBContextMenuItem("detail_open", "Open Game Details"),
-            ),
-            gameId = gameId,
-        ))}
-    }
-
     private fun openPlayStatePickerMenu(gameId: Long) {
         viewModelScope.launch {
             val game = gameRepository.getById(gameId) ?: return@launch
@@ -5620,11 +5526,7 @@ class XMBViewModel @Inject constructor(
                     add(XMBContextMenuItem("pstate_${state.name}", state.label, checked = current == state))
                 }
             }
-            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-                title  = "Mark As",
-                items  = items,
-                gameId = gameId,
-            ))}
+            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = "Mark As", rows = items), gameId = gameId))}
         }
     }
 
@@ -5637,7 +5539,7 @@ class XMBViewModel @Inject constructor(
             val inherited = state.iconDisplayModeByPlatform[game.platformId] ?: state.iconDisplayMode
             val items = buildList {
                 add(XMBContextMenuItem(
-                    id      = "icondisp_default",
+                    action = "icondisp_default",
                     label   = "Use Default (${inherited.label})",
                     checked = override == null,
                 ))
@@ -5645,11 +5547,7 @@ class XMBViewModel @Inject constructor(
                     add(XMBContextMenuItem("icondisp_${mode.name}", mode.label, checked = override == mode))
                 }
             }
-            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-                title  = "Icon Display",
-                items  = items,
-                gameId = gameId,
-            ))}
+            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = "Icon Display", rows = items), gameId = gameId))}
         }
     }
 
@@ -5661,11 +5559,7 @@ class XMBViewModel @Inject constructor(
                 add(XMBContextMenuItem("emu_pick_default", "Use Platform Default"))
                 profiles.forEach { add(XMBContextMenuItem("emu_pick_${it.id}", it.name)) }
             }
-            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-                title  = "Choose Emulator",
-                items  = items,
-                gameId = gameId,
-            ))}
+            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = "Choose Emulator", rows = items), gameId = gameId))}
         }
     }
 
@@ -5680,16 +5574,12 @@ class XMBViewModel @Inject constructor(
                 .sortedWith(compareBy<Game> { it.discNumber == null }.thenBy { it.discNumber ?: Int.MAX_VALUE }.thenBy { it.id })
                 .map { member ->
                     XMBContextMenuItem(
-                        id      = "disc_pick_${member.id}",
+                        action = "disc_pick_${member.id}",
                         label   = member.discNumber?.let { "Disc $it" } ?: "Playlist",
                         checked = member.id == preferredDiscId,
                     )
                 }
-            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(
-                title  = "Choose Disc",
-                items  = items,
-                gameId = gameId,
-            ))}
+            _uiState.update { it.copy(activeContextMenu = XMBContextMenu(state = MenuState(title = "Choose Disc", rows = items), gameId = gameId))}
         }
     }
 
@@ -6001,7 +5891,7 @@ class XMBViewModel @Inject constructor(
                 return@launch
             }
 
-            if ((menu.items + menu.overflow).none { it.id == pillId }) {
+            if (menu.items.none { it.action == pillId }) {
                 Timber.w("Pill '$pillId' is not offered by the focused row's menu")
                 closeContextMenu()
                 return@launch
@@ -6011,13 +5901,28 @@ class XMBViewModel @Inject constructor(
     }
 
     fun onContextMenuItemActivatedAt(index: Int) {
-        val id = _uiState.value.railRows().getOrNull(index)?.id ?: return
-        _uiState.update { it.copy(activeContextMenu = it.activeContextMenu?.copy(selectedIndex = index)) }
-        activateContextMenuItem(id)
+        val state = _uiState.value
+        val menu = state.activeContextMenu ?: return
+
+        when (val chosen = state.menuWithPills()?.chose(index)) {
+            is MenuSelect.Replace -> _uiState.update { it.copy(activeContextMenu = menu.copy(state = chosen.state)) }
+            is MenuSelect.Run -> {
+                _uiState.update { it.copy(activeContextMenu = menu.withSelected(index)) }
+                activateContextMenuItem(chosen.action)
+            }
+            else -> Unit
+        }
     }
 
     fun closeContextMenu() {
         _uiState.update { it.copy(activeContextMenu = null) }
+    }
+
+    fun popContextMenu() {
+        _uiState.update { s ->
+            val menu = s.activeContextMenu ?: return@update s
+            s.copy(activeContextMenu = menu.state.parent?.let { menu.copy(state = it) })
+        }
     }
 
     private fun openAppPicker(target: AppPickerTarget, title: String) {
@@ -6261,13 +6166,7 @@ class XMBViewModel @Inject constructor(
         if (items.isEmpty()) return
 
         _uiState.update { it.copy(
-            activeContextMenu = XMBContextMenu(
-                title       = if (action == "move") "Move Game To" else "Add Game To",
-                items       = items,
-                gameId      = gameId,
-                categoryContext = fromCategoryId,
-                pendingAppAction = action,
-            )
+            activeContextMenu = XMBContextMenu(state = MenuState(title = if (action == "move") "Move Game To" else "Add Game To", rows = items), gameId = gameId, categoryContext = fromCategoryId, pendingAppAction = action)
         )}
     }
 
@@ -6590,16 +6489,11 @@ class XMBViewModel @Inject constructor(
 
         val silentRow = item?.id in setOf(NO_GAMES_ITEM_ID, EMPTY_COLLECTION_ITEM_ID, EMPTY_CATEGORY_ITEM_ID)
 
-        val opensGameDetail = item?.gameId != null && item.isRealGame
-        val launches = if (opensGameDetail) {
-            _uiState.value.directLaunch
-        } else {
-            item?.launchIntentUri != null ||
-                (item?.shortcutId != null && item.packageName != null) ||
-                item?.packageName != null
-        }
+        val launchesGame = item?.gameId != null && item.isRealGame
+        val launches = item?.launchIntentUri != null ||
+            (item?.shortcutId != null && item.packageName != null) ||
+            item?.packageName != null
 
-        val launchesGame = opensGameDetail && _uiState.value.directLaunch
         val event = when {
             silentRow -> null
             launchesGame -> null
@@ -6699,11 +6593,7 @@ class XMBViewModel @Inject constructor(
         }
 
         if (item?.gameId != null && item.isRealGame) {
-            if (_uiState.value.directLaunch) {
-                launchGameDirectly(item.gameId)
-            } else {
-                _uiState.update { it.copy(activeGameId = item.gameId, activeGameAutoLaunch = false) }
-            }
+            launchGameDirectly(item.gameId)
             return
         }
 
@@ -6723,7 +6613,7 @@ class XMBViewModel @Inject constructor(
         }
 
         if (item?.gameId != null) {
-            _uiState.update { it.copy(activeGameId = item.gameId) }
+            openContextMenuForFocusedItem()
             return
         }
         if (item?.platformId != null) {
@@ -6838,8 +6728,226 @@ class XMBViewModel @Inject constructor(
         it.copy(selectedPlatformId = null, selectedCollectionId = null)
     }
 
+
+    fun openArtworkStudio(gameId: Long) {
+        closeContextMenu()
+        _uiState.update { it.copy(artworkStudioGameId = gameId) }
+    }
+
+    fun consumeArtworkStudioAction() =
+        _uiState.update { it.copy(pendingArtworkStudioAction = null) }
+
+    fun closeArtworkStudio() {
+        val id = _uiState.value.artworkStudioGameId
+        _uiState.update { it.copy(artworkStudioGameId = null) }
+        if (id != null) viewModelScope.launch { loadItemsForCategory(currentCategory()) }
+    }
+
+    private fun openManualFor(gameId: Long) {
+        closeContextMenu()
+        viewModelScope.launch {
+            val game = gameRepository.getById(gameId) ?: return@launch
+            val path = artworkStore.find(gameId, ArtworkKind.MANUAL)
+            if (path == null) {
+                SystemToasts.post("No manual available for this game", null, ToastKind.ERROR)
+                return@launch
+            }
+            _uiState.update {
+                it.copy(manualViewer = ManualViewerUi(uri = path, title = game.displayTitle))
+            }
+        }
+    }
+
+    fun closeManualViewer() = _uiState.update { it.copy(manualViewer = null) }
+
+    fun setManualPageCount(count: Int) = _uiState.update { s ->
+        val m = s.manualViewer ?: return@update s
+        s.copy(manualViewer = m.copy(pageCount = count, page = m.page.coerceIn(0, (count - 1).coerceAtLeast(0))))
+    }
+
+    fun manualPrevPage() = _uiState.update { s ->
+        val m = s.manualViewer ?: return@update s
+        s.copy(manualViewer = m.copy(page = (m.page - 1).coerceAtLeast(0), scrollSteps = 0))
+    }
+
+    fun manualNextPage() = _uiState.update { s ->
+        val m = s.manualViewer ?: return@update s
+        s.copy(manualViewer = m.copy(
+            page = (m.page + 1).coerceAtMost((m.pageCount - 1).coerceAtLeast(0)),
+            scrollSteps = 0,
+        ))
+    }
+
+    private fun scrollManual(delta: Int) = _uiState.update { s ->
+        val m = s.manualViewer ?: return@update s
+        s.copy(manualViewer = m.copy(scrollSteps = (m.scrollSteps + delta).coerceIn(0, MANUAL_MAX_SCROLL_STEPS_)))
+    }
+
+    private fun handleManualViewerInput(action: GamepadAction) {
+        when (action) {
+            GamepadAction.NAVIGATE_LEFT  -> manualPrevPage()
+            GamepadAction.NAVIGATE_RIGHT -> manualNextPage()
+            GamepadAction.NAVIGATE_DOWN  -> scrollManual(+1)
+            GamepadAction.NAVIGATE_UP    -> scrollManual(-1)
+            GamepadAction.BACK           -> closeManualViewer()
+            else -> Unit
+        }
+    }
+
+    private fun fetchArtworkFor(gameId: Long) {
+        closeContextMenu()
+        if (_uiState.value.artworkFetchTitle != null) return
+        viewModelScope.launch {
+            val before = gameRepository.getById(gameId)
+            _uiState.update { it.copy(artworkFetchTitle = before?.displayTitle ?: "this game") }
+            val result = artworkRepository.fetchArtworkForGame(gameId, before?.title.orEmpty())
+            val updated = gameRepository.getById(gameId)
+            artworkRepository.evictFromImageCache((artRefsOf(before) + artRefsOf(updated)).toSet())
+            _uiState.update { it.copy(artworkFetchTitle = null) }
+            SystemToasts.post(
+                when {
+                    result.success -> "Artwork updated"
+                    result.skipped -> "Already has artwork"
+                    else           -> result.errorMessage ?: "Artwork fetch failed"
+                },
+                null,
+                if (result.success || result.skipped) ToastKind.SUCCESS else ToastKind.ERROR,
+            )
+            loadItemsForCategory(currentCategory())
+        }
+    }
+
+    private fun artRefsOf(game: Game?): List<String> = listOfNotNull(
+        game?.artworkUri, game?.heroUri, game?.logoUri, game?.iconUri,
+        game?.boxArtUri, game?.physicalMediaUri, game?.box3dUri,
+    )
+
+    private fun openMetadataPreviewFor(gameId: Long) {
+        closeContextMenu()
+        if (_uiState.value.metadataPreview != null) return
+        val generation = ++metadataPreviewGeneration
+        _uiState.update { it.copy(metadataPreview = MetadataPreviewUi(), metadataPreviewGameId = gameId) }
+        viewModelScope.launch {
+            val outcome = runCatching { artworkRepository.fetchMetadataPreview(gameId) }
+                .onFailure { Timber.w(it, "Metadata preview failed for game $gameId") }
+            val preview = outcome.getOrNull()
+            if (generation != metadataPreviewGeneration) return@launch
+            _uiState.update { s ->
+                if (s.metadataPreview == null) return@update s
+                if (preview == null || preview.presets.isEmpty()) {
+                    return@update s.copy(
+                        metadataPreview = MetadataPreviewUi(loading = false, failed = outcome.isFailure),
+                    )
+                }
+                s.copy(metadataPreview = MetadataPreviewUi(
+                    loading = false,
+                    current = preview.current,
+                    presets = preview.presets,
+                    chosen  = MetadataApply.changedFields(preview.current, preview.presets.first()),
+                ))
+            }
+        }
+    }
+
+    fun closeMetadataPreview() {
+        metadataPreviewGeneration++
+        _uiState.update { it.copy(metadataPreview = null, metadataPreviewGameId = null) }
+    }
+
+    fun selectMetadataPolicy(policy: MetadataApplyPolicy) = updateMetadataPreview { it.copy(policy = policy) }
+
+    private fun cycleMetadataPolicy(delta: Int) = updateMetadataPreview { p ->
+        val all = MetadataApplyPolicy.entries
+        p.copy(policy = all[(p.policy.ordinal + delta).mod(all.size)])
+    }
+
+    fun cycleMetadataSource(delta: Int) = updateMetadataPreview { p ->
+        if (p.presets.size < 2) return@updateMetadataPreview p
+        val index = (p.presetIndex + delta).mod(p.presets.size)
+        val next = p.copy(presetIndex = index, chosen = MetadataApply.changedFields(p.current, p.presets[index]))
+        next.copy(focus = next.focus.coerceIn(0, next.applyIndex))
+    }
+
+    fun toggleMetadataField(field: MetadataField) = updateMetadataPreview { p ->
+        p.copy(
+            policy = MetadataApplyPolicy.CHOOSE_FIELDS,
+            chosen = if (field in p.chosen) p.chosen - field else p.chosen + field,
+        )
+    }
+
+    private fun moveMetadataFocus(delta: Int) = updateMetadataPreview { p ->
+        p.copy(focus = (p.focus + delta).coerceIn(0, p.applyIndex))
+    }
+
+    fun applyMetadataPreview() {
+        val gameId = _uiState.value.metadataPreviewGameId ?: return
+        val p = _uiState.value.metadataPreview ?: return
+        if (p.loading || p.applying) return
+
+        val preset = p.preset ?: return closeMetadataPreview()
+        if (p.policy == MetadataApplyPolicy.KEEP_CURRENT) {
+            closeMetadataPreview()
+            SystemToasts.post("Kept current metadata", null, ToastKind.SUCCESS)
+            return
+        }
+        _uiState.update { it.copy(metadataPreview = p.copy(applying = true)) }
+        viewModelScope.launch {
+            val written = runCatching { artworkRepository.applyMetadata(gameId, preset, p.policy, p.chosen) }
+                .onFailure { Timber.w(it, "Metadata apply failed for game $gameId") }
+            metadataPreviewGeneration++
+            _uiState.update { it.copy(metadataPreview = null, metadataPreviewGameId = null) }
+            SystemToasts.post(
+                written.fold(
+                    onSuccess = { fields ->
+                        when (fields.size) {
+                            0    -> "Nothing to change"
+                            1    -> "Updated 1 field from ${preset.provider.label}"
+                            else -> "Updated ${fields.size} fields from ${preset.provider.label}"
+                        }
+                    },
+                    onFailure = { "Metadata update failed" },
+                ),
+                null,
+                if (written.isSuccess) ToastKind.SUCCESS else ToastKind.ERROR,
+            )
+            loadItemsForCategory(currentCategory())
+        }
+    }
+
+    private fun updateMetadataPreview(
+        transform: (MetadataPreviewUi) -> MetadataPreviewUi,
+    ) = _uiState.update { s ->
+        val p = s.metadataPreview ?: return@update s
+        if (p.loading || p.applying) s else s.copy(metadataPreview = transform(p))
+    }
+
+    private fun handleMetadataPreviewInput(action: GamepadAction) {
+        val p = _uiState.value.metadataPreview ?: return
+        if (p.applying) return
+        if (p.nothingFound) {
+            if (action == GamepadAction.SELECT || action == GamepadAction.BACK) closeMetadataPreview()
+            return
+        }
+        when (action) {
+            GamepadAction.BACK           -> closeMetadataPreview()
+            GamepadAction.NAVIGATE_LEFT  -> cycleMetadataPolicy(-1)
+            GamepadAction.NAVIGATE_RIGHT -> cycleMetadataPolicy(+1)
+            GamepadAction.PREV_CATEGORY  -> cycleMetadataSource(-1)
+            GamepadAction.NEXT_CATEGORY  -> cycleMetadataSource(+1)
+            GamepadAction.NAVIGATE_UP    -> moveMetadataFocus(-1)
+            GamepadAction.NAVIGATE_DOWN  -> moveMetadataFocus(+1)
+            GamepadAction.SELECT         ->
+                if (p.focus >= p.applyIndex) applyMetadataPreview()
+                else p.rows.getOrNull(p.focus)?.let { toggleMetadataField(it.field) }
+            else -> Unit
+        }
+    }
+
+    private var metadataPreviewGeneration = 0
+
+    private val MANUAL_MAX_SCROLL_STEPS_ = 20
+
     private fun launchGameDirectly(gameId: Long, discId: Long? = null) {
-        _uiState.update { it.copy(activeGameId = null, activeGameAutoLaunch = false, activeGameDiscId = null, activeGameAction = null) }
         viewModelScope.launch {
             val selected = gameRepository.getById(gameId) ?: run {
                 Timber.w("Direct launch requested for missing game id=$gameId")
@@ -6928,25 +7036,6 @@ class XMBViewModel @Inject constructor(
             is LaunchDispatchResult.Rejected -> Timber.w("Direct launch rejected: ${result.message}")
             LaunchDispatchResult.Accepted -> Unit
         }
-    }
-
-    fun onCloseGameDetail() {
-        _uiState.update {
-            it.copy(
-                activeGameId = null,
-                activeGameAutoLaunch = false,
-                activeGameDiscId = null,
-
-                activeGameAction = null,
-                pendingGameDetailAction = null,
-            )
-        }
-
-        loadItemsForCategory(currentCategory(), keepCursorOnRow = true)
-    }
-
-    fun consumeGameDetailAction() {
-        _uiState.update { it.copy(pendingGameDetailAction = null) }
     }
 
     private fun openAppDetail(knownGameId: Long?, packageName: String) {
@@ -7770,11 +7859,6 @@ class XMBViewModel @Inject constructor(
         viewModelScope.launch {
             iconDisplayPreferences.lingerDelaySecondsFlow.collect { seconds ->
                 icon1LingerMs = (seconds * 1_000f).toLong()
-            }
-        }
-        viewModelScope.launch {
-            gameLaunchPreferences.directLaunchFlow.collect { direct ->
-                _uiState.update { it.copy(directLaunch = direct) }
             }
         }
     }

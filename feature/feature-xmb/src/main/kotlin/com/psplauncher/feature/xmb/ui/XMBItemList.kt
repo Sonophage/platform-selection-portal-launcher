@@ -106,6 +106,7 @@ import com.psplauncher.core.ui.image.rememberArtworkModel
 import com.psplauncher.themekit.XmbLayoutSpec
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import com.psplauncher.core.ui.components.XmbDim
 
 private val GAME_ICON_WIDTH = 126.dp
 private val GAME_ICON_HEIGHT = 70.dp
@@ -182,6 +183,7 @@ fun XmbDrillFlyout(
     onPillActivated: (String) -> Unit,
 
     focusedPillIndex: Int?,
+    pillFade: Float = 1f,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     modifier: Modifier = Modifier,
@@ -201,6 +203,7 @@ fun XmbDrillFlyout(
 
             onPillActivated = onPillActivated,
             focusedPillIndex = focusedPillIndex,
+            pillFade = pillFade,
             modifier = Modifier.fillMaxHeight().width(DRILL_GAME_COLUMN_LEFT - 10.dp),
         )
 
@@ -216,6 +219,7 @@ fun XmbDrillFlyout(
             labelHiddenByPanel = labelHiddenByPanel,
             onPillActivated = onPillActivated,
             focusedPillIndex = focusedPillIndex,
+            pillFade = pillFade,
             metadataAsSubtitle = metadataAsSubtitle,
             modifier = Modifier.fillMaxSize().padding(start = DRILL_GAME_COLUMN_LEFT),
         )
@@ -233,6 +237,7 @@ private fun XmbGameColumn(
     onPillActivated: (String) -> Unit,
 
     focusedPillIndex: Int?,
+    pillFade: Float = 1f,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
     onItemSelected: (Int) -> Unit,
@@ -261,6 +266,7 @@ private fun XmbGameColumn(
                 labelHiddenByPanel = labelHiddenByPanel,
                 onPillActivated = onPillActivated,
                 focusedPillIndex = focusedPillIndex,
+                pillFade = pillFade,
                 metadataAsSubtitle = metadataAsSubtitle,
                 iconStyle = iconStyle,
                 onClick = { onItemSelected(i) },
@@ -405,6 +411,7 @@ fun XMBItemList(
     onPillActivated: (String) -> Unit,
 
     focusedPillIndex: Int?,
+    pillFade: Float = 1f,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
 
@@ -433,6 +440,7 @@ fun XMBItemList(
                             labelHiddenByPanel = labelHiddenByPanel,
                             onPillActivated = onPillActivated,
                             focusedPillIndex = focusedPillIndex,
+                            pillFade = pillFade,
                             cardArtGrid = cardArtGrid,
                             metadataAsSubtitle = metadataAsSubtitle,
                             item = items[i],
@@ -477,6 +485,7 @@ fun XMBItemList(
                     labelHiddenByPanel = labelHiddenByPanel,
                     onPillActivated = onPillActivated,
                     focusedPillIndex = focusedPillIndex,
+                    pillFade = pillFade,
                     metadataAsSubtitle = metadataAsSubtitle,
                     iconStyle = iconStyle,
                     onClick = { onItemSelected(selectedIndex - 1) },
@@ -520,6 +529,7 @@ private fun XmbVerticalListRow(
     onPillActivated: (String) -> Unit,
 
     focusedPillIndex: Int?,
+    pillFade: Float = 1f,
     cardArtGrid: Boolean = true,
     metadataAsSubtitle: Boolean = false,
 
@@ -698,13 +708,13 @@ private fun XmbVerticalListRow(
                         }
                     }
 
-                    if (isSelected) {
+                    if (isSelected && pillFade > 0f) {
                         val pills = pillsFor(item)
                         if (pills.isNotEmpty()) {
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(PillGap),
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(top = 6.dp),
+                                modifier = Modifier.padding(top = 6.dp).alpha(pillFade),
                             ) {
                                 pills.forEachIndexed { index, pill ->
                                     XmbActionPill(

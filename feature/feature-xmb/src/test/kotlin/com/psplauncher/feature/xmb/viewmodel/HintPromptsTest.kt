@@ -8,12 +8,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.psplauncher.core.ui.components.MenuGroup
+import com.psplauncher.core.ui.components.MenuState
+import com.psplauncher.core.ui.components.rowsShown
+import com.psplauncher.core.ui.components.foldedIntoGroups
+import com.psplauncher.core.ui.components.submenuFor
 
 class HintPromptsTest {
     private fun state(
         items: List<XMBItem> = listOf(XMBItem(id = "g", title = "All Games", type = XMBItemType.ALL_GAMES)),
         selected: Int = 0,
-        directLaunch: Boolean = true,
         menu: XMBContextMenu? = null,
 
         drilled: String? = null,
@@ -26,7 +30,6 @@ class HintPromptsTest {
         ),
         currentItems = items,
         selectedItemIndex = selected,
-        directLaunch = directLaunch,
         activeContextMenu = menu,
         selectedPlatformId = drilled,
     )
@@ -42,8 +45,7 @@ class HintPromptsTest {
     @Test
     fun `a game's verb follows direct launch, because that setting IS the question`() {
         val game = listOf(XMBItem(id = "1", title = "Crisis Core", gameId = 1L))
-        assertEquals("Play", promptsFor(state(items = game, directLaunch = true)).primary?.verb)
-        assertEquals("Details", promptsFor(state(items = game, directLaunch = false)).primary?.verb)
+        assertEquals("Play", promptsFor(state(items = game)).primary?.verb)
     }
 
     @Test
@@ -71,14 +73,10 @@ class HintPromptsTest {
 
     @Test
     fun `the rail owns the bar while it is open`() {
-        val menu = XMBContextMenu(
-            title = "Crisis Core",
-            items = listOf(
+        val menu = XMBContextMenu(state = MenuState(title = "Crisis Core", rows = listOf(
                 XMBContextMenuItem("icon_display", "Icon Display"),
                 XMBContextMenuItem("file_location", "View File Location"),
-            ),
-            selectedIndex = 1,
-        )
+            ), selectedIndex = 1))
         val prompts = promptsFor(state(menu = menu))
         assertEquals("Select", prompts.primary?.verb)
         assertEquals("View File Location", prompts.primary?.target)
@@ -96,5 +94,21 @@ class HintPromptsTest {
     fun `Sort and Filter are one button and never both`() {
         val right = promptsFor(state()).right.map { it.verb }
         assertTrue("Sort and Filter both offered: $right", right.count { it == "Sort" || it == "Filter" } <= 1)
+    }
+
+    @Test
+    fun `inside a submenu Back climbs a level, and the hint says so`() {
+        val root = XMBContextMenu(state = MenuState(title = "Gran Turismo 4", rows = listOf(
+                XMBContextMenuItem("icon_display", "Icon Display", group = MenuGroup.SETTINGS),
+                XMBContextMenuItem("file_location", "View File Location", group = MenuGroup.SETTINGS),
+            )))
+        assertEquals("Close", promptsFor(state(menu = root)).back.verb)
+
+        val submenu = root.copy(state = root.state.submenuFor(MenuGroup.SETTINGS)!!)
+        assertEquals(
+            "Back would close the whole menu while claiming to close it, losing the root",
+            "Back",
+            promptsFor(state(menu = submenu)).back.verb,
+        )
     }
 }

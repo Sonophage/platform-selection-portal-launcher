@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,18 +21,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.psplauncher.core.ui.components.XmbScrim
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
-import com.psplauncher.core.ui.theme.deriveStorefrontColors
 import com.psplauncher.feature.xmb.viewmodel.LetterJumpState
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.letterAnchors
 
 internal val RAIL_WIDTH = 26.dp
 private val RESTING_ALPHA = 0.28f
+
+private const val RESTING_TAB_ALPHA = 0.55f
+private const val LIVE_TAB_ALPHA = 0.90f
+private val TAB_CORNER = 10.dp
 
 internal val RUNG_LINE_HEIGHT = 10.sp
 
@@ -48,13 +55,13 @@ fun XmbLetterRail(
     val anchors = remember(items) { letterAnchors(items) }
     if (anchors == null) return
 
-    val colors = deriveStorefrontColors()
     val text = LocalPfpTextColors.current
     val live by animateFloatAsState(
         targetValue = if (letterJump != null) 1f else 0f,
         animationSpec = tween(140),
         label = "letterRailLive",
     )
+    val tab = RESTING_TAB_ALPHA + (LIVE_TAB_ALPHA - RESTING_TAB_ALPHA) * live
 
     Box(
         modifier = modifier
@@ -84,8 +91,15 @@ fun XmbLetterRail(
 
             verticalArrangement = Arrangement.spacedBy(0.dp),
             modifier = Modifier
-                .clip(RoundedCornerShape(RAIL_WIDTH / 2))
-                .background(colors.menuPanel.copy(alpha = 0.55f * live))
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(topStart = TAB_CORNER, bottomStart = TAB_CORNER))
+                .background(
+                    Brush.horizontalGradient(
+                        0f to Color.Transparent,
+                        0.45f to XmbScrim.copy(alpha = tab),
+                        1f to XmbScrim.copy(alpha = tab),
+                    ),
+                )
                 .padding(vertical = RAIL_VERTICAL_PADDING),
         ) {
             anchors.forEachIndexed { index, anchor ->

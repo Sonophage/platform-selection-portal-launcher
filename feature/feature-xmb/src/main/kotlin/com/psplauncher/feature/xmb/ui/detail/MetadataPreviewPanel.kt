@@ -29,12 +29,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.psplauncher.feature.artwork.match.MetadataApply
 import com.psplauncher.feature.artwork.match.MetadataApplyPolicy
 import com.psplauncher.feature.artwork.match.MetadataField
 import com.psplauncher.feature.artwork.match.MetadataFieldRow
 import kotlin.math.roundToInt
 import androidx.compose.runtime.ReadOnlyComposable
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
+import com.psplauncher.feature.artwork.match.MetadataPreset
 
 private val TextPrimary: Color @Composable @ReadOnlyComposable get() = LocalPfpTextColors.current.primary
 
@@ -42,6 +44,28 @@ private val TextMuted: Color @Composable @ReadOnlyComposable get() = LocalPfpTex
 private val RowFill = Color(0xFF1B1B26)
 private val ChangeGreen = Color(0xFF45C46A)
 private val RowScrollStep = 52.dp
+
+data class MetadataPreviewUi(
+    val loading: Boolean = true,
+    val applying: Boolean = false,
+
+    val failed: Boolean = false,
+    val current: Map<MetadataField, Any?> = emptyMap(),
+    val presets: List<MetadataPreset> = emptyList(),
+    val presetIndex: Int = 0,
+    val policy: MetadataApplyPolicy = MetadataApplyPolicy.FILL_MISSING_ONLY,
+    val chosen: Set<MetadataField> = emptySet(),
+
+    val focus: Int = 0,
+) {
+    val preset: MetadataPreset? get() = presets.getOrNull(presetIndex)
+
+    val nothingFound: Boolean get() = !loading && presets.isEmpty()
+    val rows: List<MetadataFieldRow> get() = preset?.let { MetadataApply.rows(current, it) }.orEmpty()
+    val willWrite: Set<MetadataField>
+        get() = preset?.let { MetadataApply.plan(current, it, policy, chosen).keys }.orEmpty()
+    val applyIndex: Int get() = rows.size
+}
 
 @Composable
 fun MetadataPreviewPanel(

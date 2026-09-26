@@ -68,7 +68,6 @@ private val KEY_CONTEXT_MENU_HINT_DELAY_SECONDS = floatPreferencesKey("interface
 
 private val KEY_TOUCH_SENSITIVITY  = stringPreferencesKey("interface_touch_sensitivity")
 
-private val KEY_DIRECT_LAUNCH      = booleanPreferencesKey("pref_direct_game_launch")
 
 private val KEY_ICON_LEGIBILITY    = stringPreferencesKey("display_icon_legibility")
 
@@ -153,7 +152,6 @@ data class DisplaySettingsUiState(
     val contextMenuHintDelaySeconds: Float = ControllerHintPolicy.DEFAULT_DELAY_SECONDS,
     val touchSensitivity: TouchSensitivity = TouchSensitivity.NORMAL,
 
-    val directLaunch: Boolean = false,
     val customWallpaperPath: String? = null,
 
     val motionWallpaperPath: String? = null,
@@ -249,7 +247,6 @@ class DisplaySettingsViewModel @Inject constructor(
                 prefs[KEY_CONTEXT_MENU_HINT_DELAY_SECONDS] ?: ControllerHintPolicy.DEFAULT_DELAY_SECONDS
             ),
             touchSensitivity     = TouchSensitivity.fromName(prefs[KEY_TOUCH_SENSITIVITY]),
-            directLaunch         = prefs[KEY_DIRECT_LAUNCH]   ?: false,
             customWallpaperPath  = prefs[KEY_CUSTOM_WALLPAPER],
             motionWallpaperPath  = prefs[KEY_MOTION_WALLPAPER],
             wallpaperMessage     = msg,
@@ -414,7 +411,6 @@ class DisplaySettingsViewModel @Inject constructor(
     fun setThermalThrottleAware(v: Boolean)  = save { it[KEY_THERMAL_AWARE]   = v }
     fun setRespectBatterySaver(v: Boolean)   = save { it[KEY_RESPECT_BATTERY] = v }
     fun setWaveOverWallpaper(v: Boolean)     = save { it[KEY_WAVE_OVER_WALLPAPER] = v }
-    fun setDirectLaunch(v: Boolean)          = save { it[KEY_DIRECT_LAUNCH]   = v }
     fun setContextMenuHintEnabled(v: Boolean) = save { it[KEY_CONTEXT_MENU_HINT] = v }
     fun setContextMenuHintDelaySeconds(v: Float) = save {
         it[KEY_CONTEXT_MENU_HINT_DELAY_SECONDS] = v.coerceIn(1f, 5f)

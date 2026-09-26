@@ -6,7 +6,6 @@ data class XmbPill(val id: String, val label: String)
 
 internal fun pillsFor(item: XMBItem): List<XmbPill> = when {
     item.gameId != null -> buildList {
-        add(XmbPill("game_details", "Details"))
         add(if (item.isFavorite) XmbPill("unfavorite", "Unfavorite") else XmbPill("favorite", "Favorite"))
 
         if (!item.isAndroidApp) add(XmbPill("change_emulator", "Open with"))

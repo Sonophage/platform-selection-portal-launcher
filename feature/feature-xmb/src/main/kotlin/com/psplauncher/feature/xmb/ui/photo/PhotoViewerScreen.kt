@@ -54,7 +54,6 @@ import com.psplauncher.core.ui.components.PfpControllerHints
 import com.psplauncher.core.ui.components.ControllerPromptItem
 import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.core.ui.components.PspContextMenuOverlay
-import com.psplauncher.core.ui.components.PspMenuRow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -209,15 +208,8 @@ fun PhotoViewerScreen(
 
         if (state.showOptions) {
             PspContextMenuOverlay(
-                title = "Options",
-                rows = PhotoViewerAction.entries.map { action ->
-                    PspMenuRow(
-                        label = action.label,
-                        isDestructive = action == PhotoViewerAction.REMOVE,
-                    )
-                },
-                selectedIndex = state.optionsIndex,
-                onRowActivated = { viewModel.activate(PhotoViewerAction.entries[it]) },
+                state = state.optionsMenu,
+                onRowActivated = viewModel::onOptionRowActivated,
                 onDismiss = viewModel::closeOptions,
             )
         }

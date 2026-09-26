@@ -43,6 +43,14 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 
+data class ManualViewerUi(
+    val uri: String,
+    val title: String,
+    val page: Int = 0,
+    val pageCount: Int = 0,
+    val scrollSteps: Int = 0,
+)
+
 @Composable
 fun ManualViewerOverlay(
     source: String,

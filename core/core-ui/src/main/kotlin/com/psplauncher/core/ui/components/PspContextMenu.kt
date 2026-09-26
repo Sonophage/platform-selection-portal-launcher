@@ -1,52 +1,47 @@
 package com.psplauncher.core.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.psplauncher.core.ui.preview.CombinedPreviews
 import com.psplauncher.core.ui.preview.PfpPreview
-import com.psplauncher.core.ui.theme.LocalPFPColors
-import com.psplauncher.core.ui.theme.menuCursorEdge
 
-data class PspMenuRow(
-    val label: String,
-    val isDestructive: Boolean = false,
-
-    val checked: Boolean = false,
-
-    val heading: String? = null,
-)
-
-private val PanelWidth = 300.dp
+const val NoMenuSelection = -1
 
 private val TextDropShadow = Shadow(
     color = Color.Black.copy(alpha = 0.75f),
@@ -55,86 +50,94 @@ private val TextDropShadow = Shadow(
 )
 
 @Composable
-fun PspContextMenuOverlay(
-    title: String,
-    rows: List<PspMenuRow>,
-    selectedIndex: Int,
+fun <T> PspContextMenuOverlay(
+    state: MenuState<T>,
     onRowActivated: (index: Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 
-    scrim: Color = Color(0x99000000),
+    scrim: Color = XmbScrim,
 ) {
-    val colors = LocalPFPColors.current
+    val title = state.title
+    val subtitle = state.subtitle
+    val rows = state.rowsShown()
+    val selectedIndex = state.selectedIndex ?: NoMenuSelection
     val listState = rememberLazyListState()
 
     LaunchedEffect(selectedIndex) {
-        if (rows.isNotEmpty()) {
-            listState.animateScrollToItem(selectedIndex.coerceIn(0, rows.size - 1))
+        if (rows.isNotEmpty() && selectedIndex >= 0) {
+            listState.animateScrollToItem(selectedIndex.coerceIn(0, rows.lastIndex))
         }
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(scrim)
-            .clickable(onClick = onDismiss),
+            .background(
+                Brush.horizontalGradient(
+                    0f to Color.Transparent,
+                    0.5f to scrim.copy(alpha = scrim.alpha * 0.45f),
+                    1f to scrim,
+                ),
+            ),
     ) {
+        Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
+
         Column(
+            horizontalAlignment = Alignment.End,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .width(PanelWidth)
-                .background(lerp(colors.waveColor, Color.Black, 0.62f).copy(alpha = 0.96f))
-                .clickable(onClick = {})
-                .padding(start = 28.dp, end = 40.dp),
-            verticalArrangement = Arrangement.Center,
+                .padding(top = StatusStripHeight, bottom = HintBarHeight, end = RailEdgeGap),
         ) {
             Text(
                 text = title,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Light,
                 color = Color.White.copy(alpha = 0.92f),
+                fontSize = RailTitleSize,
+                fontWeight = FontWeight.Light,
                 style = TextStyle(shadow = TextDropShadow),
                 maxLines = 2,
-                modifier = Modifier.padding(bottom = 10.dp),
+                textAlign = TextAlign.End,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = RailMaxText),
             )
 
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(end = 8.dp)
-                    .height(1.dp)
-                    .background(Color.White.copy(alpha = 0.30f)),
+            Text(
+                text = subtitle.orEmpty(),
+                color = Color.White.copy(alpha = 0.62f),
+                fontSize = RailSubtitleSize,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp,
+                style = TextStyle(shadow = TextDropShadow),
+                maxLines = 1,
+                textAlign = TextAlign.End,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = RailMaxText),
             )
+
+            Spacer(Modifier.height(RailTitleGap))
 
             LazyColumn(
                 state = listState,
-
-                contentPadding = PaddingValues(top = 10.dp, bottom = 32.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(RailRowGap),
+                contentPadding = PaddingValues(bottom = RailRowGap),
             ) {
                 itemsIndexed(rows) { index, row ->
-
-                    row.heading?.let { heading ->
-                        Text(
-                            text = heading,
-                            color = colors.textSecondary.copy(alpha = 0.75f),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 1.sp,
-                            style = LocalTextStyle.current.copy(shadow = TextDropShadow),
-                            modifier = Modifier.padding(
-                                start = 20.dp,
-                                end = 20.dp,
-                                top = if (index == 0) 0.dp else 12.dp,
-                                bottom = 4.dp,
-                            ),
-                        )
+                    val target = if (selectedIndex >= 0) {
+                        XmbDim.smoothed(kotlin.math.abs(index - selectedIndex), rows.lastIndex)
+                    } else {
+                        XmbDim.smoothed(1, rows.lastIndex)
                     }
-                    PspContextMenuRow(
-                        row        = row,
-                        isSelected = index == selectedIndex,
-                        onClick    = { onRowActivated(index) },
+                    val dim by animateFloatAsState(target, tween(DimFadeMs), label = "railDim")
+
+                    XmbRailRow(
+                        label = row.label,
+                        focused = index == selectedIndex,
+                        destructive = row.isDestructive,
+                        checked = row.checked,
+                        opensSubmenu = row.opensSubmenu,
+                        dim = dim,
+                        onClick = { onRowActivated(index) },
                     )
                 }
             }
@@ -143,66 +146,118 @@ fun PspContextMenuOverlay(
 }
 
 @Composable
-private fun PspContextMenuRow(
-    row: PspMenuRow,
-    isSelected: Boolean,
+private fun XmbRailRow(
+    label: String,
+    focused: Boolean,
+    destructive: Boolean,
+    checked: Boolean,
+    opensSubmenu: Boolean,
+    dim: Float,
     onClick: () -> Unit,
 ) {
-    val glow = menuCursorEdge()
-    Box(
+    val tint = if (destructive) RailDestructive else null
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .fillMaxWidth()
-
-            .background(
-                if (isSelected) {
-                    Brush.horizontalGradient(
-                        0f to Color.Transparent,
-                        1f to glow.copy(alpha = 0.40f),
-                    )
-                } else {
-                    Brush.horizontalGradient(0f to Color.Transparent, 1f to Color.Transparent)
-                }
-            )
+            .alpha(if (focused) 1f else dim)
+            .clip(RoundedCornerShape(RailCorner))
+            .then(if (focused) Modifier.background(Color.White) else Modifier)
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(start = RailPadStart, end = RailPadEnd, top = RailPadV, bottom = RailPadV),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = row.label,
-                fontSize = if (isSelected) 16.sp else 15.sp,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = when {
-                    row.isDestructive && isSelected -> Color(0xFFFF7070)
-                    row.isDestructive               -> Color(0xAAFF7070)
-                    isSelected                      -> Color.White
-                    else                            -> Color.White.copy(alpha = 0.62f)
-                },
-                style = TextStyle(shadow = TextDropShadow),
-                modifier = Modifier.weight(1f, fill = false),
+        Text(
+            text = label,
+            color = when {
+                destructive -> RailDestructive
+                focused -> RailInk
+                else -> Color.White
+            },
+            fontSize = RailTextSize,
+            fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = RailMaxText),
+        )
+        if (checked) {
+            Spacer(Modifier.width(RailGap))
+            PfpCheckMark(
+                if (focused) RailInk else Color.White,
+                size = 15.dp,
+                shadow = TextDropShadow.color,
             )
-            if (row.checked) {
-                Spacer(Modifier.width(10.dp))
-                PfpCheckMark(Color.White, size = 15.dp, shadow = TextDropShadow.color)
-            }
         }
+        Spacer(Modifier.width(RailGap))
+        XmbRailBadge(label = label, filled = focused, opensSubmenu = opensSubmenu, tint = tint)
     }
 }
+
+@Composable
+private fun XmbRailBadge(
+    label: String,
+    filled: Boolean,
+    opensSubmenu: Boolean = false,
+    tint: Color? = null,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(RailIcon)
+            .clip(RoundedCornerShape(RailCorner))
+            .background(
+                when {
+                    filled -> tint ?: RailInk
+                    opensSubmenu -> Color.White
+                    tint != null -> tint.copy(alpha = 0.22f)
+                    else -> Color.White.copy(alpha = 0.12f)
+                },
+            ),
+    ) {
+        Text(
+            text = label.trim().firstOrNull()?.uppercase() ?: "?",
+            color = when {
+                filled -> Color.White
+                opensSubmenu -> RailInk
+                else -> Color.White.copy(alpha = 0.85f)
+            },
+            fontSize = RailGlyphSize,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+val XmbScrim = Color(0xF7050201)
+
+internal val RailIcon = 29.dp
+internal val RailCorner = 7.dp
+internal val RailEdgeGap = 24.dp
+internal val RailRowGap = 13.dp
+private const val DimFadeMs = 160
+private val RailGlyphSize = 13.sp
+private val RailTextSize = 13.sp
+private val RailTitleSize = 26.sp
+private val RailSubtitleSize = 12.sp
+private val RailTitleGap = 22.dp
+private val RailPadStart = 14.dp
+private val RailPadEnd = 4.dp
+private val RailPadV = 4.dp
+private val RailGap = 10.dp
+private val RailMaxText = 300.dp
+private val RailInk = Color(0xFF1A0C03)
+private val RailDestructive = Color(0xFFE2606A)
 
 @CombinedPreviews
 @Composable
 fun PspContextMenuPreview() {
     val rows = listOf(
-        PspMenuRow("Play"),
-        PspMenuRow("Information"),
-        PspMenuRow("Delete", isDestructive = true),
-        PspMenuRow("Add to Favorites", checked = true),
-        PspMenuRow("Assign Album"),
+        MenuRow("play", "Play"),
+        MenuRow("info", "Information"),
+        MenuRow("fav", "Add to Favorites", checked = true),
+        MenuRow<String>(null, "Settings", MenuGroup.SETTINGS, opensSubmenu = true),
+        MenuRow("remove", "Remove From Library", isDestructive = true),
     )
     PfpPreview {
         PspContextMenuOverlay(
-            title = "Gran Turismo 4",
-            rows = rows,
-            selectedIndex = 1,
+            state = MenuState("Gran Turismo 4", rows, subtitle = "Library", selectedIndex = 1),
             onRowActivated = {},
             onDismiss = {},
         )
