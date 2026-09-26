@@ -1075,9 +1075,6 @@ fun XMBShell(
                     onTouch = onLetterRailTouch,
                     onReleased = onLetterRailReleased,
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
-
-                        .padding(top = StatusStripHeight, bottom = HintBarHeight)
                         .alpha(chromeFade)
                         .zIndex(XmbChromeZ),
                 )

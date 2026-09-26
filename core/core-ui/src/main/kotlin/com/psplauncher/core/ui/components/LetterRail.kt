@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,15 +28,18 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import kotlin.math.abs
 
 data class LetterAnchor(val letter: Char, val index: Int)
 
@@ -92,10 +96,11 @@ fun LetterJumpState.at(rung: Int): LetterJumpState {
 data class RailMetrics(
     val rungs: Int,
     val badge: Dp,
-    val pitch: Dp,
+    val gap: Dp,
     val glyph: TextUnit,
-    val thickness: Dp,
-)
+) {
+    val pitch: Dp get() = badge + gap
+}
 
 internal val RailMinBadge = 16.dp
 internal val RailMaxBadge = RailIcon
@@ -103,26 +108,28 @@ private val RungGap = 3.dp
 private val BadgeSideGap = 4.dp
 private const val GlyphRatio = 0.45f
 
-val RAIL_PADDING = 6.dp
-
 private const val ACTIVE_SCALE = 1.3f
-private const val RESTING_ALPHA = 0.28f
+private const val INACTIVE_ALPHA = 0.55f
+private const val RESTING_FRACTION = 0.5f
 private const val RESTING_TAB_ALPHA = 0.55f
 private const val LIVE_TAB_ALPHA = 0.90f
 private val TAB_CORNER = 10.dp
 
+internal val RailEdgeZone = RailIcon + RailEdgeGap * 2
+
 fun railMetrics(available: Dp, anchorCount: Int): RailMetrics {
-    val usable = (available - RAIL_PADDING * 2).coerceAtLeast(RailMinBadge)
+    val usable = available.coerceAtLeast(RailMinBadge)
     val minPitch = RailMinBadge + RungGap
     val maxRungs = (usable / minPitch).toInt().coerceAtLeast(1)
     val rungs = anchorCount.coerceIn(1, maxRungs)
-    val badge = (usable / rungs - RungGap).coerceIn(RailMinBadge, RailMaxBadge)
+    val share = usable / rungs
+    val badge = (share - RungGap).coerceIn(RailMinBadge, RailMaxBadge)
+    val gap = (share - badge).coerceIn(RungGap, RailRowGap)
     return RailMetrics(
         rungs = rungs,
         badge = badge,
-        pitch = badge + RungGap,
+        gap = gap,
         glyph = (badge.value * GlyphRatio).sp,
-        thickness = (badge + BadgeSideGap * 2) * 2,
     )
 }
 
@@ -145,36 +152,43 @@ fun XmbLetterRail(
 ) {
     val anchors = remember(titles) { letterAnchors(titles) } ?: return
 
-    BoxWithConstraints(modifier.fillMaxHeight()) {
-        val metrics = railMetrics(maxHeight, anchors.size)
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val metrics = railMetrics(maxHeight - StatusStripHeight - HintBarHeight, anchors.size)
         val rungs = remember(anchors.size, metrics.rungs) { bucketIndices(anchors.size, metrics.rungs) }
-        val live = railLive(cursor)
 
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(metrics.thickness)
-                .railGestures(rungs, metrics, vertical = true, onTouch = onTouch, onReleased = onReleased),
-        ) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(RungGap, Alignment.CenterVertically),
+        if (cursor != null) {
+            Box(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(topStart = TAB_CORNER, bottomStart = TAB_CORNER))
+                    .fillMaxSize()
                     .background(
                         Brush.horizontalGradient(
                             0f to Color.Transparent,
-                            0.45f to XmbScrim.copy(alpha = tabAlpha(live)),
-                            1f to XmbScrim.copy(alpha = tabAlpha(live)),
+                            0.5f to XmbScrim.copy(alpha = XmbScrim.alpha * 0.45f),
+                            1f to XmbScrim,
                         ),
-                    )
-                    .padding(vertical = RAIL_PADDING, horizontal = BadgeSideGap),
+                    ),
             ) {
-                Rungs(anchors, rungs, cursor, metrics, live)
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(metrics.gap, Alignment.CenterVertically),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .padding(top = StatusStripHeight, bottom = HintBarHeight, end = RailEdgeGap),
+                ) {
+                    Rungs(anchors, rungs, cursor, metrics)
+                }
             }
         }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(RailEdgeZone)
+                .padding(top = StatusStripHeight, bottom = HintBarHeight)
+                .railSlide(rungs, metrics, vertical = true, onTouch = onTouch, onReleased = onReleased),
+        )
     }
 }
 
@@ -189,7 +203,7 @@ fun XmbLetterBar(
     val anchors = remember(titles) { letterAnchors(titles) } ?: return
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val metrics = railMetrics(maxWidth, anchors.size)
+        val metrics = railMetrics(maxWidth - RailEdgeGap * 2, anchors.size)
         val rungs = remember(anchors.size, metrics.rungs) { bucketIndices(anchors.size, metrics.rungs) }
         val live = railLive(cursor)
 
@@ -197,12 +211,12 @@ fun XmbLetterBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(metrics.thickness)
+                .height(metrics.badge + BadgeSideGap * 2)
                 .railGestures(rungs, metrics, vertical = false, onTouch = onTouch, onReleased = onReleased),
         ) {
             Row(
                 verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(RungGap, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(metrics.gap, Alignment.CenterHorizontally),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = TAB_CORNER, topEnd = TAB_CORNER))
@@ -213,7 +227,7 @@ fun XmbLetterBar(
                             1f to XmbScrim.copy(alpha = tabAlpha(live)),
                         ),
                     )
-                    .padding(horizontal = RAIL_PADDING, vertical = BadgeSideGap),
+                    .padding(horizontal = RailEdgeGap, vertical = BadgeSideGap),
             ) {
                 Rungs(anchors, rungs, cursor, metrics, live)
             }
@@ -239,7 +253,7 @@ private fun Rungs(
     rungs: List<Int>,
     cursor: Int?,
     metrics: RailMetrics,
-    live: Float,
+    live: Float = 1f,
 ) {
     val activeRung = cursor?.let { c -> rungs.indexOfLast { it <= c }.coerceAtLeast(0) }
     rungs.forEachIndexed { rung, anchor ->
@@ -250,7 +264,7 @@ private fun Rungs(
             metrics = metrics,
             modifier = Modifier
                 .zIndex(if (active) 1f else 0f)
-                .alpha(if (active) 1f else RESTING_ALPHA + (1f - RESTING_ALPHA) * live),
+                .alpha(if (active) 1f else INACTIVE_ALPHA * (RESTING_FRACTION + (1f - RESTING_FRACTION) * live)),
         )
     }
 }
@@ -273,11 +287,11 @@ private fun RailLetterBadge(
                 }
             }
             .clip(RoundedCornerShape(metrics.badge * RailCornerRatio))
-            .background(if (active) Color.White else Color.White.copy(alpha = 0.12f)),
+            .background(if (active) RailInk else Color.White.copy(alpha = 0.85f)),
     ) {
         Text(
             text = letter.toString(),
-            color = if (active) RailInk else Color.White.copy(alpha = 0.85f),
+            color = if (active) Color.White else RailInk,
             fontSize = metrics.glyph,
             fontWeight = FontWeight.Bold,
         )
@@ -293,31 +307,67 @@ private fun Modifier.railGestures(
     onTouch: (Int) -> Unit,
     onReleased: () -> Unit,
 ): Modifier = pointerInput(rungs, metrics, vertical) {
-    val pitchPx = metrics.pitch.toPx()
-    val spanPx = pitchPx * metrics.rungs - (metrics.pitch - metrics.badge).toPx()
+    val geometry = geometryOf(metrics)
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
-        report(down.position.let { if (vertical) it.y else it.x }, spanPx, pitchPx, rungs, vertical, onTouch)
+        report(down.position, geometry, rungs, vertical, onTouch)
         down.consume()
         while (true) {
-            val event = awaitPointerEvent()
-            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
             if (!change.pressed) break
-            report(change.position.let { if (vertical) it.y else it.x }, spanPx, pitchPx, rungs, vertical, onTouch)
+            report(change.position, geometry, rungs, vertical, onTouch)
             change.consume()
         }
         onReleased()
     }
 }
 
+private fun Modifier.railSlide(
+    rungs: List<Int>,
+    metrics: RailMetrics,
+    vertical: Boolean,
+    onTouch: (Int) -> Unit,
+    onReleased: () -> Unit,
+): Modifier = pointerInput(rungs, metrics, vertical) {
+    val geometry = geometryOf(metrics)
+    val slop = viewConfiguration.touchSlop
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var sliding = false
+        while (true) {
+            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) break
+            if (!sliding) {
+                val dx = change.position.x - down.position.x
+                val dy = change.position.y - down.position.y
+                val along = if (vertical) dy else dx
+                val across = if (vertical) dx else dy
+                sliding = abs(along) > slop && abs(along) > abs(across)
+            }
+            if (sliding) {
+                report(change.position, geometry, rungs, vertical, onTouch)
+                change.consume()
+            }
+        }
+        if (sliding) onReleased()
+    }
+}
+
+private data class RailGeometry(val spanPx: Float, val pitchPx: Float)
+
+private fun Density.geometryOf(metrics: RailMetrics) = RailGeometry(
+    spanPx = with(metrics) { badge.toPx() * rungs + gap.toPx() * (rungs - 1) },
+    pitchPx = metrics.pitch.toPx(),
+)
+
 private fun PointerInputScope.report(
-    along: Float,
-    spanPx: Float,
-    pitchPx: Float,
+    at: Offset,
+    geometry: RailGeometry,
     rungs: List<Int>,
     vertical: Boolean,
     onTouch: (Int) -> Unit,
 ) {
     val extent = (if (vertical) size.height else size.width).toFloat()
-    onTouch(rungs[rungAt(along, extent, spanPx, pitchPx, rungs.size)])
+    val along = if (vertical) at.y else at.x
+    onTouch(rungs[rungAt(along, extent, geometry.spanPx, geometry.pitchPx, rungs.size)])
 }

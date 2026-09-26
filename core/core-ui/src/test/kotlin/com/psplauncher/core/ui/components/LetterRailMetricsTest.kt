@@ -10,7 +10,7 @@ class LetterRailMetricsTest {
     private val TABLET = 668.dp - StatusStripHeight - HintBarHeight
     private val WHOLE_ALPHABET = 27
 
-    private fun span(m: RailMetrics) = m.badge * m.rungs + (m.pitch - m.badge) * (m.rungs - 1)
+    private fun span(m: RailMetrics) = m.badge * m.rungs + m.gap * (m.rungs - 1)
 
     @Test
     fun `the rungs always fit the space they were measured against`() {
@@ -20,7 +20,7 @@ class LetterRailMetricsTest {
                 assertTrue(
                     "$anchors letters in ${height}dp came out ${span(m).value}dp tall across " +
                         "${m.rungs} rungs, which overflows the space it was measured against",
-                    span(m) + RAIL_PADDING * 2 <= height.dp,
+                    span(m) <= height.dp,
                 )
             }
         }
@@ -40,6 +40,37 @@ class LetterRailMetricsTest {
         val m = railMetrics(TABLET, 8)
         assertEquals("8 letters in ${TABLET.value}dp has room to spare", RailMaxBadge.value, m.badge.value, 0.01f)
         assertEquals("nothing is bucketed when everything fits", 8, m.rungs)
+    }
+
+    @Test
+    fun `with room to spare the rungs sit exactly as the context menu's rows do`() {
+        val m = railMetrics(TABLET, 8)
+        assertEquals(
+            "the rail is meant to read as the menu, so a roomy rung is the menu's badge",
+            RailIcon.value,
+            m.badge.value,
+            0.01f,
+        )
+        assertEquals(
+            "and the space between rungs is the menu's row gap, never wider",
+            RailRowGap.value,
+            m.gap.value,
+            0.01f,
+        )
+    }
+
+    @Test
+    fun `a crowded rail tightens the gap rather than shrinking the badge first`() {
+        val roomy = railMetrics(TABLET, 8)
+        val crowded = railMetrics(TABLET, 18)
+
+        assertTrue("18 letters must close the gap up", crowded.gap < roomy.gap)
+        assertEquals(
+            "closing the gap comes first, so the badge is still the menu's",
+            RailIcon.value,
+            crowded.badge.value,
+            0.01f,
+        )
     }
 
     @Test
