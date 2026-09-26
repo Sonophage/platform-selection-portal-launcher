@@ -24,14 +24,17 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.psplauncher.core.ui.components.XmbScrim
 import com.psplauncher.core.ui.theme.LocalPfpTextColors
-import com.psplauncher.core.ui.theme.deriveStorefrontColors
 import com.psplauncher.feature.xmb.viewmodel.LetterJumpState
 import com.psplauncher.feature.xmb.viewmodel.XMBItem
 import com.psplauncher.feature.xmb.viewmodel.letterAnchors
 
 internal val RAIL_WIDTH = 26.dp
 private val RESTING_ALPHA = 0.28f
+
+private const val RESTING_TAB_ALPHA = 0.55f
+private const val LIVE_TAB_ALPHA = 0.90f
 
 internal val RUNG_LINE_HEIGHT = 10.sp
 
@@ -48,7 +51,6 @@ fun XmbLetterRail(
     val anchors = remember(items) { letterAnchors(items) }
     if (anchors == null) return
 
-    val colors = deriveStorefrontColors()
     val text = LocalPfpTextColors.current
     val live by animateFloatAsState(
         targetValue = if (letterJump != null) 1f else 0f,
@@ -85,7 +87,7 @@ fun XmbLetterRail(
             verticalArrangement = Arrangement.spacedBy(0.dp),
             modifier = Modifier
                 .clip(RoundedCornerShape(RAIL_WIDTH / 2))
-                .background(colors.menuPanel.copy(alpha = 0.55f * live))
+                .background(XmbScrim.copy(alpha = RESTING_TAB_ALPHA + (LIVE_TAB_ALPHA - RESTING_TAB_ALPHA) * live))
                 .padding(vertical = RAIL_VERTICAL_PADDING),
         ) {
             anchors.forEachIndexed { index, anchor ->
