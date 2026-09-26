@@ -182,28 +182,6 @@ data class GameDetailUiState(
         get() = DetailQuickAction.entries.filter { it != DetailQuickAction.MANUAL || hasManual }
 }
 
-data class MetadataPreviewUi(
-    val loading: Boolean = true,
-    val applying: Boolean = false,
-
-    val failed: Boolean = false,
-    val current: Map<MetadataField, Any?> = emptyMap(),
-    val presets: List<MetadataPreset> = emptyList(),
-    val presetIndex: Int = 0,
-    val policy: MetadataApplyPolicy = MetadataApplyPolicy.FILL_MISSING_ONLY,
-    val chosen: Set<MetadataField> = emptySet(),
-
-    val focus: Int = 0,
-) {
-    val preset: MetadataPreset? get() = presets.getOrNull(presetIndex)
-
-    val nothingFound: Boolean get() = !loading && presets.isEmpty()
-    val rows: List<MetadataFieldRow> get() = preset?.let { MetadataApply.rows(current, it) }.orEmpty()
-    val willWrite: Set<MetadataField>
-        get() = preset?.let { MetadataApply.plan(current, it, policy, chosen).keys }.orEmpty()
-    val applyIndex: Int get() = rows.size
-}
-
 enum class DetailAction(val label: String, val group: MenuGroup) {
     FAVORITE("Favorite", MenuGroup.LIBRARY),
     COLLECTIONS("Collections", MenuGroup.LIBRARY),

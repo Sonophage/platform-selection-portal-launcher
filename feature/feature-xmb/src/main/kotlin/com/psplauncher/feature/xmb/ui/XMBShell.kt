@@ -93,12 +93,17 @@ import com.psplauncher.core.ui.preview.DevicePreviews
 import com.psplauncher.core.ui.preview.PfpPreview
 import com.psplauncher.core.ui.theme.DefaultPFPColors
 import com.psplauncher.core.ui.theme.withWaveTint
+import com.psplauncher.core.ui.theme.menuCursorFill
+import com.psplauncher.core.ui.theme.menuCursorEdge
 import com.psplauncher.core.ui.theme.PFPTheme
 import com.psplauncher.feature.appbar.AppDrawerScreen
 import com.psplauncher.feature.appbar.AppFilter
 import com.psplauncher.feature.settings.ui.SettingsNavHost
 import com.psplauncher.feature.xmb.preview.PreviewData
 import com.psplauncher.feature.xmb.ui.app.AppDetailScreen
+import com.psplauncher.feature.xmb.ui.detail.ArtworkStudioScreen
+import com.psplauncher.feature.xmb.ui.detail.ManualViewerOverlay
+import com.psplauncher.feature.xmb.ui.detail.MetadataPreviewPanel
 import com.psplauncher.feature.xmb.ui.detail.GameDetailScreen
 import com.psplauncher.feature.xmb.ui.detail.VideoDetailScreen
 import com.psplauncher.feature.xmb.ui.photo.PhotoViewerScreen
@@ -209,6 +214,17 @@ fun XMBShellContainer(
         onLetterRailReleased = viewModel::onLetterRailReleased,
         onDrawerActionConsumed = viewModel::consumeDrawerAction,
         onCloseGameDetail = viewModel::onCloseGameDetail,
+        onCloseArtworkStudio = viewModel::closeArtworkStudio,
+        onArtworkStudioActionConsumed = viewModel::consumeArtworkStudioAction,
+        onManualPageCount = viewModel::setManualPageCount,
+        onManualPrevPage = viewModel::manualPrevPage,
+        onManualNextPage = viewModel::manualNextPage,
+        onCloseManual = viewModel::closeManualViewer,
+        onMetadataPolicy = viewModel::selectMetadataPolicy,
+        onMetadataSource = viewModel::cycleMetadataSource,
+        onMetadataField = viewModel::toggleMetadataField,
+        onMetadataApply = viewModel::applyMetadataPreview,
+        onCloseMetadata = viewModel::closeMetadataPreview,
         onOpenLibraryManager = viewModel::openLibraryManager,
         onGoToLibrary = viewModel::goToLibrary,
         onGameDetailActionConsumed = viewModel::consumeGameDetailAction,
@@ -359,6 +375,17 @@ fun XMBShell(
     onLetterRailReleased: () -> Unit = {},
     onDrawerActionConsumed: () -> Unit = {},
     onCloseGameDetail: () -> Unit = {},
+    onCloseArtworkStudio: () -> Unit = {},
+    onArtworkStudioActionConsumed: () -> Unit = {},
+    onManualPageCount: (Int) -> Unit = {},
+    onManualPrevPage: () -> Unit = {},
+    onManualNextPage: () -> Unit = {},
+    onCloseManual: () -> Unit = {},
+    onMetadataPolicy: (com.psplauncher.feature.artwork.match.MetadataApplyPolicy) -> Unit = {},
+    onMetadataSource: (Int) -> Unit = {},
+    onMetadataField: (com.psplauncher.feature.artwork.match.MetadataField) -> Unit = {},
+    onMetadataApply: () -> Unit = {},
+    onCloseMetadata: () -> Unit = {},
     onOpenLibraryManager: () -> Unit = {},
     onGoToLibrary: () -> Unit = {},
     onGameDetailActionConsumed: () -> Unit = {},
@@ -1369,6 +1396,44 @@ fun XMBShell(
                     showTouchControls = uiState.resolvedShowTouchButton,
                     onTouchInput = onTouchInput,
                     modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            uiState.artworkStudioGameId?.let { gameId ->
+                ArtworkStudioScreen(
+                    gameId = gameId,
+                    onClose = onCloseArtworkStudio,
+                    pendingGamepadAction = uiState.pendingArtworkStudioAction,
+                    onGamepadActionConsumed = onArtworkStudioActionConsumed,
+                    showTouchControls = uiState.resolvedShowTouchButton,
+                    onTouchInput = onTouchInput,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            uiState.manualViewer?.let { manual ->
+                ManualViewerOverlay(
+                    source = manual.uri,
+                    title = manual.title,
+                    page = manual.page,
+                    scrollSteps = manual.scrollSteps,
+                    onPageCount = onManualPageCount,
+                    onPrevPage = onManualPrevPage,
+                    onNextPage = onManualNextPage,
+                    onClose = onCloseManual,
+                )
+            }
+
+            uiState.metadataPreview?.let { preview ->
+                MetadataPreviewPanel(
+                    ui = preview,
+                    focusFill = menuCursorFill(),
+                    focusEdge = menuCursorEdge(),
+                    onSelectPolicy = onMetadataPolicy,
+                    onCycleSource = onMetadataSource,
+                    onToggleField = onMetadataField,
+                    onApply = onMetadataApply,
+                    onClose = onCloseMetadata,
                 )
             }
 

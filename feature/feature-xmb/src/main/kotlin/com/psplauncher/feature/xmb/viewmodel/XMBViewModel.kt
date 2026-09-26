@@ -67,6 +67,12 @@ import com.psplauncher.core.ui.icons.GameIconStyle
 import com.psplauncher.core.ui.notification.AndroidNotice
 import com.psplauncher.core.ui.notification.AndroidNotifications
 import com.psplauncher.core.ui.notification.BackgroundTaskNotifier
+import com.psplauncher.feature.artwork.match.MetadataApply
+import com.psplauncher.feature.artwork.match.MetadataApplyPolicy
+import com.psplauncher.feature.artwork.match.MetadataField
+import com.psplauncher.feature.xmb.ui.detail.ManualViewerUi
+import com.psplauncher.feature.xmb.ui.detail.MetadataPreviewUi
+import com.psplauncher.feature.artwork.store.ArtworkKind
 import com.psplauncher.core.ui.notification.SystemToasts
 import com.psplauncher.core.ui.notification.ToastKind
 import com.psplauncher.core.ui.sound.MenuSound
@@ -534,6 +540,18 @@ data class XMBUiState(
 
     val pendingDrawerTypedChar: String? = null,
     val pendingGameDetailAction: GamepadAction? = null,
+    val isFetchingArtwork: Boolean = false,
+
+    val artworkStudioGameId: Long? = null,
+
+    val pendingArtworkStudioAction: GamepadAction? = null,
+
+    val manualViewer: com.psplauncher.feature.xmb.ui.detail.ManualViewerUi? = null,
+
+    val metadataPreview: com.psplauncher.feature.xmb.ui.detail.MetadataPreviewUi? = null,
+
+    val metadataPreviewGameId: Long? = null,
+
     val activeGameId: Long? = null,
 
     val activeGameAutoLaunch: Boolean = false,
@@ -785,6 +803,9 @@ data class XMBUiState(
 
     private val fullscreenOverlay: Boolean
         get() = showBootSequence ||
+            artworkStudioGameId != null ||
+            manualViewer != null ||
+            metadataPreview != null ||
             activeGameBoot != null ||
             discCeremony != null ||
             activeVideoId != null ||
@@ -4775,6 +4796,18 @@ class XMBViewModel @Inject constructor(
                 _uiState.update { it.copy(pendingVideoDetailAction = action) }
                 return
             }
+            state.metadataPreview != null -> {
+                handleMetadataPreviewInput(action)
+                return
+            }
+            state.manualViewer != null -> {
+                handleManualViewerInput(action)
+                return
+            }
+            state.artworkStudioGameId != null -> {
+                _uiState.update { it.copy(pendingArtworkStudioAction = action) }
+                return
+            }
             state.activeGameId != null -> {
                 _uiState.update { it.copy(pendingGameDetailAction = action) }
                 return
@@ -5331,9 +5364,11 @@ class XMBViewModel @Inject constructor(
                         it.copy(activeGameId = gid, activeGameAutoLaunch = false, activeGameAction = null)
                     }
 
-                    else -> _uiState.update {
-                        it.copy(activeGameId = gid, activeGameAutoLaunch = false, activeGameAction = what)
-                    }
+                    "ARTWORK"  -> openArtworkStudio(gid)
+                    "MANUAL"   -> openManualFor(gid)
+                    "METADATA" -> openMetadataPreviewFor(gid)
+                    "REFRESH"  -> fetchArtworkFor(gid)
+                    else -> Timber.w("Details row '$what' has no handler")
                 }
             } else if (itemId.startsWith("pstate_")) {
                 val gid = menu.gameId
@@ -6711,6 +6746,225 @@ class XMBViewModel @Inject constructor(
     private fun closePlatformFolder() = navigateRememberingCursor {
         it.copy(selectedPlatformId = null, selectedCollectionId = null)
     }
+
+
+    fun openArtworkStudio(gameId: Long) {
+        closeContextMenu()
+        _uiState.update { it.copy(artworkStudioGameId = gameId) }
+    }
+
+    fun consumeArtworkStudioAction() =
+        _uiState.update { it.copy(pendingArtworkStudioAction = null) }
+
+    fun closeArtworkStudio() {
+        val id = _uiState.value.artworkStudioGameId
+        _uiState.update { it.copy(artworkStudioGameId = null) }
+        if (id != null) viewModelScope.launch { loadItemsForCategory(currentCategory()) }
+    }
+
+    private fun openManualFor(gameId: Long) {
+        closeContextMenu()
+        viewModelScope.launch {
+            val game = gameRepository.getById(gameId) ?: return@launch
+            val path = artworkStore.find(gameId, ArtworkKind.MANUAL)
+            if (path == null) {
+                SystemToasts.post("No manual available for this game", null, ToastKind.ERROR)
+                return@launch
+            }
+            _uiState.update {
+                it.copy(manualViewer = ManualViewerUi(uri = path, title = game.displayTitle))
+            }
+        }
+    }
+
+    fun closeManualViewer() = _uiState.update { it.copy(manualViewer = null) }
+
+    fun setManualPageCount(count: Int) = _uiState.update { s ->
+        val m = s.manualViewer ?: return@update s
+        s.copy(manualViewer = m.copy(pageCount = count, page = m.page.coerceIn(0, (count - 1).coerceAtLeast(0))))
+    }
+
+    fun manualPrevPage() = _uiState.update { s ->
+        val m = s.manualViewer ?: return@update s
+        s.copy(manualViewer = m.copy(page = (m.page - 1).coerceAtLeast(0), scrollSteps = 0))
+    }
+
+    fun manualNextPage() = _uiState.update { s ->
+        val m = s.manualViewer ?: return@update s
+        s.copy(manualViewer = m.copy(
+            page = (m.page + 1).coerceAtMost((m.pageCount - 1).coerceAtLeast(0)),
+            scrollSteps = 0,
+        ))
+    }
+
+    private fun scrollManual(delta: Int) = _uiState.update { s ->
+        val m = s.manualViewer ?: return@update s
+        s.copy(manualViewer = m.copy(scrollSteps = (m.scrollSteps + delta).coerceIn(0, MANUAL_MAX_SCROLL_STEPS_)))
+    }
+
+    private fun handleManualViewerInput(action: GamepadAction) {
+        when (action) {
+            GamepadAction.NAVIGATE_LEFT  -> manualPrevPage()
+            GamepadAction.NAVIGATE_RIGHT -> manualNextPage()
+            GamepadAction.NAVIGATE_DOWN  -> scrollManual(+1)
+            GamepadAction.NAVIGATE_UP    -> scrollManual(-1)
+            GamepadAction.BACK           -> closeManualViewer()
+            else -> Unit
+        }
+    }
+
+    private fun fetchArtworkFor(gameId: Long) {
+        closeContextMenu()
+        if (_uiState.value.isFetchingArtwork) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isFetchingArtwork = true) }
+            val before = gameRepository.getById(gameId)
+            val result = artworkRepository.fetchArtworkForGame(gameId, before?.title.orEmpty())
+            val updated = gameRepository.getById(gameId)
+            artworkRepository.evictFromImageCache((artRefsOf(before) + artRefsOf(updated)).toSet())
+            _uiState.update { it.copy(isFetchingArtwork = false) }
+            SystemToasts.post(
+                when {
+                    result.success -> "Artwork updated"
+                    result.skipped -> "Already has artwork"
+                    else           -> result.errorMessage ?: "Artwork fetch failed"
+                },
+                null,
+                if (result.success || result.skipped) ToastKind.SUCCESS else ToastKind.ERROR,
+            )
+            loadItemsForCategory(currentCategory())
+        }
+    }
+
+    private fun artRefsOf(game: Game?): List<String> = listOfNotNull(
+        game?.artworkUri, game?.heroUri, game?.logoUri, game?.iconUri,
+        game?.boxArtUri, game?.physicalMediaUri, game?.box3dUri,
+    )
+
+    private fun openMetadataPreviewFor(gameId: Long) {
+        closeContextMenu()
+        if (_uiState.value.metadataPreview != null) return
+        val generation = ++metadataPreviewGeneration
+        _uiState.update { it.copy(metadataPreview = MetadataPreviewUi(), metadataPreviewGameId = gameId) }
+        viewModelScope.launch {
+            val outcome = runCatching { artworkRepository.fetchMetadataPreview(gameId) }
+                .onFailure { Timber.w(it, "Metadata preview failed for game $gameId") }
+            val preview = outcome.getOrNull()
+            if (generation != metadataPreviewGeneration) return@launch
+            _uiState.update { s ->
+                if (s.metadataPreview == null) return@update s
+                if (preview == null || preview.presets.isEmpty()) {
+                    return@update s.copy(
+                        metadataPreview = MetadataPreviewUi(loading = false, failed = outcome.isFailure),
+                    )
+                }
+                s.copy(metadataPreview = MetadataPreviewUi(
+                    loading = false,
+                    current = preview.current,
+                    presets = preview.presets,
+                    chosen  = MetadataApply.changedFields(preview.current, preview.presets.first()),
+                ))
+            }
+        }
+    }
+
+    fun closeMetadataPreview() {
+        metadataPreviewGeneration++
+        _uiState.update { it.copy(metadataPreview = null, metadataPreviewGameId = null) }
+    }
+
+    fun selectMetadataPolicy(policy: MetadataApplyPolicy) = updateMetadataPreview { it.copy(policy = policy) }
+
+    private fun cycleMetadataPolicy(delta: Int) = updateMetadataPreview { p ->
+        val all = MetadataApplyPolicy.entries
+        p.copy(policy = all[(p.policy.ordinal + delta).mod(all.size)])
+    }
+
+    fun cycleMetadataSource(delta: Int) = updateMetadataPreview { p ->
+        if (p.presets.size < 2) return@updateMetadataPreview p
+        val index = (p.presetIndex + delta).mod(p.presets.size)
+        val next = p.copy(presetIndex = index, chosen = MetadataApply.changedFields(p.current, p.presets[index]))
+        next.copy(focus = next.focus.coerceIn(0, next.applyIndex))
+    }
+
+    fun toggleMetadataField(field: MetadataField) = updateMetadataPreview { p ->
+        p.copy(
+            policy = MetadataApplyPolicy.CHOOSE_FIELDS,
+            chosen = if (field in p.chosen) p.chosen - field else p.chosen + field,
+        )
+    }
+
+    private fun moveMetadataFocus(delta: Int) = updateMetadataPreview { p ->
+        p.copy(focus = (p.focus + delta).coerceIn(0, p.applyIndex))
+    }
+
+    fun applyMetadataPreview() {
+        val gameId = _uiState.value.metadataPreviewGameId ?: return
+        val p = _uiState.value.metadataPreview ?: return
+        if (p.loading || p.applying) return
+
+        val preset = p.preset ?: return closeMetadataPreview()
+        if (p.policy == MetadataApplyPolicy.KEEP_CURRENT) {
+            closeMetadataPreview()
+            SystemToasts.post("Kept current metadata", null, ToastKind.SUCCESS)
+            return
+        }
+        _uiState.update { it.copy(metadataPreview = p.copy(applying = true)) }
+        viewModelScope.launch {
+            val written = runCatching { artworkRepository.applyMetadata(gameId, preset, p.policy, p.chosen) }
+                .onFailure { Timber.w(it, "Metadata apply failed for game $gameId") }
+            metadataPreviewGeneration++
+            _uiState.update { it.copy(metadataPreview = null, metadataPreviewGameId = null) }
+            SystemToasts.post(
+                written.fold(
+                    onSuccess = { fields ->
+                        when (fields.size) {
+                            0    -> "Nothing to change"
+                            1    -> "Updated 1 field from ${preset.provider.label}"
+                            else -> "Updated ${fields.size} fields from ${preset.provider.label}"
+                        }
+                    },
+                    onFailure = { "Metadata update failed" },
+                ),
+                null,
+                if (written.isSuccess) ToastKind.SUCCESS else ToastKind.ERROR,
+            )
+            loadItemsForCategory(currentCategory())
+        }
+    }
+
+    private fun updateMetadataPreview(
+        transform: (MetadataPreviewUi) -> MetadataPreviewUi,
+    ) = _uiState.update { s ->
+        val p = s.metadataPreview ?: return@update s
+        if (p.loading || p.applying) s else s.copy(metadataPreview = transform(p))
+    }
+
+    private fun handleMetadataPreviewInput(action: GamepadAction) {
+        val p = _uiState.value.metadataPreview ?: return
+        if (p.applying) return
+        if (p.nothingFound) {
+            if (action == GamepadAction.SELECT || action == GamepadAction.BACK) closeMetadataPreview()
+            return
+        }
+        when (action) {
+            GamepadAction.BACK           -> closeMetadataPreview()
+            GamepadAction.NAVIGATE_LEFT  -> cycleMetadataPolicy(-1)
+            GamepadAction.NAVIGATE_RIGHT -> cycleMetadataPolicy(+1)
+            GamepadAction.PREV_CATEGORY  -> cycleMetadataSource(-1)
+            GamepadAction.NEXT_CATEGORY  -> cycleMetadataSource(+1)
+            GamepadAction.NAVIGATE_UP    -> moveMetadataFocus(-1)
+            GamepadAction.NAVIGATE_DOWN  -> moveMetadataFocus(+1)
+            GamepadAction.SELECT         ->
+                if (p.focus >= p.applyIndex) applyMetadataPreview()
+                else p.rows.getOrNull(p.focus)?.let { toggleMetadataField(it.field) }
+            else -> Unit
+        }
+    }
+
+    private var metadataPreviewGeneration = 0
+
+    private val MANUAL_MAX_SCROLL_STEPS_ = 20
 
     private fun launchGameDirectly(gameId: Long, discId: Long? = null) {
         _uiState.update { it.copy(activeGameId = null, activeGameAutoLaunch = false, activeGameDiscId = null, activeGameAction = null) }
