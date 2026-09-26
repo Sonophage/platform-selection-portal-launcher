@@ -1053,7 +1053,7 @@ fun XMBShell(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
 
-                        .padding(top = StatusStripHeight, bottom = HintBarHeight, end = 4.dp)
+                        .padding(top = StatusStripHeight, bottom = HintBarHeight)
                         .alpha(chromeFade)
                         .zIndex(XmbChromeZ),
                 )

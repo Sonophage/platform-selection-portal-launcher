@@ -20,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,6 +37,7 @@ private val RESTING_ALPHA = 0.28f
 
 private const val RESTING_TAB_ALPHA = 0.55f
 private const val LIVE_TAB_ALPHA = 0.90f
+private val TAB_CORNER = 10.dp
 
 internal val RUNG_LINE_HEIGHT = 10.sp
 
@@ -57,6 +60,7 @@ fun XmbLetterRail(
         animationSpec = tween(140),
         label = "letterRailLive",
     )
+    val tab = RESTING_TAB_ALPHA + (LIVE_TAB_ALPHA - RESTING_TAB_ALPHA) * live
 
     Box(
         modifier = modifier
@@ -86,8 +90,14 @@ fun XmbLetterRail(
 
             verticalArrangement = Arrangement.spacedBy(0.dp),
             modifier = Modifier
-                .clip(RoundedCornerShape(RAIL_WIDTH / 2))
-                .background(XmbScrim.copy(alpha = RESTING_TAB_ALPHA + (LIVE_TAB_ALPHA - RESTING_TAB_ALPHA) * live))
+                .clip(RoundedCornerShape(topStart = TAB_CORNER, bottomStart = TAB_CORNER))
+                .background(
+                    Brush.horizontalGradient(
+                        0f to Color.Transparent,
+                        0.45f to XmbScrim.copy(alpha = tab),
+                        1f to XmbScrim.copy(alpha = tab),
+                    ),
+                )
                 .padding(vertical = RAIL_VERTICAL_PADDING),
         ) {
             anchors.forEachIndexed { index, anchor ->
